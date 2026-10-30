@@ -1057,7 +1057,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         AsyncActionItem(
             id = "plugin_${m.id}_containment",
             title = "Containment check",
-            subtitle = "Where it runs, and whether it can reach the network, droidtop's files or shared storage by itself",
+            subtitle = "Where it runs, and whether it can reach the network, droidtop's files or shared storage",
             run = { ctx, _ ->
                 val policy = PluginCrashPolicy(ctx.applicationContext)
                 try {
@@ -1668,7 +1668,7 @@ internal fun AppSettingsCatalogs.pluginPermissionGroups(context: Context, plugin
         val badge = PluginTiers.badge(record, snap)
         when {
             refusal != null -> ActionItem(id = "plugin_permissions_access_row", title = if (PluginTiers.declaresFullTrust(record.manifest)) "Needs full access to work" else "Needs an update", subtitle = refusal)
-            record.manifest.contractVersion < 2 -> ActionItem(id = "plugin_permissions_access_row", title = badge ?: "Full access (older plugin)", subtitle = "Written before permissions existed: it can do anything droidtop can, and only what it asks droidtop to do is listed under Activity")
+            record.manifest.contractVersion < 2 -> ActionItem(id = "plugin_permissions_access_row", title = badge ?: "Full access (older plugin)", subtitle = "Written before permissions: it can do all droidtop can; Activity lists what it asks for")
             badge != null -> ActionItem(id = "plugin_permissions_access_row", title = badge, subtitle = accessLine(record, snap))
             // A permission's caution (gpu.render) is on its own line below, where the person can take it back.
             else -> null
@@ -1926,7 +1926,7 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                             ActionItem(
                                 id = "plugin_keys_none",
                                 title = "No keys added by you",
-                                subtitle = "Only the official origin is trusted. Add a plugin source below and droidtop fetches its key, or paste one by hand",
+                                subtitle = "Only the official origin is trusted. Add a source below to fetch its key, or paste one",
                             ),
                         )
                     }
@@ -2024,7 +2024,7 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                     DocumentPickItem(
                         id = "plugin_keys_manual_file",
                         title = "Add key from a file",
-                        subtitle = "A droidtop-plugin-key.json file (it holds the origin and the key), or a plain key file with the Origin id filled in above",
+                        subtitle = "A droidtop-plugin-key.json file, or a plain key file with the Origin id filled in above",
                         // Not application/json: many file managers label a
                         // .json as octet-stream, which a narrower filter
                         // would hide. The file is parsed before it is kept.

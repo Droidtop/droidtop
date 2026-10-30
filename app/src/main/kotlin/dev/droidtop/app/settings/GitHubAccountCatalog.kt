@@ -346,7 +346,7 @@ object GitHubAccountCatalog {
                 AsyncActionItem(
                     id = "repos_found_refresh",
                     title = "Look again",
-                    subtitle = "Reads the repositories you can access (cached for hours; it never installs anything on them)",
+                    subtitle = "Reads the repositories you can access, cached for hours. It never installs anything there",
                     run = { ctx, onStatus ->
                         onStatus("Reading your repositories...")
                         describeDetection(PluginRepoDetection.refresh(ctx, force = true))
@@ -421,7 +421,7 @@ object GitHubAccountCatalog {
                 ActionItem(
                     id = "repos_proposal_info",
                     title = "REFUSED: origin \"${decision.origin}\" belongs to ${decision.byRepo}",
-                    subtitle = "One origin can be trusted for one repository. Remove that repository first if this one replaces it.",
+                    subtitle = "One origin per repository. Remove that repository first if this one replaces it.",
                 ),
             )
         }

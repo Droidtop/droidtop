@@ -86,7 +86,7 @@ object PluginJobsScreen {
         return CatalogScreen(
             id = ID,
             title = Place.DOWNLOADS.title,
-            subtitle = "Getting games, plugin downloads, library scrapes and other long-running actions, and updates".takeIf { headed },
+            subtitle = "Getting games, plugin downloads, library scrapes, updates and other long-running work".takeIf { headed },
             groups = { context ->
                 val nowMs = System.currentTimeMillis()
                 val extra = kept.read(context, nowMs)
@@ -201,7 +201,7 @@ object PluginJobsScreen {
             NestedScreenItem(
                 id = "plugin_jobs_rules_link",
                 title = "Download rules",
-                subtitle = "Which network downloads use, when updates may run, and which games keep themselves up to date",
+                subtitle = "Which network downloads use, when updates run, and which games update themselves",
                 registryId = RULES_SCREEN_ID,
             ),
         ),

@@ -884,7 +884,7 @@ object EmulatorsCatalog {
                             AsyncActionItem(
                                 id = "emulator_custom_remove",
                                 title = "Remove",
-                                subtitle = "A system or game set to this player falls back to the next choice: your default emulator, then the first installed one",
+                                subtitle = "Systems and games set to it fall back to your default emulator, then the first installed",
                                 confirmTitle = "Remove ${player.name}?",
                                 run = { ctx, _ ->
                                     withContext(Dispatchers.IO) { CustomPlayerPrefs.remove(ctx, system.id, playerId) }

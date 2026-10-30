@@ -1051,7 +1051,7 @@ object GamingSettingsCatalog {
     private fun navigationSoundsItem(context: Context) = ToggleItem(
         id = ID_NAVIGATION_SOUNDS,
         title = "Navigation sounds",
-        subtitle = "A sound for moving, choosing, going back, opening menus and launching; the theme's own where it has them",
+        subtitle = "Sounds for moving, choosing, going back, menus and launching, the theme's where it has any",
         current = navigationSoundsOn(context),
         onToggle = { ctx, value ->
             CatalogPrefs.prefs(ctx).edit().putBoolean(ID_NAVIGATION_SOUNDS, value).apply()
@@ -1273,7 +1273,7 @@ object GamingSettingsCatalog {
                 ToggleItem(
                     id = "companion_pip",
                     title = "Picture-in-picture on the companion",
-                    subtitle = "A video that goes small on the main screen plays on the companion instead. Needs More controls",
+                    subtitle = "A video shrunk on the main screen plays on the companion instead. Needs More controls",
                     current = settings.pipToCompanion,
                     onToggle = { c, on -> CompanionPrefs.setPipToCompanion(c, on) },
                 ),
@@ -1783,7 +1783,7 @@ object GamingSettingsCatalog {
     fun rescanPcFoldersItem(): AsyncActionItem = AsyncActionItem(
         id = ID_RESCAN_PC_FOLDERS,
         title = RESCAN_PC_FOLDERS,
-        subtitle = "Looks in your game folders for new or changed PC and engine games. Console folders are not walked",
+        subtitle = "Looks in your game folders for new or changed PC and engine games, not console folders",
         run = { ctx, onStatus ->
             if (LibraryRescan.cancel()) "Cancelling the rescan\u2026" else LibraryRescan.runPcFolders(ctx, onStatus)
         },

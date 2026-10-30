@@ -72,7 +72,7 @@ object WineOptionsCatalog {
                         ActionItem(
                             id = "wine_options_where",
                             title = "Runs in its own prefix",
-                            subtitle = "This game chose its own Wine build, so it has a Windows prefix of its own; changes here apply to it alone",
+                            subtitle = "This game has its own Wine build and prefix; changes here apply to it alone",
                             value = state.prefixName,
                         )
                     } else {
@@ -163,7 +163,7 @@ object WineOptionsCatalog {
                 NestedScreenItem(
                     id = "wine_options_tools",
                     title = "Prefix tools",
-                    subtitle = "Wine configuration, the registry editor and a command prompt, running a program, and stopping Wine, for the shared prefix",
+                    subtitle = "Wine configuration, registry editor, command prompt, running a program and stopping Wine",
                     inline = PrefixToolsCatalog.screen(null, title, shared = true),
                 ),
             )

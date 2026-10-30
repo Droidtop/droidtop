@@ -64,7 +64,7 @@ object RunInPrefixCatalog {
                 DocumentPickItem(
                     id = "run_in_prefix_pick",
                     title = "Choose another file",
-                    subtitle = "An .exe, .msi, .bat or .cmd anywhere on this device. It runs where it is; nothing is copied",
+                    subtitle = "An .exe, .msi, .bat or .cmd anywhere on this device. It runs in place; nothing is copied",
                     mimeType = "*/*",
                     // The game's own folder first, when it is on the shared storage the picker can open in.
                     startIn = target.gameRoot.removePrefix(SHARED_STORAGE).takeIf { it != target.gameRoot && it.isNotEmpty() },

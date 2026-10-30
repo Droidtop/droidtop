@@ -182,7 +182,7 @@ object DroidtopWideSettings {
                         ActionItem(
                             id = "pref_global_rerun_onboarding",
                             title = "Rerun onboarding",
-                            subtitle = "Go through first-run setup again from the start; nothing is reset until you change it there",
+                            subtitle = "Go through first-run setup again; nothing is reset until you change it there",
                             run = { ctx ->
                                 ctx.startActivity(
                                     Intent(ctx, OnboardingActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -337,7 +337,7 @@ object DroidtopWideSettings {
                         ChoiceItem(
                             id = "pref_desktop_panel",
                             title = "Desktop panel",
-                            subtitle = "The bar and app launcher inside the Linux desktop. A change installs what it needs when the desktop next starts",
+                            subtitle = "The bar and launcher in the Linux desktop. A change installs what it needs at next start",
                             options = dev.droidtop.runtime.DesktopPanel.entries.map { ChoiceOption(it.id, it.label) },
                             current = dev.droidtop.app.DesktopSetupPrefs.panel(context).id,
                             onSelect = { ctx, value ->
@@ -633,7 +633,7 @@ object DroidtopWideSettings {
         return ActionItem(
             id = "pref_global_debug_crash",
             title = "Debug: force a crash",
-            subtitle = "Crashes droidtop on purpose: writes a crash note and counts toward safe mode, like a real crash",
+            subtitle = "Crashes droidtop on purpose: a crash note, counted toward safe mode like a real crash",
             confirmTitle = "Crash droidtop now?",
             run = { _ ->
                 android.os.Handler(android.os.Looper.getMainLooper()).post {

@@ -471,7 +471,7 @@ object UpdatesPage {
                             ToggleItem(
                                 id = "updates_apps_silent",
                                 title = "Update apps without asking",
-                                subtitle = "Where Android allows it (Android 12 and later, for apps droidtop installed). Elsewhere Android asks each time",
+                                subtitle = "On Android 12 and later, for apps droidtop installed. Elsewhere Android asks each time",
                                 current = dev.droidtop.app.apps.ApkInstaller.silentUpdates(context),
                                 onToggle = { ctx, value -> dev.droidtop.app.apps.ApkInstaller.setSilentUpdates(ctx, value) },
                             ),

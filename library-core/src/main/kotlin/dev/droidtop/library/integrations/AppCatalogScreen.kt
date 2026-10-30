@@ -64,7 +64,7 @@ object AppCatalogScreen {
     fun screen(): CatalogScreen = CatalogScreen(
         id = ID,
         title = "Get apps",
-        subtitle = "Android apps from the catalogs your plugins add. droidtop checks each app's package and signing key before Android installs it",
+        subtitle = "Android apps from your plugins' catalogs, each checked by package and signing key first",
         groups = { context -> withContext(Dispatchers.IO) { rootGroups(context) } },
         indexGroups = { emptyList() },
     )

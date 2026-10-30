@@ -25,7 +25,7 @@ object RiskyActionsCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Risky actions",
-        subtitle = "What droidtop may change in other apps for you. Everything here is off until you turn it on",
+        subtitle = "What droidtop may change in other apps for you. All of it is off until you turn it on",
         groups = { context -> groups(context) },
     )
 
@@ -48,7 +48,7 @@ object RiskyActionsCatalog {
                 ToggleItem(
                     id = "risky_master_switch",
                     title = "Allow risky actions",
-                    subtitle = "The master switch. While it is off, none of the actions below can run, whatever their own switch says",
+                    subtitle = "The master switch: while it is off, none of the actions below run, whatever their switch",
                     current = switches.master,
                     onToggle = { ctx, on -> withContext(Dispatchers.IO) { RiskyActions.setMaster(ctx, on) } },
                 ),

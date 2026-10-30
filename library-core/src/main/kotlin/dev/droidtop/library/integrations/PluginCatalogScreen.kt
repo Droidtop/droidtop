@@ -156,7 +156,7 @@ object PluginCatalogScreen {
                     TextInputItem(
                         id = "plugins_catalogs_add_address",
                         title = "Catalog address",
-                        subtitle = "The catalog's GitHub repository (https://github.com/<owner>/<repo>) or the https address of its index.json",
+                        subtitle = "Its GitHub repository (https://github.com/<owner>/<repo>) or its index.json address",
                         value = pendingAddress,
                         onChange = { _, v -> pendingAddress = v.trim() },
                     ),
@@ -437,7 +437,7 @@ object PluginCatalogScreen {
                     ChoiceItem(
                         id = "plugins_catalog_channel_$sourceId",
                         title = "Channel",
-                        subtitle = "Which versions this catalog offers. Testing and Unstable get new versions sooner and may not work as well. A plugin's own page can choose differently",
+                        subtitle = "Which versions to take. Testing and Unstable are sooner and less sure; a plugin can differ",
                         options = PluginChannel.entries.map { ChoiceOption(it.id, it.label) },
                         current = PluginChannels.forContext(context).catalog(sourceId).id,
                         onSelect = { ctx, value -> PluginChannel.of(value)?.let { PluginChannels.forContext(ctx).setCatalog(sourceId, it) } },
@@ -578,7 +578,7 @@ object PluginCatalogScreen {
                 AsyncActionItem(
                     id = "plugins_catalog_remove",
                     title = "Remove this catalog",
-                    subtitle = "Nothing is listed or updated from it any more. Plugins you installed from it stay, under the keys you trusted",
+                    subtitle = "Nothing is listed or updated from it. Plugins from it stay, under the keys you trusted",
                     confirmTitle = "Remove \"${source.name}\"?",
                     run = { ctx, _ ->
                         if (PluginCatalog.removeCatalog(ctx, source)) "Removed \"${source.name}\"" else "It was already removed"

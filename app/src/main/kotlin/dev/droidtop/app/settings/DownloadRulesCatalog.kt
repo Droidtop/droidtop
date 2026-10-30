@@ -26,7 +26,7 @@ object DownloadRulesCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Download rules",
-        subtitle = "Which network downloads use, when updates may run, and whether games keep themselves up to date",
+        subtitle = "Which network downloads use, when updates run, and whether games update themselves",
         groups = { context -> groups(context) },
     )
 
@@ -45,7 +45,7 @@ object DownloadRulesCatalog {
                     ChoiceItem(
                         id = "download_rules_network_rule",
                         title = "Download over",
-                        subtitle = "A download that is held waits and says why. On a metered connection you can allow the connection, never one download",
+                        subtitle = "A held download says why. On a metered network you allow the network, never one download",
                         options = NetworkRule.values().map { ChoiceOption(it.key, it.label) },
                         current = s.network.key,
                         onSelect = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(network = NetworkRule.fromKey(value)) } },
@@ -80,7 +80,7 @@ object DownloadRulesCatalog {
                     ToggleItem(
                         id = "download_rules_engine_isolation",
                         title = "Isolate the download engine with Android",
-                        subtitle = "Android 11 and later. The engine always runs in a process of its own with no access to your files; this also gives it a user of its own. Off until it has been checked on the console",
+                        subtitle = "Android 11+. The engine runs apart with no file access; this also gives it its own user",
                         current = isolated,
                         onToggle = { ctx, value -> withContext(Dispatchers.IO) { EnginePrefs.setAndroidIsolation(ctx, value) } },
                     ),
@@ -93,7 +93,7 @@ object DownloadRulesCatalog {
                     ToggleItem(
                         id = "download_rules_auto_default",
                         title = "Keep installed store games up to date",
-                        subtitle = "The default for games that follow it. A game's own menu can turn it on or off for that game",
+                        subtitle = "The default for games that follow it. A game's own menu can turn it on or off for itself",
                         current = s.autoUpdateDefault,
                         onToggle = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(autoUpdateDefault = value) } },
                     ),

@@ -640,7 +640,7 @@ object ActionLinks {
     fun screen(): CatalogScreen = CatalogScreen(
         id = SCREEN_ID,
         title = "Open a droidtop link",
-        subtitle = "A link asks droidtop to do the steps below. Approve or deny each; nothing runs until you press Run",
+        subtitle = "A link asks droidtop to do the steps below. Approve or deny each; nothing runs before Run",
         groups = { _ ->
             val current = plan
             if (current == null) {

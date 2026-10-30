@@ -176,7 +176,7 @@ object ManualDownloads {
     fun screen(): CatalogScreen = CatalogScreen(
         id = SCREEN_ID,
         title = "Add download",
-        subtitle = "An https link, a magnet link, or a .torrent or .metalink file. droidtop asks where it goes before it downloads",
+        subtitle = "An https or magnet link, or a .torrent or .metalink file. droidtop asks where to put it",
         groups = { context ->
             val offer = pending
             val pc = withContext(Dispatchers.IO) { runCatching { SourceScreens.entryContext(context).pcFolder }.getOrNull() }

@@ -209,7 +209,7 @@ object ContainersCatalog {
     private fun imagesScreen() = CatalogScreen(
         id = "containers_images",
         title = "Images",
-        subtitle = "Each container keeps its own copy of its image's files, so removing an image breaks nothing",
+        subtitle = "Each container keeps its own copy of its image's files, so removing one breaks nothing",
         groups = { context ->
             val runtime = ContainerRuntimeFactory.select(context)
             val listed = runCatching { ImageListing.rows(OciImageStore.of(context).entries(), runtime.listContainers()) }
@@ -450,7 +450,7 @@ object ContainersCatalog {
             DocumentPickItem(
                 id = "container_backup_export",
                 title = "Back up its data",
-                subtitle = "Saves everything installed and made in it to a file you choose, to restore later or on another device",
+                subtitle = "Saves everything in it to a file you choose, to restore later or on another device",
                 mimeType = "application/x-tar",
                 createName = "$fileName-container.tar",
                 onPicked = { ctx, uri ->
@@ -507,7 +507,7 @@ object ContainersCatalog {
             return ActionItem(
                 id = "container_recreate",
                 title = "Recreate from the image",
-                subtitle = "This container has no recorded image reference to recreate from (it was made before droidtop recorded them)",
+                subtitle = "No image is recorded for this container: it was made before droidtop recorded them",
             )
         }
         return AsyncActionItem(
@@ -967,7 +967,7 @@ object ContainersCatalog {
             return ActionItem(
                 id = "container_terminal",
                 title = "Terminal",
-                subtitle = "A terminal opens as a window on the desktop, which is not running. Open Desktop first, then choose Terminal again",
+                subtitle = "The terminal opens on the desktop, which is off. Open Desktop, then choose Terminal again",
             )
         }
         val container = info.container

@@ -119,7 +119,7 @@ object WindowsInstallCatalog {
                             AsyncActionItem(
                                 id = "windows_unpack_check",
                                 title = "Check the unpacker",
-                                subtitle = "innoextract, built by droidtop's component catalog from its upstream source. Fetched when first needed and checked against the catalog's SHA-256; this asks it for its version",
+                                subtitle = "innoextract from droidtop's component catalog, fetched when needed and checked by SHA-256",
                                 run = { ctx, onStatus -> InnoExtract.version(ctx, onStatus) },
                             ),
                         ),
@@ -188,13 +188,13 @@ object WindowsInstallCatalog {
                         NestedScreenItem(
                             id = "windows_install_tools",
                             title = "Prefix tools",
-                            subtitle = "Wine configuration, the registry editor, a command prompt, Windows components and a look at the files of this prefix",
+                            subtitle = "Wine configuration, registry editor, command prompt, Windows components and the files",
                             inline = PrefixToolsCatalog.screen(PcContainers.ofContainer(pending.id), pending.title, shared = false),
                         ),
                         AsyncActionItem(
                             id = "windows_install_discard",
                             title = "Throw this install away",
-                            subtitle = "Deletes the new prefix and everything installed in it. The installer and your folders are not touched",
+                            subtitle = "Deletes the new prefix and all in it. The installer and your folders are not touched",
                             confirmTitle = "Throw this install away?",
                             run = { ctx, _ -> WindowsInstalls.discard(ctx, pending.id) },
                         ),

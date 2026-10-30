@@ -311,7 +311,7 @@ internal object StoresCatalog {
                     ToggleItem(
                         id = "stores_links",
                         title = "Get it on and Support the developer",
-                        subtitle = "On a game no store owns, its menu points to where it can be bought and where its developer takes support",
+                        subtitle = "For a game no store owns, its menu says where to buy it and where its developer helps",
                         current = !StoreLinkPrefs.hiddenEverywhere(context),
                         onToggle = { ctx, on -> StoreLinkPrefs.setHiddenEverywhere(ctx, !on) },
                     ),
@@ -690,7 +690,7 @@ internal object StoresCatalog {
                     ActionItem(
                         id = PcSource.holdingItemId(store.key, StoreHolding.FREE),
                         title = StoreHolding.FREE.label,
-                        subtitle = "Free games the account holds but never added. PC Games shows them once played or installed, or from List options",
+                        subtitle = "Free games the account never added. They show once played or installed, or by List options",
                         value = "${counts.free} ${if (counts.free == 1) "game" else "games"}",
                         run = ::openGames,
                     ),

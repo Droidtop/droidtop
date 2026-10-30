@@ -66,7 +66,7 @@ object SourceRecordScreen {
                         ActionItem(
                             id = "update_record_no_page",
                             title = "No source page for this update",
-                            subtitle = "The source that named the newer version has no page droidtop can show. Its own game page has its sources",
+                            subtitle = "The source naming the newer version has no page droidtop can show; see the game's sources",
                         ),
                     ),
                 ),

@@ -147,7 +147,7 @@ object PrefixToolsCatalog {
                         AsyncActionItem(
                             id = "wine_prefix_kill",
                             title = "Stop every Wine process",
-                            subtitle = "For a program that hung, or a game left running in the background. Ends every Windows program that is running, in any prefix",
+                            subtitle = "For a hung program or a game left running: ends every Windows program, in any prefix",
                             confirmTitle = "Stop every Wine process?",
                             run = { _, _ -> WinePrefixTools.killAll() },
                         ),

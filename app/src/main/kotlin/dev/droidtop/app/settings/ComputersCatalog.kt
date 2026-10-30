@@ -85,7 +85,7 @@ object ComputersCatalog {
                             ActionItem(
                                 id = "computers_pair_handheld",
                                 title = "Pair a handheld",
-                                subtitle = "Another handheld running droidtop, for plugins that keep the two in step, such as Syncthing",
+                                subtitle = "Another handheld running droidtop, for plugins that keep the two in step, like Syncthing",
                                 run = { ctx -> ctx.startActivity(PairComputerActivity.intent(ctx, handheld = true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                             ),
                         )
@@ -124,14 +124,14 @@ object ComputersCatalog {
         ToggleItem(
             id = "computers_show_games",
             title = "Show computers' games",
-            subtitle = "Games on a computer and not on this device appear in the library, marked with the computer's name, for the computers whose games you turned on",
+            subtitle = "Games on a computer you turned on appear in the library, marked with the computer's name",
             current = Computers.gamesShown(context),
             onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setGamesShown(ctx, on) }.also { refreshLibrary(ctx) } },
         ),
         ToggleItem(
             id = "computers_show_apps",
             title = "Show computers' apps",
-            subtitle = "Programs installed on a computer appear in Apps, for the computers whose apps you turned on",
+            subtitle = "Programs on a computer you turned on appear in Apps",
             current = Computers.appsShown(context),
             onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setAppsShown(ctx, on) }.also { refreshLibrary(ctx) } },
         ),
@@ -161,7 +161,7 @@ object ComputersCatalog {
                 ToggleItem(
                     id = "computers_rendezvous",
                     title = "Find computers away from home",
-                    subtitle = "Through Syncthing's global discovery, the way Syncthing finds devices: only addresses go there, and the sync itself goes through a direct, encrypted tunnel",
+                    subtitle = "By Syncthing's global discovery: only addresses go there; syncing is direct and encrypted",
                     current = Computers.rendezvousOn(context),
                     onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setRendezvousOn(ctx, on) } },
                 ),

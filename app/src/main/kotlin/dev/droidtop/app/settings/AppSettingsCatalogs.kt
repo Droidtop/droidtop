@@ -873,7 +873,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "enginehost_no_bundles",
                                 title = "No runtime bundles installed yet",
-                                subtitle = "Launching an engine game offers the matching bundle, and installs it without asking when droidtop is sure which one it needs",
+                                subtitle = "An engine game offers its bundle at launch, installed unasked when droidtop is sure which",
                             ),
                         )
                     } else {
@@ -975,7 +975,7 @@ object AppSettingsCatalogs {
     private fun windowsGamesScreen() = CatalogScreen(
         id = SCREEN_WINDOWS_GAMES,
         title = "Windows games",
-        subtitle = "The Wine environment Windows games run inside, its Wine build and graphics, and the folders it can reach",
+        subtitle = "Where Windows games run: the Wine build, graphics and the folders it can reach",
         groups = { context -> windowsGamesGroups(context) },
         // The Wine option rows read the installed components and droidtop's
         // component catalog (a network fetch once a day); search does not wait
@@ -1015,7 +1015,7 @@ object AppSettingsCatalogs {
                             NestedScreenItem(
                                 id = "windows_install_row",
                                 title = "Install a Windows game",
-                                subtitle = "Run a GOG offline installer or any setup program in a new prefix, then add the game it installed to your library",
+                                subtitle = "Run a GOG offline installer or any setup program, then add what it installed to your games",
                                 registryId = WindowsInstallCatalog.SCREEN_ID,
                             ),
                         )
@@ -1038,7 +1038,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "windows_no_roots",
                             title = "No game folders added yet",
-                            subtitle = "Add one under Game folders first — a Windows environment that cannot see your games is not much use",
+                            subtitle = "Add one under Game folders first: Windows games need a folder the environment can see",
                         ),
                     )
                 } else {
@@ -1078,7 +1078,7 @@ object AppSettingsCatalogs {
     private fun accountsAndSourcesScreen() = CatalogScreen(
         id = SCREEN_ACCOUNTS_AND_SOURCES,
         title = "Accounts and sources",
-        subtitle = "Every account, scraper, plugin and integration droidtop can use — one row per source, its status and its actions",
+        subtitle = "Every account, scraper, plugin and integration droidtop uses, with its status and actions",
         groups = { context -> accountsAndSourcesGroups(context) },
     )
 
@@ -1382,7 +1382,7 @@ object AppSettingsCatalogs {
     private fun integrationsScreen() = CatalogScreen(
         id = SCREEN_INTEGRATIONS,
         title = "App integrations",
-        subtitle = "Declared as .json files you add, never bundled or synced — which apps you hook in is yours alone",
+        subtitle = "Declared as .json files you add, never bundled or synced: which apps you hook in is yours",
         groups = { context ->
             val declared = withContext(Dispatchers.IO) {
                 IntegrationStore.seedExampleIfEmpty(context)
@@ -1620,7 +1620,7 @@ object AppSettingsCatalogs {
                         ToggleItem(
                             id = "scrape_pc_auto",
                             title = "Get details for PC games automatically",
-                            subtitle = "Soon after droidtop starts and after a store syncs, for PC and engine games missing art or details. No account needed",
+                            subtitle = "After start and each store sync, for PC and engine games missing art. No account needed",
                             current = dev.droidtop.library.scraper.PcAutoScrape.enabled(context),
                             onToggle = { ctx, on -> dev.droidtop.library.scraper.PcAutoScrape.setEnabled(ctx, on) },
                         ),
@@ -1685,7 +1685,7 @@ object AppSettingsCatalogs {
                         ToggleItem(
                             id = "scrape_miximage_rotate_boxes",
                             title = "Rotate horizontal boxes in miximages",
-                            subtitle = "Turns a box wider than it is tall on its side, so it takes the same space as an upright one",
+                            subtitle = "Turns a box wider than it is tall on its side, so it takes the space of an upright one",
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.miximageRotateHorizontalBoxes(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setMiximageRotateHorizontalBoxes(ctx, value) },
                         ),

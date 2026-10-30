@@ -67,7 +67,7 @@ object MeteredConnectionCatalog {
                         ActionItem(
                             id = "metered_wifi_settings",
                             title = "This network is not metered",
-                            subtitle = "Opens Android's settings for this Wi-Fi network, where you can set it as not metered. droidtop never changes it",
+                            subtitle = "Opens Android's settings for this Wi-Fi to set it not metered. droidtop never changes it",
                             run = { ctx -> ctx.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                         ),
                     )
