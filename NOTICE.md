@@ -135,17 +135,17 @@ This project is distributed under the GNU General Public License v3.0 (see
   the Gaming shell's look and motion are ported from its Compose front end (Kurt Himebauch,
   The412Banner, MaxsTechReview and contributors), reworked to droidtop's cursor selection and
   design tokens: the motion switch and its snap rule, Rise and the sheen (`ui/FrontEndScreen.kt`,
-  as `shell-gamepad/.../MotionEffects.kt` and `MotionTokens.kt`), the sliding focus ring (`ui/FocusGlide.kt`, as
+  as `shell-gamepad/.../MotionEffects.kt`, `Shine.kt` and `MotionTokens.kt`), the sliding focus ring (`ui/FocusGlide.kt`, as
   `FocusGlide.kt`), the non-focusable keycap (`ui/SettingsWidgets.kt`, as `Keycap` in `TouchActions.kt`), and the
   wide-art cover, hero fill, status chip and empty-backdrop glow (`ui/FrontEndArt.kt`,
   `ui/FrontEndGames.kt`, `ui/FrontEndWidgets.kt`, `ui/FrontEndContent.kt`, in `pc/PcCapsule.kt` and
-  `pc/PcBackdrop.kt`), the fading foot of a long menu (`ui/SettingsWidgets.kt`, in `MenuPanel`, `GamingMenu.kt`),
+  `pc/PcBackdrop.kt`), the fading foot of a long menu (`ui/SettingsWidgets.kt`, in `MenuPanel`, `MenuPanel.kt`),
   the page and launch floods (`ui/PageFlood.kt`, `ui/LaunchFlood.kt`, as `PageFlood.kt`), the switch and slider
-  (`ui/SettingsWidgets.kt`, as `ShellSwitch` and `ShellSlider` in `GamingMenu.kt`), the turning cog
+  (`ui/SettingsWidgets.kt`, as `ShellSwitch` and `ShellSlider` in `ShellControls.kt`), the turning cog
   (`ui/FrontEndWidgets.kt`, the game page's gear), the Stop pill (`ui/SessionOverlay.kt`, the Quick Menu's
   Game section), the Resume row with its live dot and the attention dot (`ui/FrontEndRail.kt`, in
   `LeftMenu.kt`), and the store page's header chips and busy bar (`ui/StorePage.kt`, as catalog chips and
-  progress rows in `SettingsCatalogView.kt` and `GamingMenu.kt`). Each ported file names
+  progress rows in `SettingsCatalogView.kt` and `MenuRow.kt`). Each ported file names
   the DroidDeck file it came from. No DroidDeck artwork, logo or wordmark is used.
 
 ## Bundled themes

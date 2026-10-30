@@ -371,7 +371,7 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
 internal const val WAVE_FORMAT_EXTENSIBLE = 0xFFFE
 
 /** What a .wav file's RIFF header says about it: the format a SoundPool has to decode. */
-internal class WavInfo(
+class WavInfo(
     val formatTag: Int,
     val channels: Int,
     val sampleRate: Long,
@@ -405,7 +405,7 @@ internal class WavInfo(
  * A PCM .wav file's RIFF header (the `fmt ` chunk's fields and the `data`
  * chunk's size), or null when it is not one. Reads only the chunk headers.
  */
-internal fun wavInfo(file: File): WavInfo? = runCatching {
+fun wavInfo(file: File): WavInfo? = runCatching {
     RandomAccessFile(file, "r").use { raf ->
         fun u16(): Int {
             val b = ByteArray(2)
@@ -457,4 +457,4 @@ internal fun wavInfo(file: File): WavInfo? = runCatching {
 }.getOrNull()
 
 /** A PCM .wav file's playing time, or null when it is not one (see [wavInfo]). */
-internal fun wavDurationMs(file: File): Long? = wavInfo(file)?.durationMs
+fun wavDurationMs(file: File): Long? = wavInfo(file)?.durationMs

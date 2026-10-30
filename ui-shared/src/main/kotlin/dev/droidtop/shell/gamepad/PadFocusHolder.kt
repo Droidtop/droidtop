@@ -48,7 +48,7 @@ fun PadFocusHolder(modifier: Modifier = Modifier, content: @Composable () -> Uni
 }
 
 /** When the holder tries to place the focus. Pure. */
-internal object PadFocusRules {
+object PadFocusRules {
     /** Frames a screen has to place its own focus before the holder does: about 100 ms. */
     const val SETTLE_FRAMES = 6
 

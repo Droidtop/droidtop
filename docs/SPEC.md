@@ -18835,7 +18835,14 @@ tokens — a token half the chrome cannot reach is not a system. The theme palet
 public. The input pipeline followed (part 2): `input/` (the pad gate, the key map, controller layouts, hints and
 their fit), the hint bar and touch actions (`TouchActions`), the one focus ring (`FocusGlide`), the selection look
 (`selectionFrame`, `rowFocus`), the frame bars' edges (`ChromeBar`), the keyboard routing (`KeyboardTargets`) and
-`currentShellWindow()`. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
+`currentShellWindow()`. The component set came next (part 3), one file each by what it holds: the rows and group
+labels (`MenuRow`, `MenuHeader`, `MenuSectionLabel`, `StatusChip`), the chip and button (`ShellChip`), the switch,
+slider and progress bar (`ShellControls`), the modal panel and its cursor and scroll rules (`MenuPanel`, `menuMove`),
+a dialog's choices (`DialogChoices`), the one modal window (`ShellDialog`) and the focus holder inside it
+(`PadFocusHolder`), the side panels (`SidePanelFrame`), the sheet of choices (`ActionSheet`), the tab rail (`TabRail`)
+with the glyphs it draws (`QuickGlyph`), a catalog row's glyph (`CatalogGlyph`), the sheen (`shine`),
+`requestFocusWhenAttached`, and the interface sounds the panels play (`theme/`: `EsDeNavigationSounds`, `UiSound`,
+the wav reader and normaliser). It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
 `TypeRole` naming the job of each role with `DroidtopTypography` behind it, `MenuTokens` as the
 shell's palette and row measures, and `ChromeColors` as the colour source for chrome outside
 the shell. `DroidtopTheme` supplies the colour

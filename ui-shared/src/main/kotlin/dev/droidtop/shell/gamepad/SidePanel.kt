@@ -36,10 +36,10 @@ import dev.droidtop.ui.shared.Motion
 import kotlinx.coroutines.launch
 
 /** The edge a [SidePanelFrame] slides in from. */
-internal enum class PanelEdge { LEFT, RIGHT, BOTTOM }
+enum class PanelEdge { LEFT, RIGHT, BOTTOM }
 
 /** A panel width as a [fraction] of the screen, held between [min] and [max] and never past the screen. */
-internal fun sidePanelWidth(screen: Dp, fraction: Float, min: Dp, max: Dp): Dp =
+fun sidePanelWidth(screen: Dp, fraction: Float, min: Dp, max: Dp): Dp =
     (screen * fraction).coerceIn(min, max).coerceAtMost(screen)
 
 /**
@@ -73,7 +73,7 @@ internal fun sidePanelWidth(screen: Dp, fraction: Float, min: Dp, max: Dp): Dp =
  * fades with the panel; it is not part of the panel's slide.
  */
 @Composable
-internal fun SidePanelFrame(
+fun SidePanelFrame(
     edge: PanelEdge,
     onDismiss: () -> Unit,
     panelWidth: (screen: Dp) -> Dp = { it },

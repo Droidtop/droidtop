@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.flowOn
  * off in Settings silences the next cue without a restart. The preference is read off the main thread.
  */
 @Composable
-internal fun SoundSync() {
+fun SoundSync() {
     val context = LocalContext.current.applicationContext
     LaunchedEffect(context) {
         EsDeNavigationSounds.attachPack(context)
