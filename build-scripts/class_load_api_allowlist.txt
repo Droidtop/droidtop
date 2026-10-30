@@ -32,6 +32,10 @@ dev.droidtop.app.StrictModeViolationListener
 # under the SDK_INT >= R branch in AccessibilityTyping.connect (AccessibilityTyping.kt).
 dev.droidtop.app.ScreenshotCallback
 
+# WallpaperManager.OnColorsChangedListener (API 27) for Device colours, built only under the
+# SDK_INT >= O_MR1 branch in ThemeColorStore.install (ThemeColorStore.kt).
+dev.droidtop.library.theme.WallpaperColoursListener
+
 # WindowInsetsAnimation.Callback (API 30). Instantiated under
 # Utilities.ATLEAST_R in Folder.java:324 and WorkUtilityView.java:137.
 com.android.launcher3.anim.KeyboardInsetAnimationCallback
