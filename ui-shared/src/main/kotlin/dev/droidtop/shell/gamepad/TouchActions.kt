@@ -103,7 +103,7 @@ fun rememberGamepadTouch(): (GamepadAction) -> Unit {
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-internal fun TouchHintBar(
+fun TouchHintBar(
     hints: List<Pair<GamepadAction, String>>,
     modifier: Modifier = Modifier,
     background: Color = MenuTokens.HintBar,
@@ -204,7 +204,7 @@ internal fun TouchHintBar(
  * `focusable()` ahead of this; only the click's extra node goes.
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-internal fun Modifier.padRow(
+fun Modifier.padRow(
     enabled: Boolean = true,
     onLongClick: (() -> Unit)? = null,
     silent: Boolean = false,
@@ -233,7 +233,7 @@ internal fun Modifier.padRow(
  * takes neither focus nor taps and is drawn by its caller as dimmed. The caller adds its own size and padding after.
  */
 @Composable
-internal fun Modifier.pressableRow(
+fun Modifier.pressableRow(
     onClick: () -> Unit,
     shape: androidx.compose.ui.graphics.Shape = Corners.Crisp,
     rest: Color = Color.Transparent,
@@ -330,7 +330,7 @@ private fun TouchHint(action: GamepadAction, label: String?, plated: Boolean, on
  * (ui/SettingsWidgets.kt at 9310d19).
  */
 @Composable
-internal fun Keycap(label: String, modifier: Modifier = Modifier, height: Dp = MenuTokens.KeycapHeight, dimmed: Boolean = false) {
+fun Keycap(label: String, modifier: Modifier = Modifier, height: Dp = MenuTokens.KeycapHeight, dimmed: Boolean = false) {
     val style = MaterialTheme.typography.labelMedium.copy(
         fontSize = MenuTokens.HintGlyphTextSize,
         fontWeight = FontWeight.Bold,

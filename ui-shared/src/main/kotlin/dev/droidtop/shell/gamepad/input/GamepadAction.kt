@@ -57,7 +57,7 @@ object GamepadKeyMap {
      * (SPEC 7j), so a keyboard needs its own route to the shoulders that
      * cycle the sections. A focused text field takes its own keys first.
      */
-    internal fun physicalAction(keyCode: Int, shift: Boolean = false): GamepadAction? = when (keyCode) {
+    fun physicalAction(keyCode: Int, shift: Boolean = false): GamepadAction? = when (keyCode) {
         KeyEvent.KEYCODE_BUTTON_A,
         KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER,
@@ -88,7 +88,7 @@ object GamepadKeyMap {
      * before the focused field does, so it leaves these alone; otherwise a
      * menu around a search box would eat its space bar.
      */
-    internal fun isTextKey(keyCode: Int): Boolean =
+    fun isTextKey(keyCode: Int): Boolean =
         keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_TAB
 
     /**

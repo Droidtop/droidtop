@@ -72,13 +72,13 @@ import kotlin.math.hypot
  */
 
 /** A control that can carry the ring: where it is, its shape, and how far outside it the ring sits. */
-internal class GlideSource {
+class GlideSource {
     var coords: LayoutCoordinates? = null
     var shape: Shape = androidx.compose.ui.graphics.RectangleShape
     var outset: Dp = 0.dp
 }
 
-internal class FocusGlide(val view: View) {
+class FocusGlide(val view: View) {
     var host: LayoutCoordinates? = null
 
     /** Controls that hold the cursor, the latest last (two screens crossfading can each hold one). */
@@ -117,7 +117,7 @@ internal class FocusGlide(val view: View) {
     }
 }
 
-internal val LocalFocusGlide = staticCompositionLocalOf<FocusGlide?> { null }
+val LocalFocusGlide = staticCompositionLocalOf<FocusGlide?> { null }
 
 private fun cornerOf(s: GlideSource, size: Size, dir: LayoutDirection, density: Density): Float {
     val outset = with(density) { s.outset.toPx() }
@@ -133,7 +133,7 @@ private fun cornerOf(s: GlideSource, size: Size, dir: LayoutDirection, density: 
  * [FocusGlideHost], draws a still ring here. [outset] puts the ring that far outside the control's
  * edge (a capsule's art keeps its edge clear, as Steam's does).
  */
-internal fun Modifier.focusRing(shown: Boolean, shape: Shape, outset: Dp = 0.dp): Modifier = composed {
+fun Modifier.focusRing(shown: Boolean, shape: Shape, outset: Dp = 0.dp): Modifier = composed {
     val glide = LocalFocusGlide.current
     if (glide == null || glide.view !== LocalView.current) {
         if (!shown) return@composed Modifier
@@ -195,7 +195,7 @@ private fun follow(): AnimationSpec<Float> = Motion.sp(1f, 2400f)
  * ring invalidates only the overlay's own drawing, never the content under it.
  */
 @Composable
-internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val view = LocalView.current
     val density = LocalDensity.current
     val dir = LocalLayoutDirection.current
@@ -404,18 +404,18 @@ internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable 
 }
 
 /** Which edge leads a move of ([dx], [dy]): 0 left, 1 top, 2 right, 3 bottom. Pure. */
-internal fun glideLeadEdge(dx: Float, dy: Float): Int =
+fun glideLeadEdge(dx: Float, dy: Float): Int =
     if (abs(dx) >= abs(dy)) (if (dx >= 0) 2 else 0) else (if (dy >= 0) 3 else 1)
 
 /** Whether a move [sinceLastMs] after the last one is a held direction. Pure. */
-internal fun glideIsHeld(sinceLastMs: Long): Boolean = sinceLastMs < Motion.GlideRepeatMs
+fun glideIsHeld(sinceLastMs: Long): Boolean = sinceLastMs < Motion.GlideRepeatMs
 
 /** How far [to] is from [from], edge to edge: 0 when they touch or overlap. Pure. */
-internal fun glideGap(from: Rect, to: Rect): Float {
+fun glideGap(from: Rect, to: Rect): Float {
     val x = maxOf(0f, to.left - from.right, from.left - to.right)
     val y = maxOf(0f, to.top - from.bottom, from.top - to.bottom)
     return hypot(x, y)
 }
 
 /** Whether a move whose controls are [distanceDp] apart, edge to edge, travels as a drop: a far, single press. Pure. */
-internal fun glideIsFar(held: Boolean, distanceDp: Float): Boolean = !held && distanceDp > Motion.GlideFarDp
+fun glideIsFar(held: Boolean, distanceDp: Float): Boolean = !held && distanceDp > Motion.GlideFarDp

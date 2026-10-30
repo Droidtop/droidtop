@@ -12,7 +12,7 @@ package dev.droidtop.shell.gamepad.input
  * swallows what belongs to the layer beneath. Held keys are delivered, never dropped here; dropping is the
  * stack's decision. Pure over [nextFrame], so a test steps the frames by hand.
  */
-internal class KeySettle<E>(
+class KeySettle<E>(
     private val deliver: (E) -> Boolean,
     private val opens: (E) -> Boolean,
     private val nextFrame: (() -> Unit) -> Unit,

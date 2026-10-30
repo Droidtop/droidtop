@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
-internal fun Modifier.opticallyCentred(height: Dp, fontSize: TextUnit): Modifier = layout { measurable, constraints ->
+fun Modifier.opticallyCentred(height: Dp, fontSize: TextUnit): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints.copy(minHeight = 0))
     val boxHeight = height.roundToPx()
     val baseline = placeable[FirstBaseline]
@@ -32,7 +32,7 @@ private const val CAP_MIDDLE_EM = 0.36f
  * two bars have beyond their height and gutter, so they read as one frame
  * (docs/SPEC.md 7k) while the footer keeps its own plate.
  */
-internal fun Modifier.frameEdge(atTop: Boolean): Modifier = drawBehind {
+fun Modifier.frameEdge(atTop: Boolean): Modifier = drawBehind {
     val y = if (atTop) 0.5f else size.height - 0.5f
     drawLine(MenuTokens.FrameHairline, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
 }

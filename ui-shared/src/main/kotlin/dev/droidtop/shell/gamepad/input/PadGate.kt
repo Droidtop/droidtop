@@ -22,7 +22,7 @@ import androidx.compose.ui.window.DialogWindowProvider
  * Where the scheduling [PadGateCore] needs comes from: a Handler on the
  * device, a list of pending tasks in the unit tests.
  */
-internal interface PadScheduler {
+interface PadScheduler {
     /** The clock key events are timed on (uptime milliseconds on a device). */
     fun now(): Long
 
@@ -31,7 +31,7 @@ internal interface PadScheduler {
 }
 
 /** A key event the gate makes up: the stick held as a D-pad key, a trigger as its button, a Select tap or hold. */
-internal data class PadSyntheticKey(
+data class PadSyntheticKey(
     val keyCode: Int,
     val down: Boolean,
     val repeatCount: Int,
@@ -74,7 +74,7 @@ internal data class PadSyntheticKey(
  *   delivered, and the release is dropped). No screen ever sees half of a
  *   hold.
  */
-internal class PadGateCore(
+class PadGateCore(
     private val scheduler: PadScheduler,
     private val longPressMs: Long,
     private val repeatTimeoutMs: Long,
@@ -260,7 +260,7 @@ internal class PadGateCore(
  * falls under [PadGateCore.EXIT_THRESHOLD]. [suppressed] answers per exact
  * key, never per device (see [PadGateCore]).
  */
-internal fun axisTargetKey(
+fun axisTargetKey(
     value: Float,
     currentKey: Int?,
     negativeKey: Int,
@@ -619,11 +619,11 @@ object PadModality {
     /** Whether the selection ring is drawn right now. */
     val showsFocus: Boolean get() = drivingState.value
 
-    internal fun padDriving() = set(true)
+    fun padDriving() = set(true)
 
-    internal fun touched() = set(false)
+    fun touched() = set(false)
 
-    internal fun assumeOnce(padAttached: () -> Boolean) {
+    fun assumeOnce(padAttached: () -> Boolean) {
         if (assumed) return
         assumed = true
         set(padAttached())

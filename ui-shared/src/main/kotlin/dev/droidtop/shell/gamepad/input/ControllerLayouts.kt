@@ -261,7 +261,7 @@ object ControllerLayouts {
     }
 
     /** Unit tests set the layout directly; nothing else does. */
-    internal fun useLayoutForTest(layout: FaceLayout) {
+    fun useLayoutForTest(layout: FaceLayout) {
         layoutState = layout
     }
 

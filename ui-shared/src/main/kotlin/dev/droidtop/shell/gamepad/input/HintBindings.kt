@@ -160,7 +160,7 @@ class FocusedHints {
      */
     fun tipsAllowedFor(window: Any?): Boolean = layers.isEmpty() || layers.last().window === window
 
-    internal fun pushLayer(owner: Any, bindings: List<HintBinding>, menus: Boolean, window: Any? = null) {
+    fun pushLayer(owner: Any, bindings: List<HintBinding>, menus: Boolean, window: Any? = null) {
         val index = layers.indexOfFirst { it.owner === owner }
         when {
             index < 0 -> layers.add(Layer(owner, bindings, menus, window))
@@ -169,7 +169,7 @@ class FocusedHints {
         }
     }
 
-    internal fun popLayer(owner: Any) {
+    fun popLayer(owner: Any) {
         layers.removeAll { it.owner === owner }
     }
 
@@ -177,13 +177,13 @@ class FocusedHints {
     var bindings by mutableStateOf<List<HintBinding>?>(null)
         private set
 
-    internal fun declare(owner: Any, bindings: List<HintBinding>) {
+    fun declare(owner: Any, bindings: List<HintBinding>) {
         if (this.owner === owner && this.bindings === bindings) return
         this.owner = owner
         this.bindings = bindings
     }
 
-    internal fun release(owner: Any) {
+    fun release(owner: Any) {
         if (this.owner === owner) {
             this.owner = null
             bindings = null
@@ -239,7 +239,7 @@ fun DeclareLayerHints(bindings: List<HintBinding>, menusReachable: Boolean = fal
  * reachable, [layerMenus]), otherwise [leading], the focused element's
  * [declared] hints or the [fallback], then [trailing].
  */
-internal fun footerBindings(
+fun footerBindings(
     layer: List<HintBinding>?,
     layerMenus: Boolean,
     declared: List<HintBinding>?,

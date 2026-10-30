@@ -151,7 +151,7 @@ object KeyboardTargets {
         return handler(event)
     }
 
-    internal fun isPadKey(event: android.view.KeyEvent): Boolean {
+    fun isPadKey(event: android.view.KeyEvent): Boolean {
         val fromPad = event.isFromSource(android.view.InputDevice.SOURCE_GAMEPAD) || event.isFromSource(android.view.InputDevice.SOURCE_JOYSTICK)
         return android.view.KeyEvent.isGamepadButton(event.keyCode) || (fromPad && event.keyCode in PAD_DPAD)
     }

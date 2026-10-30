@@ -18832,8 +18832,10 @@ contract is the file and not yet the screens.)
 in `:ui-shared` since Droidtop/tracker#827 F1b so every mode's shell, not only Gaming and `:app`, reads the same
 tokens — a token half the chrome cannot reach is not a system. The theme palette they read (`GamingTheme`,
 `GamingPalette`), the motion tokens (`FocusLook`) and the window (`ShellWindow`, `ProvideShellCanvas`) moved with it,
-public; `currentShellWindow()`, which reads the pad from the input pipeline, stays in `:shell-gamepad` until that
-pipeline moves. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
+public. The input pipeline followed (part 2): `input/` (the pad gate, the key map, controller layouts, hints and
+their fit), the hint bar and touch actions (`TouchActions`), the one focus ring (`FocusGlide`), the selection look
+(`selectionFrame`, `rowFocus`), the frame bars' edges (`ChromeBar`), the keyboard routing (`KeyboardTargets`) and
+`currentShellWindow()`. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
 `TypeRole` naming the job of each role with `DroidtopTypography` behind it, `MenuTokens` as the
 shell's palette and row measures, and `ChromeColors` as the colour source for chrome outside
 the shell. `DroidtopTheme` supplies the colour

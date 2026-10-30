@@ -21,7 +21,7 @@ class PadPress(val action: GamepadAction, val repeat: Boolean)
  * (es-core/src/components/IList.h:38-69): each tier is how long it lasts
  * and how long it waits between steps, the last one lasting for ever.
  */
-class PadCadence internal constructor(private val tiers: List<Pair<Long, Long>>) {
+class PadCadence(private val tiers: List<Pair<Long, Long>>) {
     /** The wait between two steps once a direction has been held [heldMs]. */
     fun delayAt(heldMs: Long): Long {
         var start = 0L
@@ -77,7 +77,7 @@ class PadCadence internal constructor(private val tiers: List<Pair<Long, Long>>)
  * Pure: it takes key codes and times, so the unit tests drive it with no
  * Android `KeyEvent` (which throws `Stub!` outside a device).
  */
-internal class PadEdges(private val cadence: PadCadence) {
+class PadEdges(private val cadence: PadCadence) {
     private val lastStep = HashMap<Int, Long>()
 
     /**
