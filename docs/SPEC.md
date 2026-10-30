@@ -20739,7 +20739,17 @@ follows the link: play history and the favourite move to the entry the
 card draws (the local copy, which is what is here) and scraped metadata is
 copied into an empty place; an undo leaves them where they are. Each copy
 keeps its own save rule and its own saves, which the person can copy from
-one copy to another (7o, "Saves between copies"). Play is the card's, as for any card with several
+one copy to another (7o, "Saves between copies").
+
+The card's update comes from all its copies. A linked source answers for
+the folder copy, and the store answers for its own. When the source's
+newest release is that store's own build (Bare Witness on F95zone, whose
+latest release is called "Steam Build", the owner, 2026-10-29: "The latest
+version on F95 is actually CALLED 'steam build'"), the person already owns
+it: the Versions tab's Update row says "That is the Steam build, which you
+own" and opens the Steam copy to play or install it, rather than offering
+the source's download. The store's name as a word in the release's name is
+the evidence (`namesStore`). Play is the card's, as for any card with several
 copies (`CopyChoices`): an installed copy, the one the person chose with
 "Use this copy for this game" first, so the choice is remembered. Store
 ids and links are read with the rest of the library's facts, one batch
