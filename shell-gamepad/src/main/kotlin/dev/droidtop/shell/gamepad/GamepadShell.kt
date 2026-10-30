@@ -1011,6 +1011,7 @@ internal fun GamepadShellBody(
         showHints = GamingPrefs.showHints(context),
         touchFirst = shellWindow.touchFirst,
         claim = helpRowClaim,
+        padDriving = dev.droidtop.shell.gamepad.input.PadModality.showsFocus,
     )
     androidx.compose.runtime.CompositionLocalProvider(
         LocalShellWindow provides shellWindow,
