@@ -142,6 +142,22 @@ class LibraryQueryTest {
     }
 
     @Test
+    fun `a name sort goes by the sort name, and inside a collection by the collection sort name first (tracker 766)`() {
+        val witcher = game("w", title = "The Witcher").copy(sortName = "Witcher", collectionSortName = "3 Witcher")
+        val baldur = game("b", title = "Baldur's Gate")
+        val zork = game("z", title = "Zork").copy(collectionSortName = "1 Zork")
+
+        assertEquals(listOf("Baldur's Gate", "The Witcher", "Zork"), LibraryQuery().applyTo(listOf(zork, witcher, baldur), scope).map { it.title })
+
+        val collection = scope.copy(
+            facets = scope.facets + LibraryFacet.COLLECTION,
+            context = scope.context.copy(collectionsOf = { setOf("favs") }),
+        )
+        val inCollection = LibraryQuery(facets = mapOf(LibraryFacet.COLLECTION.key to setOf("favs")))
+        assertEquals(listOf("Zork", "The Witcher", "Baldur's Gate"), inCollection.applyTo(listOf(baldur, witcher, zork), collection).map { it.title })
+    }
+
+    @Test
     fun `the year sort is oldest first with unknown after every dated game`() {
         val dated = listOf(game("newer", releaseDate = "20100101T000000"), game("older", releaseDate = "19990101T000000"))
         val undated = game("undated")

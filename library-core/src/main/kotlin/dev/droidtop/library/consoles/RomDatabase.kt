@@ -51,12 +51,10 @@ import kotlinx.coroutines.flow.Flow
  *   display output to launch this game on -- maps directly onto
  *   droidtop's own actual multi-display work (`DisplayOutputRepository`),
  *   more directly applicable here than in upstream ES-DE itself.
- * - `sortName`/`collectionSortName` (Scrape=false, real): stored, real,
- *   matching ES-DE's own field exactly -- `collectionSortName` has no
- *   real consumer yet since droidtop has no custom-collections concept
- *   (same honestly-tracked gap noted in `LibraryEntry`'s own doc
- *   comment), stored now rather than invented later so a real collections
- *   pass doesn't also need a schema migration.
+ * - `sortName`/`collectionSortName` (Scrape=false, real): matching ES-DE's
+ *   own fields exactly; a list sorts by name with them (shell-gamepad
+ *   `sortTitle`, the collection one only inside a custom collection,
+ *   Droidtop/tracker#766).
  * - No ESRB/age-rating field -- confirmed real ES-DE has none either.
  * - Deliberately NOT modeled: `playcount`/`playtime`/`lastplayed`
  *   (real ES-DE's own `Statistic` column marks these auto-tracked, not

@@ -151,10 +151,9 @@ data class LibraryEntry(
     // meaning "no override, use the real current default."
     val launchScreen: Int? = null,
     val sortName: String? = null,
-    // Real ES-DE MD_STRING field, stored but not yet consumed -- real
-    // custom collections now exist (CollectionEntity/
-    // CollectionMemberEntity), this specifically needs a real per-
-    // collection sort-order UI/consumer, a smaller, separate follow-up.
+    // Real ES-DE MD_STRING field: what this game sorts by in a list showing a
+    // custom collection, before [sortName] (shell-gamepad `sortTitle`,
+    // Droidtop/tracker#766).
     val collectionSortName: String? = null,
     // Real ES-DE badge "collection" slot data (confirmed against
     // BadgeComponent.cpp's own real SLOT_COLLECTION) -- true when this
