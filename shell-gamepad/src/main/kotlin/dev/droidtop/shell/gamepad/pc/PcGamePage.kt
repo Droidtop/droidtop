@@ -403,6 +403,7 @@ internal fun PcGamePage(
                 open
             },
             updateStatus = updateStatus,
+            onOpenCopy = { copy -> copyOptions = copy },
             onGetInstaller = { marker ->
                 val store = dev.droidtop.library.stores.StoreLibraries.byId(marker.storeId)
                 val page = store?.webPages?.accountLibrary
@@ -1412,6 +1413,12 @@ internal fun oldVersionRows(
     }
 }
 
+/** Whether [update], as a source words it, names [copy]'s store ("Steam Build" names Steam): a word match, any case. */
+internal fun namesStore(update: String, copy: LibraryEntry): Boolean {
+    val label = dev.droidtop.library.PcSource.of(copy)?.label()?.takeIf { it.isNotBlank() } ?: return false
+    return Regex("(^|\\W)" + Regex.escape(label) + "(\\W|$)", RegexOption.IGNORE_CASE).containsMatchIn(update)
+}
+
 /** The heading row that says what the last removal of an old version did. */
 internal const val OLD_VERSIONS_ROW = "Older versions"
 
@@ -1431,6 +1438,8 @@ private fun pageRows(
     onOpenLink: (String) -> Unit = {},
     // "Get the new installer" for a copy a store installed outside droidtop: its account library (docs/SPEC.md 7g).
     onGetInstaller: (dev.droidtop.library.StoreMarker) -> Unit = {},
+    // Another copy of this game, opened where it is installed or played (its options: Install, Play).
+    onOpenCopy: (LibraryEntry) -> Unit = {},
     // A folder game's update: the record page of the source that named it (docs/SPEC.md 7g, "Getting an update").
     onOpenUpdate: (() -> Unit)? = null,
     // What getting the update last said ("Downloading...", "Added Game v0.6. Copied 3 save files from Game v0.5").
@@ -1498,6 +1507,11 @@ private fun pageRows(
     // from the account's own library, where the installers are, never by droidtop downloading over the folder.
     val marker = entry.pcInfo?.marker
     val markerStore = marker?.let { dev.droidtop.library.PcSource.Store(it.storeId).label() }
+    // A source's newest release that is a store's own build ("Steam Build" on F95zone) of a game whose card holds
+    // that store's copy (docs/SPEC.md 7m, "A store's copy and a local copy", Droidtop/tracker#745): the person owns
+    // it, so the row points at that copy instead of a download from the source.
+    val ownedCopy = entry.availableUpdate?.let { update -> siblings.firstOrNull { it.id != entry.id && it.isStoreRow() && namesStore(update, it) } }
+    val ownedStore = ownedCopy?.let { dev.droidtop.library.PcSource.of(it)?.label() }
     entry.availableUpdate?.let { update ->
         add(
             PageFact(
@@ -1505,11 +1519,12 @@ private fun pageRows(
                 update,
                 subtitle = when {
                     marker != null -> "${GameUpdates.line(update)}. Get the new installer from your $markerStore library"
+                    ownedCopy != null -> "That is the $ownedStore build, which you own: ${if (ownedCopy.pcInfo?.installed == true) "play" else "install"} the $ownedStore copy"
                     updateStatus != null -> updateStatus
                     onOpenUpdate != null -> "${GameUpdates.line(update)}. Get it from its source"
                     else -> GameUpdates.line(update)
                 },
-                onActivate = marker?.let { m -> { onGetInstaller(m) } } ?: onOpenUpdate,
+                onActivate = marker?.let { m -> { onGetInstaller(m) } } ?: ownedCopy?.let { copy -> { onOpenCopy(copy) } } ?: onOpenUpdate,
                 tab = PageTab.VERSIONS,
             ),
         )
