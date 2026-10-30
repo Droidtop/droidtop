@@ -383,6 +383,22 @@ object ContainersCatalog {
                     ),
                 )
             }
+            // A sibling with no program of its own starts with the desktop from here; one with a program has the same
+            // switch beside its program (Droidtop/tracker#808).
+            if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart &&
+                runCatching { runtime.imageRunConfig(container) }.getOrNull()?.program().isNullOrEmpty()
+            ) {
+                val app = context.applicationContext
+                add(
+                    ToggleItem(
+                        id = "container_autostart",
+                        title = "Start with the desktop",
+                        subtitle = "Starts it each time the desktop starts",
+                        current = withContext(Dispatchers.IO) { ContainerPrograms.autostart(app, container.id) },
+                        onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerPrograms.setAutostart(app, container.id, on) } },
+                    ),
+                )
+            }
             if (running) add(restartItem(info, runtime))
             add(recreateItem(info, runtime))
             add(storageItem(diskUsageBytes))

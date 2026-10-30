@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerProgram
+import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerUser
 import dev.droidtop.runtime.ExposedPort
@@ -187,12 +188,23 @@ internal object ContainerPrograms {
         set(containerId, State.Stopped)
     }
 
-    /** Starts every container's program whose "Start with the desktop" is on: called once the desktop session is up. */
+    /**
+     * Starts every container whose "Start with the desktop" is on, once the desktop session is up: its program when its
+     * image names one, else the container itself, a sibling with nothing of its own to run but its init
+     * (Droidtop/tracker#808, docs/SPEC.md 3d "Start with the desktop").
+     */
     suspend fun startWithDesktop(context: Context, runtime: ContainerRuntime) {
         val ids = settings(context).stringPropertyNames().filter { it.endsWith(KEY_AUTOSTART) }.map { it.removeSuffix(KEY_AUTOSTART) }
             .filter { autostart(context, it) }
         if (ids.isEmpty()) return
-        runtime.listContainers().filter { it.container.id in ids }.forEach { start(context, runtime, it.container) }
+        runtime.listContainers().filter { it.container.id in ids }.forEach { info ->
+            val program = runCatching { runtime.imageRunConfig(info.container) }.getOrNull()?.program().orEmpty()
+            when {
+                program.isNotEmpty() -> start(context, runtime, info.container)
+                info.container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart && !info.running ->
+                    runCatching { runtime.start(info.container) }.onFailure { Log.w(TAG, "Couldn't start ${info.container.id} with the desktop", it) }
+            }
+        }
     }
 
     // ---- the per-container settings ----

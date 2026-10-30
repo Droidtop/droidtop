@@ -1969,7 +1969,10 @@ differ only in the `RootfsUnpacker` that writes the tree.
   than 30 s after its start, and after 5 such failures in a row it stays
   stopped and says so), **Start with the desktop** (off by default;
   `ContainerPrograms.startWithDesktop` once the session is up), and the
-  log's last 40 lines. `ContainerPrograms` runs each program as one job in
+  log's last 40 lines. A sibling whose image names no program has the
+  same switch beside its Start, which starts the container itself with
+  the desktop, its init and nothing else (Droidtop/tracker#808): one
+  setting per container, read by the same `startWithDesktop`. `ContainerPrograms` runs each program as one job in
   the process scope (`ContainerProgram.command`: `/bin/sh` changes to the
   working folder, marks the start in the log and execs the program with
   its output appended to `files/container-logs/<id>.log`, which every
