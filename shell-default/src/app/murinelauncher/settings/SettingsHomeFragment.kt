@@ -17,7 +17,6 @@ import app.murinelauncher.receiver.ScreenOffAdminReceiver
 import app.murinelauncher.widget.CustomSeekBarPreference
 import app.murinelauncher.widget.radio.RadioGroupPreference
 import app.murinelauncher.widget.smartspace.SmartspaceMode
-import app.murinelauncher.service.MurineAccessibilityService
 import app.murinelauncher.settings.common.AbstractSettingsFragment
 import com.android.launcher3.touch.GestureAction
 import com.android.launcher3.ConstantItem
@@ -54,18 +53,16 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
 
         @JvmStatic @RequiresApi(Build.VERSION_CODES.P)
         fun requestAccessibilityPermission(context: Context): Boolean {
-            if (!Private.isAccessibilityServiceEnabled(context, MurineAccessibilityService::class.java)) {
-                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-                    val componentName = ComponentName(context, MurineAccessibilityService::class.java).flattenToString()
-                    putExtra(":settings:fragment_args_key", componentName)
-                    putExtra(":settings:show_fragment_args_key", componentName)
-                    putExtra("android.intent.extra.COMPONENT_NAME", componentName)
-                }
-                context.startActivity(intent)
+            // droidtop's one accessibility service (Droidtop/tracker#740), turned on the one way: elevated access
+            // when droidtop has it, else Android's accessibility page.
+            if (!dev.droidtop.runtime.keyboard.AccessibilityKeyboard.isActive(context)) {
+                Thread {
+                    dev.droidtop.runtime.keyboard.AccessibilityKeyboard.turnOn(context)
+                }.start()
                 dev.droidtop.library.settings.Notices.flash(context.resources.getString(R.string.pref_accessibility_request_toast), context = context)
                 return false
             }
-            return true;
+            return true
         }
     }
 
@@ -281,27 +278,5 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         // No preference to flip back off any more (see bindGestureAction's
         // own comment): a denied request just leaves LOCK_SCREEN selected
         // but a no-op, same as it always was with no admin active.
-    }
-
-    private object Private {
-        fun isAccessibilityServiceEnabled(context: Context, serviceClass: Class<out AccessibilityService>): Boolean {
-            val expectedComponentName = ComponentName(context, serviceClass)
-            val enabledServices = Settings.Secure.getString(
-                context.contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            ) ?: return false
-
-            val colonSplitter = TextUtils.SimpleStringSplitter(':')
-            colonSplitter.setString(enabledServices)
-
-            while (colonSplitter.hasNext()) {
-                val componentNameString = colonSplitter.next()
-                val enabledService = ComponentName.unflattenFromString(componentNameString)
-                if (enabledService != null && enabledService == expectedComponentName) {
-                    return true
-                }
-            }
-            return false
-        }
     }
 }

@@ -35,29 +35,47 @@ object AccessibilityKeyboard {
     }
 
     /**
-     * Whether the HOME button combos work over other apps (docs/SPEC.md "In-game overlays: HOME chords",
-     * Droidtop/tracker#740), and the line that says so in plain words. They need this service on: Android delivers a
-     * game's button presses to no other app, so only the service's key filter sees HOME held with R2, L2 or Start.
-     * Reads a system setting.
+     * Whether Android actually runs the service: bound, or among the services Android reports enabled. A switch the
+     * person turned on that Android then refused (Android 13's restricted settings for an app installed from a file:
+     * the console showed it "enabled" while ACCESS_RESTRICTED_SETTINGS was deny, Droidtop/tracker#740) is not.
      */
-    fun homeChords(context: Context): Pair<Boolean, String> =
-        if (isEnabled(context)) {
-            true to "On: HOME + R2, L2 or Start open droidtop's menus over any app or game"
-        } else {
-            false to "Off: Android needs you to allow droidtop to see button presses over other apps. Press to allow it"
-        }
+    fun isActive(context: Context): Boolean {
+        if (connected) return true
+        val manager = context.getSystemService(android.view.accessibility.AccessibilityManager::class.java) ?: return false
+        return runCatching {
+            manager.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+                .any { info -> info.resolveInfo?.serviceInfo?.let { it.packageName == context.packageName && it.name == SERVICE_CLASS } == true }
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Whether the HOME button combos work over other apps (docs/SPEC.md "In-game overlays: HOME chords",
+     * Droidtop/tracker#740), and the line that says so in plain words: on, off, or blocked by Android's restricted
+     * settings. They need this service running: Android delivers a game's button presses to no other app, so only the
+     * service's key filter sees HOME held with R2, L2 or Start. Reads system state: off the main thread.
+     */
+    fun homeChords(context: Context): Pair<Boolean, String> = when {
+        isActive(context) -> true to "On: HOME + R2, L2 or Start open droidtop's menus over any app or game"
+        RestrictedSettings.stepNeeded(context, RestrictedGrant.ACCESSIBILITY, granted = false) ->
+            false to "Blocked: Android stops apps installed from a file from seeing button presses until you allow it. " +
+                "Press, then in droidtop's App info open the menu and choose Allow restricted settings"
+        else -> false to "Off: Android needs you to allow droidtop to see button presses over other apps. Press to allow it"
+    }
 
     /**
      * Turns the service on for the person who pressed to (Droidtop/tracker#740). With elevated access (Shizuku or
-     * Sui) droidtop adds itself to Android's enabled list, keeping every service already on it (a vendor's, such as
-     * Retroid's Game Assistant, stays); otherwise Android's accessibility page opens, where the person turns it on.
-     * Either way it can be turned off there again. Returns the line to say. Off the main thread: it may run a shell
-     * command.
+     * Sui) droidtop allows its restricted settings and adds itself to Android's enabled list, keeping every service
+     * already on it (a vendor's, such as Retroid's Game Assistant, stays). Without it, App info opens when Android's
+     * restricted settings block the service, else Android's accessibility page. Either way it can be turned off in
+     * Android's settings again. Returns the line to say. Off the main thread: it may run a shell command.
      */
     fun turnOn(context: Context): String {
-        if (isEnabled(context)) return "On"
+        if (isActive(context)) return "On"
         val shell = dev.droidtop.runtime.tasks.TaskManager.shell
         if (shell.capabilities().shellCommand) {
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                shell.exec(listOf("appops", "set", context.packageName, "ACCESS_RESTRICTED_SETTINGS", "allow"))
+            }
             val now = runCatching {
                 Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
             }.getOrNull().orEmpty()
@@ -66,6 +84,10 @@ object AccessibilityKeyboard {
             val listed = shell.exec(listOf("settings", "put", "secure", Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, next))?.exit == 0
             val enabled = listed && shell.exec(listOf("settings", "put", "secure", Settings.Secure.ACCESSIBILITY_ENABLED, "1"))?.exit == 0
             if (enabled) return "On"
+        }
+        if (RestrictedSettings.stepNeeded(context, RestrictedGrant.ACCESSIBILITY, granted = false)) {
+            RestrictedSettings.openAppInfo(context)
+            return "In droidtop's App info, open the menu, choose Allow restricted settings, then press this row again"
         }
         openSettings(context)
         return "Turn on droidtop in the list Android opened"

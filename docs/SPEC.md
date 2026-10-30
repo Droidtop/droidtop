@@ -1163,10 +1163,13 @@ same all-apps, and it exists only where the screen is large. What is not followe
 type and the data source, which a third-party home cannot have.
 
 **The mechanism (`StandardTaskbar`, `dev.droidtop.shell.standard`).**
-- *Window.* A `TYPE_ACCESSIBILITY_OVERLAY` window per display, owned by
-  `MurineAccessibilityService`, the accessibility service the gesture actions (lock screen, Recents)
-  already need. No `SYSTEM_ALERT_WINDOW` and no second service or permission: the person enabling the
-  one service is the only grant. The overlay covers the bottom strip of the app in front (an overlay
+- *Window.* A `TYPE_ACCESSIBILITY_OVERLAY` window per display, owned by droidtop's one accessibility
+  service (`TypingAccessibilityService`, reached through `AccessibilityHost`), the same service the
+  gesture actions (lock screen, Recents), the HOME combos and typing use. No `SYSTEM_ALERT_WINDOW` and no
+  second service or permission: the person enabling the one service is the only grant. The service asks
+  Android for key events only while the taskbar or the HOME combos want them (`AccessibilityHost.wantKeyFilter`,
+  the union of its owners). There was a second service, Murine's, for the taskbar and gestures; it was
+  deleted (Droidtop/tracker#740, one mechanism per job), so Android's list shows droidtop once. The overlay covers the bottom strip of the app in front (an overlay
   cannot reserve space the app lays out around); Hide folds it to a tab for an app whose own controls sit
   there. On external displays the window is created for that display (`createWindowContext` from
   Android 12, `createDisplayContext` before) and apps are launched onto the display of the bar
@@ -3838,10 +3841,15 @@ the `ContainerRuntime` interface that already exists (§3):
   - **Saying when they are off, and turning them on (owner on the console, 2026-10-29: "The home + keymaps don't work
     in retroarch"; the service was off, and nothing said so).** Settings > Controls has a "HOME button combos over
     games" row, and onboarding's controller step the same one (`AccessibilityKeyboard.homeChords`): On, or Off with
-    why in plain words ("Android needs you to allow droidtop to see button presses over other apps"). Pressed while
-    off, it turns the service on (`AccessibilityKeyboard.turnOn`): with elevated access droidtop adds itself to
-    Android's enabled list, keeping every service already on it (a vendor's, such as Retroid's Game Assistant), else
-    Android's accessibility page opens. Pressed while on, it opens that page, where it is turned off again: every
+    why in plain words ("Android needs you to allow droidtop to see button presses over other apps"). Whether it is on is
+    read from Android's own enabled list (`AccessibilityKeyboard.isActive`), not only from droidtop's service being
+    connected. When Android blocks the service as a restricted setting (an app not installed from a store, Android
+    13 and later; the console's case on 2026-10-29), the row says "Blocked" and why: Android needs "Allow restricted
+    settings" from droidtop's App info menu first. Pressed while
+    off, it turns the service on (`AccessibilityKeyboard.turnOn`): with elevated access droidtop first allows its
+    restricted settings (`appops set ACCESS_RESTRICTED_SETTINGS allow`) and then adds itself to
+    Android's enabled list, keeping every service already on it (a vendor's, such as Retroid's Game Assistant); else,
+    when blocked, droidtop's App info opens for "Allow restricted settings"; else Android's accessibility page opens. Pressed while on, it opens that page, where it is turned off again: every
     grant stays revocable. A Home press that reaches droidtop while the service is off says once, as a flash, that the
     combos are off and where to turn them on, so the person learns it before they are in a game. Whether a vendor's
     own service that also filters keys lets HOME through to droidtop's is the console's to show.

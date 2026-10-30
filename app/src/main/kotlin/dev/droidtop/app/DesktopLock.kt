@@ -3,7 +3,6 @@ package dev.droidtop.app
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.os.Build
-import app.murinelauncher.service.MurineAccessibilityService
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notices
 
@@ -14,9 +13,9 @@ import dev.droidtop.library.settings.Notices
  * Android's accessibility settings past the disclosure Standard shows first.
  */
 internal fun lockScreen(context: Context) {
-    val service = MurineAccessibilityService.INSTANCE
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && service != null) {
-        service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+        dev.droidtop.runtime.keyboard.AccessibilityHost.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+    ) {
         return
     }
     Notices.flash(

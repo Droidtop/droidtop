@@ -6,7 +6,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.os.Build
 import app.murinelauncher.receiver.ScreenOffAdminReceiver
-import app.murinelauncher.service.MurineAccessibilityService
 import app.murinelauncher.settings.SettingsHomeFragment
 import app.murinelauncher.widget.accessibility.AlertDialogSheet
 import com.android.launcher3.Launcher
@@ -138,9 +137,8 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
          * accessibility settings.
          */
         private fun performGlobal(launcher: Launcher, action: Int) {
-            val accessibility = MurineAccessibilityService.INSTANCE
-            if (accessibility != null) {
-                accessibility.performGlobalAction(action)
+            if (dev.droidtop.runtime.keyboard.AccessibilityHost.performGlobalAction(action)) {
+                // Done by droidtop's one accessibility service.
             } else if (!LauncherPrefs.ACCESSIBILITY_DISCLOSURE_ACCEPTED.get(launcher)) {
                 AlertDialogSheet.show(
                     launcher,

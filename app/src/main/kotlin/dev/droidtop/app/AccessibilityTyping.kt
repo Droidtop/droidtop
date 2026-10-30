@@ -38,26 +38,36 @@ import java.util.concurrent.Executors
  * field's text only to make the edit asked for. All of the work is [AccessibilityTyping].
  */
 class TypingAccessibilityService : AccessibilityService() {
+    /** Standard's taskbar (docs/SPEC.md 2c "Taskbar on large screens"), hosted here: droidtop has one service. */
+    private var taskbar: dev.droidtop.shell.standard.StandardTaskbar? = null
+
     override fun onServiceConnected() {
         super.onServiceConnected()
+        dev.droidtop.runtime.keyboard.AccessibilityHost.service = this
         AccessibilityTyping.connect(this)
         AccessibilityPointer.connect(this)
         HomeOverlayKeys.connect(this)
+        taskbar = dev.droidtop.shell.standard.StandardTaskbar(this).also { it.attach() }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event?.let {
             HomeOverlayKeys.onEvent(this, it)
             AccessibilityTyping.onEvent(this, it)
+            taskbar?.onEvent(it)
         }
     }
 
-    /** The HOME chords' key filter (Droidtop/tracker#740), asked for only while droidtop is the default home. */
-    override fun onKeyEvent(event: KeyEvent): Boolean = HomeOverlayKeys.onKey(this, event)
+    /** The key filter's two users: the HOME chords (Droidtop/tracker#740) first, then the taskbar's Meta and Mode. */
+    override fun onKeyEvent(event: KeyEvent): Boolean =
+        HomeOverlayKeys.onKey(this, event) || taskbar?.onKey(event) == true
 
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: Intent?): Boolean {
+        dev.droidtop.runtime.keyboard.AccessibilityHost.service = null
+        taskbar?.detach()
+        taskbar = null
         AccessibilityPointer.disconnect(this)
         AccessibilityTyping.disconnect(this)
         return super.onUnbind(intent)
