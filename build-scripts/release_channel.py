@@ -1,7 +1,7 @@
 """The one mechanism behind droidtop's release channels (docs/SPEC.md 10b).
 
-Five subcommands, run by CI only except changelog-entry (run by hand when
-cutting a real version):
+Six subcommands, run by CI only except fragments (run by hand when cutting
+a real version):
 
   version-code COMMIT
       Prints the versionCode for COMMIT: the number of commits reachable from
@@ -13,6 +13,16 @@ cutting a real version):
       number. Counted through the GitHub API because CI checks out one commit
       of history, and the full history is a 200 MB fetch per run.
 
+  changelog OUT VERSION_CODE
+      Writes OUT, this build's changelog.json (docs/SPEC.md 10b, "Every build
+      carries its changelog"): every build's entry, newest first, this one's
+      included. An entry is the changelog.d fragments that build was the
+      first to carry, grouped Added / Changed / Fixed. The history is the
+      previous per-build release's own changelog.json, so it is complete
+      without reading git history, and the app bundles OUT so it can show
+      every version a person skipped without the network. Never fails: an
+      empty entry is written as empty and publish-build refuses it.
+
   info OUTPUTS VERSION_CODE COMMIT
       Writes OUTPUTS/release-info.json (OUTPUTS is app/build/outputs) for the
       universal APKs under it. That file is the in-app updater's one probe
@@ -20,20 +30,19 @@ cutting a real version):
       it points at, are a contract with every installed build.
 
   publish-build OUTPUTS
-      Publishes the APKs and release-info.json under OUTPUTS to a brand new,
-      permanent release tagged by this build's version (v0.2.0-dev.<code>,
-      matching versionName). This is what every push to main does (the
-      "Unstable" channel): one release per build, never rewritten, so the
-      release list is droidtop's build history. Notes are generated from the
-      commit subjects since the previous versioned release, grouped Added /
-      Changed / Fixed (categorize_commits, render_sections -- the exact same
-      grouping and rendering CHANGELOG.md entries use: see changelog-entry
-      below, one mechanism for both jobs). If a release for this exact tag
-      already exists -- a rebuild of the same commit, or a retry after a
-      cancelled run -- it is replaced (delete, recreate), never any OTHER
-      version's release. The in-app updater finds the newest one through the
-      GitHub API (AppSelfUpdate.fetchNewestBuild); nothing points at this tag
-      by a fixed name.
+      Publishes the APKs, release-info.json and changelog.json under OUTPUTS
+      to a brand new, permanent release tagged by this build's version
+      (v0.2.0-dev.<code>, matching versionName). This is what every push to
+      main does (the "Unstable" channel): one release per build, never
+      rewritten, so the release list is droidtop's build history. The notes
+      are this build's changelog entry, rendered whole; a build without one
+      (no new fragment since the previous release) fails here, before
+      anything is published. If a release for this exact tag already exists
+      -- a rebuild of the same commit, or a retry after a cancelled run -- it
+      is replaced (delete, recreate), never any OTHER version's release. The
+      in-app updater finds the newest one through the GitHub API
+      (AppSelfUpdate.fetchNewestBuild); nothing points at this tag by a
+      fixed name.
 
   publish CHANNEL OUTPUTS
       Publishes the APKs and release-info.json under OUTPUTS (a build's own
@@ -49,18 +58,11 @@ cutting a real version):
       release-info.json, which the updater rejects by digest and retries at
       the next check.
 
-  changelog-entry FROM_COMMIT TO_COMMIT
-      Prints a Keep a Changelog section body (### Added / ### Changed /
-      ### Fixed) for the commits between FROM_COMMIT and TO_COMMIT, using
-      categorize_commits/render_sections -- the same grouping code
-      publish-build uses for a build's own release notes. This is not run by
-      CI: cutting a real version is a deliberate, curated edit to
-      CHANGELOG.md (commit subjects are written for other developers, not
-      end users, so a person or agent reads this output and rewrites it into
-      plain language before it lands), but the *grouping* -- what counts as
-      Added vs Changed vs Fixed, which lines get dropped -- is the one
-      mechanism behind both documents, never a second one hand-rolled for
-      CHANGELOG.md.
+  fragments
+      Prints every fragment in changelog.d grouped Added / Changed / Fixed,
+      the section to paste into CHANGELOG.md when a real version is cut
+      (after which those fragments are removed by name). The same parsing
+      and rendering as a build's entry: one mechanism for both documents.
 """
 
 import hashlib
@@ -98,18 +100,24 @@ STAGED_PREFIX = "next."
 # excluded by not matching this pattern.
 BUILD_TAG_RE = re.compile(r"^v" + re.escape(BASE_VERSION) + r"-dev\.(\d+)$")
 
-# Commit subjects naming a private plugin never appear in public release
-# notes or the changelog (docs "romgi is private"): the line is dropped
-# rather than redacted in place, so nothing about it -- including that a
-# line was hidden -- leaks either.
+# The changelog's fragments (docs/SPEC.md 10b): one file per change, written
+# in plain words for the people using droidtop, so two branches never edit
+# the same lines. A fragment's name is its identity in every build's history
+# and is never reused.
+FRAGMENTS_DIR = "changelog.d"
+FRAGMENTS_README = "README.md"
+CHANGELOG_ASSET = "changelog.json"
+CHANGELOG_FORMAT = 1
+
+# A private plugin is never named in public release notes or the changelog
+# (docs "romgi is private"): a fragment naming one fails the build rather
+# than being published.
 PRIVATE_NAMES = ("romgi",)
 
-ADD_RE = re.compile(r"^(add|adds|added)\b", re.IGNORECASE)
-FIX_RE = re.compile(r"^(fix|fixed|fixes)\b", re.IGNORECASE)
-
-# Keep a Changelog's own section order; both a build's release notes and a
-# CHANGELOG.md entry render in this order.
+# Keep a Changelog's own section order; a build's notes, the app's What's
+# new and a CHANGELOG.md entry all render in this order.
 SECTION_ORDER = ("Added", "Changed", "Fixed")
+SECTION_RE = re.compile(r"^###\s+(Added|Changed|Fixed)\s*$")
 
 
 def gh(*args, check=True):
@@ -253,40 +261,57 @@ def previous_build_release(exclude_tag):
     for release in gh_json(f"repos/{REPO}/releases?per_page=100"):
         tag = release["tag_name"]
         if tag != exclude_tag and BUILD_TAG_RE.match(tag):
-            return tag, release["target_commitish"]
-    return None, None
+            return release
+    return None
 
 
-def clean_commit_subjects(raw_subjects):
-    # Shared by build_notes and changelog_entry: a merge commit or a line
-    # naming a private plugin (docs "romgi is private") never reaches either
-    # document. Dropped outright, not redacted in place, so nothing about it
-    # -- including that a line was hidden -- leaks either.
-    subjects = []
-    for subject in raw_subjects:
-        subject = subject.strip()
-        if not subject or subject.lower().startswith("merge "):
+def parse_fragment(name, text):
+    # A fragment is Keep a Changelog's own shape: "### Added" (or Changed,
+    # Fixed) headings, each over "- " lines. A line that continues the one
+    # above it is joined to it. Anything else is an error, so a malformed
+    # fragment fails the build instead of vanishing from the changelog.
+    sections = {}
+    current = None
+    for number, raw in enumerate(text.splitlines(), 1):
+        line = raw.rstrip()
+        if not line.strip():
             continue
-        if any(name in subject.lower() for name in PRIVATE_NAMES):
-            continue
-        subjects.append(subject)
-    return subjects
-
-
-def categorize_commits(subjects):
-    # The one grouping mechanism behind both a build's release notes and a
-    # CHANGELOG.md entry (Keep a Changelog's own vocabulary): a subject
-    # starting with "add"/"adds"/"added" is Added, "fix"/"fixed"/"fixes" is
-    # Fixed, everything else is Changed. Never reimplemented per document.
-    sections = {name: [] for name in SECTION_ORDER}
-    for subject in subjects:
-        if ADD_RE.match(subject):
-            sections["Added"].append(subject)
-        elif FIX_RE.match(subject):
-            sections["Fixed"].append(subject)
+        heading = SECTION_RE.match(line)
+        if heading:
+            current = sections.setdefault(heading.group(1), [])
+        elif line.startswith("- ") and current is not None:
+            current.append(line[2:].strip())
+        elif line.startswith("  ") and current:
+            current[-1] += " " + line.strip()
         else:
-            sections["Changed"].append(subject)
+            sys.exit(f"{FRAGMENTS_DIR}/{name}:{number}: expected '### Added', '### Changed', '### Fixed' or '- ' under one")
+    if not any(sections.values()):
+        sys.exit(f"{FRAGMENTS_DIR}/{name} has no entries")
+    lowered = text.lower()
+    if any(private in lowered for private in PRIVATE_NAMES):
+        sys.exit(f"{FRAGMENTS_DIR}/{name} names a private plugin")
     return sections
+
+
+def read_fragments(directory=FRAGMENTS_DIR):
+    # Name (without .md) -> sections, in name order.
+    fragments = {}
+    if not os.path.isdir(directory):
+        return fragments
+    for entry in sorted(os.listdir(directory)):
+        if not entry.endswith(".md") or entry == FRAGMENTS_README:
+            continue
+        with open(os.path.join(directory, entry)) as f:
+            fragments[entry[:-3]] = parse_fragment(entry, f.read())
+    return fragments
+
+
+def merge_sections(fragments):
+    merged = {name: [] for name in SECTION_ORDER}
+    for sections in fragments:
+        for name in SECTION_ORDER:
+            merged[name].extend(sections.get(name, []))
+    return {name: items for name, items in merged.items() if items}
 
 
 def render_sections(sections):
@@ -298,41 +323,46 @@ def render_sections(sections):
     return "\n\n".join(parts)
 
 
-def commits_between(previous_commit, commit):
-    result = gh("api", f"repos/{REPO}/compare/{previous_commit}...{commit}", check=False)
-    if result.returncode != 0:
-        return None, result.stderr.strip()
-    subjects = [
-        entry["commit"]["message"].splitlines()[0]
-        for entry in json.loads(result.stdout).get("commits", [])
-    ]
-    return clean_commit_subjects(subjects), None
+def previous_history(exclude_tag):
+    # The newest per-build release's changelog.json is the history up to it.
+    # A release from before builds carried one (or none at all) starts the
+    # history here.
+    release = previous_build_release(exclude_tag)
+    if release is None or not any(a["name"] == CHANGELOG_ASSET for a in release.get("assets", [])):
+        return []
+    stage = tempfile.mkdtemp()
+    gh("release", "download", release["tag_name"], "--pattern", CHANGELOG_ASSET, "--dir", stage)
+    with open(os.path.join(stage, CHANGELOG_ASSET)) as f:
+        return json.load(f).get("builds", [])
 
 
-def build_notes(commit, previous_tag, previous_commit):
-    if previous_commit is None:
-        return "First release under per-build release history (docs/SPEC.md 10b)."
+def write_changelog(out, code):
+    version_name = f"{BASE_VERSION}-dev.{code}"
+    # A rebuild of the same version replaces its own entry.
+    history = [b for b in previous_history(f"v{version_name}") if b.get("versionCode") != code]
+    carried = {name for build in history for name in build.get("fragments", [])}
+    fragments = read_fragments()
+    new = [name for name in fragments if name not in carried]
+    entry = {
+        "versionCode": code,
+        "versionName": version_name,
+        "fragments": new,
+        "sections": merge_sections(fragments[name] for name in new),
+    }
+    if not new:
+        print(f"No changelog fragment is new in {version_name}; publishing this build will fail")
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    with open(out, "w") as f:
+        json.dump({"formatVersion": CHANGELOG_FORMAT, "builds": [entry] + history}, f, indent=1)
+    print(f"{version_name}: {len(new)} new fragment(s), {len(history)} earlier build(s)")
 
-    subjects, error = commits_between(previous_commit, commit)
-    if error is not None:
-        # Never fail a publish over notes; a short generic line beats no
-        # release at all.
-        return f"Changes since {previous_tag}. (Commit list unavailable: {error})"
 
-    if not subjects:
-        return f"No user-visible changes since {previous_tag}."
-
-    return render_sections(categorize_commits(subjects))
-
-
-def changelog_entry(from_commit, to_commit):
-    subjects, error = commits_between(from_commit, to_commit)
-    if error is not None:
-        sys.exit(f"Could not list commits between {from_commit} and {to_commit}: {error}")
-    if not subjects:
-        print("(no commits in this range)")
+def print_fragments():
+    fragments = read_fragments()
+    if not fragments:
+        print("(no fragments)")
         return
-    print(render_sections(categorize_commits(subjects)))
+    print(render_sections(merge_sections(fragments.values())))
 
 
 def publish_build(outputs):
@@ -343,10 +373,22 @@ def publish_build(outputs):
             sha256(os.path.join(outputs, ASSETS[1][1])) != info["debugApkSha256"]:
         sys.exit("The APKs do not match their release-info.json; refusing to publish")
 
-    tag = f"v{info['versionName']}"
-    previous_tag, previous_commit = previous_build_release(exclude_tag=tag)
-    notes = build_notes(commit, previous_tag, previous_commit)
+    # Every build's notes are its complete changelog (owner, Droidtop/tracker#727): the entry this build's APK
+    # carries, read from the same file, so the notes and the app's What's new cannot differ.
+    changelog_path = os.path.join(outputs, CHANGELOG_ASSET)
+    if not os.path.exists(changelog_path):
+        sys.exit(f"This build has no {CHANGELOG_ASSET}; refusing to publish")
+    with open(changelog_path) as f:
+        builds = json.load(f).get("builds", [])
+    entry = builds[0] if builds else None
+    if entry is None or entry.get("versionCode") != info["versionCode"] or not entry.get("sections"):
+        sys.exit(
+            f"v{info['versionName']} has no changelog entry: add a fragment under {FRAGMENTS_DIR}/ "
+            f"saying what changed for the people using droidtop ({FRAGMENTS_DIR}/{FRAGMENTS_README})"
+        )
+    notes = render_sections(entry["sections"])
 
+    tag = f"v{info['versionName']}"
     # A rebuild of the same commit (or a retry after this run was cancelled
     # partway) reuses this exact tag: replace it rather than leaving a
     # half-uploaded release or failing outright. Any OTHER version's release
@@ -359,6 +401,8 @@ def publish_build(outputs):
     for name, source in ASSETS:
         shutil.copyfile(os.path.join(outputs, source), os.path.join(stage, name))
         files.append(os.path.join(stage, name))
+    # The next build's history starts from this file (write_changelog).
+    files.append(changelog_path)
 
     # Marked prerelease while every version is 0.x-dev; the promotion
     # command is what marks a real 1.0 stable release non-pre.
@@ -376,8 +420,10 @@ def main(argv):
         publish_build(argv[1])
     elif len(argv) == 3 and argv[0] == "publish":
         publish(argv[1], argv[2])
-    elif len(argv) == 3 and argv[0] == "changelog-entry":
-        changelog_entry(argv[1], argv[2])
+    elif len(argv) == 3 and argv[0] == "changelog":
+        write_changelog(argv[1], int(argv[2]))
+    elif len(argv) == 1 and argv[0] == "fragments":
+        print_fragments()
     else:
         sys.exit(__doc__)
 
