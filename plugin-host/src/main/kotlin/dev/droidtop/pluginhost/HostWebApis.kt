@@ -128,7 +128,16 @@ internal object HostWebApis {
             // A link a host account, a debrid account or the host's own API serves comes from there, without the page (#638);
             // the plugin gets the files as it would a captured download, and never the account or its key.
             val downloads = dev.droidtop.pluginhost.hosts.HostLinks.resolve(url) ?: run {
-                val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, inUse(env, record), null, maxDownloads = max))
+                val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, inUse(env, record), null, maxDownloads = max)
+                // Out of sight first (Droidtop/tracker#783): a served host or a started download needs no page, and an
+                // expired link is the plugin's to ask its site for again; only a page the person must act on is shown.
+                val hidden = env.hiddenWebSession(request, PluginWebAccount.expiredText(record))
+                if (hidden?.end == HiddenWebSession.End.EXPIRED) {
+                    env.vault()?.let { SiteChecks.keep(it, record.manifest.id, hidden.result.session) }
+                    return@HostOp JSONObject().put("captured", false).put("expired", true)
+                }
+                hidden?.takeIf { it.end == HiddenWebSession.End.PERSON }?.let { env.vault()?.let { v -> SiteChecks.keep(v, record.manifest.id, it.result.session) } }
+                val result = hidden?.takeIf { it.end != HiddenWebSession.End.PERSON }?.result ?: show(env, record, request)
                 // A browser check passed in the view clears droidtop's requests to that site too (Droidtop/tracker#600).
                 env.vault()?.let { SiteChecks.keep(it, record.manifest.id, result.session) }
                 // The site may have renewed the session while the person was there: the plugin's own sites are kept for

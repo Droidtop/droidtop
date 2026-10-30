@@ -56,6 +56,20 @@ object PluginWebAccount {
             .takeIf { it.matches(Regex("[A-Za-z0-9_.-]{1,64}")) }
     }
 
+    /**
+     * The `expiredText` of [record]'s `web.session` entry: the sentences its site's page shows for a download link that
+     * has expired (Droidtop/tracker#783). The plugin knows its site's words; droidtop never guesses at a page. Up to
+     * [MAX_EXPIRED_TEXTS], each one line of at most 200 characters; empty when it declared none.
+     */
+    fun expiredText(record: PluginRecord): List<String> {
+        val entry = record.manifest.v2.permissions.firstOrNull { it.id == WebSessions.PERMISSION } ?: return emptyList()
+        val listed = runCatching { JSONObject(entry.extra).optJSONArray("expiredText") }.getOrNull() ?: return emptyList()
+        return (0 until listed.length()).mapNotNull { listed.optString(it).trim().takeIf { text -> text.isNotEmpty() && text.length <= 200 && '\n' !in text } }
+            .take(MAX_EXPIRED_TEXTS)
+    }
+
+    const val MAX_EXPIRED_TEXTS = 8
+
     /** Where a browser check is passed: the declared sign-in page's site, else the first declared site's home page. */
     fun checkUrl(record: PluginRecord): String? {
         signInUrl(record)?.let { url -> NetScope.hostOf(url)?.let { return "https://$it/" } }
@@ -149,9 +163,14 @@ object PluginWebAccount {
      * (a masked link, a captcha, the host's own button) and every download the page starts, up to [max], is handed
      * back to droidtop with the cookies, user agent and referrer it needs. The session's cookies go only to the
      * plugin's declared sites; a session the site renewed meanwhile is kept. Nothing when `web.session` is turned off.
+     *
+     * The link opens out of sight first ([HiddenWebSession], docs/SPEC.md 12a, Droidtop/tracker#783): a page that leads
+     * to a host droidtop serves hands over there, and one that starts a download gives it, with no page shown. A page that
+     * says the link has expired ([expiredText]) asks [refresh] once for a current link from the plugin, which opens the
+     * same way. Only a page the person has something to do on opens in the visible view.
      * Blocks until the view closes: never on the main thread.
      */
-    fun openForDownloads(context: Context, record: PluginRecord, url: String, max: Int): List<WebSessionDownload> {
+    fun openForDownloads(context: Context, record: PluginRecord, url: String, max: Int, refresh: (() -> String?)? = null): List<WebSessionDownload> {
         if (!NetScope.isHttps(url) || NetScope.hostOf(url) == null) return emptyList()
         // A link a host account, a debrid account or the host's own API serves comes from there, without the page (#638).
         var refusal: String? = null
@@ -167,7 +186,33 @@ object PluginWebAccount {
         val borrowed = shared.keys.filter { stored?.cookies?.get(it).isNullOrBlank() }
         val inUse = DownloadSites.borrow(stored, shared)
         val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, if (inUse != null) domains else emptyList(), inUse, null, maxDownloads = max.coerceIn(1, 16), signInUrl = signInUrl(record))
-        val result = showKept(context, record, request)
+        val hidden = HiddenWebSession.open(context, request, expiredText(record))
+        if (hidden?.end == HiddenWebSession.End.EXPIRED) {
+            keepAfter(context, record, vault, stored, borrowed, hidden.result)
+            val fresh = refresh?.invoke() ?: return emptyList()
+            return openForDownloads(context, record, fresh, max, refresh = null)
+        }
+        // What the hidden view cleared on the way is kept before the person's view opens with it.
+        if (hidden?.end == HiddenWebSession.End.PERSON) keepAfter(context, record, vault, stored, borrowed, hidden.result)
+        val result = if (hidden == null || hidden.end == HiddenWebSession.End.PERSON) showKept(context, record, request) else hidden.result
+        keepAfter(context, record, vault, stored, borrowed, result)
+        // The page led to a host droidtop serves (a masked link the person unmasked, Droidtop/tracker#650): that link
+        // goes through the resolvers above, and opens its own page only if none serves it (the view does not hand off
+        // the page it was opened on, so this ends there).
+        result.handoff?.let { return openForDownloads(context, record, it, max) }
+        // A host whose API refused the link (Mega's limit on anonymous downloads) says so in the job's line.
+        return result.downloads.take(max).map { download -> refusal?.let { download.copy(via = "from the web page ($it)") } ?: download }
+    }
+
+    /** What a view of [record]'s site left: its clearance, a shared site's renewed cookies, and the plugin's renewed session. */
+    private fun keepAfter(
+        context: Context,
+        record: PluginRecord,
+        vault: PluginVault,
+        stored: WebSessions.Stored?,
+        borrowed: List<String>,
+        result: WebSessionResult,
+    ) {
         SiteChecks.keep(vault, record.manifest.id, result.session)
         // A shared site's renewed cookies go back to droidtop, never into the plugin's vault.
         result.session?.cookies?.filterKeys { it in borrowed }?.forEach { (domain, header) -> DownloadSites.renew(context, domain, header) }
@@ -175,12 +220,6 @@ object PluginWebAccount {
             ?.takeIf { stored != null && it.cookies.isNotEmpty() }?.let {
                 vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, it.copy(account = stored?.account).toJson())
             }
-        // The page led to a host droidtop serves (a masked link the person unmasked, Droidtop/tracker#650): that link
-        // goes through the resolvers above, and opens its own page only if none serves it (the view does not hand off
-        // the page it was opened on, so this ends there).
-        result.handoff?.let { return openForDownloads(context, record, it, max) }
-        // A host whose API refused the link (Mega's limit on anonymous downloads) says so in the job's line.
-        return result.downloads.take(max).map { download -> refusal?.let { download.copy(via = "from the web page ($it)") } ?: download }
     }
 
     /** The line shown when [open] kept no session: the person backed out, or the permission is off. */

@@ -18845,6 +18845,38 @@ A condition the person should know about (an unofficial plugin, a feature that i
     `BROWSER_CHECK_REQUIRED` as before. Other methods still use the client. A guest page is still the site's page:
     the plugin answers `SIGN_IN_REQUIRED` for it, not "could not read" (docs/plugin-api.md 1.3), and that change is
     the F95 plugin's.
+  - **The hidden view runs in droidtop's window, and a download link opens there first (2026-10-30, Droidtop/tracker#783).**
+    On the console, F95's check passed at once in the visible view but "did not pass by itself" in the hidden one,
+    on the same WebView, and the person was shown the site for nothing. The hidden view was in no window, which to its
+    browser is a hidden page: no frames are drawn and its timers are slowed, and a check's script does not finish.
+    The owner, on what follows from it: "The site says the link works for "a few hours", so let's open the link in the
+    hidden webview, check for the text currently onscreen, and if we see it, refresh the link and launch that.
+    Otherwise, display the webview to the user (if they need to look at it). I have a torbox key saved, so since I'm
+    using pixeldrain, it should just hand it off". So:
+    - **Where it runs.** Every hidden view (`WebFetch`, `HiddenWebSession`) is put behind the content of droidtop's
+      screen in front, at its size, unfocusable and out of the accessibility tree (`HiddenWebViews`), and taken out
+      before it is destroyed. Not behind the companion or a cover parked on the other screen, nor a running game. With
+      no droidtop screen in front a fetch runs in no window as before, and a download link opens in the visible view.
+    - **The same session as the visible view.** The plugin's session and droidtop's download-site sign-ins are put into
+      the cookie store and taken out again exactly as for the visible view (`WebSessionCookies`).
+    - **A download link opens out of sight first** (`PluginWebAccount.openForDownloads`, and a plugin's own
+      `web.session open_in_session`), and ends one of four ways:
+      - **A host droidtop serves.** The page leads there, and the host's resolvers take it as from the visible view
+        (#650): with a TorBox key a pixeldrain link comes "via your TorBox". No page is shown.
+      - **A download.** The page starts one, and it is taken as the visible view takes one.
+      - **Expired.** The page shows a sentence the plugin declared for an expired link (`web.session`'s `expiredText`,
+        docs/plugin-api.md 3 G3). droidtop never guesses at a site's page. For a record's link droidtop asks the source
+        for the record again, finds the same mirror in it by section, host and label, and opens that link out of sight
+        the same way, once. A plugin's own `open_in_session` answers `{captured: false, expired: true}` instead, for
+        the plugin to ask its site again.
+      - **The person's.** A check that did not pass by itself in about 12 seconds, a page that neither moves on nor
+        starts anything within 3 seconds of finishing, or 40 seconds in all: the visible view opens on the same link,
+        and what the hidden one cleared on the way is kept first.
+    - **The record's links are kept.** A masked link works for a few hours, so the address droidtop saved with the
+      record is opened as it is, and is asked for again only when its page says it has expired.
+    - **The plugin stays loaded while a view of its site is open** (`PluginProcesses.keep`): a check or a download page
+      the person takes minutes on no longer outlasts the plugin's idle unload, which ended F95's process on the console
+      while the person was on its page.
   - **Asked once, never in a loop:** nothing retries by itself; a background call that meets a check fails with the error and waits for the person. A download asked again right after the person passed the check says so once ("<source>'s site still asked for its check after it was passed, so nothing was downloaded") and does not open the check again for it.
 - **Sign-in and browser checks.** A source answers `SIGN_IN_REQUIRED` or the new `BROWSER_CHECK_REQUIRED` (no made-up "Sign in to <site>" result row, no paragraph about opening Settings). The search shows "Sign in to search here" / "The site checks the browser first" under the source's name with droidtop's own Sign in / Open the site, which searches again after; a view page offers the same as its notice's action and reads the page again. Both open the plugin's `web.session` in droidtop's web view (`PluginWebAccount`, a new `CHECK` mode with Done for the browser check): the `signIn` page the plugin declares on its `web.session` entry, or the site's home page.
 - **The account row.** A plugin holding `web.session` gets "<site> account", Signed in / Not signed in, with Sign in or Sign out and "Your sign-in stays in droidtop: <plugin> never sees your password", on its page, from the session droidtop keeps (the vault entry the plugin cannot read). Pressing droidtop's Sign in is the person allowing `web.session`: an unanswered grant becomes allowed when a session is kept; a refused one is never overridden, and the row says to turn it on in Permissions.
