@@ -225,9 +225,8 @@ interface ContainerRuntime {
 
     /**
      * Why this backend cannot export and import a container's data; null
-     * when it can (docs/SPEC.md 3d "Backup", Droidtop/tracker#81). Only the
-     * proot backend's plain rootfs directory is archived here; droidspaces'
-     * rootfs is an image mounted as root, which is its own piece of work.
+     * when it can (docs/SPEC.md 3d "Backup", Droidtop/tracker#81, #758). proot
+     * archives its rootfs directory as the app, droidspaces as root.
      */
     val dataBackupUnavailableReason: String?
         get() = "Only the non-root desktop can back up a container's data yet"
@@ -250,8 +249,8 @@ interface ContainerRuntime {
         error(dataBackupUnavailableReason ?: "not supported")
 
     /**
-     * Why this backend cannot copy a container; null when it can (Droidtop/tracker#757). Like backup, only the
-     * proot backend's plain rootfs directory is copied here; droidspaces' rootfs is an image mounted as root.
+     * Why this backend cannot copy a container; null when it can (Droidtop/tracker#757, #758). proot copies its
+     * rootfs directory as the app, droidspaces as root.
      */
     val cloneUnavailableReason: String?
         get() = "Only the non-root desktop can copy a container yet"

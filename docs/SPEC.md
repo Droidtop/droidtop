@@ -3336,8 +3336,14 @@ the `ContainerRuntime` interface that already exists (§3):
   and only then swaps it in, so a bad or truncated archive leaves the
   container as it was. It replaces the container's files whole; the
   container's own settings (name, sockets, mounts, provisioning plan) live
-  outside the rootfs and stay. Proot backend only: the droidspaces rootfs is
-  an image mounted as root, which shows "not available here". Scheduled or
+  outside the rootfs and stay. On droidspaces (Droidtop/tracker#758) the
+  tree is root's, so the same toybox `tar` runs through the root shell
+  (Shizuku or Sui, `RootArchive`, streamed through `RootProcess.spawn`):
+  the container is stopped first, sockets found with a root `find -type s`
+  are left out, and owners and modes come back as they were on restore,
+  which unpacks beside the tree, checks for `/etc` and `/usr`, and swaps it
+  in with the old tree put back if the swap fails. Without the root shell
+  the row says so. Scheduled or
   incremental backups are later, once the manual path is proven.
   **Copy (Droidtop/tracker#757, #750 part 1).** A sibling's page has a Copy
   group: a Name, defaulting to "<name> copy" and numbered when that is taken
@@ -3358,9 +3364,12 @@ the `ContainerRuntime` interface that already exists (§3):
     copy is always a sibling: everything installed in the desktop, run as
     a container of its own, never a second desktop. Its role is set to
     sibling and the provisioning plan stays with the original.
-  - **Backend:** proot only for now, as with backup. droidspaces shows why
-    on the row (`cloneUnavailableReason`); its copy and backup are their
-    own queued item (Droidtop/tracker#758).
+  - **droidspaces (Droidtop/tracker#758):** the tree is copied as root with
+    `cp -a` (owners, modes, links and special files kept), with the same
+    settings files (image, run settings, home and folders, sockets,
+    devices); a copy of the desktop's own gets a sibling's init, and its
+    provisioning plan stays with the original. A failed copy is deleted
+    whole, through the same guarded root delete as Delete (`RootfsDelete`).
   **Resource usage (Droidtop/tracker#757 slice 3).** A running
   container's page has "Memory and processor" under Storage used: the
   memory its processes hold (their resident sets, summed) and their share
