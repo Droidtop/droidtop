@@ -15513,14 +15513,14 @@ the same care as the art.
     name before searching again (the plan's on-screen keyboard pre-filled with the title). The sources take any
     name (`PcMetadataSource.search`), but `PcScraper.candidates` searches the game's own title, and the shell has
     no plain text entry for the pad to reuse.
-- **Sources behave the same (proposed 2026-10-30 for the owner's review, Droidtop/tracker#784).** The owner: "We need
+- **Sources behave the same (approved 2026-10-30, Droidtop/tracker#784).** The owner: "We need
   to normalize the other plugins as much as possible. We want users to be able to interact with them consistently".
   docs/plugin-api.md 1.11 proposes the contract:
   - a candidate has a name or says "(name not given)";
   - a Match the person starts always searches, with the current link first and marked, and the rest following;
   - the record is the one source of download links, opened out of sight first (#783);
   - one set of states in droidtop's words.
-  Not built until the owner has read it, except the parts marked built there.
+  The owner approved it on 2026-10-30 ("Plugin rules look good"); it is built in slices in that order.
 - **A source's own match: plugins search by name and link what they find (2026-10-17, Droidtop/tracker#575).**
   The coordinator: the F95 plugin's metadata fetch needs a thread id, so the PC scrape got no F95 text for a game
   nobody had linked. A metadata plugin (docs/plugin-api.md 3 A3) is now asked like a built-in source:

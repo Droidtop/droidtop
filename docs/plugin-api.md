@@ -1720,7 +1720,7 @@ So:
 
 ---
 
-### 1.11 Sources behave the same: match, links, states (proposed 2026-10-30 for the owner's review, Droidtop/tracker#784)
+### 1.11 Sources behave the same: match, links, states (approved 2026-10-30, Droidtop/tracker#784)
 
 The owner, 2026-10-29: "We need to normalize the other plugins as much as possible. We want users to be able to
 interact with them consistently", after F95's Match showed a correct link as "thread 214581" and could not be changed
@@ -1728,8 +1728,9 @@ interact with them consistently", after F95's Match showed a correct link as "th
 every source plugin (`library.metadata`, `library.updates`, `library.sources`) can count on droidtop doing, and the
 little it must do itself. Where droidtop can do a thing once, it does, so no plugin builds its own.
 
-**Status: a proposal.** Nothing below is built until the owner has read it. The parts marked *(built)* landed with
-#783 and #784's first commits.
+**Status: approved** (the owner, 2026-10-30: "Plugin rules look good"). It is built in this order, each a slice of #784:
+names through `fetch`, the one rematch path, the record-link path, the shared states, then the audit of every source
+plugin. The parts marked *(built)* have landed.
 
 1. **A candidate has a name, or says it has none.**
    - A `match` candidate carries `title`, the name the source's record goes by.
