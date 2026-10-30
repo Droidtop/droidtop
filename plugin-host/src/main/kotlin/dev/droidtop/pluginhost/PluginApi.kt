@@ -106,8 +106,18 @@ class PluginArgs(private val values: Map<String, String>) {
 /** A capability call's answer. [values] is treated as untrusted by droidtop's side regardless of what a plugin puts in it (12a point 5): size-capped, schema-checked, never used as a path/URI/intent target directly. */
 class PluginResult private constructor(val ok: Boolean, val values: Map<String, String>, val error: String?) {
     companion object {
-        fun success(values: Map<String, String> = emptyMap()) = PluginResult(true, values, null)
-        fun failure(reason: String) = PluginResult(false, emptyMap(), reason)
+        /** The values a screen shows as words, cleaned ([PluginText]); the rest are data (paths, addresses, ids) and kept as given. */
+        private val SHOWN = setOf("summary", "message")
+
+        fun success(values: Map<String, String> = emptyMap()) = PluginResult(
+            true,
+            // A shown value that cleans to nothing is left out, so the screen says its own words instead of a blank.
+            values.mapNotNull { (key, value) -> if (key in SHOWN) PluginText.clean(value, PluginText.DETAIL_MAX)?.let { key to it } else key to value }.toMap(),
+            null,
+        )
+
+        /** A failure: its [reason] is shown, so it is cleaned ([PluginText]), whoever wrote it. */
+        fun failure(reason: String) = PluginResult(false, emptyMap(), PluginText.clean(reason, PluginText.DETAIL_MAX) ?: "It failed")
     }
 }
 

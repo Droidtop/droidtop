@@ -383,10 +383,8 @@ object PluginViewCall {
      */
     fun errorNotice(reply: PluginReply, declared: Set<String>, fallbackTitle: String, messages: MutableList<String>? = null): ViewNode.Notice {
         val title = (reply.title ?: fallbackTitle).cut(PluginViewLimits.length("noticeTitle"))
-        val sentence = when (reply.code) {
-            PluginErrorCode.PERMISSION_DENIED -> SourceFailures.permissionOff(reply.message, reply.code)
-            else -> SourceFailures.plain(reply.message)
-        }
+        // droidtop's words for a shared code, the plugin's only for FAILED and only when plain (Droidtop/tracker#784).
+        val sentence = SourceFailures.forCode(reply.code, reply.message)
         val body = (reply.subtitle ?: sentence?.takeIf { reply.title == null })?.cut(PluginViewLimits.length("noticeSubtitle"))
         var opensPermissions = false
         var action: ViewAction? = null

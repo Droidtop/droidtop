@@ -151,9 +151,14 @@ class PluginReply private constructor(
     }
 
     companion object {
+        /** What a permission id looks like (`web.session`, `library.folders.write`). */
+        private val PERMISSION_ID = Regex("[a-z][a-z0-9_]*(\\.[a-z0-9_]+){0,5}")
+
         fun ok(data: JSONObject = JSONObject()): PluginReply = PluginReply(true, data, null, null)
 
-        fun error(code: PluginErrorCode, message: String): PluginReply = PluginReply(false, JSONObject(), code, message)
+        /** An error with [message] as its sentence: cleaned ([PluginText]), since a runner may pass a plugin's own words here (an exception's text). */
+        fun error(code: PluginErrorCode, message: String): PluginReply =
+            PluginReply(false, JSONObject(), code, PluginText.clean(message, PluginText.DETAIL_MAX).orEmpty())
 
         /** An error the person reads: [title] and [subtitle] in plain words, the [permission] it is about, an [action] to offer. */
         fun error(code: PluginErrorCode, title: String, subtitle: String? = null, permission: String? = null, action: JSONObject? = null): PluginReply =
@@ -161,9 +166,13 @@ class PluginReply private constructor(
 
         /** A failure the person reads as one plain [message], with what the code saw in [detail] for "Technical details". */
         fun failed(code: PluginErrorCode, message: String, detail: String?): PluginReply =
-            PluginReply(false, JSONObject(), code, message, detail = detail)
+            PluginReply(false, JSONObject(), code, PluginText.clean(message, PluginText.DETAIL_MAX).orEmpty(), detail = PluginText.clean(detail, PluginText.DETAIL_MAX))
 
-        /** Reads a reply from a plugin. A reply that is not JSON of the right shape is FAILED, and an error code outside the closed set is read as FAILED. */
+        /**
+         * Reads a reply from a plugin. A reply that is not JSON of the right shape is FAILED, and an error code outside
+         * the closed set is read as FAILED. An error's words are the plugin's, so they are cleaned here, where they
+         * enter droidtop ([PluginText]), and the permission it names must look like a permission id.
+         */
         fun parse(text: String?): PluginReply {
             if (text == null) return error(PluginErrorCode.FAILED, "plugin returned no reply")
             if (text.toByteArray(Charsets.UTF_8).size > PluginRunner.MAX_RESULT_BYTES) return error(PluginErrorCode.FAILED, "reply exceeds the size cap")
@@ -173,17 +182,17 @@ class PluginReply private constructor(
                     ok(json.optJSONObject("data") ?: JSONObject())
                 } else {
                     val err = json.optJSONObject("error")
-                    fun text(key: String) = err?.takeUnless { it.isNull(key) }?.optString(key)?.trim()?.takeIf { it.isNotEmpty() }
+                    fun text(key: String, max: Int) = err?.takeUnless { it.isNull(key) }?.optString(key)?.let { PluginText.clean(it, max) }
                     PluginReply(
                         false,
                         JSONObject(),
                         PluginErrorCode.fromId(err?.optString("code")) ?: PluginErrorCode.FAILED,
-                        err?.optString("message").orEmpty(),
-                        title = text("title"),
-                        subtitle = text("subtitle"),
-                        permission = text("permission"),
+                        text("message", PluginText.MESSAGE_MAX).orEmpty(),
+                        title = text("title", PluginText.TITLE_MAX),
+                        subtitle = text("subtitle", PluginText.MESSAGE_MAX),
+                        permission = err?.takeUnless { it.isNull("permission") }?.optString("permission")?.trim()?.takeIf { PERMISSION_ID.matches(it) },
                         action = err?.optJSONObject("action"),
-                        detail = text("detail"),
+                        detail = text("detail", PluginText.DETAIL_MAX),
                     )
                 }
             } catch (e: Exception) {

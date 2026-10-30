@@ -1764,6 +1764,23 @@ plugin. The parts marked *(built)* have landed.
    - droidtop draws every one of them the same way for every source: "Sign in", "Open the site" and "Try again", with
      the same sentence shape ("<source> could not ...: <message>").
    - A source draws no sign-in, retry or error row of its own.
+   - *(built, #784)* The sentence is droidtop's for every shared code (`SourceFailures.forCode`): a sign-in, a check,
+     "The site asked for a pause" for `RATE_LIMITED`, "It is no longer on the site" for `NOT_FOUND`. Only a `FAILED`
+     message may stand as written, and only when it is one short plain sentence with no link or address in it.
+     Anything else gets droidtop's sentence, with the source's words under Technical details.
+   - *(built, #784; the owner: "Parse and sanitize it against any injection attacks and stuff first")* Every word a
+     plugin sends is cleaned where it enters droidtop (`PluginText`, applied in `PluginReply.parse`, `PluginReply.error`
+     and `PluginResult`), before any screen, job line, notice or TalkBack gets it:
+     - markup and HTML entities are removed;
+     - control characters become spaces;
+     - invisible format characters are dropped: the bidirectional overrides and isolates that can show text out of
+       order, zero-width characters, the byte-order mark;
+     - lone surrogates are dropped;
+     - the text is bounded (a message 200 characters, a title 80, a detail 400).
+
+     An error's `permission` must look like a permission id, or it is ignored. droidtop shows the result only as text:
+     never parsed as HTML, a format string, a link or an intent. A job's `summary` and `message` are cleaned the same
+     way; its other values are data and are kept as given.
 5. **What each source is checked against.** The audit on #784 goes through every source plugin and lists, per point
    above, what it does now and what changes:
    - gamegrab-sources: F95, the ROM catalog plugin, LewdCorner, Repacks, Nyaa, Abandonware, BIOS, the F95 adapter in

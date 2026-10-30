@@ -135,7 +135,7 @@ object PluginSearchAggregator {
         val sentence = when (access) {
             PluginWebAccount.Need.SIGN_IN -> SourceFailures.NEEDS_SIGN_IN
             PluginWebAccount.Need.BROWSER_CHECK -> SourceFailures.NEEDS_BROWSER_CHECK
-            null -> permission ?: SourceFailures.plain(said)
+            null -> permission ?: SourceFailures.forCode(reply?.code, reply?.message ?: said)
         }
         // What actually failed, never the headline again (Droidtop/tracker#746): the call, the plugin, the code or the
         // exception, the source's own words and when.

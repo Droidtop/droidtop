@@ -155,7 +155,7 @@ object PluginContextActions {
             val reply = policy.handle(action.record, newCall(POINT, "run", place, args, 15_000L))
             if (!reply.ok) {
                 return PluginOutcome(
-                    message = "${action.label} failed: ${reply.message}",
+                    message = "${action.label} failed: ${dev.droidtop.pluginhost.SourceFailures.forCode(reply.code, reply.message)}",
                     screen = null,
                 )
             }
@@ -420,7 +420,7 @@ object PluginTiles {
             val reply = policy.handle(tile.record, newCall(tile.entry.point, PluginTileProtocol.pressOp(state), surface, args(tile, surface), 15_000L))
             if (!reply.ok) {
                 return PluginOutcome(
-                    message = "${tile.fallbackLabel} failed: ${reply.message}",
+                    message = "${tile.fallbackLabel} failed: ${dev.droidtop.pluginhost.SourceFailures.forCode(reply.code, reply.message)}",
                     screen = null,
                 )
             }
@@ -555,7 +555,10 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
             call(source, "record", JSONObject().put("id", externalId), RECORD_BUDGET_MS, userInitiated = true)
         }
         if (reply == null || !reply.ok) {
-            val failure = reply?.message ?: if (reply == null) "The source $source is not installed or not running" else "The source did not answer"
+            // droidtop's words for the source's answer (docs/plugin-api.md 1.11 point 4): "<source> could not open its page: ...".
+            val label = providers().firstOrNull { (_, e) -> e.id == source }?.let { (record, entry) -> entry.label ?: record.manifest.label } ?: source
+            val failure = reply?.let { dev.droidtop.pluginhost.SourceFailures.line(label, "open its page", it.code, it.message) }
+                ?: "The source $source is not installed or not running"
             Log.w(TAG, "record $source/$externalId: ${reply?.code ?: "no reply"}: $failure")
             // A source that cannot answer now: droidtop's saved copy, which says when it was saved.
             savedRecord(source, externalId)?.let { return it.copy(failure = failure) }

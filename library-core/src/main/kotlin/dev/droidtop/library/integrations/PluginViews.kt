@@ -30,6 +30,7 @@ import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginMessages
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginReply
+import dev.droidtop.pluginhost.SourceFailures
 import dev.droidtop.pluginhost.PluginResult
 import dev.droidtop.pluginhost.PluginRunner
 import dev.droidtop.pluginhost.PluginView
@@ -162,7 +163,7 @@ object PluginViews {
                 val value = reply.data.optString("value").take(dev.droidtop.pluginhost.PluginViewLimits.facetLength("value"))
                 when {
                     !reply.ok -> ActionOutcome(
-                        "${record.manifest.label}: ${reply.message ?: "failed"}", null, refetch = false,
+                        "${record.manifest.label}: ${SourceFailures.forCode(reply.code, reply.message)}", null, refetch = false,
                         notice = PluginViewCall.errorNotice(reply, declared(record), FAILED_TITLE, messages),
                     )
                     value.isBlank() -> ActionOutcome("${record.manifest.label} gave nothing to show", null, refetch = false)
@@ -180,7 +181,7 @@ object PluginViews {
                 val reply = call(context, record, point, action.op, callArgs)
                 if (!reply.ok) {
                     ActionOutcome(
-                        "${record.manifest.label}: ${reply.message ?: "failed"}", null, refetch = false,
+                        "${record.manifest.label}: ${SourceFailures.forCode(reply.code, reply.message)}", null, refetch = false,
                         notice = PluginViewCall.errorNotice(reply, declared(record), FAILED_TITLE, messages),
                     )
                 } else {
@@ -201,7 +202,7 @@ object PluginViews {
                 val replaced = result.values["view"]?.let { text -> runCatching { PluginView.parse(JSONObject(text), messages) }.getOrNull() }
                 // A download's own outcome ("Added <file>") says more than the plugin's message from before it ran (#558).
                 val said = result.values["summary"] ?: result.values["message"]
-                val message = if (result.ok) said ?: "Done" else "${record.manifest.label}: ${result.error ?: "failed"}"
+                val message = if (result.ok) said ?: "Done" else "${record.manifest.label}: ${SourceFailures.plain(result.error)}"
                 val notice = if (result.ok) {
                     // The plugin's own notice when it sent one; otherwise droidtop's (#521 item 9), so a finished job always
                     // says so on the page that started it, with the plugin's sentence when it gave one.
@@ -421,7 +422,7 @@ private class PluginPage(
         } else if (reply.code == PluginErrorCode.UNSUPPORTED && fallback != null) {
             show(fallback.invoke())
         } else {
-            error = reply.message?.takeIf { it.isNotBlank() } ?: "${record.manifest.label} did not answer"
+            error = "${record.manifest.label}: ${SourceFailures.forCode(reply.code, reply.message)}"
         }
     }
 
