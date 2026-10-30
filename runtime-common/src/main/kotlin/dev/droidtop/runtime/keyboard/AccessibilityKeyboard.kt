@@ -58,7 +58,9 @@ object AccessibilityKeyboard {
         isActive(context) -> true to "On: HOME + R2, L2 or Start open droidtop's menus over any app or game"
         RestrictedSettings.stepNeeded(context, RestrictedGrant.ACCESSIBILITY, granted = false) ->
             false to "Blocked: Android stops apps installed from a file from seeing button presses until you allow it. " +
-                "Press, then in droidtop's App info open the menu and choose Allow restricted settings"
+                "Press for droidtop's App info, open its menu and choose Allow restricted settings. Where there is no " +
+                "such item (Retroid's Android), run this from a computer once: ${restrictedSettingsCommand(context)}. " +
+                "Installing droidtop through an app store or a session installer (SAI) avoids the block"
         else -> false to "Off: Android needs you to allow droidtop to see button presses over other apps. Press to allow it"
     }
 
@@ -86,11 +88,26 @@ object AccessibilityKeyboard {
             if (enabled) return "On"
         }
         if (RestrictedSettings.stepNeeded(context, RestrictedGrant.ACCESSIBILITY, granted = false)) {
+            // Some Androids have no "Allow restricted settings" item at all (the Retroid Pocket 5, Droidtop/tracker#740),
+            // so the way that always works is said too, and copied, ready to paste on the computer.
+            copyCommand(context)
             RestrictedSettings.openAppInfo(context)
-            return "In droidtop's App info, open the menu, choose Allow restricted settings, then press this row again"
+            return "In droidtop's App info, open the menu and choose Allow restricted settings, then press this row again. " +
+                "No such item? Run from a computer (copied): ${restrictedSettingsCommand(context)}"
         }
         openSettings(context)
         return "Turn on droidtop in the list Android opened"
+    }
+
+    /** The one command that lifts Android's restricted-settings block from a computer with adb. */
+    fun restrictedSettingsCommand(context: Context): String =
+        "adb shell appops set ${context.packageName} ACCESS_RESTRICTED_SETTINGS allow"
+
+    private fun copyCommand(context: Context) {
+        runCatching {
+            context.getSystemService(android.content.ClipboardManager::class.java)
+                ?.setPrimaryClip(android.content.ClipData.newPlainText("adb command", restrictedSettingsCommand(context)))
+        }
     }
 
     /** Android's accessibility settings, where the user turns the service on (no app can do that for them). */

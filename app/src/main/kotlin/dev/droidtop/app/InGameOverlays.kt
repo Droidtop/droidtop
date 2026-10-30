@@ -69,6 +69,12 @@ internal object InGameOverlays {
         app = application
         scope.launch {
             OverlayRequests.requests.collect { request ->
+                // A window Android took away (its display went, the service unbound) is not open any more: the chord
+                // opens a new one instead of closing what is no longer there (Droidtop/tracker#740).
+                shown?.takeIf { !it.view.isAttachedToWindow }?.let {
+                    Log.i(TAG, "${it.kind} was no longer on screen")
+                    close()
+                }
                 val open = shown
                 // The same chord again closes it; another chord replaces it.
                 if (open != null && open.kind == request.kind) {
@@ -112,10 +118,14 @@ internal object InGameOverlays {
             return
         }
         val wm = windowContext.getSystemService(WindowManager::class.java) ?: return
-        val (view, lifecycle) = overlayView(windowContext) {
+        val (view, lifecycle) = overlayView(windowContext, request.displayId) {
             when (request.kind) {
                 OverlayRequest.Kind.QUICK_MENU -> QuickMenuStandalone(
                     library = library,
+                    // Over the running game the rail has its Game section, as in the shell (Droidtop/tracker#740:
+                    // the owner saw a rail with tabs missing).
+                    runningEntry = runningEntry,
+                    onRestart = { entry -> open(GameLaunchActivity.intentFor(app, entry.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                     // Start swaps to the left menu, as it does in Gaming.
                     onOpenStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
                     onDismiss = { close() },
@@ -182,7 +192,11 @@ internal object InGameOverlays {
      * Droidtop/tracker#788) and [LocalInGameOverlay]. The overlays and the on-device check of every Quick Menu tab
      * (OverlayQuickMenuRigTest) both draw through it. Returns the view and its lifecycle, set to destroyed on close.
      */
-    internal fun overlayView(windowContext: android.content.Context, content: @androidx.compose.runtime.Composable () -> Unit): Pair<ComposeView, LifecycleRegistry> {
+    internal fun overlayView(
+        windowContext: android.content.Context,
+        displayId: Int = android.view.Display.DEFAULT_DISPLAY,
+        content: @androidx.compose.runtime.Composable () -> Unit,
+    ): Pair<ComposeView, LifecycleRegistry> {
         val lifecycleOwner = object : LifecycleOwner {
             val registry = LifecycleRegistry(this)
             override val lifecycle: Lifecycle get() = registry
@@ -194,7 +208,8 @@ internal object InGameOverlays {
         }
         savedStateOwner.controller.performRestore(null)
         lifecycleOwner.registry.currentState = Lifecycle.State.RESUMED
-        val view = ComposeView(windowContext).apply {
+        // The shell's text scale and canvas density on this display, as droidtop's activities get them.
+        val view = ComposeView(AccessibilityPrefs.canvasContext(windowContext, displayId)).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
             setContent {
