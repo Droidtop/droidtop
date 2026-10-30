@@ -4908,7 +4908,8 @@ droidtop 0.2.0-dev.1931).
   and Performance. Only the selected tab is composed.
 - **The bar.** A window taller than wide draws a bar of labelled icons along the bottom; a wider one draws the
   same entries as a rail down the left. Both are `TabRail` (`:shell-gamepad`), the one rail the Quick Menu draws
-  without labels. Which tabs are on it is one pure function, `slots(chosen, mode, running, extent, labelSizes)`
+  without labels. The companion draws it in the shell's tab-strip style: the selected tab on the accent plate, its
+  glyph and label in the ink on the accent (Droidtop/tracker#786 S2a, 2026-10-30). Which tabs are on it is one pure function, `slots(chosen, mode, running, extent, labelSizes)`
   in `CompanionTabs.kt`: up to four chosen tabs, then the running tabs (Game while a game runs; Input too while
   a stream or a PC game runs, unless already chosen), then More, always last, holding every other tab. Chosen
   tabs never move for a running one. Labels wrap to two lines; the bar measures them at the current font and
@@ -6054,8 +6055,10 @@ rig check in the commit message.
   the system's task list where the elevated helper reads it, else from the screen droidtop launched
   the app on; an app droidtop cannot place gets no overlay. It needs "Display over other apps", a
   user grant. A Hide key closes it until that editor's session ends.
-- **The companion is a keyboard for the other screen.** A Keys pill in the companion's tab strip
-  (not on the Input tab, which already is one) opens the Input tab; it types into the
+- **The companion is a keyboard for the other screen.** Its Input tab is the keyboard, on the bar or under More
+  like any tab; the floating Keys pill and its "Keys button" setting are gone (Droidtop/tracker#786 S2a, the console
+  capture: "the floating Keys pill don't look like droidtop"), and the docked slab still comes up by itself when a
+  field on the other screen wants keys. Input types into the
   focused field on the other screen by the best route there is (`AddonKeyboardRules.route`, one
   order for every surface that types into another app, `RoutedKeyboardSink`): droidtop's input
   method's connection, else droidtop's accessibility service's focused field, else the elevated

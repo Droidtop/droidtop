@@ -271,10 +271,8 @@ object AddonKeyboard {
 
     private const val KEY_PLACEMENT = "keyboard_placement"
     const val KEY_COMPANION_HOSTS = "companion_hosts_keyboard"
-    const val KEY_COMPANION_KEYS_BUTTON = "companion_keys_button"
     private val placementFlow = MutableStateFlow(KeyboardPlacement.DEFAULT)
     private val companionHosts = MutableStateFlow(true)
-    private val companionKeys = MutableStateFlow(true)
 
     /** Displays, "Keyboard displays on". Mirrored here so the hot paths never read a file; loaded by [load]. */
     val placement: StateFlow<KeyboardPlacement> = placementFlow
@@ -282,15 +280,11 @@ object AddonKeyboard {
     /** The companion's own setting: whether it may host the keyboard for the other screen. */
     val companionHostsKeyboard: StateFlow<Boolean> = companionHosts
 
-    /** The companion's own setting: its Keys button, a shortcut to its input controller. */
-    val companionKeysButton: StateFlow<Boolean> = companionKeys
-
     /** Reads the settings this object mirrors into flows; called by `:app` off the main thread. */
     fun load(context: Context) {
         val prefs = prefs(context)
         placementFlow.value = KeyboardPlacement.fromKey(prefs.getString(KEY_PLACEMENT, null))
         companionHosts.value = prefs.getBoolean(KEY_COMPANION_HOSTS, true)
-        companionKeys.value = prefs.getBoolean(KEY_COMPANION_KEYS_BUTTON, true)
     }
 
     fun setPlacement(context: Context, placement: KeyboardPlacement) {
@@ -303,11 +297,6 @@ object AddonKeyboard {
     fun setCompanionHostsKeyboard(context: Context, on: Boolean) {
         companionHosts.value = on
         prefs(context).edit().putBoolean(KEY_COMPANION_HOSTS, on).apply()
-    }
-
-    fun setCompanionKeysButton(context: Context, on: Boolean) {
-        companionKeys.value = on
-        prefs(context).edit().putBoolean(KEY_COMPANION_KEYS_BUTTON, on).apply()
     }
 
     /** Whether droidtop controls the keyboard at all ("Not controlled by droidtop" is the one way it does not). */

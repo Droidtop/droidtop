@@ -117,7 +117,7 @@ class RemoteInputActivity : AppCompatActivity() {
     companion object {
         fun intent(context: Context): Intent = Intent(context, RemoteInputActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-        /** Opens the screen on [displayId] (the companion's screen, for its Keys button) or where the caller is. */
+        /** Opens the screen on [displayId] (the companion's screen, for its Input tab) or where the caller is. */
         fun open(context: Context, displayId: Int? = null) {
             val options = displayId?.let { ActivityOptions.makeBasic().setLaunchDisplayId(it).toBundle() }
             context.startActivity(intent(context), options)

@@ -1563,12 +1563,6 @@ object GamingSettingsCatalog {
                                         current = keyboard.companionHostsKeyboard.value,
                                         onToggle = { c, on -> keyboard.setCompanionHostsKeyboard(c, on) },
                                     ),
-                                    ToggleItem(
-                                        id = keyboard.KEY_COMPANION_KEYS_BUTTON,
-                                        title = "Keys button",
-                                        current = keyboard.companionKeysButton.value,
-                                        onToggle = { c, on -> keyboard.setCompanionKeysButton(c, on) },
-                                    ),
                                 ),
                             ),
                         ))

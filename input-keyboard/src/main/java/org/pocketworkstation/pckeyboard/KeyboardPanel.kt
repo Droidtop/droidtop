@@ -7,7 +7,7 @@ import android.widget.FrameLayout
 /**
  * droidtop's one keyboard surface: the embedded Hacker's Keyboard grid ([SecondScreenKeyboard.createView], the
  * same `LatinKeyboardView`, layouts and themes droidtop's input method draws) wired to a [KeyboardSink]. Every
- * place droidtop draws a keyboard of its own uses this view: the companion's Input tab and its Keys button, the
+ * place droidtop draws a keyboard of its own uses this view: the companion's Input tab and its docked slab, the
  * Social tab's draft, droidtop's own text fields on a screen Android draws no keyboard on, and the keyboard
  * droidtop pops over another app on such a screen. Only the sink differs.
  *

@@ -64,7 +64,6 @@ import dev.droidtop.library.settings.SocialBadge
 import dev.droidtop.library.settings.UiMode
 import dev.droidtop.library.settings.UiModeRefresh
 import dev.droidtop.library.social.SocialHub
-import dev.droidtop.runtime.keyboard.AddonKeyboard
 import dev.droidtop.shell.gamepad.KeyboardTargets
 import dev.droidtop.shell.gamepad.LABEL_LINE
 import dev.droidtop.shell.gamepad.LABEL_SIZE
@@ -241,10 +240,6 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
     var autoTab by remember { mutableStateOf<String?>(null) }
     // A conversation Home's Social section opened; the Social tab starts there.
     var socialStart by remember { mutableStateOf<OpenConversation?>(null) }
-    // The tab to go back to when the input controller was opened by the Keys button.
-    var before by remember { mutableStateOf<String?>(null) }
-
-    val keysButton by AddonKeyboard.companionKeysButton.collectAsState()
     // While started, this companion is where droidtop's keyboard for a field on the other screen opens (SPEC 4c).
     val lifecycle = LocalLifecycleOwner.current
     DisposableEffect(lifecycle, view) {
@@ -405,9 +400,10 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         // 2026-10-16: "by default, it's PART of the companion"); the tab itself stays (Droidtop/tracker#369).
         val shown = selected
         val colors = MaterialTheme.colorScheme
+        // The shell's tab strip: the selected tab on the accent plate (Droidtop/tracker#786 S2a, the console capture).
         val railColors = RailColors(
-            selected = colors.surfaceVariant,
-            ink = colors.onSurface,
+            selected = colors.primary,
+            ink = colors.onPrimary,
             muted = colors.onSurfaceVariant,
             accent = colors.primary,
             onAccent = colors.onPrimary,
@@ -425,27 +421,14 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         }
 
         val content: @Composable ColumnScope.() -> Unit = {
-            // The keyboard for a field on the other screen can be hidden from here; the Keys shortcut opens the
-            // input controller where Input is not on the bar (tracker#314).
-            if (requested != null || (keysButton && bar.tabs.none { it.id == CompanionTab.INPUT.id })) {
+            // The keyboard for a field on the other screen can be hidden from here while it is docked. Keys is the Input
+            // tab, on the bar or under More like any tab; there is no floating Keys button (Droidtop/tracker#786 S2a).
+            if (requested != null) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 ) {
-                    if (requested != null) {
-                        CompanionPill("Hide keyboard", selected = true) { KeyboardTargets.hideCompanion() }
-                    } else {
-                        CompanionPill("Keys", selected = selected == CompanionTab.INPUT.id) {
-                            if (selected == CompanionTab.INPUT.id) {
-                                select(before ?: CompanionTab.HOME.id)
-                                before = null
-                            } else {
-                                val from = selected
-                                select(CompanionTab.INPUT.id)
-                                before = from
-                            }
-                        }
-                    }
+                    CompanionPill("Hide keyboard", selected = true) { KeyboardTargets.hideCompanion() }
                 }
             }
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
