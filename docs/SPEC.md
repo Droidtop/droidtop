@@ -17425,11 +17425,22 @@ game of EXACTLY the same name (`ProtonDbClient.steamAppIdFor`) — a
 similar name is a suggestion, not an automatic identity, so it is never
 guessed.
 
-**Where to read about it (2026-10-30, DroidDeck's resources row, Droidtop/tracker#363).** Every PC game's About
-rows in `PcGameMenu` carry PCGamingWiki (fixes, settings, where saves are), Guides (GameFAQs' walkthroughs and FAQs)
-and Search the web (for a walkthrough). Each is a search by the game's display name (`GameResources`, tested), so
-nothing is asked of a site until the row is pressed, and it opens in the browser through `Links`. They are the way into
-the guide reader once #817 builds it.
+**Guides (2026-10-30, Droidtop/tracker#817, under #818; the owner: "a walkthrough helper (especially if there's a guide
+link or document or etc)").** Every PC game's About rows in `PcGameMenu` have one Guides row, opening the game's
+guides in one list (`GuidesScreen`):
+- the walkthrough, guide, FAQ, manual and readme files in the game's own folder and one level down (`GameGuides`,
+  tested), `.txt`, `.md`, `.nfo` and `.pdf` read in droidtop's reader and `.html` in the browser, read where they are and
+  never moved;
+- then PCGamingWiki, Guides (GameFAQs) and Search the web for a walkthrough (DroidDeck's resources row, #363), each a
+  search by the game's display name (`GameResources`, tested), opened in the browser only when chosen;
+- an empty folder says so, and the searches stay.
+
+**The reader** reads by pad. A text guide scrolls with Up and Down and pages with L1 and R1; a PDF shows a page at a
+time at the screen's width, rendered off the main thread (`PdfRenderer`), Left and Right or L1 and R1 turning pages.
+Y marks the place, X goes to the next mark, B closes. **The place is kept per game** (`GuidePlaces`, droidtop's own
+data, never the game's folder): the guide last opened (marked "Last read"), where each was left, and the marks. The
+guide pane beside the game on the companion, the same in the HOME+L2 overlay, notes, and guides from plugins (a `guide`
+facet, proposed on #817) are the next slices of #817.
 
 **What's new, asked for the same way (2026-10-14, Droidtop/tracker#229).** A
 Steam game (its own row, or an engine copy that kept its Steam store id) has a

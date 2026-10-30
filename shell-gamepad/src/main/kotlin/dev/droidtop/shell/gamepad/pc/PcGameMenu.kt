@@ -173,6 +173,7 @@ internal fun PcGameMenu(
     var importingLutris by remember(entry) { mutableStateOf(false) }
     // This game's Wine and graphics settings (docs/SPEC.md 5a), in a sheet
     // over the menu; null when it is closed.
+    var readingGuides by remember(entry) { mutableStateOf(false) }
     var wineScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     // Which program the game runs (docs/SPEC.md 7i, "Which program runs"), in a sheet the same way.
     var programScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
@@ -430,6 +431,17 @@ internal fun PcGameMenu(
             },
             onDismiss = { importingLutris = false },
         )
+        return
+    }
+    if (readingGuides) {
+        FullScreenOverlay(onDismiss = { readingGuides = false }) {
+            GuidesScreen(
+                gameId = entry.id,
+                gameName = gameName,
+                folder = entry.pcInfo?.installPath?.takeIf { it.startsWith("/") } ?: entry.id.takeIf { it.startsWith("/") },
+                onClose = { readingGuides = false },
+            )
+        }
         return
     }
     if (viewingMedia) {
@@ -1062,10 +1074,9 @@ internal fun PcGameMenu(
                 )
             }
             actions.info.forEach { add(it) }
-            // Where to read about it (Droidtop/tracker#363): searches by its name, opened only when pressed.
-            dev.droidtop.library.GameResources.forGame(gameName).forEach { resource ->
-                add(ActionRow(resource.label, resource.detail) { dev.droidtop.library.Links.open(context, resource.url) })
-            }
+            // Its guides (Droidtop/tracker#817): the folder's walkthrough, guide and readme in droidtop's reader, then the
+            // web searches by its name (#363), one list.
+            add(ActionRow("Guides", "Walkthroughs and readmes, with your place kept") { readingGuides = true })
             compat?.let {
                 add(ActionNote(it.summary() + "\nOther people's results on other hardware."))
             }

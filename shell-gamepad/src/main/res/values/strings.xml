@@ -38,4 +38,11 @@
     <string name="secret_copied">Copied</string>
     <string name="secret_close">Close</string>
     <string name="secret_hint_choose">Choose</string>
+    <!-- A game's guides and the reader (Droidtop/tracker#817). -->
+    <string name="guides_title">Guides for %1$s</string>
+    <string name="guides_looking">Looking in the game\'s folder</string>
+    <string name="guides_none_in_folder">No walkthrough, guide or readme in the game\'s folder. The searches above look for one.</string>
+    <string name="guide_unreadable">This guide could not be read.</string>
+    <string name="guide_opening_page">Opening the page</string>
+    <string name="guide_pdf_heading">%1$s  ·  page %2$d of %3$d</string>
 </resources>
