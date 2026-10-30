@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -82,7 +83,7 @@ internal fun CompanionReadOnlyRow(title: String, value: String, locked: Locked, 
                         },
                 )
             }
-            Text("Not allowed yet", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            Text(stringResource(R.string.companion_not_allowed_yet), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         }
     }
     if (open) CompanionLockedSheet(locked, onClose = { open = false })

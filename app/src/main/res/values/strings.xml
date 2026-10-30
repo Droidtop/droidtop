@@ -52,6 +52,7 @@
     <string name="companion_power_charge_limit">Charge limit (%1$s): %2$s</string>
     <string name="companion_power_gpu_mhz">GPU: %1$s MHz</string>
     <string name="companion_displays_brightness">Brightness</string>
+    <string name="companion_not_allowed_yet">Not allowed yet</string>
     <string name="pair_computer_pair_a">Pair a %1$s</string>
     <string name="pair_computer_getting_a_code">Getting a code…</string>
     <string name="pair_computer_keep_this_screen_open_until">Keep this screen open until the other handheld says it is paired. Both have to be on the same network.</string>
