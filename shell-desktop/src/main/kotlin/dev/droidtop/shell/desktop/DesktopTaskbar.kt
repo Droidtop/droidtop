@@ -12,6 +12,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -87,6 +88,8 @@ import dev.droidtop.library.TaskbarPins
 import dev.droidtop.library.tasks.TaskActions
 import dev.droidtop.runtime.systemstatus.NotificationsStore
 import dev.droidtop.runtime.tasks.CloseOutcome
+import dev.droidtop.runtime.tasks.OwnScreen
+import dev.droidtop.runtime.tasks.OwnScreens
 import dev.droidtop.runtime.tasks.RunningApp
 import dev.droidtop.runtime.tasks.TaskManager
 import dev.droidtop.runtime.tasks.TaskPolicy
@@ -150,42 +153,79 @@ internal fun BoxScope.Taskbar(
         }
     }
 
-    Column(
+    val ownScreens by OwnScreens.open.collectAsState()
+    // On a narrow screen the buttons alone fill the bar, and a Row gives its weighted child only what is left: the
+    // window list had no width at all on a 411 dp phone, so foot, Enginehost and Settings were open and nowhere on
+    // the bar (Droidtop/tracker#750, rig 2638). Below [BAR_ONE_ROW_MIN] the pins and windows take a strip of their own.
+    BoxWithConstraints(
         modifier = Modifier
             .align(if (atTop) Alignment.TopStart else Alignment.BottomStart)
-            .fillMaxWidth()
-            .onSizeChanged { onHeight(it.height) },
+            .fillMaxWidth(),
     ) {
-        if (!atTop) legend()
-        Row(
+        val oneRow = maxWidth >= BAR_ONE_ROW_MIN
+        val strip: @Composable () -> Unit = {
+            if (!oneRow && (pins.isNotEmpty() || toplevels.isNotEmpty() || androidApps.isNotEmpty() || ownScreens.isNotEmpty())) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TaskbarPinChips(pins, onOpenPin, onUnpin)
+                    TaskbarWindowList(hostBridge, toplevels, androidApps, ownScreens, windows, windowIcons, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
-            verticalAlignment = Alignment.CenterVertically,
+                .onSizeChanged { onHeight(it.height) },
         ) {
-            TaskbarButton(onClick = onOpenStartMenu) {
-                Text(stringResource(R.string.desktop_start_menu))
+            if (!atTop) {
+                legend()
+                strip()
             }
-            Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
-            TaskbarPinChips(pins, onOpenPin, onUnpin)
-            TaskbarWindowList(hostBridge, toplevels, androidApps, windows, windowIcons, modifier = Modifier.weight(1f))
-            // What only Android can do stays on droidtop's bar (Droidtop/tracker#555 D4): Terminal, Containers
-            // and Settings are Start's System rows, and the clock is the panel's (Waybar's custom/clock, or
-            // swaybar's status line), so the screen has one. The mode switcher stays, by name: Desktop's only
-            // other route to the Android home or Gaming is a long-press of Back (SPEC 2c).
-            TaskbarButton(onClick = { openModes(context) }) {
-                Text(stringResource(R.string.desktop_modes))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TaskbarButton(onClick = onOpenStartMenu) {
+                    Text(stringResource(R.string.desktop_start_menu))
+                }
+                Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
+                if (oneRow) {
+                    TaskbarPinChips(pins, onOpenPin, onUnpin)
+                    TaskbarWindowList(hostBridge, toplevels, androidApps, ownScreens, windows, windowIcons, modifier = Modifier.weight(1f))
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+                // What only Android can do stays on droidtop's bar (Droidtop/tracker#555 D4): Terminal, Containers
+                // and Settings are Start's System rows, and the clock is the panel's (Waybar's custom/clock, or
+                // swaybar's status line), so the screen has one. The mode switcher stays, by name: Desktop's only
+                // other route to the Android home or Gaming is a long-press of Back (SPEC 2c).
+                TaskbarButton(onClick = { openModes(context) }) {
+                    Text(stringResource(R.string.desktop_modes))
+                }
+                KeyboardTaskbarItem()
+                PluginTaskbarItems()
+                CompanionTaskbarItem()
+                ClipboardNotice()
+                SystemTray(onClick = onOpenQuickMenu)
             }
-            KeyboardTaskbarItem()
-            PluginTaskbarItems()
-            CompanionTaskbarItem()
-            ClipboardNotice()
-            SystemTray(onClick = onOpenQuickMenu)
+            if (atTop) {
+                strip()
+                legend()
+            }
         }
-        if (atTop) legend()
     }
 }
+
+/** The narrowest bar that keeps the pins and the window list beside the buttons (docs/SPEC.md 2b). */
+internal val BAR_ONE_ROW_MIN = 600.dp
 
 /**
  * A taskbar button with the narrow padding a bar needs. The stock Button's
@@ -247,6 +287,7 @@ internal fun TaskbarWindowList(
     hostBridge: HostBridge?,
     toplevels: List<Toplevel>,
     androidApps: List<RunningApp>,
+    ownScreens: List<OwnScreen>,
     windows: DesktopWindows?,
     windowIcons: Map<String, String>,
     modifier: Modifier = Modifier,
@@ -256,7 +297,7 @@ internal fun TaskbarWindowList(
     val hidden by rememberHiddenWindows(windows)
     val placed by remember(windows) { windows?.placed ?: MutableStateFlow(emptyMap<Long, SwayWindow>()) }.collectAsState()
 
-    if (toplevels.isEmpty() && androidApps.isEmpty()) {
+    if (toplevels.isEmpty() && androidApps.isEmpty() && ownScreens.isEmpty()) {
         Spacer(modifier = modifier)
         return
     }
@@ -296,6 +337,44 @@ internal fun TaskbarWindowList(
                 app = app,
                 onOpen = { openAndroidApp(context, app) },
                 onClose = { scope.launch { closeAndroidApp(context, app) } },
+            )
+        }
+        // droidtop's own screens open in a task of their own: Settings, a place (Droidtop/tracker#750).
+        items(ownScreens, key = { "own:" + it.taskId }) { screen ->
+            TaskbarOwnScreenRow(
+                screen = screen,
+                onOpen = { openOwnScreen(context, screen) },
+                onClose = { OwnScreens.close(context, screen) },
+            )
+        }
+    }
+}
+
+/** One of droidtop's own screens in the bar: droidtop's icon and the screen's name; a tap brings it back, a long press offers Close. */
+@Composable
+internal fun TaskbarOwnScreenRow(screen: OwnScreen, onOpen: () -> Unit, onClose: () -> Unit) {
+    val context = LocalContext.current
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .widthIn(max = 180.dp)
+                .heightIn(min = 48.dp)
+                .combinedClickable(onClick = onOpen, onLongClick = { menuOpen = true })
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 10.dp),
+        ) {
+            AppIcon(context.packageName, size = 20.dp)
+            Text(screen.title, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (menuOpen) {
+            val close = stringResource(R.string.desktop_close)
+            ActionSheet(
+                title = screen.title,
+                rows = listOf(ActionRow(close, onSelect = { menuOpen = false; onClose() })),
+                onDismiss = { menuOpen = false },
             )
         }
     }

@@ -471,7 +471,8 @@ private fun WindowsSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val hidden by rememberHiddenWindows(windows)
-    val rows = remember(toplevels, androidApps, hidden) {
+    val ownScreens by dev.droidtop.runtime.tasks.OwnScreens.open.collectAsState()
+    val rows = remember(toplevels, androidApps, ownScreens, hidden) {
         toplevels.map { toplevel ->
             HostedRow(
                 key = "window:" + toplevel.id,
@@ -500,6 +501,17 @@ private fun WindowsSheet(
                     onDismiss()
                 },
                 onToggle = { scope.launch { closeAndroidApp(context, app) } },
+            )
+        } + ownScreens.map { screen ->
+            HostedRow(
+                key = "own:" + screen.taskId,
+                title = screen.title,
+                subtitle = "droidtop, " + TaskPolicy.displayLabel(screen.displayId),
+                onSelect = {
+                    openOwnScreen(context, screen)
+                    onDismiss()
+                },
+                onToggle = { dev.droidtop.runtime.tasks.OwnScreens.close(context, screen) },
             )
         }
     }

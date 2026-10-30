@@ -397,6 +397,13 @@ internal fun openAndroidApp(context: Context, app: RunningApp) {
     }
 }
 
+/** Brings one of droidtop's own screens back to the front, and says so when Android no longer has it. */
+internal fun openOwnScreen(context: Context, screen: dev.droidtop.runtime.tasks.OwnScreen) {
+    if (!dev.droidtop.runtime.tasks.OwnScreens.bringToFront(context, screen)) {
+        dev.droidtop.library.settings.Notices.flash("${screen.title} is no longer open", context = context)
+    }
+}
+
 /** Closes through the task manager's strongest path and says so only when that did not end it. */
 internal suspend fun closeAndroidApp(context: Context, app: RunningApp) {
     val outcome = TaskManager.close(context, app.packageName)

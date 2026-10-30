@@ -482,6 +482,16 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   only while Desktop shows). An entry wears the app's icon; a tap opens it where it runs (`TaskActions.bringTo`),
   a long press, or X in the sheet, closes it by the task manager's strongest path and says so only when that
   could not end it. Without Shizuku the list holds the apps droidtop opened itself, as everywhere else.
+- **droidtop's own screens are in the bar too** (Droidtop/tracker#750, rig 2638). The task manager leaves
+  droidtop out of its list, so Settings, a place or the container manager opened from Desktop (each a
+  `CatalogScreenActivity` in a task of its own) is listed from `OwnScreens`, which each such screen joins while it
+  exists: droidtop's icon and the screen's name, a tap brings its task to the front, a long press or X in the
+  windows sheet ends the task. Those screens are no longer excluded from recents: Android removes a hidden task as
+  soon as another one comes to the front, so Settings was gone after one HOME.
+- **A narrow bar gives the windows a strip of their own** (Droidtop/tracker#750, rig 2638). The window list is the
+  bar's one weighted slot, so on a 411 dp phone screen the buttons and tray took the whole width and no window,
+  Android app or droidtop screen could show. Below 600 dp (`BAR_ONE_ROW_MIN`) the pins and the window list sit in
+  a second row on the screen side of the buttons, shown only while there is something in it.
 - **The Start menu reaches the bar's buttons.** A System section (Terminal while a session runs, Containers,
   Modes, Settings) is the bar's own four buttons as rows, so a pad with no way to the bar can still open
   Settings or the mode switcher and then give the pad back to the container by closing the sheet.
