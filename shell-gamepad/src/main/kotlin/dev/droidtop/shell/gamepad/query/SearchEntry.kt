@@ -8,7 +8,7 @@ package dev.droidtop.shell.gamepad.query
  * - **Everything**: Start > Search, Y on Home, the band's search. The device's games and apps, the sources,
  *   and the system names themselves ("snes" finds the system).
  * - **One system**: "Search SNES" in a system's gamelist Select menu (and, later, Home's system tiles and the
- *   Quick Menu's Game section): that system's library and the sources that serve it; a download goes to that
+ *   running console game's L2 sheet): that system's library and the sources that serve it; a download goes to that
  *   system's folder (SourceDestinations).
  * - **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
  */

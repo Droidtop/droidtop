@@ -13,8 +13,8 @@ import kotlinx.coroutines.flow.flowOn
 
 /**
  * Keeps the interface sounds current while the Gaming shell is composed: the bundled set loaded
- * ([EsDeNavigationSounds.attachPack]) and Gaming's Navigation sounds switch observed, so turning it
- * off in Settings silences the next cue without a restart. The preference is read off the main thread.
+ * ([EsDeNavigationSounds.attachPack]) and the Navigation sounds volume observed, so a change in Settings or the
+ * Audio controls reaches the next cue without a restart. The preference is read off the main thread.
  */
 @Composable
 fun SoundSync() {
@@ -24,12 +24,12 @@ fun SoundSync() {
         callbackFlow {
             val prefs = CatalogPrefs.prefs(context)
             val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key == null || key == GamingSettingsCatalog.ID_NAVIGATION_SOUNDS) trySend(GamingSettingsCatalog.navigationSoundsOn(context))
+                if (key == null || key == GamingSettingsCatalog.ID_NAVIGATION_SOUNDS) trySend(GamingSettingsCatalog.navigationSoundsVolume(context))
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(GamingSettingsCatalog.navigationSoundsOn(context))
+            trySend(GamingSettingsCatalog.navigationSoundsVolume(context))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }.conflate().flowOn(Dispatchers.IO).collect { EsDeNavigationSounds.enabled = it }
+        }.conflate().flowOn(Dispatchers.IO).collect { EsDeNavigationSounds.volume = it / GamingSettingsCatalog.NAVIGATION_SOUNDS_MAX.toFloat() }
     }
 }
 

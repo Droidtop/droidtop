@@ -8,11 +8,8 @@ import dev.droidtop.app.LauncherGamesActivity
 import dev.droidtop.app.OpenWithSource
 import dev.droidtop.library.PcSource
 import dev.droidtop.library.StoreLinkPrefs
-import dev.droidtop.library.integrations.AcquireContentSource
-import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.PluginJobsScreen
-import dev.droidtop.library.integrations.SourceScreens
-import dev.droidtop.library.integrations.SourceState
+import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogChip
@@ -371,31 +368,26 @@ internal object StoresCatalog {
     }
 
     /**
-     * Downloads and Updates' Get games, after its Updates row (Droidtop/tracker#644 slice 3; owner, 2026-10-24: Game
-     * sources "Split, plus a status list"): every installed source plugin, ready or not, so a newcomer with no folders
-     * and no library can still reach a search, opening one searches it for PC games or asks the system
-     * (Droidtop/tracker#540); then Add a game. Getting games is a use, so it lives where downloads are seen, not in
-     * the setup of where games come from. Off the main thread.
+     * Downloads and Updates' Get games, after its Updates row (Droidtop/tracker#644 slice 3): one Get games row, the one
+     * search over every source at once with its source filter (owner, 2026-10-30, Droidtop/tracker#825: "Why do we have
+     * plugin-specific searches? We want a single get games section, and a filter to choose where it searches"). It
+     * replaced a row per source plugin, each opening that plugin's form, which drew as "Search · not set". With no
+     * source installed the search itself says so and leads to Plugins. Then Add a game. Off the main thread.
      */
     suspend fun getGamesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
-        val sources = runCatching { AcquireContentSources.listings(context) }.getOrDefault(emptyList())
-        val sourceEntry = if (sources.any { it.state == SourceState.READY }) runCatching { SourceScreens.entryContext(context) }.getOrNull() else null
         listOf(
-            // With no source installed, one row to Plugins, never a blank.
             CatalogGroup(
                 id = "stores_sources_group",
                 title = "Get games",
-                items = sources.map { sourceRow(context, it, sourceEntry) }.ifEmpty {
-                    listOf(
-                        NestedScreenItem(
-                            id = "stores_no_sources",
-                            title = "Get games from a source",
-                            subtitle = "No source is installed yet. Plugins lists the ones you can add",
-                            registryId = AcquireContentSources.PLUGINS_SCREEN_ID,
-                            icon = CatalogIcon.LIBRARY,
-                        ),
-                    )
-                },
+                items = listOf(
+                    ActionItem(
+                        id = GetGamesEntry.SEARCH_ROW_ID,
+                        title = GetGamesEntry.LABEL,
+                        subtitle = "Search every source at once, or see what they feature",
+                        icon = CatalogIcon.SEARCH,
+                        run = { ctx -> ctx.startActivity(dev.droidtop.app.LauncherSearchActivity.getGamesIntent(ctx)) },
+                    ),
+                ),
             ),
             CatalogGroup(
                 id = "stores_add_group",
@@ -408,7 +400,7 @@ internal object StoresCatalog {
                         inline = addGameScreen(),
                         icon = CatalogIcon.LIBRARY,
                     ),
-                    // Get new games and Get apps were Updates' rows; updates moved to the Quick Menu, and getting things is
+                    // Get new games and Get apps were Updates' rows; updates have their own page, and getting things is
                     // this place's (owner, 2026-10-29, Droidtop/tracker#749).
                     UpdatesPage.getNewGamesRow(context),
                     NestedScreenItem(
@@ -466,42 +458,6 @@ internal object StoresCatalog {
                     )
                 },
             ),
-        )
-    }
-
-    /**
-     * A source plugin's row in Game sources: ready, it opens its search ([SourceScreens.entryScreen]); waiting for
-     * approval, turned off or disabled, it opens the plugin's own page in Plugins, where that is fixed. The state is
-     * the row's value, so a source is a detail of where games come from and not a screen of its own.
-     */
-    /** One source's row; reads its grants, so on IO like the rest of [rootGroups]. */
-    private fun sourceRow(context: Context, listing: dev.droidtop.library.integrations.SourceListing, entry: SourceScreens.EntryContext?): CatalogItem {
-        val id = "source_${listing.pluginId}"
-        // Why it is not ready (or not allowed to give games) and the one way on, not its approval list straight away
-        // (Droidtop/tracker#270).
-        val blocked = AcquireContentSources.blockedScreen(context, listing)
-        val ready = blocked == null && entry != null
-        val value: (Context) -> String? = { if (blocked != null && listing.state == SourceState.READY) "Not allowed yet" else listing.stateLabel }
-        if (ready) {
-            val source = AcquireContentSource.Plugin(listing.record)
-            return NestedScreenItem(
-                id = id,
-                title = listing.label,
-                subtitle = source.description ?: "Search ${listing.label} for games",
-                inline = SourceScreens.entryScreen(source, entry!!),
-                valueLabel = value,
-                icon = CatalogIcon.GLOBAL,
-            )
-        }
-        val page = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, listing.pluginId)
-        return NestedScreenItem(
-            id = id,
-            title = listing.label,
-            subtitle = "Not ready to give games. Open it to see why",
-            inline = blocked ?: page,
-            registryId = if (blocked == null && page == null) AcquireContentSources.PLUGINS_SCREEN_ID else null,
-            valueLabel = value,
-            icon = CatalogIcon.GLOBAL,
         )
     }
 

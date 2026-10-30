@@ -126,8 +126,32 @@ internal fun LibraryEntry.backdropArt(): String? = heroArt().let { it.landscape 
  * The games whose backdrops are worth having ready: [reach] either side of
  * the cursor, never the cursor's own. Pure, for the tests.
  */
-internal fun neighbourBackdrops(list: List<LibraryEntry>, index: Int, reach: Int = BACKDROP_PRELOAD_REACH): List<String> =
-    (-reach..reach).filter { it != 0 }.mapNotNull { list.getOrNull(index + it)?.backdropArt() }.distinct()
+internal fun neighbourBackdrops(list: List<LibraryEntry>, index: Int, reach: Int = BACKDROP_PRELOAD_REACH, columns: Int = 0): List<String> =
+    ((-reach..reach) + if (columns > 1) listOf(-columns, columns) else emptyList())
+        .filter { it != 0 }.mapNotNull { list.getOrNull(index + it)?.backdropArt() }.distinct()
+
+/**
+ * The backdrops worth having ready on the shelves (Droidtop/tracker#782, #632; the owner on the console, 2026-10-30:
+ * "Should probably read ahead on these"): beside the cursor on its own shelf, and on the shelves above and below, the
+ * game Up or Down lands on ([landing]: the place the cursor last had on that shelf, else its first game) and its
+ * neighbours. Moving between the hero shelf and a shelf of posters waited on the next backdrop's decode, in both
+ * directions, because only the cursor's own shelf was read ahead. Pure, for the tests.
+ */
+internal fun shelfNeighbourBackdrops(
+    shelves: List<List<LibraryEntry>>,
+    shelf: Int,
+    item: Int,
+    landing: (shelf: Int) -> Int,
+    reach: Int = BACKDROP_PRELOAD_REACH,
+): List<String> = buildList {
+    addAll(neighbourBackdrops(shelves.getOrNull(shelf).orEmpty(), item, reach))
+    for (other in listOf(shelf - 1, shelf + 1)) {
+        val list = shelves.getOrNull(other) ?: continue
+        val at = landing(other).coerceIn(0, (list.size - 1).coerceAtLeast(0))
+        list.getOrNull(at)?.backdropArt()?.let(::add)
+        addAll(neighbourBackdrops(list, at, reach = 1))
+    }
+}.distinct().filter { it != shelves.getOrNull(shelf)?.getOrNull(item)?.backdropArt() }
 
 /** One request for both the shown and the preloaded backdrop, so they share a memory-cache entry. */
 private fun backdropRequest(context: Context, art: String): ImageRequest =

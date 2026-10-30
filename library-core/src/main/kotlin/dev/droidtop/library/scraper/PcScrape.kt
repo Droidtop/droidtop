@@ -557,15 +557,25 @@ object PcScraper {
 
         val dao = RomDatabase.get(context).romDao()
         // A library is thousands of entries, and one IN list that long can pass SQLite's limit on
-        // variables; the rows are read in slices.
-        val ordered = entries.sortedBy(::orderKey)
+        // variables; the rows are read in slices. A game is in a pass once, however many times the list names it
+        // (Droidtop/tracker#834: one game scraped twice in a pass).
+        val ordered = entries.distinctBy { it.id }.sortedBy(::orderKey)
         val existing = ordered.map { it.id }.chunked(METADATA_READ_CHUNK)
             .flatMap { dao.getGameMetadata(it) }.associateBy { it.id }
         val filter = filter ?: ScrapeOptionsPrefs.filter(context)
         // Only a pass the person started over everything (a game's own Scrape, or "Everything") replaces what a game
         // already has; any other pass fills what is missing (Droidtop/tracker#318 §7.2).
         val refresh = !auto && filter == ScrapeFilter.ALL
-        val candidates = if (resumeAfter == null) ordered else ordered.filter { orderKey(it) > resumeAfter }
+        val afterCheckpoint = if (resumeAfter == null) ordered else ordered.filter { orderKey(it) > resumeAfter }
+        // An automatic pass does not ask again about a game the last answer for was "no match" or "needs a pick" under
+        // the same name (Droidtop/tracker#834): that is asked again when the name changes, or when the person asks (a
+        // pass they start, the game's own Scrape, Review matches).
+        val remembered = if (auto) rememberedMisses(context, existing) else emptyMap()
+        val (candidates, unchanged) = afterCheckpoint.partition { entry -> remembered[entry.id] != searchTitleFor(entry) }
+        for (entry in unchanged) {
+            dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc]: not asked, the last answer under this name stands")
+            reported(entry, Outcome.SKIPPED, "Not asked again: the last answer under this name stands")
+        }
         val (targets, passedOver) = candidates.partition { entry ->
             val row = existing[entry.id]
             picked(row, hasCover = hasCover(context, entry, row), filter = filter)
@@ -687,6 +697,20 @@ object PcScraper {
             dev.droidtop.library.ScanLog.write("scrape: PC and engine games summary: ${it.replace('\n', ' ')}")
         }
     }
+
+    /** Whether [value] is an address a picture can be fetched from. Pure. */
+    internal fun isAddress(value: String?): Boolean =
+        value != null && (value.startsWith("https://", ignoreCase = true) || value.startsWith("http://", ignoreCase = true))
+
+    /**
+     * The games whose last answer was "no match" or "needs a pick", with the name that was searched for
+     * (Droidtop/tracker#834): Review matches' queue keeps both. A game marked [NEEDS_PICK] before the queue kept answers
+     * has no searched name, so it is left to be asked. Database work.
+     */
+    private suspend fun rememberedMisses(context: Context, rows: Map<String, GameMetadataEntity>): Map<String, String> =
+        dev.droidtop.library.identity.MatchQueue.items(context)
+            .filter { rows[it.gameId]?.scrapeConfidence.let { c -> c == null || c == NEEDS_PICK } }
+            .associate { it.gameId to it.searched }
 
     /**
      * One line of the scrape job's report (docs/SPEC.md "Jobs and their results"): the game, what happened to it in
@@ -1077,10 +1101,12 @@ object PcScraper {
 
         /** Downloads the first of [candidates] that arrives into [folder]; its path, or null. */
         fun fetch(field: String, enabled: Boolean, folder: String, candidates: List<Sourced<String>>): String? {
-            if (!enabled || candidates.isEmpty() || systemFolder == null || gamesRoot == null) return null
+            // Only an address is fetched: a source that gave none (or the text "null") is no picture (Droidtop/tracker#834).
+            val addresses = candidates.filter { isAddress(it.value) }
+            if (!enabled || addresses.isEmpty() || systemFolder == null || gamesRoot == null) return null
             val destination = PcMediaLayout.mediaFile(gamesRoot, systemFolder, folder, baseName)
             if (!replaces && destination.isFile) return destination.absolutePath
-            val won = candidates.firstOrNull { candidate ->
+            val won = addresses.firstOrNull { candidate ->
                 runCatching { downloadImage(candidate.value, destination) }
                     .onFailure { android.util.Log.w("droidtop.Scraper", "${FieldSources.LABELS[field]} for ${entry.title} failed: ${it.message}") }
                     .isSuccess

@@ -203,9 +203,16 @@ object PluginJobsCenter {
         }
     }
 
-    /** Adds interrupted resumable jobs, as paused, to the live list; a job already tracked is left as it is. */
+    /**
+     * Adds interrupted resumable jobs, as paused, to the live list; a job already tracked is left as it is. A job that
+     * cannot be paused comes back ended ([stoppedByRestart]): paused, it had no Resume, and whoever asked for its kind
+     * again joined it and waited for ever. That was the update check after a self-update, so Check now did nothing
+     * (Droidtop/tracker#837, console dev.2758: "PAUSED (1): Check for updates").
+     */
     internal fun restore(restored: List<Entry>) {
-        state.update { current -> (restored.filter { old -> current.none { it.jobId == old.jobId } } + current).distinctBy { it.jobId } }
+        val now = System.currentTimeMillis()
+        val back = restored.map { if (!it.done && !it.pausable && it.nativeKind !in nativeReattachKinds) stoppedByRestart(it, now) else it }
+        state.update { current -> (back.filter { old -> current.none { it.jobId == old.jobId } } + current).distinctBy { it.jobId } }
         // A job that carries on from what it left on disk (a download's partial file) is not left paused for
         // the person to resume: it runs again from its checkpoint.
         // One the person paused stays paused: only the restart stopped the others (console, 0.2.0-dev.2129: "Get details
@@ -218,6 +225,18 @@ object PluginJobsCenter {
             launchNative(entry.jobId, entry.resumePayload)
         }
     }
+
+    /** [entry], which could not be paused, as the restart left it: ended, saying so. Pure. */
+    internal fun stoppedByRestart(entry: Entry, nowMs: Long): Entry = entry.copy(
+        done = true,
+        paused = false,
+        pausedByPerson = false,
+        result = PluginResult.failure(STOPPED_BY_RESTART),
+        statusLine = STOPPED_BY_RESTART,
+        finishedAtMs = nowMs,
+    )
+
+    internal const val STOPPED_BY_RESTART = "Stopped when droidtop restarted"
 
     private val writeQueued = java.util.concurrent.atomic.AtomicBoolean(false)
 

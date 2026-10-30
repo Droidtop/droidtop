@@ -153,7 +153,20 @@ internal fun CompanionNestedScreen(
     val context = LocalContext.current
     var version by remember { mutableStateOf(0) }
     val items by produceState<List<CatalogItem>?>(null, screen, version) {
-        value = withContext(Dispatchers.IO) { runCatching { screen.groups(context).flatMap { it.items } }.getOrDefault(emptyList()) }
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val groups = screen.groups(context)
+                // A strip page (Updates' views) is drawn as its top and its first view, All, until the companion
+                // has the strip (Droidtop/tracker#786 S2a2): every view in a row would list each item twice.
+                val shown = if (screen.layout == dev.droidtop.library.settings.CatalogLayout.STRIP) {
+                    val top = groups.filter { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID }
+                    top + groups.filterNot { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID }.take(1)
+                } else {
+                    groups
+                }
+                shown.flatMap { it.items }
+            }.getOrDefault(emptyList())
+        }
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

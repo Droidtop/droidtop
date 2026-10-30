@@ -42,7 +42,8 @@ class LeftMenuTest {
 
     @Test
     fun `Updates and Get new games are pages of Downloads and Updates, not rows of their own`() {
-        // Owner, 2026-10-24: "Updates should be in the Downloads and Updates menu" (Droidtop/tracker#639).
+        // The owner, 2026-10-30 (Droidtop/tracker#792): "Uh... There's a separate "updates" item in the left menu, now?";
+        // the way in is Downloads and Updates' "Updates · N available" row.
         assertFalse(GamingSection.NEW_GAMES in menuSectionsFor(UiMode.FULL))
         assertFalse(GamingSection.UPDATES in menuSectionsFor(UiMode.FULL))
         val downloads = all.single { it.section == GamingSection.DOWNLOADS }

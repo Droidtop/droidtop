@@ -270,15 +270,21 @@ fun esDeHelpRowOwner(
     showHints: Boolean,
     touchFirst: Boolean,
     claim: HelpRowClaim,
-): HelpRowOwner = when (claim) {
-    // A screen's own bar IS the control surface for that screen; there
-    // is nothing for the shell's to add. Switching hints off silences it
-    // like any other.
-    HelpRowClaim.SCREEN -> if (showHints) HelpRowOwner.SCREEN else HelpRowOwner.NONE
-    // The theme's row is a legend: with no pad attached it names buttons
-    // a finger cannot reach, so the shell's tappable bar takes the row.
-    HelpRowClaim.THEME -> if (showHints && touchFirst) HelpRowOwner.SHELL else HelpRowOwner.THEME
-    HelpRowClaim.NONE -> if (showHints) HelpRowOwner.SHELL else HelpRowOwner.NONE
+    // Whether the pad is what the person is using now (PadModality). "Show button hints" off hides the
+    // bar only then: the bar is also the touch route to what the pad buttons do, and for some of it
+    // (the Start menu) the only one, so a person touching always has it (Droidtop/tracker#839).
+    padDriving: Boolean = true,
+): HelpRowOwner {
+    val shown = showHints || !padDriving
+    return when (claim) {
+        // A screen's own bar IS the control surface for that screen; there
+        // is nothing for the shell's to add.
+        HelpRowClaim.SCREEN -> if (shown) HelpRowOwner.SCREEN else HelpRowOwner.NONE
+        // The theme's row is a legend: with no pad attached it names buttons
+        // a finger cannot reach, so the shell's tappable bar takes the row.
+        HelpRowClaim.THEME -> if (shown && touchFirst) HelpRowOwner.SHELL else HelpRowOwner.THEME
+        HelpRowClaim.NONE -> if (shown) HelpRowOwner.SHELL else HelpRowOwner.NONE
+    }
 }
 
 /**

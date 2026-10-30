@@ -42,6 +42,20 @@ class SettingsCategoriesTest {
     }
 
     @Test
+    fun `two rows with one id, a game and its linked copy, still get keys of their own`() {
+        // Droidtop/tracker#837: the same update row twice gave the column one key twice and killed droidtop.
+        val game = "updates_game_/storage/7EF7-E477/GameSync/renpy/30YearOldVirgin-0.37.dv-pc"
+        val groups = listOf(
+            CatalogGroup(id = "updates_view_games", title = "Games", items = listOf(link(game, screen("s1")), link(game, screen("s2")), link("other", screen("s3")))),
+        )
+
+        val keys = settingsCategories(groups, untitledLabel = "Updates").map { it.key }
+
+        assertEquals(listOf("link:$game", "link:$game#2", "link:other"), keys)
+        assertEquals(keys.size, keys.toSet().size)
+    }
+
+    @Test
     fun `untitled groups are one entry named after the screen, not the same label twice`() {
         val groups = listOf(
             CatalogGroup(id = "a", title = null, items = listOf(toggle("t1"))),

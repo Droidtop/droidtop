@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.TextRange
 import androidx.compose.foundation.text.BasicTextField
@@ -68,6 +69,7 @@ import dev.droidtop.library.integrations.SourceDestinations
 import dev.droidtop.library.integrations.SourceHit
 import dev.droidtop.library.integrations.UnavailableSource
 import dev.droidtop.library.integrations.UnifiedSearch
+import dev.droidtop.library.integrations.SourceSelection
 import dev.droidtop.library.integrations.SourceFix
 import dev.droidtop.library.settings.StatusMark
 import dev.droidtop.library.settings.Notices
@@ -509,6 +511,9 @@ internal fun LibrarySearchDialog(
     settingsRoot: CatalogScreen? = null,
     // The person opened the search to type (a Search row they picked), so typing starts at once (Droidtop/tracker#612).
     startTyping: Boolean = false,
+    // Get games (Droidtop/tracker#825): the source filter's chips under the field, and with no text what the sources
+    // feature now, so it opens on games rather than a blank list.
+    getGames: Boolean = false,
 ) {
     // The field reopens with what was typed and the caret at its END, so Backspace deletes the last letter
     // (Droidtop/tracker#376: a plain String field put the caret at the start).
@@ -569,6 +574,8 @@ internal fun LibrarySearchDialog(
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     // The row under the pad's cursor, by key so a source answering above it does not move it; null is the field.
     var focusKey by remember { mutableStateOf<String?>(null) }
+    // The chip under the cursor while it is on the source filter's row (Left and Right move it).
+    var chipAt by remember { mutableIntStateOf(0) }
     val currentLocal by rememberUpdatedState(local)
     val currentFilter by rememberUpdatedState(sourceFilter)
     // The settings index is built once, off the main thread, the first time the text is long enough to match one
@@ -611,14 +618,18 @@ internal fun LibrarySearchDialog(
     // Restarted by every keystroke: the previous query is cancelled, the device's rows are back at once and the sources
     // are asked only once the text rests (UnifiedSearch.SOURCE_DEBOUNCE_MS).
     LaunchedEffect(text, systemId, sourcePlatform, searchTick, localKey, handoffs) {
-        UnifiedSearch.search(
-            context = context,
-            query = text,
-            platform = sourcePlatform ?: systemId,
-            local = { q -> currentLocal?.invoke(q).orEmpty() + handoffRows(q) },
-            carry = state.sourceHits,
-            keep = { result -> currentFilter?.invoke(result) ?: true },
-        ).collect { state = it }
+        // Set up off the main thread: it reads the source filter's preferences (SourceSelection).
+        withContext(Dispatchers.IO) {
+            UnifiedSearch.search(
+                context = context,
+                query = text,
+                platform = sourcePlatform ?: systemId,
+                local = { q -> currentLocal?.invoke(q).orEmpty() + handoffRows(q) },
+                carry = state.sourceHits,
+                keep = { result -> currentFilter?.invoke(result) ?: true },
+                featuredWhenEmpty = getGames,
+            )
+        }.collect { state = it }
     }
 
     // Opening a source's result: its destination is worked out off the main thread, then its detail opens. The row is
@@ -645,6 +656,22 @@ internal fun LibrarySearchDialog(
     val lines = buildList<SearchLine> {
         switches.forEach { switch ->
             add(SearchLine.Entry("switch:${switch.label}", switch.label, on = switch.on, onPick = switch.toggle))
+        }
+        // Where Get games searches (owner, 2026-10-30, Droidtop/tracker#825: "a filter to choose where it searches"): a
+        // chip per source, on or off and kept (SourceSelection), turning while its source is asked and saying so when it
+        // failed. A press turns it over and searches again.
+        if (getGames) {
+            val chips = sourceChips(state)
+            if (chips.isNotEmpty()) {
+                add(
+                    SearchLine.Chips(SOURCE_CHIPS_KEY, chips, at = chipAt.coerceIn(0, chips.lastIndex)) { chip ->
+                        coroutineScope.launch {
+                            withContext(Dispatchers.IO) { SourceSelection.set(context, chip.id, !chip.on) }
+                            searchTick++
+                        }
+                    },
+                )
+            }
         }
         if (local == null) {
             add(
@@ -687,7 +714,9 @@ internal fun LibrarySearchDialog(
         fun rowLine(row: SearchRow): SearchLine = SearchLine.Entry(
             "row:${row.kind}:${row.key}",
             row.title,
-            subtitle = row.detail,
+            // One game from several sources names them all (Droidtop/tracker#825: "from F95zone · LewdCorner").
+            subtitle = sourcesLine(row.choices.map { UnifiedSearch.placeOf(it) }) ?: row.detail,
+            art = row.hit?.result?.artUrl?.takeIf { it.isNotBlank() },
             value = when {
                 row.others.isNotEmpty() -> "${row.choices.size} places"
                 else -> row.hit?.let { if (it.source.canGet(it.result)) "Get" else null }
@@ -713,13 +742,14 @@ internal fun LibrarySearchDialog(
                     },
                 )
             }
-        } else if (text.isNotBlank()) {
+        } else if (text.isNotBlank() || getGames) {
             // What is here first, then the matches from the download sources under their own heading (owner, 2026-10-23:
-            // "Get new games should be presented under the search results", Droidtop/tracker#612).
+            // "Get new games should be presented under the search results", Droidtop/tracker#612). Get games with no text
+            // lists what the sources feature now (Droidtop/tracker#825).
             val (here, new) = state.rows.partition { !it.isNew }
             here.forEach { row -> add(rowLine(row)) }
             if (new.isNotEmpty()) {
-                add(SearchLine.Header(dev.droidtop.library.integrations.GetGamesEntry.NEW_GAMES))
+                add(SearchLine.Header(if (state.featured) FEATURED else dev.droidtop.library.integrations.GetGamesEntry.NEW_GAMES))
                 new.forEach { row -> add(rowLine(row)) }
             }
             // Settings are a different thing being searched (docs/SPEC.md 7k), so they are a section of their own after the
@@ -732,8 +762,8 @@ internal fun LibrarySearchDialog(
                 }
             }
             when {
-                !state.settled -> add(SearchLine.Note("Searching"))
-                state.rows.isEmpty() && settingsHits.isEmpty() -> add(SearchLine.Note("No match"))
+                !state.settled -> add(SearchLine.Note(if (text.isBlank()) "Asking your sources" else "Searching"))
+                state.rows.isEmpty() && settingsHits.isEmpty() -> add(SearchLine.Note(if (text.isBlank()) "Nothing featured right now" else "No match"))
             }
             if (state.settled) {
                 // Sources that wait for the person: one row that opens the approval, not a line per plugin.
@@ -858,7 +888,7 @@ internal fun LibrarySearchDialog(
             statusLine?.let { add(SearchLine.Note(it)) }
         }
     }
-    val entries = lines.filterIsInstance<SearchLine.Entry>()
+    val entries = lines.filterIsInstance<SearchLine.Stop>()
 
     if (activeCatalog == null) ShellDialog(
         // Back from the places of one game returns to the results, as B does.
@@ -882,6 +912,17 @@ internal fun LibrarySearchDialog(
                             // From the places of one game, B goes back to the results; from the results it closes.
                             if (choosing != null) choosing = null else onDismiss()
                             true
+                        }
+                        // On the source filter's row, Left and Right move between its chips.
+                        GamepadAction.LEFT, GamepadAction.RIGHT -> {
+                            val chips = entries.getOrNull(at) as? SearchLine.Chips
+                            if (chips == null) {
+                                false
+                            } else {
+                                val step = if (press.action == GamepadAction.RIGHT) 1 else -1
+                                chipAt = (chips.at + step).coerceIn(0, chips.chips.lastIndex)
+                                true
+                            }
                         }
                         GamepadAction.DOWN -> if (entries.isEmpty()) {
                             false
@@ -937,7 +978,7 @@ internal fun LibrarySearchDialog(
                 .padding(20.dp),
         ) {
             Text(
-                "Search",
+                if (getGames) GetGamesEntry.LABEL else "Search",
                 style = MaterialTheme.typography.titleLarge,
                 color = MenuTokens.OnSurface,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
@@ -951,7 +992,13 @@ internal fun LibrarySearchDialog(
                     if (changed) onTextChange(it.text)
                 },
                 singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Search),
+                // Android's keyboard does not come up just because the field took the cursor: Compose raised it on
+                // every focus, over the Gaming screen, even where droidtop's own keyboard serves the field on the
+                // companion (Droidtop/tracker#832). The one rule every droidtop field follows (raisesKeyboardWithFocus).
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    imeAction = ImeAction.Search,
+                    showKeyboardOnFocus = dev.droidtop.shell.gamepad.raisesKeyboardWithFocus,
+                ),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                     onSearch = {
                         keyboard?.hide()
@@ -987,6 +1034,11 @@ internal fun LibrarySearchDialog(
                             focusKey = line.key
                             line.onPick()
                         }
+                        is SearchLine.Chips -> SourceChipRow(line, cursorAt = line.at.takeIf { line.key == focusKey }) { index ->
+                            focusKey = line.key
+                            chipAt = index
+                            line.toggle(line.chips[index])
+                        }
                     }
                 }
             }
@@ -1013,9 +1065,21 @@ internal data class SearchSwitch(val label: String, val on: Boolean, val toggle:
 private sealed interface SearchLine {
     data class Header(val text: String) : SearchLine
     data class Note(val text: String) : SearchLine
-    class Entry(
+
+    /** A line the pad's cursor stops on; A runs [onPick]. */
+    sealed interface Stop : SearchLine {
         /** Stable across a redraw, so the cursor stays on its row while sources answer above it. */
-        val key: String,
+        val key: String
+        val onPick: () -> Unit
+    }
+
+    /** Get games' source filter: one row of chips, Left and Right between them, A turns the one under the cursor over. */
+    class Chips(override val key: String, val chips: List<SourceChip>, val at: Int, val toggle: (SourceChip) -> Unit) : Stop {
+        override val onPick: () -> Unit = { chips.getOrNull(at)?.let(toggle) }
+    }
+
+    class Entry(
+        override val key: String,
         val title: String,
         val subtitle: String? = null,
         val value: String? = null,
@@ -1026,8 +1090,57 @@ private sealed interface SearchLine {
         val iconFile: String? = null,
         /** A state glyph beside the title (a failed source's attention, Droidtop/tracker#746). */
         val mark: StatusMark? = null,
-        val onPick: () -> Unit,
-    ) : SearchLine
+        /** A source result's box art, a file or a web address, drawn before the row (Droidtop/tracker#825). */
+        val art: String? = null,
+        override val onPick: () -> Unit,
+    ) : Stop
+}
+
+/** One source in Get games' filter: on or off, still being asked, or failed (its short reason). */
+internal data class SourceChip(val id: String, val label: String, val on: Boolean, val busy: Boolean, val failed: Boolean)
+
+/** The filter's chips: the sources asked, in their order, then the ones turned off. Pure. */
+internal fun sourceChips(state: UnifiedState): List<SourceChip> =
+    state.sources.map { SourceChip(it.source.id, it.source.label, on = true, busy = it.pending, failed = it.failure != null) } +
+        state.off.map { SourceChip(it.id, it.label, on = false, busy = false, failed = false) }
+
+/** "from F95zone · LewdCorner" for a game more than one source has, else null (the row's own detail says it). Pure. */
+internal fun sourcesLine(places: List<String>): String? =
+    places.distinct().takeIf { it.size > 1 }?.joinToString(" · ", prefix = "from ")
+
+/** The heading over what the sources feature when Get games has no text yet. */
+private const val FEATURED = "Featured"
+
+/** The source filter's row key. */
+private const val SOURCE_CHIPS_KEY = "source_chips"
+
+/** The source filter, drawn: a chip per source, its ring where the pad's cursor is ([cursorAt]). */
+@Composable
+private fun SourceChipRow(line: SearchLine.Chips, cursorAt: Int?, onPick: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        line.chips.forEachIndexed { index, chip ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                dev.droidtop.shell.gamepad.ShellChip(
+                    label = if (chip.failed) "${chip.label} · failed" else chip.label,
+                    on = chip.on,
+                    selected = cursorAt == index,
+                    onClick = { onPick(index) },
+                )
+                // Turning while its source is asked (show, then say).
+                if (chip.busy) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.padding(start = 4.dp).size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = MenuTokens.OnSurfaceMuted,
+                    )
+                }
+            }
+        }
+    }
 }
 
 /** One row of the one list: an app with its icon, a library game, a source's result, or a follow-up action. */
@@ -1039,6 +1152,14 @@ private fun SearchEntryRow(entry: SearchLine.Entry, selected: Boolean, onPick: (
                 bitmap = it.asImageBitmap(),
                 contentDescription = null,
                 modifier = Modifier.padding(end = 8.dp).size(40.dp),
+            )
+        }
+        entry.art?.let { art ->
+            coil3.compose.AsyncImage(
+                model = if (art.startsWith("https://") || art.startsWith("http://")) art else java.io.File(art),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.padding(end = 8.dp).size(width = 48.dp, height = 64.dp).clip(dev.droidtop.shell.gamepad.Corners.Crisp),
             )
         }
         MenuRow(

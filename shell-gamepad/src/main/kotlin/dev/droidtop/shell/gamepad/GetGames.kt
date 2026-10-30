@@ -77,7 +77,7 @@ internal fun GetGamesChip(
  * no device rows of its own: the place it was opened from already lists what is here.
  */
 @Composable
-internal fun GetGamesSearch(
+fun GetGamesSearch(
     systemId: String? = null,
     systemFolder: java.io.File? = null,
     pc: Boolean = false,
@@ -97,6 +97,7 @@ internal fun GetGamesSearch(
         systemFolder = systemFolder,
         local = { emptyList() },
         sourcePlatform = if (pc) dev.droidtop.library.integrations.SourceDestinations.PC_PLATFORM else null,
+        getGames = true,
     )
 }
 

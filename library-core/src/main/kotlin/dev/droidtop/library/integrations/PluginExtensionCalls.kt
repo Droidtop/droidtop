@@ -799,6 +799,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
                 if (row.isNull(name)) null else row.optString(name).trim().takeIf { it.isNotEmpty() }?.take(max)
             val id = text("id") ?: askedId
             if (id != askedId) return null
+            // Each mirror once, whatever systems it covers (Droidtop/tracker#838), as for a contract 3 record.
             val downloads = row.optJSONArray("downloads")?.let { array ->
                 (0 until minOf(array.length(), MAX_DOWNLOADS)).mapNotNull { i ->
                     val d = array.optJSONObject(i) ?: return@mapNotNull null
@@ -817,7 +818,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
                         systems = dev.droidtop.pluginhost.DownloadSystems.of(dev.droidtop.pluginhost.DownloadSystems.read(d.optJSONArray("systems")), section),
                     )
                 }
-            }.orEmpty()
+            }.orEmpty().let(ItemPageFacets::distinctDownloads)
             val tags = row.optJSONArray("tags")?.let { array ->
                 (0 until array.length()).mapNotNull { array.optString(it).trim().takeIf { t -> t.isNotEmpty() && t.length <= 40 } }.distinct().take(MAX_TAGS)
             }.orEmpty()

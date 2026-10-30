@@ -180,7 +180,9 @@ internal fun EntryDetailScreen(
 ) {
     val context = LocalContext.current
     val launchFocus = remember { FocusRequester() }
-    LaunchedEffect(entry) { launchFocus.requestFocus() }
+    // Play holds focus from the start, asked each frame until the page's window has it: one early request was lost,
+    // and the cursor started on whatever the fallback reached first (Droidtop/tracker#820).
+    LaunchedEffect(entry) { requestFocusWhenAttached(launchFocus, "Game page Play") }
 
     var editingMetadata by remember { mutableStateOf(false) }
     var viewingMedia by remember(entry) { mutableStateOf(false) }

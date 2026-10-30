@@ -36,6 +36,26 @@ internal fun AppOptionsMenu(
     onUninstall: (() -> Unit)? = null,
     detailsLabel: String = "App details",
 ) {
+    // The game that is running leads with its own sheet, this menu one row into it (Droidtop/tracker#740).
+    RunningGameFirst(entry, onDismiss) {
+        AppOptionsSheet(entry, onPrimary, onDetails, onToggleFavorite, onDismiss, isGame, onMarkGame, hidden, onToggleHidden, onUninstall, detailsLabel)
+    }
+}
+
+@Composable
+private fun AppOptionsSheet(
+    entry: LibraryEntry,
+    onPrimary: (() -> Unit)?,
+    onDetails: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onDismiss: () -> Unit,
+    isGame: Boolean,
+    onMarkGame: (() -> Unit)?,
+    hidden: Boolean,
+    onToggleHidden: (() -> Unit)?,
+    onUninstall: (() -> Unit)?,
+    detailsLabel: String,
+) {
     // What plugins offer on this app (C4, Droidtop/tracker#67): the same page as Standard's long-press menu.
     var pluginScreen by remember(entry) { mutableStateOf<CatalogScreen?>(null) }
     val hasPluginActions = rememberHasPluginActions(entry)

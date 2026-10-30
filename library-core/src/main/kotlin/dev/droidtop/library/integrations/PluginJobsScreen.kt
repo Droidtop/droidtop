@@ -61,6 +61,9 @@ object PluginJobsScreen {
      */
     const val QUICK_MENU_ID = "quick_menu_downloads"
 
+    /** The row that opens Updates ([updatesGroup]). */
+    const val UPDATES_LINK_ID = "updates_open"
+
     /** The Download rules screen's registry id, registered by :app (`DownloadRulesCatalog`). */
     const val RULES_SCREEN_ID = "download_rules"
 
@@ -90,14 +93,34 @@ object PluginJobsScreen {
             groups = { context ->
                 val nowMs = System.currentTimeMillis()
                 val extra = kept.read(context, nowMs)
-                groupsFor(PluginJobsCenter.entries().value, nowMs) +
+                dev.droidtop.library.settings.UpdatesWaiting.refresh?.invoke(context)
+                listOf(updatesGroup()) + groupsFor(PluginJobsCenter.entries().value, nowMs) +
                     (extra?.let { (before, after) -> before + after } ?: listOf(loadingGroup())) +
                     rulesGroup()
             },
             onLeave = { kept.clear() },
-            live = kotlinx.coroutines.flow.merge(PluginJobsCenter.entries(), kept.changes),
+            live = kotlinx.coroutines.flow.merge(PluginJobsCenter.entries(), kept.changes, dev.droidtop.library.settings.UpdatesWaiting.count),
         )
     }
+
+    /**
+     * The way to Updates from Downloads and Updates and the Quick Menu's Downloads tab: one row, "Updates · N
+     * available", opening the page (the owner, 2026-10-30, Droidtop/tracker#792: "An updates link should be in the
+     * Downloads and Updates tab. Not there directly, but a shortcut"). The updates are only on their own page.
+     */
+    fun updatesGroup() = CatalogGroup(
+        id = "updates_link",
+        title = null,
+        items = listOf(
+            dev.droidtop.library.settings.NestedScreenItem(
+                id = UPDATES_LINK_ID,
+                title = Place.UPDATES.title,
+                subtitle = "droidtop, plugins, apps and games with a newer version",
+                valueLabel = { dev.droidtop.library.settings.UpdatesWaiting.line(dev.droidtop.library.settings.UpdatesWaiting.count.value) },
+                registryId = Place.ID_UPDATES,
+            ),
+        ),
+    )
 
     /** Get games and Sources while they are first read: one row of their own, loading. */
     private fun loadingGroup() = CatalogGroup(

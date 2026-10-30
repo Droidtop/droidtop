@@ -27,6 +27,23 @@ class HelpRowOwnerTest {
     }
 
     @Test
+    fun `hints switched off never hide the touch route from a person touching`() {
+        // Droidtop/tracker#839: the bar is the touch route to the pad buttons, and the Start menu has no other.
+        assertEquals(
+            HelpRowOwner.SHELL,
+            esDeHelpRowOwner(showHints = false, touchFirst = true, claim = HelpRowClaim.NONE, padDriving = false),
+        )
+        assertEquals(
+            HelpRowOwner.SCREEN,
+            esDeHelpRowOwner(showHints = false, touchFirst = false, claim = HelpRowClaim.SCREEN, padDriving = false),
+        )
+        assertEquals(
+            HelpRowOwner.SHELL,
+            esDeHelpRowOwner(showHints = false, touchFirst = true, claim = HelpRowClaim.THEME, padDriving = false),
+        )
+    }
+
+    @Test
     fun `a theme still draws its own row with droidtop's hints switched off`() {
         // The pref is droidtop's own bar; a themed view switched off by
         // it would lose the row the THEME drew, which is not what the

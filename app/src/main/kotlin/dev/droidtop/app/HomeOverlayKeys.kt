@@ -65,11 +65,17 @@ object HomeOverlayKeys {
                     "overlay=${decision.toOverlay} idle=${chords.idle}",
             )
         }
-        decision.open?.let { OverlayRequests.raise(OverlayRequest(it, frontDisplay, frontPackage)) }
+        decision.open?.let { raise(it) }
         if (decision.home) s.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
         if (decision.toOverlay) sink?.invoke(event)
         return decision.consume
     }
+
+    /**
+     * Opens [kind] over what is in front, as its chord does: the touch route (Android's accessibility button,
+     * [TypingAccessibilityService]) asks through here so it lands on the same display and app the chords would.
+     */
+    fun raise(kind: OverlayRequest.Kind): Boolean = OverlayRequests.raise(OverlayRequest(kind, frontDisplay, frontPackage))
 
     /** Asks for the key filter while droidtop is the default home, and drops it otherwise. */
     private fun refresh(s: AccessibilityService) {

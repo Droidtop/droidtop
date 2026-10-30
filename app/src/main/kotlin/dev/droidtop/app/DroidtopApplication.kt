@@ -9,6 +9,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.svg.SvgDecoder
 import com.android.launcher3.LauncherApplication
+import kotlinx.coroutines.launch
 import dev.droidtop.runtime.AudioHandOff
 
 /**
@@ -71,6 +72,11 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         dev.droidtop.library.controller.ConsoleLookup.forThisDevice = dev.droidtop.library.controller.HardwareDatabase::forThisDevice
         // The feature steps, before onboarding or What's new reads them (docs/SPEC.md 7b, "Update onboarding").
         WhatsNew.registerSteps()
+        // Every entry to Updates says how many are waiting (Droidtop/tracker#792): the page lists them, off the main thread.
+        dev.droidtop.library.settings.UpdatesWaiting.refresh = { context ->
+            val app = context.applicationContext
+            dev.droidtop.runtime.util.AppScopes.io.launch { runCatching { dev.droidtop.app.settings.UpdatesPage.publishCount(app) } }
+        }
         // A restore staged by "Restore droidtop" goes into place before anything opens a database (Droidtop/tracker#625).
         dev.droidtop.app.settings.DroidtopBackup.finishPendingRestore(this)
         // The scan log goes to logcat AND to a file droidtop owns, and
@@ -174,6 +180,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 AudioHandOff.mark("${javaClass.simpleName} $what (display ${window?.decorView?.display?.displayId})")
             override fun onActivityPaused(activity: Activity) {
                 activity.note("paused")
+                WhatsNew.onScreenPaused(activity)
                 if (!activity.isParkedSurface()) AudioHandOff.releaseNow("${activity.javaClass.simpleName} paused")
             }
             override fun onActivityResumed(activity: Activity) {

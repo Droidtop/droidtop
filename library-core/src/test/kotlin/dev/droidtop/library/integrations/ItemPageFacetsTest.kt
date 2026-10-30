@@ -116,4 +116,22 @@ class ItemPageFacetsTest {
         assertEquals(2000000000L, download.parts[1].size)
     }
 
+    @Test
+    fun `a mirror listed twice is one download covering both systems (tracker 838)`() {
+        fun d(url: String?, systems: List<String>, link: String = "", host: String = "MEGA") =
+            dev.droidtop.library.UpdateSources.Download("Win/Linux", host, host, link, url, systems)
+        val list = ItemPageFacets.distinctDownloads(
+            listOf(
+                d("https://mega.nz/a", listOf("windows")),
+                d("https://gofile.io/b", listOf("windows")),
+                d("https://mega.nz/a", listOf("linux")),
+                d(null, emptyList(), link = "0:MEGA"),
+                d(null, emptyList(), link = "0:MEGA"),
+                d(null, emptyList(), link = "1:MEGA"),
+            ),
+        )
+        assertEquals(listOf("https://mega.nz/a", "https://gofile.io/b", null, null), list.map { it.url })
+        assertEquals(listOf("windows", "linux"), list[0].systems)
+        assertEquals(listOf("0:MEGA", "1:MEGA"), list.drop(2).map { it.link })
+    }
 }

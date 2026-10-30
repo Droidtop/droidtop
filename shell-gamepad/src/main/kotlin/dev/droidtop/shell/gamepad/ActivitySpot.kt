@@ -40,7 +40,9 @@ import dev.droidtop.ui.shared.JobRing
 @Composable
 internal fun ActivitySpot(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val jobs by remember { PluginJobsCenter.entries() }.collectAsState()
-    val now = remember(jobs) { HappeningNow.of(jobs) } ?: return
+    // One job on the spot while it runs, its fill only moving forward (Droidtop/tracker#834).
+    val held = remember { HappeningNow.Held() }
+    val now = remember(jobs) { held.next(jobs) } ?: return
     val colors = shellJobColors()
     Box(
         contentAlignment = Alignment.Center,

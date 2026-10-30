@@ -96,7 +96,7 @@ folder of separate emulator-style apps:
   behalf or vice versa. The one real cross-launcher interop point: if the
   user's actual home screen is a *different* launcher and they open
   droidtop from there, it should default to the Desktop shell (not
-  Standard, which doesn't make sense when droidtop isn't the home
+  Mobile, which doesn't make sense when droidtop isn't the home
   screen) — configurable in settings like everything else in §7b.
 
 ## 2. Core architectural decision: Qubes-style split, not a hand-rolled compositor
@@ -472,13 +472,13 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   Quick Menu's frame already did). Before, the activity showed them, the Quick Menu hid them, the Start
   menu, windows list and search left them, and focus coming back showed them again, so the desktop
   resized under the person as sheets opened and closed. A swipe from the edge shows them for a moment.
-  Standard keeps the system bars.
+  Mobile keeps the system bars.
 - **One listener feeds the container's window list.** The bridge has room for one change listener, so the
   taskbar and the windows sheet read the same list.
 - **Android apps and games started from Desktop are in the bar** (Droidtop/tracker#352). A game or an app
   launched from the Start menu is a fullscreen Activity over the desktop, which the compositor's window list
   cannot show, so the bar and the windows sheet also list what the task manager reports running
-  (`TaskManager.snapshot`, the one list the Quick Menu, the companion and Standard's home read; it is polled
+  (`TaskManager.snapshot`, the one list the Quick Menu, the companion and Mobile's home read; it is polled
   only while Desktop shows). An entry wears the app's icon; a tap opens it where it runs (`TaskActions.bringTo`),
   a long press, or X in the sheet, closes it by the task manager's strongest path and says so only when that
   could not end it. Without Shizuku the list holds the apps droidtop opened itself, as everywhere else.
@@ -531,8 +531,8 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   destroyed service starts the next one itself, so the new one waits for the old container stop
   (`pendingStop`). Keep the desktop running and its answer are untouched. Desktop settings has the same action
   as "Restart the desktop", under the rows it applies. Lock screen is the accessibility service's
-  `GLOBAL_ACTION_LOCK_SCREEN`, the lock Standard's double tap uses. Without that service it says where to turn
-  it on, and does not open Android's accessibility settings past the disclosure Standard shows first. Sleep is
+  `GLOBAL_ACTION_LOCK_SCREEN`, the lock Mobile's double tap uses. Without that service it says where to turn
+  it on, and does not open Android's accessibility settings past the disclosure Mobile shows first. Sleep is
   not offered: Android gives an app no way to sleep the device but that lock.
 - **Linux app icons** (Droidtop/tracker#689, the coordinator's Desktop review, decided 2026-10-29). The
   container's applications carry their own icons in droidtop's chrome: Start's Linux apps rows, their taskbar
@@ -558,7 +558,7 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   opened Launcher3's settings activity with `SettingsDesktopFragment`, which drew the same catalog as stock
   Android preferences, so Desktop's two System rows looked like two different apps. Desktop's page is first, and
   its last row, "All settings", opens the rest of Settings (`global_settings`). Reached from Global settings'
-  own Desktop row it leads back there, a step B undoes. The Launcher3 fragment stays Standard's.
+  own Desktop row it leads back there, a step B undoes. The Launcher3 fragment stays Mobile's.
 - **Desktop appearance** (Droidtop/tracker#694, the coordinator's Desktop review, decided 2026-10-29). The Linux
   desktop had sway's own background and stock GTK's light look, whatever droidtop's Light or dark. Now it follows
   droidtop as the desktop starts (`DesktopAppearance`). GTK apps get `GTK_THEME=Adwaita:dark` (Adwaita is built
@@ -577,7 +577,7 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   on to `MenuRow`'s `minHeight`), never under a 48 dp touch target, so about twice as many fit as at Gaming's
   72 dp; a row with more text still grows.
 - **Search is the one search** (12a "One search"; Droidtop/tracker#351). The Start menu's first row, and R1,
-  open `LauncherSearchScreen`, the dialog the launcher's drawer and Standard use, with the local rows of this
+  open `LauncherSearchScreen`, the dialog the launcher's drawer and Mobile use, with the local rows of this
   surface: the library's entries (the scan the Start menu observes, collected only while the search is open)
   and the container's desktop entries (`ContainerApplications`, already read for the menu) as the apps,
   matched by `StartMenuSections.appMatches` on the name or generic name. A Linux app starts in the session, a
@@ -698,7 +698,15 @@ than a claim: the library and its resolution never belonged to Gaming, and
 since the modes pass they are no longer built inside `MainActivity`, which
 only runs in Gaming or Desktop.
 
-### Launcher mode — the Android home screen
+### Mobile mode (Launcher) — the home screen
+
+**Named Mobile (owner, 2026-10-30, Droidtop/tracker#827: "We're renaming "standard" to "mobile". It provides a layout
+for using the device as a phone or standard mobile tablet, etc.").** Everywhere a person reads it (the mode switcher's
+row, Default mode, Settings, the Quick Menu, onboarding) this mode is **Mobile**; it was "Standard" in settings and
+docs and "Android" in the mode switcher, Default mode and plugin placements, two names for one mode
+(Droidtop/tracker#826). `Mode.LAUNCHER.label` is the one name; its wire id stays `standard`, so saved choices, intents
+and plugin manifests are unchanged, and code names (`:shell-default`, `StandardTaskbar`, `PluginModes.STANDARD`) stay
+as they are. "Android" now means only the operating system and its own settings.
 
 The Launcher3 fork (`:shell-default`): home screen, app drawer, widgets,
 notification dots, the fork's own gestures. It contributes the *device*
@@ -734,7 +742,7 @@ droidtop back on whichever screen we're looking at. Companion if it's that scree
 `HomeTrampolineActivity` (Home on the default display) and `SecondaryDisplayActivity` (Home on a secondary display,
 Android's own `SECONDARY_HOME` start, told from droidtop placing it by the category) each ask
 `HomeDisplays.targetFor` with their own display. The companion is brought to the front on the display it lives on,
-the main screen (Gaming, Desktop or Standard, through the redirect below) on the display the shell runs on or on the
+the main screen (Gaming, Desktop or Mobile, through the redirect below) on the display the shell runs on or on the
 default display, and droidtop's secondary surface anywhere else. `CompanionActivity` and `MainActivity` record where
 they are (`HomeDisplays.companionShown`, `shellShown`); a process that is not running knows neither, and Home then
 brings the main screen, which arranges the rest. Before, the redirect always started `MainActivity`: on the console,
@@ -766,7 +774,7 @@ app screen below 10), as its hand-off work with the skip beside it; the
 Alternative choice asks the same way. Global settings' "Use droidtop as
 home screen" is On only when droidtop's launcher is enabled AND is what
 Home opens, says which app Home opens, and turning it on opens Android's
-Default home app screen. The mode switcher always lists "Android", and
+Default home app screen. The mode switcher always lists "Mobile", and
 when droidtop's launcher is not Home (or droidtop holds no home at all) it
 opens whatever Home opens; it used to vanish then (dq-onboard-02). Below
 Android 10 there is no role to request: when no Home app has been chosen
@@ -805,7 +813,7 @@ package from the drawer. It now works like this:
   goes home. Game folders opened in the grid carries its own hint row
   (A Select, Y Info, B Back), since the settings navigator draws none.
   Opened from droidtop's own home screen, B reopens that home screen as the
-  explicit "Android" one: a plain finish let Android recreate it with a
+  explicit "Mobile" one: a plain finish let Android recreate it with a
   fresh Home intent, which forwards to the default mode (dq-shell2-02).
   PC and engine games are listed as Gaming's PC Games tab lists them, one
   card per game under the game's name (`LibraryGrouping`, §7m).
@@ -878,17 +886,17 @@ into it would mean rewriting the fork's app model.
 **A mode never opens another (owner, 2026-10-24, Droidtop/tracker#639).** "While sections can share code, we
 absolutely should NOT be seeing jumps between modes." On the console an update row in Gaming opened Standard's games
 screen, whose Back opened Android's home screen (`START com.android.launcher3.Launcher`). Nothing in Gaming,
-Standard, Desktop or the companion starts another mode's screen (MainActivity in another mode, Standard's games
+Mobile, Desktop or the companion starts another mode's screen (MainActivity in another mode, Mobile's games
 screen, the Android home screen, the mode switcher); only the person's own switch does: the mode menu and switcher,
 a widget's or the app icon's mode buttons, a row that says it switches ("Open Desktop"), and entries from outside
 droidtop (Open with, an exported launch). A physical Home press goes where Home goes (below). `ModeBoundaryTest`
-counts every start of a mode's screen by file, now including Standard's launcher named by class
+counts every start of a mode's screen by file, now including Mobile's launcher named by class
 (`StandardComponents.LAUNCHER`) and its drawer's action (`Intent.ACTION_ALL_APPS`), the route the taskbar took
 (2026-10-30). Audited 2026-10-24:
 - an update row is a nested screen, never the game's page (7g, "Facets in place");
-- Standard's games screen goes Back to Standard's home only when opened in Standard;
-- a job row's game opens Standard's games screen only in Standard, Gaming's own page in Gaming, nothing in Desktop;
-- a store's library row in Settings opens Standard's games screen only in Standard;
+- Mobile's games screen goes Back to Mobile's home only when opened in Mobile;
+- a job row's game opens Mobile's games screen only in Mobile, Gaming's own page in Gaming, nothing in Desktop;
+- a store's library row in Settings opens Mobile's games screen only in Mobile;
 - Updates lists Get new games only in Gaming;
 - the Containers screen's Terminal row no longer switches to Desktop (it says the terminal is on the desktop), and
   "Start the desktop" became "Open Desktop", which says it switches;
@@ -907,7 +915,7 @@ the Alternative forwarder both ask it, on a cold start and on every Home
 press. It used to follow the last-used mode alone, so a person who
 answered "Opens into Android" and then opened Gaming once had every later
 Home press land back in Gaming (rig, dq-coordinator-24). An explicit
-"Android" from the mode switcher (`BackButtonMenu.openHome`, which names
+"Mobile" from the mode switcher (`BackButtonMenu.openHome`, which names
 the mode in its intent) shows the home screen and is never forwarded.
 Default mode offers Android whenever droidtop holds the home screen, so
 onboarding's answer reads back there instead of "Whichever was used last";
@@ -921,36 +929,36 @@ brought back Gaming, the default, so the person had left Desktop for another mod
 ruled out in #639: "we absolutely should NOT be seeing jumps between modes." Back in Desktop, the app is a chip in
 the bar ("Android apps and games started from Desktop are in the bar"). A desktop kept running after a switch to
 another mode does not count: the mode in use is then that other one. A mode the person names (the mode menu and
-switcher, "Android") still wins. The session state reaches runtime-common through `Modes.desktopLive`, which
+switcher, "Mobile") still wins. The session state reaches runtime-common through `Modes.desktopLive`, which
 `DesktopSessionService` installs. On that rig the main screen is display 2, not Android's default display, so Home
 there opens the secondary-display home (`SECONDARY_HOME`), which is droidtop's only when droidtop holds the home
 role; with another launcher holding it, Home shows that launcher's secondary screen, and droidtop's icon is the way
 back.
 
 Checked again 2026-09-26 after a UX review reported Home landing on the
-Standard shell with Default mode = Gaming: on a genuinely cold process start
+Mobile shell with Default mode = Gaming: on a genuinely cold process start
 (`am force-stop` then Home, or a reboot) `Launcher.onCreate`'s redirect is
 recorded immediately but only acted on in `onStart` (see that method's own
 comment), which does not run until Launcher3's own model load finishes --
 observed taking several seconds on a cold, not-yet-JIT-warmed process
 (emulator-5560, Android 14). Checking the resumed activity right after the
 Home key, rather than waiting those few seconds out, reads as "stuck on
-Standard" when it is actually still loading; waiting confirms it does land in
+Mobile" when it is actually still loading; waiting confirms it does land in
 Gaming. No code change from this: recorded here so the same false read isn't
 repeated. The switch-mode dialog's own, separately confirmed break is
 recorded below.
 
 Confirmed again 2026-10-16 (follow-up rig on v0.2.0-dev.2011): after a force-stop the console came back in Gaming
-though Standard was the mode in use, and its Default mode is Gaming. The owner: the console's Default mode "SHOULD
+though Mobile was the mode in use, and its Default mode is Gaming. The owner: the console's Default mode "SHOULD
 be gaming". So Gaming after a force-stop is this rule working, not a fault, and nothing changes.
 
 Revisited 2026-09-26 (launcher2, p1-dt-home-redirect-before-model-load).
 The held task's original ask was to decide the target with `ModeGate`/prefs
-alone, as early as possible, so Standard never draws when the target is
+alone, as early as possible, so Mobile never draws when the target is
 another mode. That decision already happened as early as `Launcher.onCreate`
 could make it -- before `super.onCreate()`, from `Modes.homeTarget` (a
 SharedPreferences read, no model, no disk work) -- but `Launcher.onCreate`
-could not act on a non-Standard decision without first running the rest of
+could not act on a non-Mobile decision without first running the rest of
 its own upstream body: `onStart` is where the old redirect fired (not
 `onCreate`) specifically because `Launcher.onDestroy` unconditionally
 dereferences fields (`mModel`, `mRotationHelper`, `mAppWidgetHolder`,
@@ -969,12 +977,12 @@ gating's `launcherIsDroidtopHome` check the enabled-state of). A real Home
 press now goes: system -> `HomeTrampolineActivity.onCreate` -> one
 `Modes.homeTarget` read -> an explicit-component `Intent` to whichever of
 `MainActivity` (Gaming/Desktop) or `com.android.launcher3.Launcher`
-(Standard) is the target, then `finish()`. When the target isn't Standard,
+(Mobile) is the target, then `finish()`. When the target isn't Mobile,
 Launcher3 is never constructed at all -- no `setupViews()`, no
-`LauncherModel` bind -- so the multi-second Standard frame is gone for that
-case. When the target IS Standard, the trampoline forwards to
+`LauncherModel` bind -- so the multi-second Mobile frame is gone for that
+case. When the target IS Mobile, the trampoline forwards to
 `com.android.launcher3.Launcher` explicit-to-explicit, the same pattern
-`BackButtonMenu.openHome`'s "Android" already used, so Standard draws
+`BackButtonMenu.openHome`'s "Android" already used, so Mobile draws
 exactly as before. The double-tap "hard display reinit" detection that used
 to live in `Launcher.onNewIntent`'s own redirect branch moved to the
 trampoline too (a process-lifetime timestamp, since every Home press
@@ -982,19 +990,19 @@ recreates the trampoline fresh).
 
 **One Home decision for both HOME activities (2026-10-30, Droidtop/tracker#771).**
 `HomeEntry.route` is the decision, in order: unfinished setup, Home on the
-companion's screen, an explicit "Android", a crash-looping theme (to Gaming),
+companion's screen, an explicit "Mobile", a crash-looping theme (to Gaming),
 the home target's mode with the display reinit (forced on a double tap within
-600 ms, timed once per press before any branch), else Standard.
+600 ms, timed once per press before any branch), else Mobile.
 `HomeTrampolineActivity` and `AlternativeLauncherActivity` both run it, so
 the Alternative forwarder now escapes a theme crash loop, brings the
-companion back on its screen and does the double-tap reinit as Standard does.
-On Standard each does its own step after `HomeEntry.enterStandard`: the
+companion back on its screen and does the double-tap reinit as Mobile does.
+On Mobile each does its own step after `HomeEntry.enterStandard`: the
 trampoline starts `com.android.launcher3.Launcher` marked as the explicit
 "Android" (`EXTRA_MODE=launcher`), and the forwarder starts the other
 launcher. `Launcher.java`'s own three copies of the decision (`onCreate`,
 `onStart`, `onNewIntent`) are deleted. They could disagree: the trampoline's
-Standard forward carried no mode, so Launcher3 ran `Modes.homeTarget` again
-and could send an explicit "Android" back to the default mode. The forwarder
+Mobile forward carried no mode, so Launcher3 ran `Modes.homeTarget` again
+and could send an explicit "Mobile" back to the default mode. The forwarder
 starts the other launcher a second time on the next frame, as farmerbb/Taskbar's
 HSLActivity does, because some launchers move to their default page only on a
 Home intent that reaches them while already in front. Which ones is not
@@ -1012,7 +1020,7 @@ now sets both explicitly on `Theme.DroidTop` so the real icon and its own
 background (`#1B2430`, the same slate `ic_launcher_background` uses) render
 on every API 31+ device regardless of that derivation. The review's other
 fallback-icon findings (Enginehost and several BlueStacks-bundled utility
-apps showing the platform mascot in the Standard shell's Apps grid) are not
+apps showing the platform mascot in the Mobile shell's Apps grid) are not
 a droidtop bug: that grid resolves each entry's icon through
 `PackageManager`/`LauncherActivityInfo`, which falls back only when the
 target app's own manifest has no resolvable icon resource. Enginehost's
@@ -1049,18 +1057,19 @@ Enginehost's own icon (it currently sets none, per the fallback-icon
 finding above) is that app's own fix, not droidtop's.
 
 **Switching modes is named on every surface (decided 2026-09-25).** The
-mode switcher (`BackButtonMenu`: Android, the modes that are on, and
-"Modes and settings") opens from a long-press of Back anywhere, and by
-name from each surface, because the long press alone is invisible to a
-newcomer and BlueStacks never delivers it: the Android home screen's
-long-press menu ("droidtop modes"), Gaming's Quick Menu, System tab
-("Switch mode"), and the Desktop taskbar ("Modes"). A surface with no
+mode switcher (`BackButtonMenu`: Mobile, the modes that are on, and
+Settings) opens from a long-press of Back anywhere, and by
+name from Gaming's Quick Menu, System tab ("Switch mode"), and the Desktop taskbar ("Modes"). Mobile's home screen
+has no route of its own (owner, 2026-10-30, Droidtop/tracker#827: "Long pressing HOME is what gets the mode switcher.
+Why do we need other routes, we've made the home button the sole controller"): its long-press menu lost its "droidtop
+modes" row, and the left menu Start opens there has no Switch mode. Whether long-press Back, the Quick Menu's row and
+the Desktop taskbar's go too is with the owner; until then they stay and no route is added. A surface with no
 Activity of its own to hand opens it through `ModeSwitcherActivity`. Over Gaming or Desktop, which hide Android's
 bars, the sheet's window hides them too, so it draws as the shell's own
-sheet; over Standard (Android's home screen) they stay (console
+sheet; over Mobile (Android's home screen) they stay (console
 2026-10-29, Droidtop/tracker#750: Android's status bar showed over it on
 Desktop; one host kept, agreed with the coordinator).
-"Modes and settings" opens Global settings, where each mode is switched on
+Settings (it was "Modes and settings") opens the droidtop-wide Settings page, where each mode is switched on
 and off (Settings runs in a task of its own and every opening from a
 switcher, the home screen menu or the Desktop taskbar starts it fresh, so a
 page left open never answers for the page asked for, and clearing it never
@@ -1082,19 +1091,19 @@ otherwise. The rows and what each does stay in `:shell-default`
 (`BackButtonMenu.choices`), in `ModeGate.switcherModes` order (unit-tested in
 `ModesTest`): Android always, Desktop and Gaming only while enabled, then Modes
 and settings, Reinitialize displays and Close all apps. Each mode's row carries
-its glyph (Standard's apps grid, Gaming's controller, Desktop's window) and the
+its glyph (Mobile's apps grid, Gaming's controller, Desktop's window) and the
 mode in use says "Current" in the value column; the three rows that are not
 modes sit below them under a quiet "Also here" heading, so a press meant for a
 mode does not land on Close all apps (2026-10-16, Droidtop/tracker#530). They
 stay in this sheet rather than moving to Gaming's System tab: this is the one
-menu every mode reaches, and the recovery route from Standard and Desktop.
+menu every mode reaches, and the recovery route from Mobile and Desktop.
 The first row holds the
 cursor from the start, so one A chooses it; B closes; the sheet draws its own
 hint row (A Select, B Cancel), the touch route to those presses, because the
 window has no shell footer.
 
 **Android mode without droidtop as Home asks first; the companion is the shell's, not the mode's (2026-10-14,
-Droidtop/tracker#522).** With droidtop's launcher on but another app holding Android's Home role, "Android" in
+Droidtop/tracker#522).** With droidtop's launcher on but another app holding Android's Home role, "Mobile" in
 the switcher would start that launcher, which on a dual-screen device takes the companion's screen while the
 shell stays up, with no word (rig, review D1). `ModeGate.androidAsksForHome` (droidtop's launcher on, not Home)
 makes that row ask instead, in the same sheet: "Android mode needs droidtop as Home", Set (Android's own
@@ -1128,10 +1137,10 @@ Quick Menu on every real deep-link re-entry
 per-entry reset token `GamepadShell` already uses for a rescan/section
 deep link), not by touching mode resolution.
 
-### Standard mode on a phone, a tablet and in portrait (owner, 2026-09-28)
+### Mobile mode on a phone, a tablet and in portrait (owner, 2026-09-28)
 
-Standard supports phone use. The same device can run different UIs as contexts: a phone becomes
-a desktop by plugging in and switching UIs, so Standard is a first-class phone launcher and not
+Mobile supports phone use. The same device can run different UIs as contexts: a phone becomes
+a desktop by plugging in and switching UIs, so Mobile is a first-class phone launcher and not
 only the handheld's plain home screen (Droidtop/tracker#89). What that means in the fork:
 
 - **Grids and sizes.** Launcher3's own two grid profiles ship in `res/xml/device_profiles.xml`:
@@ -1152,16 +1161,16 @@ only the handheld's plain home screen (Droidtop/tracker#89). What that means in 
 
 ### Taskbar on large screens (owner, 2026-09-29, Droidtop/tracker#88)
 
-The owner: "Tablets and larger screens are important targets." Standard mode draws a taskbar
+The owner: "Tablets and larger screens are important targets." Mobile mode draws a taskbar
 along the bottom of every tablet-sized or larger display, and of every external display, with
 the launcher's pinned apps, the apps opened since it started, an Apps button that opens the
 drawer, Recents, and a Hide button that folds it to a small tab.
 
-**Only while Standard is the mode in use (2026-10-30).** The bar is Standard's own, so it is drawn only while
-Standard is the mode in use (`TaskbarPolicy.shown`, tested), never over a game started from Gaming or Desktop.
-Standard merely being switched on is not enough. On the console (build 2730) it showed over a game started from
-Gaming, and its Apps button opened Standard's drawer (`com.android.launcher3.Launcher`): a jump from Gaming into
-Standard (the owner: "The bottom bar in game automatically kicks to tbe standard screen. And also, it exists, which
+**Only while Mobile is the mode in use (2026-10-30).** The bar is Mobile's own, so it is drawn only while
+Mobile is the mode in use (`TaskbarPolicy.shown`, tested), never over a game started from Gaming or Desktop.
+Mobile merely being switched on is not enough. On the console (build 2730) it showed over a game started from
+Gaming, and its Apps button opened Mobile's drawer (`com.android.launcher3.Launcher`): a jump from Gaming into
+Mobile (the owner: "The bottom bar in game automatically kicks to tbe standard screen. And also, it exists, which
 seems wrong"). Its Apps button also checks the mode before it opens anything.
 
 **What upstream does, and why droidtop's is its own.** Launcher3's taskbar (`TaskbarActivityContext`
@@ -1220,7 +1229,7 @@ type and the data source, which a third-party home cannot have.
 Wayland compositor's toplevels (`wlr-foreign-toplevel-management`) inside the Desktop mode surface, with
 its Start menu, container windows and tray; its window list is a list of container windows, not Android
 apps, and its host is droidtop's own activity, not a window over other apps. Nothing in it fits an
-Android-app strip over foreign apps except the look, so the Standard taskbar shares no code with it and
+Android-app strip over foreign apps except the look, so the Mobile taskbar shares no code with it and
 neither is a second mechanism for the other's job: one draws Android apps over Android, the other draws the
 container's windows inside the container.
 
@@ -1242,7 +1251,7 @@ already read, and the controller hint row ("A Select, B Cancel"), are hidden fro
 screen reader. The D-pad behaviour is untouched, so nothing here can reopen that bug.
 Only the code path is changed: TalkBack itself has not been run on either dialog.
 
-### Recents in Standard (Droidtop/tracker#90)
+### Recents in Mobile (Droidtop/tracker#90)
 
 droidtop provides no Overview of its own (no quickstep module, above). The Recents key and
 gesture belong to the system: on Android 10 and later SystemUI binds to the device's own
@@ -1271,7 +1280,7 @@ service's `GLOBAL_ACTION_RECENTS`, the same single path the lock-screen action a
 ### Widgets on any launcher (Droidtop/tracker#563, decided 2026-10-16)
 
 droidtop's own surfaces as Android app widgets and shortcuts, so they live on any launcher's pages (Niagara, Lawnchair,
-a stock launcher, Standard's own) through the standard AppWidget and ShortcutManager surfaces. The full plan, the
+a stock launcher, Mobile's own) through the standard AppWidget and ShortcutManager surfaces. The full plan, the
 widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a widget) are on #563.
 
 - **One renderer** (`DroidtopWidgets`, `:app`). Every widget is built off the main thread from what droidtop already
@@ -1325,7 +1334,7 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
   last three games played (each plays through `GameLaunchActivity`, with its art), then Search, the Quick Menu and
   Switch mode, then Gaming and Desktop, each only while that mode is on. Rebuilt whole at start, whenever a mode is
   switched on or off (`ModeStartup`) and after each game launch, off the main thread; the static shortcuts count
-  against the same per-activity cap. A launcher that shows only four (Launcher3, so Standard) shows the static ones;
+  against the same per-activity cap. A launcher that shows only four (Launcher3, so Mobile) shows the static ones;
   one that shows more (Nova, Niagara) shows these after them, in this order.
 
 ### "Full computer", and where Launcher mode stands against Nova/Apex (survey + decided 2026-09-25)
@@ -1345,13 +1354,13 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Feature | State | Where |
 |---|---|---|
 | Dock, folders, drawer, widgets, rotation, grid size | HAVE (stock Launcher3 + Murine) | `com.android.launcher3.Workspace`/`CellLayout`/`Folder`; grid size `SettingsHomeFragment.GRID_SIZE_WIDTH`/`HEIGHT` |
-| Icon packs, including **per-app** override; the same pack on Gaming's Apps tiles (Droidtop/tracker#508, 2026-10-16) | HAVE | `app/murinelauncher/icons/IconPackManager.kt:1067` (`buildIconPackEntries(perAppComponent)`), `SettingsIconPackFragment.kt`. Gaming's Apps tiles come from the same icon cache (`NativeAppProvider`), whose per-app state includes the pack, so they already followed Standard's choice. The choice is now also in the shared catalog's Appearance as **Icon pack** (system icons by default), through `IconPacks` (`:runtime-common`), which `:app` backs with `IconPackManager` (`StandardIconPacks`): one choice, one mechanism. Choosing there drops the pack cache, reloads the launcher model and rescans the Apps kinds |
+| Icon packs, including **per-app** override; the same pack on Gaming's Apps tiles (Droidtop/tracker#508, 2026-10-16) | HAVE | `app/murinelauncher/icons/IconPackManager.kt:1067` (`buildIconPackEntries(perAppComponent)`), `SettingsIconPackFragment.kt`. Gaming's Apps tiles come from the same icon cache (`NativeAppProvider`), whose per-app state includes the pack, so they already followed Mobile's choice. The choice is now also in the shared catalog's Appearance as **Icon pack** (system icons by default), through `IconPacks` (`:runtime-common`), which `:app` backs with `IconPackManager` (`StandardIconPacks`): one choice, one mechanism. Choosing there drops the pack cache, reloads the launcher model and rescans the Apps kinds |
 | Notification badges/dots | HAVE, wired | `NotificationBadgeCounter.kt`, consumed by `BubbleTextView.java` and `FolderIcon.java` |
 | Hidden apps / app lock | HAVE | `settings/hiddenapps/{AppLock,HiddenAppsRepository}.kt` |
 | Backup/restore | HAVE, wired to Settings | `backup/BackupHelper.kt`, `SettingsMiscFragment.BACKUP_EXPORT`/`BACKUP_IMPORT` |
 | Smartspace/clock widget | HAVE | `widget/smartspace/{MurineClockView,SmartspaceMode}.kt` |
 | Configurable QSB with web search providers | HAVE; the bar opens the one search (2026-10-16, Droidtop/tracker#564) | `widget/search/{SearchProvider,MurineSearchBarView,WebSearch}.kt` (8 providers + custom). Decided by the coordinator: one search. A tap on the home search bar, or what its mic heard, opens `LauncherSearchActivity`; the web is one row there, "Search the web" with the query as its detail, last in the list (`SearchRowKind.WEB`), searching with the bar's provider (`WebSearch`). Murine's own search box, its history and its bubble settings are deleted; upstream's search-bar app search (`e4e124c`) is skipped on purpose |
-| Gestures: double-tap, swipe down, two-finger swipe down and up, pinch in and out, and the Home button pressed on the first page, each assignable to nothing/lock screen/notifications/app drawer/recent apps/close all apps/companion, or droidtop's Search, Quick Menu, Switch mode and Games, or an app the person picks (Open an app, added 2026-10-16 for the Nova and Apex import, which brings across gestures that open apps) (**slots and droidtop targets added 2026-10-16**, Droidtop/tracker#564; double-tap and swipe down built 2026-09-26) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), one `LauncherPrefs.GESTURE_*_ACTION` per slot, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows; double-tap in `WorkspaceTouchListener.java`, swipe down in `SwipeDownSlotController.kt`, the two-finger slots in `MultiFingerGestureController.kt` (whichever of the swipe or the pinch crosses three touch slops first wins), Home in `Launcher.onNewIntent` (on any other page Home still goes to the first page). Two-finger swipe down opens the Quick Menu out of the box, and the home screen's long-press menu has a Quick Menu row: before, Standard had no way into it. The Quick Menu is `QuickMenuActivity` (`:app`), a translucent window over the home screen holding `QuickMenuStandalone`, the sheet Desktop's tray opens; Start closes it, Standard having no Start menu. `:shell-default` opens it and the Games grid by class name (`DroidtopScreens`). Swipe up stays Launcher3's own drawer swipe. Which gesture is which slot (two-finger swipe or pinch, and when Home runs its slot) is `StandardGestures` in `:runtime-common`, tested there (`StandardGesturesTest`); `StandardGestureTargetsTest` checks that the class names and the search action `:shell-default` opens droidtop's screens by are the real activities. The rig cannot inject these gestures (2026-10-16), so the tests carry them. Open an app is `GestureAction.LAUNCH_APP`, the app kept in a preference beside the slot's own (`<slot key>_app`); every slot runs through `HomeActions` (`dev.droidtop.shell.standard`), which starts the app through `LauncherApps.startMainActivity` (a launcher activity only, never an arbitrary intent) and says so with a notice when it is gone. A gesture's action and an icon's swipe share one type and stored form, `HomeAction` in `:runtime-common` (the action's `GestureAction.id`, written out per constant so a rename never loses a saved action, or `app:` and the component; `HomeActionTest`). The seven slots are listed once, `GestureSlot` (name, Home settings row, preference), which the importer, the two-finger controller and the settings read (Droidtop/tracker#771). Choosing Open an app shows the launchable apps in the same focusable list as the other choices; the slot changes only once an app is picked |
+| Gestures: double-tap, swipe down, two-finger swipe down and up, pinch in and out, and the Home button pressed on the first page, each assignable to nothing/lock screen/notifications/app drawer/recent apps/close all apps/companion, or droidtop's Search, Quick Menu, Switch mode and Games, or an app the person picks (Open an app, added 2026-10-16 for the Nova and Apex import, which brings across gestures that open apps) (**slots and droidtop targets added 2026-10-16**, Droidtop/tracker#564; double-tap and swipe down built 2026-09-26) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), one `LauncherPrefs.GESTURE_*_ACTION` per slot, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows; double-tap in `WorkspaceTouchListener.java`, swipe down in `SwipeDownSlotController.kt`, the two-finger slots in `MultiFingerGestureController.kt` (whichever of the swipe or the pinch crosses three touch slops first wins), Home in `Launcher.onNewIntent` (on any other page Home still goes to the first page). Two-finger swipe down opens the Quick Menu out of the box, and the home screen's long-press menu has a Quick Menu row: before, Mobile had no way into it. The Quick Menu is `QuickMenuActivity` (`:app`), a translucent window over the home screen holding `QuickMenuStandalone`, the sheet Desktop's tray opens; Start closes it, Mobile having no Start menu. `:shell-default` opens it and the Games grid by class name (`DroidtopScreens`). Swipe up stays Launcher3's own drawer swipe. Which gesture is which slot (two-finger swipe or pinch, and when Home runs its slot) is `StandardGestures` in `:runtime-common`, tested there (`StandardGesturesTest`); `StandardGestureTargetsTest` checks that the class names and the search action `:shell-default` opens droidtop's screens by are the real activities. The rig cannot inject these gestures (2026-10-16), so the tests carry them. Open an app is `GestureAction.LAUNCH_APP`, the app kept in a preference beside the slot's own (`<slot key>_app`); every slot runs through `HomeActions` (`dev.droidtop.shell.standard`), which starts the app through `LauncherApps.startMainActivity` (a launcher activity only, never an arbitrary intent) and says so with a notice when it is gone. A gesture's action and an icon's swipe share one type and stored form, `HomeAction` in `:runtime-common` (the action's `GestureAction.id`, written out per constant so a rename never loses a saved action, or `app:` and the component; `HomeActionTest`). The seven slots are listed once, `GestureSlot` (name, Home settings row, preference), which the importer, the two-finger controller and the settings read (Droidtop/tracker#771). Choosing Open an app shows the launchable apps in the same focusable list as the other choices; the slot changes only once an app is picked |
 | Drawer search over apps, droidtop's own library and the download sources, in one ranked list | **built (Droidtop/tracker#12)** | the drawer's search field opens `LauncherSearchActivity` on the shared `LibrarySearchDialog`; see "Launcher search" below |
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
 | Light or dark from droidtop's one Appearance setting, not a launcher setting of its own (2026-10-16) | HAVE | `ThemeOverride` reads `AppearancePrefs`; see 7k "Light and dark" |
@@ -1364,8 +1373,8 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Label colour on Home: from the wallpaper (the theme's own), White or Black (Nova's label colour, built 2026-10-28, Droidtop/tracker#564) | HAVE | `LabelColor`, `LauncherPrefs.LABEL_COLOR`, Settings > Icons beside Labels visibility. Home-screen icons and folder names take it (`BubbleTextView` with the workspace display, applied after the style's colour); the drawer, the dock's hidden labels and folders' insides keep the theme's. A change lays the home screen out again, as a label size change does (`InvariantDeviceProfile`) |
 | Folder covers, per folder: swipe to open (a tap starts the folder's first app, a swipe up on the icon opens the folder) and a cover (the folder shows its first app's icon in place of its preview) (built 2026-10-16, Droidtop/tracker#564) | HAVE | The open folder's footer has a Folder options button (`Folder.showOptions`), two ticks saved with the folder as `FolderInfo.FLAG_SWIPE_TO_OPEN` and `FLAG_COVER` in its `options` column, read only while the home screen is locked. The first app is the lowest rank (`FolderInfo.firstApp`), so reordering the folder changes it. The tap goes through `ItemClickHandler.onClickAppShortcut`, the same path as an icon's tap. The swipe is `FolderIcon.handleSwipeToOpen`: claimed from the workspace at half a touch slop when it goes more up than sideways (before the drawer's own swipe up takes it at one), so a page swipe that starts on the folder still pages. The cover is drawn in `FolderIcon.drawCover` from the app's in-memory icon, with the notification dot kept. A folder's own picture, drawn in place of both the preview and a cover, is one of the per-icon options below (built 2026-10-16) |
 | Widget stacks: several widgets in one place on the home screen; a vertical swipe on it shows the next, and dots down its edge show which (built 2026-10-16, Droidtop/tracker#564) | HAVE | The shown widget is the model's item; the others are bound to the launcher's widget host and listed in a side table (`WidgetStackTable` in `:runtime-common`, pure and unit-tested; `WidgetStacks` keeps it in the launcher's preferences). A swipe swaps the item's widget id and provider for the next member's and binds it again (`WidgetStacks.swipe`, from `LauncherAppWidgetHostView`). It is claimed from the workspace at half a touch slop when vertical, and not taken while what is under the finger can still scroll that way, so a list widget scrolls first. Adding: the widget's resize frame (after a long press) has a "Stack a widget here" button. `WidgetStackActivity` lists the device's widgets, gives the chosen one an id on the launcher's host, binds it (asking when the system wants that), runs its setup, and shows it in the stack. The one model change is the ghost-widget cleanup sparing live stacks' hidden widgets (shell-default/UPSTREAM.md, "Deliberate local changes"; coordinator, 2026-10-16: "Widget stacks: go with your design... Keep the Launcher3 change to that single removeGhostWidgets hook"), because the loader keeps only widgets on the grid that overlap nothing. Removing the shown widget removes the stack, and its other widgets are freed at the next load. Taking one widget out of a stack is not built. Every member, hidden ones included, is given the place's size as its widget options whenever the stack is made, a member is shown, or the stacked widget's view comes on screen (`WidgetStacks.sizeMembers`, by widget id, off the main thread): members are bound without size options, and a provider that lays out from them (the system Digital clock) otherwise drew for 0x0 (rig on 0.2.0-dev.2070) |
-| Per-icon options on the home screen, in the dock and in folders: a title of the icon's own, a picture in place of its icon, and what a swipe up or down on it does (an action of Standard's or an app); a folder's own picture in place of its preview (built 2026-10-16 for the Nova and Apex import, Droidtop/tracker#564: both launchers have them) | HAVE | An app icon's long-press menu has Customize (not while the home screen is locked): Title, Choose a picture / Remove the picture, Swipe up, Swipe down. A folder's options (its footer button) have Choose a picture / Remove the picture. All are kept per item id by `HomeItemExtras` (`dev.droidtop.shell.standard`): the title as Launcher3's own per-item label (`IconPreferences`' instance labels, which the loader had applied to pinned shortcuts only), the picture as a PNG in the app's files (`home_item_pictures/<id>.png`, fitted into a square of at most 384 pixels, read into memory as the workspace loads so no view reads a file), the swipes as `HomeAction`s in one JSON object in the launcher's preferences (`home_item_swipes`). They are drawn when a view applies its item (`BubbleTextView.applyLabel` and its icon, the folder preview, `FolderIcon`'s cover), so an icon refresh keeps them, and forgotten when the item is deleted (`ModelWriter`). A title equal to the app's own clears it; a picture is never themed. The picture is picked with the system's file picker (`ItemPictureActivity`, `ACTION_OPEN_DOCUMENT`, images only, at most 16 MB read). An icon's swipe is claimed from the workspace as a folder's swipe to open is, one shared rule (`IconSwipe`: half a touch slop to claim, more vertical than sideways, one slop to fire), and only in a direction the icon has an action for, so the workspace's own swipe up (the drawer) and swipe down (its gesture) still work from an icon with nothing set. Per-app titles from the drawer (App info's rename) stay as they were, for every icon of that app. Standard's own backup (Settings > Backup) carries the pictures, one flat entry each (`home_item_picture_<id>.png`), and a restore replaces them; titles and swipes are in the preferences it already carries |
-| Import from Nova or Apex: a `.novabackup` or `.apexbackup` (or Apex's older loose `apex_settings.bak` / `apex_data.bak`) as Standard's home screen (built 2026-10-16, Droidtop/tracker#564; the coordinator cleared it with the formats in the tracker's coordination/standard/launcher-import-formats.md, read from decompiled Apex 4.9.20 and Nova 8.0.18) | HAVE | The scope, relayed by the coordinator, 2026-10-16: "The owner wants Nova's and Apex's features in Standard, not only their layouts. So for the items the document lists as having no droidtop equivalent, build the equivalent where it's a real launcher feature: per-icon swipe actions, a custom icon and title per item, a custom folder image, and gestures that launch an app. Then import those too. Some things can't come across, like Nova's or Apex's own custom widgets. Show those in an import summary with plain reasons; never drop them silently." Settings > Misc > Backup > Import from Nova or Apex: the system's file picker (Apex's own folder under Android/data is not readable by other apps), then a summary, then Import. **Read** (`dev.droidtop.runtime.launcherimport`, pure, tested from the document's schemas): ZIP entries by base name only, each and in total capped (32 and 64 MB), a zipped `.novabackup` unwrapped once; preferences by a strict reader of the `<map>` format (no entity expanded); the database copied to the cache, opened read-only, its tables read as rows and the copy removed. Every column and key is read by presence, never by version, so older layouts read alike (Nova's `launcher.db` and legacy preferences, the pre-7.1 grid ints, `workspaceScreens` screen ids, `appgroup:` members, hidden apps at group 0). Intents are data: only a plain launch of an installed app's launcher activity is kept. **Mapping**: home and dock items, folders (with their name and multi-page flags; Nova's swipe-to-open folder becomes a cover folder with swipe to open), widgets as Launcher3's "tap to set up" placeholders (`appWidgetId` -1, restored `FLAG_ID_NOT_VALID`, `FLAG_PROVIDER_NOT_READY`, `FLAG_UI_NOT_READY`, as Nova's own restore does), grid and dock size, label switches (Apex), icon pack, gestures (to Standard's actions, or Open an app), hidden apps (added to droidtop's), drawer tabs and drawer folders (a Nova folder or Apex folder whose apps also stayed in the main list becomes a tab, said so in the summary), drawer renames (Nova), and each icon's own title, picture and swipes and a folder's own picture (the per-icon options above). Nova's half cells double the grid when it stays within 10, else round down; anything that then overlaps moves to the first free cell or a new page. Only the default dock page exists in droidtop. **Fitted to the device** (`ImportCheck`): apps not installed, widgets whose app is not, an icon pack that is not, and swipes or gestures to a missing app are left out; a folder left with one app becomes that app. **Never silent**: everything not brought across is a line of the summary with its reason (pinned shortcuts, which only their app can pin again; Nova's and Apex's own widgets; launcher actions droidtop has no equivalent of; other dock pages; gestures droidtop has no slot for; drawer-only custom icons), and so is everything changed on the way. **Apply** (`LauncherImport`, `LauncherImportActivity`): the grid and dock size first, on the main thread where the device profile follows them; then on the model thread the database for that grid (`tryMigrateDB`, as a grid change does) has every item replaced in one transaction; then the settings; then the launcher loads again. The import replaces the home screen and dock; drawer tabs, hidden apps and renames are added to. The file's entry list, its database's `user_version` and the Nova hidden-apps group's rows are logged (`droidtop.LauncherImport`) for the rig check the document asks for: there was no real backup file when this was built |
+| Per-icon options on the home screen, in the dock and in folders: a title of the icon's own, a picture in place of its icon, and what a swipe up or down on it does (an action of Mobile's or an app); a folder's own picture in place of its preview (built 2026-10-16 for the Nova and Apex import, Droidtop/tracker#564: both launchers have them) | HAVE | An app icon's long-press menu has Customize (not while the home screen is locked): Title, Choose a picture / Remove the picture, Swipe up, Swipe down. A folder's options (its footer button) have Choose a picture / Remove the picture. All are kept per item id by `HomeItemExtras` (`dev.droidtop.shell.standard`): the title as Launcher3's own per-item label (`IconPreferences`' instance labels, which the loader had applied to pinned shortcuts only), the picture as a PNG in the app's files (`home_item_pictures/<id>.png`, fitted into a square of at most 384 pixels, read into memory as the workspace loads so no view reads a file), the swipes as `HomeAction`s in one JSON object in the launcher's preferences (`home_item_swipes`). They are drawn when a view applies its item (`BubbleTextView.applyLabel` and its icon, the folder preview, `FolderIcon`'s cover), so an icon refresh keeps them, and forgotten when the item is deleted (`ModelWriter`). A title equal to the app's own clears it; a picture is never themed. The picture is picked with the system's file picker (`ItemPictureActivity`, `ACTION_OPEN_DOCUMENT`, images only, at most 16 MB read). An icon's swipe is claimed from the workspace as a folder's swipe to open is, one shared rule (`IconSwipe`: half a touch slop to claim, more vertical than sideways, one slop to fire), and only in a direction the icon has an action for, so the workspace's own swipe up (the drawer) and swipe down (its gesture) still work from an icon with nothing set. Per-app titles from the drawer (App info's rename) stay as they were, for every icon of that app. Mobile's own backup (Settings > Backup) carries the pictures, one flat entry each (`home_item_picture_<id>.png`), and a restore replaces them; titles and swipes are in the preferences it already carries |
+| Import from Nova or Apex: a `.novabackup` or `.apexbackup` (or Apex's older loose `apex_settings.bak` / `apex_data.bak`) as Mobile's home screen (built 2026-10-16, Droidtop/tracker#564; the coordinator cleared it with the formats in the tracker's coordination/standard/launcher-import-formats.md, read from decompiled Apex 4.9.20 and Nova 8.0.18) | HAVE | The scope, relayed by the coordinator, 2026-10-16: "The owner wants Nova's and Apex's features in Standard, not only their layouts. So for the items the document lists as having no droidtop equivalent, build the equivalent where it's a real launcher feature: per-icon swipe actions, a custom icon and title per item, a custom folder image, and gestures that launch an app. Then import those too. Some things can't come across, like Nova's or Apex's own custom widgets. Show those in an import summary with plain reasons; never drop them silently." Settings > Misc > Backup > Import from Nova or Apex: the system's file picker (Apex's own folder under Android/data is not readable by other apps), then a summary, then Import. **Read** (`dev.droidtop.runtime.launcherimport`, pure, tested from the document's schemas): ZIP entries by base name only, each and in total capped (32 and 64 MB), a zipped `.novabackup` unwrapped once; preferences by a strict reader of the `<map>` format (no entity expanded); the database copied to the cache, opened read-only, its tables read as rows and the copy removed. Every column and key is read by presence, never by version, so older layouts read alike (Nova's `launcher.db` and legacy preferences, the pre-7.1 grid ints, `workspaceScreens` screen ids, `appgroup:` members, hidden apps at group 0). Intents are data: only a plain launch of an installed app's launcher activity is kept. **Mapping**: home and dock items, folders (with their name and multi-page flags; Nova's swipe-to-open folder becomes a cover folder with swipe to open), widgets as Launcher3's "tap to set up" placeholders (`appWidgetId` -1, restored `FLAG_ID_NOT_VALID`, `FLAG_PROVIDER_NOT_READY`, `FLAG_UI_NOT_READY`, as Nova's own restore does), grid and dock size, label switches (Apex), icon pack, gestures (to Mobile's actions, or Open an app), hidden apps (added to droidtop's), drawer tabs and drawer folders (a Nova folder or Apex folder whose apps also stayed in the main list becomes a tab, said so in the summary), drawer renames (Nova), and each icon's own title, picture and swipes and a folder's own picture (the per-icon options above). Nova's half cells double the grid when it stays within 10, else round down; anything that then overlaps moves to the first free cell or a new page. Only the default dock page exists in droidtop. **Fitted to the device** (`ImportCheck`): apps not installed, widgets whose app is not, an icon pack that is not, and swipes or gestures to a missing app are left out; a folder left with one app becomes that app. **Never silent**: everything not brought across is a line of the summary with its reason (pinned shortcuts, which only their app can pin again; Nova's and Apex's own widgets; launcher actions droidtop has no equivalent of; other dock pages; gestures droidtop has no slot for; drawer-only custom icons), and so is everything changed on the way. **Apply** (`LauncherImport`, `LauncherImportActivity`): the grid and dock size first, on the main thread where the device profile follows them; then on the model thread the database for that grid (`tryMigrateDB`, as a grid change does) has every item replaced in one transaction; then the settings; then the launcher loads again. The import replaces the home screen and dock; drawer tabs, hidden apps and renames are added to. The file's entry list, its database's `user_version` and the Nova hidden-apps group's rows are logged (`droidtop.LauncherImport`) for the rig check the document asks for: there was no real backup file when this was built |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
 | Plugin contributions in the launcher: status tiles (**built this change**), search providers and app actions (still not buildable -- see below) | PARTIAL | `PluginStatusWidgetProvider.kt`; see below |
@@ -1376,7 +1385,7 @@ Murine `081e840` (v1.1.2, 2026-07-18), found by comparing contents since the
 import named none; `shell-default/UPSTREAM.md` records it and every upstream
 commit droidtop has decided (taken, already done here, or not for this tree),
 and `scripts/murine-upstream.sh` lists the upstream commits not decided yet.
-Upstream's fixes are taken as they come, its features as Standard's own work
+Upstream's fixes are taken as they come, its features as Mobile's own work
 reaches them; its website, version bumps and build moves (droidtop's build is
 its own) are not.
 
@@ -1389,7 +1398,7 @@ settings screen (`AppSettingsCatalogs.pluginsScreen`, "Call ...'s status
 tile"), not a real launcher surface. `PluginStatusWidgetProvider` is that
 call site: a droidtop-drawn home-screen widget (not a row inside Murine's
 own workspace grid, per §7k), same shape as the already-shipped
-`ContinuePlayingWidgetProvider` -- placeable from the Standard launcher's
+`ContinuePlayingWidgetProvider` -- placeable from the Mobile launcher's
 stock widget picker, refreshed on its own schedule (the system's periodic
 tick, or immediately after a plugin's approval/enabled state changes in
 Settings) rather than a background loop a plugin owns itself, matching
@@ -1417,7 +1426,7 @@ neither of them specific to the new widget:
    `AppFilter.HIDE_SELF_EXEMPT_CLASSES` was extended to include both
    widget providers. That list was the bug's real shape: every widget added later
    (Search, Quick launch, Downloads, Desktop, Shelf, Companion and the
-   droidtop page) was filtered out of Standard's picker again (rig,
+   droidtop page) was filtered out of Mobile's picker again (rig,
    2026-10-16, build 0.2.0-dev.1994: only Continue playing and Plugin
    status listed). The list is gone. `LauncherSelfFilter` (`:runtime-common`)
    is the one rule: droidtop's package shows its one icon and every
@@ -1501,7 +1510,7 @@ alphabetical list (same shape as the work-profile items already prepended
 there), matched against apps already in `mApps` so a hidden, filtered, or
 since-uninstalled component is silently excluded.
 
-Standard's own values kept as a string in its preferences (the widget
+Mobile's own values kept as a string in its preferences (the widget
 stacks, the drawer tabs, the recent apps and their launch counts, the icon
 swipes) all use one store, `CachedPref` in `:runtime-common`, over
 `LauncherPrefsFile` (decided 2026-10-30, Droidtop/tracker#771). Each is read
@@ -1512,7 +1521,7 @@ does not parse is logged and kept beside it as `<key>_unreadable`, as it
 was, before anything is saved over it: before, each store fell back to
 empty and the next save erased the person's tabs or swipes without a
 trace. A launch is recorded on the module's executor, not the tap's
-thread. Standard's background work runs on Launcher3's
+thread. Mobile's background work runs on Launcher3's
 `Executors.THREAD_POOL_EXECUTOR`; the one exception is Clear all apps,
 whose task-manager calls suspend and so run in droidtop's process scope
 (`AppScopes`).
@@ -1699,7 +1708,7 @@ same as the rest of droidtop's chrome — Murine's stock pages already satisfy
 this by inheriting Launcher3's own d-pad/keyboard navigation, and
 `ContinuePlayingWidgetProvider`'s rows are ordinary focusable/clickable
 widget views, reachable the same way any home-screen widget is. The pad's
-other buttons have a Standard meaning of their own (`StandardPad`,
+other buttons have a Mobile meaning of their own (`StandardPad`,
 Droidtop/tracker#699): L1/R1 turn the home pages, X opens the focused item's
 own menu (what a long press opens), Y opens the one search, Start opens the
 mode switcher, and B is Android's Back (it closes the drawer, a folder or a
@@ -3960,7 +3969,7 @@ the `ContainerRuntime` interface that already exists (§3):
   with the level or when the ledger forgets the game. It rides droidtop's accessibility overlay when that
   service is on (no grant, as the keyboard overlay does, "Typing on the add-on display") and otherwise an application overlay, which
   needs "Display over other apps": with neither, the Overlay row's value reads "Needs display over apps"
-  and A opens that grant's screen (the permission table, "Permissions are asked at the feature", lists it).
+  and A opens that grant's screen (the permission table under "Permissions", Droidtop/tracker#830, lists it).
   **Where each figure comes from, and what a normal app cannot read.** Nothing Android gives an unprivileged
   app reports another app's frames: Choreographer, FrameMetrics and `dumpsys gfxinfo` see only a process's
   own HWUI windows, and a game draws into a SurfaceView or its own GL surface. The most reliable source is
@@ -3981,7 +3990,7 @@ the `ContainerRuntime` interface that already exists (§3):
   GPU reads `--` until its counter is added. Games running inside droidtop's own process (the Wine view)
   have no separate layer to find and read `--` for FPS.
   **The one control the console allows without root: a per-game performance mode.** With a running
-  `priv.shell` provider and a game in front, a second row, **Performance mode**, cycles Standard,
+  `priv.shell` provider and a game in front, a second row, **Performance mode**, cycles Mobile,
   Performance and Battery saver through Android's GameManager: `cmd game set --mode <mode> --user 0 <package>`
   (Android 14) with `cmd game mode --user 0 <mode> <package>` (Android 12 and 13) as the fallback
   (`GameModeControl`). The row reports "Set for this game" or "Android refused"; Android keeps the mode, so
@@ -4067,7 +4076,7 @@ the `ContainerRuntime` interface that already exists (§3):
     overlay, else "Display over other apps") on the request's display, full-window, at that display's canvas and
     Interface size (the theme's `ProvideShellCanvas` reads the window's own display). The same chord again closes it,
     as does B or the menu's own close; another chord replaces it.
-  - HOME + R2 is the shell's own Quick Menu (`QuickMenuStandalone`, the one Desktop's tray and Standard's gesture
+  - HOME + R2 is the shell's own Quick Menu (`QuickMenuStandalone`, the one Desktop's tray and Mobile's gesture
     open), not a copy. Its sheets and pages are `ShellDialog`s, the shell's one modal window: Compose's Dialog in
     droidtop's own windows, and inside an overlay (`LocalInGameOverlay`) a focusable Popup filling the overlay, a
     sub-window of it, since a Dialog has no activity to belong to over another app. The UI rule `bare-dialog` fails a
@@ -4090,16 +4099,26 @@ the `ContainerRuntime` interface that already exists (§3):
     this app/game/etc").** Every tool for the thing in front is reached from HOME + L2: its guides and walkthroughs and
     notes (#817), cheats and the memory editor (#720), achievements, saves and states, its own settings, its controls
     and Report a problem. Nothing contextual goes in R2, nothing global in L2.
+  - **L2 on the running game in Gaming opens the same sheet** (`RunningGameFirst`, #740): the game menus
+    (`PcGameMenu`, `AppOptionsMenu`) lead with `RunningGameSheet` when their game is the one running, and its Game
+    options row opens the menu itself; inside it the menu does not lead with the sheet again. Resume and Restart
+    launch the shell's one way (`onLaunch`). Coming back to the shell while the game runs opens the sheet too (7f,
+    "Return to the game").
   - HOME + L2 is the menu of what is in front, contextual like L2 itself:
     - the game droidtop launched (in front, or with nothing else known to be): its own overlay
-      (`GameOptionsStandalone`), a surface of its own: the game's name and what runs it, **Resume** (closes the
-      overlay; the game never left), **Pause the game** for a console game (RetroArch's `PAUSE_TOGGLE` over its
-      command port, `RetroArchCommands`, sent only on that press; pressed again carries on), **Guides** (the game's
-      guides over it, the game menu's own `GuidesScreen`; 7i "Guides"; B comes back), **Game options** (what L2
-      opens on the game in Gaming: a PC or engine game's `PcGameMenu`, whose Game page is drawn over the game too, or
-      a console game's game menu, `AppOptionsMenu`, whose Game details is Gaming's detail screen; B there comes back),
-      and **Quit** and **Kill**, each on a second press, ending it the shell's way (`Library.quitRunning`,
-      `killRunning`) and closing the overlay once it has ended. Nothing else ever pauses the game;
+      (`GameOptionsStandalone`), a surface of its own that draws **the running game's sheet** (`RunningGameSheet`,
+      the one L2 on the running game opens in Gaming too, #740): the game's name and what runs it, **Resume** (closes
+      the overlay; the game never left), **Pause the game** for a console game (RetroArch's `PAUSE_TOGGLE` over its
+      command port, `RetroArchCommands`, sent only on that press; pressed again carries on), **Emulator** (the game's
+      own choice, `GameEmulatorChoice`), **Report a problem**, **Mouse mode** and **Controls** for a game in
+      droidtop's own screen, **Guides** (the game's guides over it, the game menu's own `GuidesScreen`; 7i "Guides";
+      B comes back), the console's **Search** where the host has one (Gaming), **Game options** (what L2 opens on the
+      game in Gaming: a PC or engine game's `PcGameMenu`, whose Game page is drawn over the game too, or a console
+      game's game menu, `AppOptionsMenu`, whose Game details is Gaming's detail screen; B there comes back), and
+      **Quit**, **Restart** and **Kill**, ending it the shell's way (`Library.quitRunning`, `killRunning`), asking
+      first in the one `ConfirmDialog` when `GameControls.asks` says so, saying the outcome on the row and closing
+      the sheet once it has ended; Restart starts the game again only then. The rows a mode shows are
+      `GameControls.rows`' (Kid and Kiosk get fewer). Nothing else ever pauses the game;
     - another app, Android's Settings included (`AppInFrontStandalone`): its name, **Resume**, **Close the app** on a
       second press (`TaskManager.close`, its outcome on the row) and **App info** (Android's page for it);
     - droidtop's own screen: that screen's own context menu, the one L2 opens there (droidtop's foreground screen is
@@ -4110,7 +4129,17 @@ the `ContainerRuntime` interface that already exists (§3):
     destination leaves the screen for droidtop: a place through `PlaceLinks` (Gaming on it when Gaming is the mode in
     use, else the screen host), any other section in Gaming. Available in every mode: Gaming's own sections (Home, the
     libraries, Apps, Settings) are offered only while Gaming is the mode in use (`Place.opensInGaming`), so a row never
-    switches the person into a mode they are not using; in Standard and Desktop it lists Search and the places. R2 in it swaps to the Quick Menu and Start in the Quick Menu to it, as in Gaming.
+    switches the person into a mode they are not using; in Mobile and Desktop it lists Search and the places. R2 in it swaps to the Quick Menu and Start in the Quick Menu to it, as in Gaming.
+  - **The touch route: Android's accessibility button (decided 2026-10-30, Droidtop/tracker#839;** the owner: "we
+    can't ASSUME gamepad presence", then "We should probably add an accessibility button that lets the user pick what
+    menu to open"). droidtop's one accessibility service asks for the button (`flagRequestAccessibilityButton`), so
+    Android shows it, in the navigation bar or floating as the person sets it in Android, whenever that service is on.
+    A tap raises `OverlayRequest.Kind.PICKER` on the display and over the app the chords would use
+    (`HomeOverlayKeys.raise`), and the overlay host draws `MenuPickerStandalone`: Quick Menu, the menu of what is in
+    front (named This game, This app or This screen), Start menu, and Switch mode (`ModeSwitcher`). Each of the first
+    three opens the very overlay its chord opens, swapped in place of the picker; nothing is a copy. It works whether
+    or not droidtop is the default home, unlike the chords, which need the key filter. This is also the mode
+    switcher's touch route over any app.
 - **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
   Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
   navigation and the places things live. The owner's direction: "branch our quick menu out a
@@ -4125,11 +4154,11 @@ the `ContainerRuntime` interface that already exists (§3):
   place ("1st", "2nd"), and picking a section for a place swaps it with the one there (`QuickMenuOrder`, the one list in
   preferences the rail and that screen both read, with the section names). A section droidtop adds later comes in at
   its own place.
-  - **Game** (only while a game is parked, first when present): the Game section below. **Quit is back** beside
-    Restart (owner, 2026-10-23: "Quit still exists on the companion, so it should exist in the quick menu"): the gentle
-    end, asking first like Restart; Kill stays the header's force-stop. Whether its Quit, Restart and
-    its Kill pill need the second A is `GameControls.needsSecondPress` (Droidtop/tracker#414, slice C8): the same
-    decision the companion's Game tab asks by, so turning Ask before stopping off makes both act at once.
+  - **No Game section (moved to L2, 2026-10-30, Droidtop/tracker#740;** the owner: "r2 is the global menu. L2 is
+    everything we can do contextually for this app/game/etc", answering "6: Yes" to moving it). What it held (Resume,
+    Emulator, Report a problem, Mouse mode, Controls, the console's search, Quit, Restart and Kill) is the running
+    game's L2 sheet, `RunningGameSheet`, below; nothing is in both. Performance (the overlay and the performance mode,
+    which apply to every game) stays here. The companion's Game tab keeps all of its rows.
   - **Running apps**: the task manager's list with Close and Clear all (`AppsTab`, #245, #252).
   - **Notifications**: unchanged (`NotificationsTab`, grant row when access is missing, #180).
   - **Social** (moved off the left menu 2026-10-24, Droidtop/tracker#644 slice 3; owner: "Game sources go into the
@@ -4162,7 +4191,7 @@ the `ContainerRuntime` interface that already exists (§3):
     Sound screen) and Do Not Disturb (with its grant row).
   - **Display**: brightness, adaptive brightness, auto-rotate, screen timeout, the Gaming
     shell's orientation (`GamingSettingsCatalog.ID_ORIENTATION`, the current mode's own per-mode
-    setting; Standard and Desktop keep theirs on their own screens) and the screen assignment
+    setting; Mobile and Desktop keep theirs on their own screens) and the screen assignment
     rows (shell display, game launch display, swap, reinitialize).
   - **Downloads** (was "Downloads and jobs", one name with the left menu's place): the one jobs screen (`PluginJobsScreen`, the same as Settings'
     "Downloads and installs") hosted in the sheet by `CatalogNavigator`, without its own heading
@@ -4422,7 +4451,7 @@ droidtop is a general compute device in every mode, so seeing what is open and e
 reachable from the Gaming UI, not only from Android's own Recents. The owner's reports that started
 this: the Quick Menu's Quit row did nothing for a plain app (the calendar), and nothing let you clear
 the stack. One mechanism serves every surface: `TaskManager` in `:runtime-common`
-(`dev.droidtop.runtime.tasks`). The Quick Menu, the companion and Standard's home call it; none has
+(`dev.droidtop.runtime.tasks`). The Quick Menu, the companion and Mobile's home call it; none has
 a close path of its own. Every call works off the main thread.
 
 - **Ending an app: one path, strongest first** (`TaskPolicy.closeSteps`, `AppCloser`):
@@ -4504,7 +4533,7 @@ a close path of its own. Every call works off the main thread.
   "Ending <game>…" at once, then nothing when it ended or the reason where it was pressed, as well as on the
   banner; after 15 s without an outcome they say it has not ended yet, and the stop goes on.
 - **The running game's session ends in one place** (`SessionMonitor`, `SessionLiveness`, Droidtop/tracker#289,
-  #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, Quick Menu Game section,
+  #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, the running game's L2 sheet,
   companion Game tab and Now card, keep-awake) follows it and none polls for itself. `SessionMonitor` looks
   at the game's package while a session stands (every 3 s in the first minute after a start, where launches
   die, then every 15 s) and ends it (`clearRunning`) when the app looks gone on two looks in a row: the
@@ -4529,7 +4558,7 @@ a close path of its own. Every call works off the main thread.
 - **Close current app (superseded 2026-10-02).** A "Close <app>" tile on the System tab ran the same
   `TaskManager.close` as the Game section's Kill row and the Running apps list's X. With the Quick Menu
   branching into sections it was a third route to one job and is gone: the app in front is closed from
-  Running apps, and a game that is parked from the Game section.
+  Running apps, and the running game from its L2 sheet (#740).
 - **One running-apps list, and what a non-privileged app can know** (`TaskManager.snapshot`,
   `RunningApp`: name, package, display id, task id). Android hides other apps' tasks from a normal app:
   `getRunningTasks` and `getRunningAppProcesses` return only the caller's own, `getAppTasks` only
@@ -4575,11 +4604,11 @@ a close path of its own. Every call works off the main thread.
     droidtop's preferences); marking a package protected has no screen yet.
   - **A confirm only when it matters:** more than `CONFIRM_CLEAR_ALL_ABOVE` (3) targets, the count in the
     question. The Quick Menu's Running apps section uses the shell's arm-then-press-again step; the
-    companion asks inline with Close them and Cancel; Standard shows a dialog.
+    companion asks inline with Close them and Cancel; Mobile shows a dialog.
   - **Quick Menu:** the first row of the Running apps section (no second tile on the System section:
     one mechanism per job, 2026-10-02). **Companion:** a "Clear all apps" pill above the running-apps row; touch only, no
     controller focus (tracker#186), and the switch tap launches on the app's own screen so the
-    companion never moves what the user opened (tracker#243). **Standard:** "Close all apps" in the mode
+    companion never moves what the user opened (tracker#243). **Mobile:** "Close all apps" in the mode
     switcher's menu (the dialog the home screen's long-press, long Back and the taskbar already open)
     and as a gesture-slot action, both through `ClearAllApps`, a translucent activity that shows the
     confirm after the list is read and ends with a toast.
@@ -4864,7 +4893,7 @@ remaining height. Layout follows the external display's size, never the handheld
 orientation. Companion interaction is touch first; the pad reaches it only as "The companion's tabs" says.
 
 Each mode owns a `Screen orientation` choice in its own settings. Gaming offers Follow
-device (default), Landscape, and Landscape (flipped). Standard and Desktop offer Follow
+device (default), Landscape, and Landscape (flipped). Mobile and Desktop offer Follow
 device (default), Portrait, Portrait (flipped), Landscape, and Landscape (flipped).
 One `Application.ActivityLifecycleCallbacks` applies the active mode's choice to each
 droidtop Activity at creation, and re-applies it when the choice or active mode changes.
@@ -4899,8 +4928,8 @@ types into the request already, shows no second one.
 
 The companion is a tabbed, touch-only second screen. One entry, `CompanionTabs` (`:app`), is drawn by
 every host that draws the companion (the registry's `Surface`, used by `SecondScreenPresentation` and
-`SecondaryDisplayActivity`, and `CompanionActivity`). Standard draws the same tabs (decided 2026-10-08, Droidtop/tracker#347): its own
-launcher-style surface used to stand in for them, so a Standard user's add-on display had no Social, Tasks,
+`SecondaryDisplayActivity`, and `CompanionActivity`). Mobile draws the same tabs (decided 2026-10-08, Droidtop/tracker#347): its own
+launcher-style surface used to stand in for them, so a Mobile user's add-on display had no Social, Tasks,
 Performance, System or Keys, did not scroll and carried a prose line; its one unique piece, the quick-launch
 row of recent apps, became Home's Recent apps section for every mode.
 
@@ -4926,10 +4955,10 @@ droidtop 0.2.0-dev.1931).
   passes their sizes in, and when they do not fit, chosen tabs move into More from the right end and come back
   when there is room, so the person decides what goes first by their order. Where the mode hides the Companion
   group (Kid, Kiosk) nobody can choose, so the bar is the mode's whole tab set. Defaults: Home, System, Apps,
-  Social in Gaming and Standard; Input, Home, System, Apps in Desktop. A tab under More passes its badge to
+  Social in Gaming and Mobile; Input, Home, System, Apps in Desktop. A tab under More passes its badge to
   More (the Social unread count, spoken with it). Every entry has the tab role, its selected state and a spoken
   name. A first-run tip says what the bar is and that Game appears while a game runs, until dismissed.
-- **Opening tab and game start.** The companion opens on the mode's opening tab: Home in Gaming and Standard,
+- **Opening tab and game start.** The companion opens on the mode's opening tab: Home in Gaming and Mobile,
   Input in Desktop (section 6c), any tab, or the last one used. When a game starts while Home shows, it turns
   to the runner's tab ("When a game starts": Game by default, Input for a runner that asks for it, any tab, or
   stay), announces the tab to TalkBack, and goes back to Home on quit. Started from another tab, nothing moves.
@@ -4970,7 +4999,7 @@ droidtop 0.2.0-dev.1931).
   only while that tile is on a Home that is on screen); a stat tile is not a live region. A pin for a control that needs the helper app is not
   drawn without it; a pin whose grant is missing shows its grant row. Kid and Kiosk keep volume and brightness,
   cannot edit, and Home shows nothing past the pins there (`ControlAccess`). Then the sections:
-  1. **Now**: the running game (`LaunchDisplay.running`, the same parked launch the Quick Menu's Game section
+  1. **Now**: the running game (`LaunchDisplay.running`, the same parked launch the running game's L2 sheet
      uses, now an observable flow carrying when the session started): art, name, this session's time, Resume
      (a relaunch of the entry, the Quick Menu's resume), Quit (`Library.quitRunning`, the one quit path both
      surfaces call, which clears the running state only on a confirmed end) and Controls (the System tab).
@@ -4989,7 +5018,7 @@ droidtop 0.2.0-dev.1931).
      up to twelve apps from the launcher's own launch history (`RecentAppsStore`, the drawer's Recent row),
      a tap opens one on the companion's screen; nothing recorded, no section. It re-reads when the launcher
      records a launch (a preference listener), so an app opened while Home shows appears at once: it was read
-     once, and on Standard's second screen never appeared (rig, build 1702, Droidtop/tracker#347).
+     once, and on Mobile's second screen never appeared (rig, build 1702, Droidtop/tracker#347).
   3. **Downloads and updates**: the running jobs from `PluginJobsCenter` with their progress bars (at most
      four), and the number of games with an update waiting (the library's own `availableUpdate`).
   4. **Social**: unread conversations and friends in a game, from the same rows the Social tab draws; a tap
@@ -5011,7 +5040,7 @@ droidtop 0.2.0-dev.1931).
   7. **Widgets**: the user's Android widgets, then Add widget and Remove widget, the same on every host:
      Add opens `CompanionWidgetPickActivity` (Android's picker needs an Activity result, which the
      second-screen hosts cannot take) on the companion's own screen, and `CompanionWidgetPrefs.ids` is
-     observed, so Standard's second screen can add widgets too (it showed no Widgets section, rig, build 1702).
+     observed, so Mobile's second screen can add widgets too (it showed no Widgets section, rig, build 1702).
   **The person never meets the machinery's name (owner, 2026-10-17: "what helper app? and why are we telling the
   user this?", Droidtop/tracker#582).** What elevated access unlocks is called **More controls** everywhere a feature
   says it needs it ("Needs More controls"); "the helper app", "privileged helper" and Shizuku appear in no feature's
@@ -5121,7 +5150,7 @@ droidtop 0.2.0-dev.1931).
   ("Disconnect"). `GameControls.asks` is the one decision whether a row asks first: the runner's or a plugin's
   `confirm` flag; **Ask before stopping** (Companion group, on by default) for Quit, Restart, Kill, an Apps row's
   Stop and Clear all; **Ask before load and overwrite** (on by default) for plugin rows flagged `confirm`; and Kid
-  and Kiosk always ask. The Quick Menu's Game section reads the same decision. The question starts on Keep playing,
+  and Kiosk always ask. The running game's L2 sheet reads the same decision. The question starts on Keep playing,
   the two answers large and well apart; a pad press that reaches the companion while it is open closes it as
   Cancel and says "Cancelled. Tap Quit on this screen to quit." Restart is the one quit, then the one launch.
 - **The one question (Droidtop/tracker#786 S2a, 2026-10-30).** Every question the companion asks is `CompanionAsk`:
@@ -5144,7 +5173,7 @@ droidtop 0.2.0-dev.1931).
   2026-10-16): a panel is a `CatalogScreen` marked `panel`, with the plugin's icon (`iconFile`), and every host
   draws it the same way: the icon before the panel's name at the title size, each row's subtitle as one line under
   it (the whole text in Info on the shell, a tap on the line on the companion), and values in the one muted value
-  colour (the accent is for what acts). The Quick Menu, the Standard and Desktop plugin window
+  colour (the accent is for what acts). The Quick Menu, the Mobile and Desktop plugin window
   (`PluginHubActivity`) and the plugin's page in Settings draw it with Gaming's rows (`CatalogNavigator`), the
   companion with its touch rows (`CompanionNestedScreen`). Plugins sits under More unless chosen, and any one panel can be chosen as a tab
   of its own (the Companion group's tab choices list Plugins and each panel, through `PluginShellHooks`). A panel
@@ -5242,7 +5271,7 @@ droidtop 0.2.0-dev.1931).
   (`InputDevice.getBatteryState`, Android 12 and later), and Home's status line names the one in hand ("Pad 80%")
   when exactly one reports a battery.
 - **One screen (slice C13, owner question 2's default).** A device with no second screen gets the same
-  `CompanionTabs` in `CompanionSheetActivity`: a pull-down sheet from the top over Standard's home screen, opened
+  `CompanionTabs` in `CompanionSheetActivity`: a pull-down sheet from the top over Mobile's home screen, opened
   from the home screen's menu ("Companion", offered only while Android lists one display, `CompanionSheet.offered`)
   or by the launcher's swipe-down slot set to Companion (`GestureAction.OPEN_COMPANION`; the slot's default stays
   Android's notifications), and a tray panel at the bottom right over Desktop's taskbar ("Companion" on the taskbar,
@@ -5469,7 +5498,7 @@ implementations of one job. A single module owns:
   `SecondaryDisplayLauncher` and any Gaming equivalent collapse into
   it, since two activities both claiming that category is precisely the
   duplication to remove;
-- what that activity renders, chosen by the active mode: Standard gets
+- what that activity renders, chosen by the active mode: Mobile gets
   the launcher's secondary-display UI, Gaming gets the companion
   surface, Desktop gets its input surface (§4);
 - the screen roles and swap (`ScreenRoles`, `DisplayArrangement`);
@@ -5672,7 +5701,7 @@ while playing on the handheld, the dual-screen AVD (two external displays: the s
 - **The arrangement** (`ScreenRoles.arrange`, pure and tested): the menus on the screen answered Main screen (the
   lowest id if several), else on the screen droidtop started on; the companion on the screen answered Companion (the
   lowest id), else on the screen droidtop started on when the menus moved elsewhere, else nowhere. Gaming and Desktop
-  follow it; Standard is Launcher3's own. Swap screens (Quick Menu) swaps the menus and the companion between their
+  follow it; Mobile is Launcher3's own. Swap screens (Quick Menu) swaps the menus and the companion between their
   screens and remembers it (`ScreenRoles.swap`). The interface size of each screen follows the same roles.
 - **The launch chooser orders screens by role**: the main screen first, then the companion's, then the rest by id
   (`DualScreenOrchestration.chooserCandidates`, tested). No screen is first for being an add-on.
@@ -5754,7 +5783,9 @@ naming `CompanionActivity`, 15:55:44, from the owner's own pad). Decisions: a ne
 finishes any older live one (one shell, ever); and `TouchOnlySurfaceFocus` (`:display`) makes the
 companion and the idle cover focusable only while they are the top resumed activity (when the pad
 already points at their display, so it takes nothing from the shell), hands the pad back by moving
-the shell's task to the front when the shell is resumed on the other screen (`REORDER_TASKS`, a
+the shell's task to the front when the shell is resumed on the other screen, or, when no shell is resumed yet (droidtop's
+start: the companion can be the top activity first), as soon as one is (`TouchOnlySurfaceFocus.shellResumed`;
+Droidtop/tracker#820, the owner: "on launch, droidtop doesn't have anything focused by the pad") (`REORDER_TASKS`, a
 normal permission), delivers any key that still arrives to the shell's window, and swallows pad,
 D-pad and Back keys when there is no shell to give them to. The moment the surface stops being the
 top activity it is touch-only again (#186 holds). The orchestrator's separate "re-front the shell
@@ -5817,7 +5848,7 @@ What is true on Android, and what this section corrects in the text above:
   for the app's own text fields. **Decision: the count follows window
   visibility** (`onWindowVisibilityChanged`, GONE once the Activity stops), so
   only a keyboard surface that is actually on screen suppresses it.
-- The Standard second screen's quick-launch row started apps with no launch
+- The Mobile second screen's quick-launch row started apps with no launch
   display, which resolves against whichever display is ambiently current (the
   ambiguity `LaunchDisplay.startOn` already documents). It now pins the display
   the tap was on.
@@ -5871,7 +5902,7 @@ had not moved.
   - on the main screen while the shell is on another: it closes and the screens are reinitialized
     (`MainActivity.reinitializeDisplays`), and a notice says "The screens were mixed up, so droidtop set them up
     again";
-  - covered by the shell on its own screen it finishes by itself, as before; in Standard it stays.
+  - covered by the shell on its own screen it finishes by itself, as before; in Mobile it stays.
   Either action at most once in five seconds, so a shell that cannot start is not started in a loop.
 - The companion surfaces enforce the one-display rule themselves
   (`CompanionSurfaceLifetime`, `DualScreenOrchestration.companionSurfaceRetires`,
@@ -6182,7 +6213,7 @@ companion trackpad's pointer, `canPerformGestures`, see "Input (slice C12)"), wh
     where the keyboard shows: a Home group with one switch per Home section (see "The companion's
     tabs"), "Keyboard for the other screen" (whether it may host it) and "Keys
     button", which is only a shortcut to the Input tab where the mode has no Input tab of its own. The
-    Input tab in Gaming and Standard types by the one route order too (`RoutedKeyboardSink`), so the
+    Input tab in Gaming and Mobile types by the one route order too (`RoutedKeyboardSink`), so the
     separate Keys panel is gone.
 - **Android 13+ restricted settings.** For an app installed from a file, Android 13 and later lock
   notification access and accessibility services until "Allow restricted settings" is chosen in
@@ -6281,7 +6312,7 @@ the fix: the periodic self-heal above is the fix, and in the common case the pil
 never appears or clears itself within one health-check tick. Drawn by `MainActivity`
 itself, over both shells' own content, rather than inside either shell's chrome (the
 Gaming hint row, the Desktop taskbar): the broken state is a MainActivity-level fact true
-in both, and neither shell needs a second copy of when to show it. Standard mode is not
+in both, and neither shell needs a second copy of when to show it. Mobile mode is not
 covered (Launcher3's own secondary-display handling, not this orchestration, owns that
 display there) -- the existing menu row and gestures remain its route to the same
 recovery.
@@ -6356,7 +6387,7 @@ The owner, after this session's other dual-screen fixes: "it seems we use the sa
 screen mode for standard and gaming. The second screen needs to apply more to the mode."
 True of the code as it stood: SecondScreenPresentation (the LIVE surface, shown whenever
 MainActivity itself drives the second screen) never branched on mode at all and always drew
-the game companion, and Standard's own registration
+the game companion, and Mobile's own registration
 (SecondaryDisplayRegistrations.registerLauncherHandoff) handed off to Launcher3's bare
 SecondaryDisplayLauncher -- a near-empty system stub, not a droidtop surface, and the exact
 thing rp5test's screenshots kept catching (this section's own "companion-fallback" finding
@@ -6365,7 +6396,7 @@ above). droidtop has three modes and now three second-screen designs:
 - **Gaming**: the game companion, unchanged (CompanionSurface, section 4d) -- the focused
   game's art and metadata, play time, "Runs with", updates, and the idle rotation/status
   strip while browsing.
-- **Standard** (superseded 2026-10-08, Droidtop/tracker#347: Standard now draws the
+- **Mobile** (superseded 2026-10-08, Droidtop/tracker#347: Mobile now draws the
   companion tabs like the other modes, see "The companion's tabs"; what follows is the
   surface it had): StandardSecondScreenSurface (:app) -- a launcher-style surface, built
   from pieces droidtop already has rather than a new system: CompanionSystemBar and
@@ -6375,7 +6406,7 @@ above). droidtop has three modes and now three second-screen designs:
   recent/frequently-used app history -- not a fabricated list), and already-added Android
   widgets through the SAME CompanionWidgets host and CompanionWidgetPrefs set the
   companion's own widget picker manages (one widget set across the whole companion
-  experience; Standard has no add/remove UI of its own, the same constraint every
+  experience; Mobile has no add/remove UI of its own, the same constraint every
   non-owning companion host already documents). No media-session "now playing": docs/SPEC.md
   section 7e is scoped but not built, and there is nothing real to show without fabricating
   it; a plugin status tile is an ordinary Android widget (PluginStatusWidgetProvider),
@@ -6392,11 +6423,11 @@ regardless of what SecondaryDisplayContent.currentMode said. SecondScreenPresent
 reads the SAME registry (SecondaryDisplayContent.contentFor(mode)) the idle surface does,
 so the two can never disagree about what a mode's second screen is again. The dead
 handoff-to-an-Activity mechanism (SecondaryDisplayContent.registerHandoff, added only for
-Standard's old bare-launcher-3 hand-off) is removed with it: Standard registers real
+Mobile's old bare-launcher-3 hand-off) is removed with it: Mobile registers real
 composable content the same way Gaming and Desktop do, and ModePiece.LAUNCHER_SECOND_SCREEN
-(the mode-piece that used to gate that hand-off) is gone -- Standard's second screen is not
+(the mode-piece that used to gate that hand-off) is gone -- Mobile's second screen is not
 gated on a mode piece at all -- the platform only ever places SecondaryDisplayActivity
-(which reads this registry) while droidtop holds Home, so an unregistered Standard content
+(which reads this registry) while droidtop holds Home, so an unregistered Mobile content
 would only matter in a state nothing can show it in anyway.
 
 ### The Alternative forwarder keeps the second screen (directed 2026-09-27, corrected)
@@ -6410,7 +6441,7 @@ droidtop still holds the HOME role, one of its own two HOME activities (this one
 different, person-chosen launcher instead of rendering anything itself. Since droidtop is
 still the platform's current Home app in this configuration, the platform's own
 `SECONDARY_HOME` placement already puts `SecondaryDisplayActivity` on the secondary display
-exactly as it does for plain Standard -- nothing here needed a new attachment mechanism,
+exactly as it does for plain Mobile -- nothing here needed a new attachment mechanism,
 and the `SecondScreenAttachService`/`SecondScreenOwnership` foreground-service machinery this
 section briefly carried (checked against AOSP's background-activity-launch policy, still a
 real thing to know if droidtop ever needs a TRUE not-Home case) was removed again per one
@@ -6419,11 +6450,11 @@ does not actually have.
 
 **The real gap**: `SecondaryDisplayContent.currentMode` (what both `SecondaryDisplayActivity`
 and `SecondScreenPresentation` read) resolves from `Modes.lastMode`, and nothing wrote
-`Mode.LAUNCHER` there when Home actually landed on Standard or forwarded through Alternative
--- only `BackButtonMenu`'s explicit "Android" switcher row did. Pressing the real Home key
+`Mode.LAUNCHER` there when Home actually landed on Mobile or forwarded through Alternative
+-- only `BackButtonMenu`'s explicit "Mobile" switcher row did. Pressing the real Home key
 (`HomeTrampolineActivity.forwardToStandard`) or letting Alternative forward
 (`AlternativeLauncherActivity`) left `Modes.lastMode` however it last was from Gaming or
-Desktop, so the second screen kept showing that stale mode's content instead of Standard's
+Desktop, so the second screen kept showing that stale mode's content instead of Mobile's
 own -- the same root shape as "The second screen is per-mode" above, reaching one step
 further back into how the mode is even recorded. Both activities now call
 `Modes.setLastMode(this, Mode.LAUNCHER)` before forwarding, matching what every other real
@@ -6438,7 +6469,7 @@ does not pause the Activity beneath it). It now does. And `MainActivity.onStop` 
 session's earlier N64-hang fix, "An N64 launch, root-caused" above) only tore its own
 companion `Presentation` down when a launch had parked onto that SAME display -- correct for
 "a game launched elsewhere," but it left a stale Gaming/Desktop companion Presentation
-sitting on top of Standard's freshly-registered content when the real reason for leaving was
+sitting on top of Mobile's freshly-registered content when the real reason for leaving was
 a Home press. `onStop` now also tears it down when `Modes.lastMode` no longer matches the
 mode this MainActivity instance was showing (`modeDeparted`) -- set by the trampoline/
 forwarder/switcher BEFORE this Activity's own `onStop` runs, in Android's normal activity-
@@ -6450,9 +6481,9 @@ implementation to Alternative through droidtop's own Settings (Global settings >
 as home screen > A launcher you already have > RetroidLauncher, the console's own stock
 launcher), pressed Home — forwarded cleanly, no flash, no loop
 (`com.retroidpocket.gamelauncher/.activities.RpGameLauncher` resumed on the built-in display).
-The mode switcher's "Android" row opens that same launcher. Confirmed the second screen
+The mode switcher's "Mobile" row opens that same launcher. Confirmed the second screen
 attaches (see "The Alternative forwarder needed a nudge" below for the one further fix this
-needed) and switched Home back to Standard afterward, confirmed on both screens.
+needed) and switched Home back to Mobile afterward, confirmed on both screens.
 
 ### The Alternative forwarder needed a nudge to keep the second screen (rig, 2026-09-27)
 
@@ -6461,7 +6492,7 @@ holding Home via `AlternativeLauncherActivity`, forwarding to the console's own 
 launcher) found the theory incomplete: after droidtop self-updated (a fresh process, no
 droidtop Activity resumed anywhere at all) the secondary display stayed on Android's own
 mirror-of-the-default-display fallback rather than picking up droidtop's newly-registered
-Standard content, even though droidtop still held Home. The platform's automatic
+Mobile content, even though droidtop still held Home. The platform's automatic
 SECONDARY_HOME placement does not proactively re-evaluate an already-established mirror on
 its own -- it needs a nudge, the exact same platform behaviour
 `LaunchDisplay.coverVacatedDisplays` was already built to work around for game launches (that
@@ -6469,7 +6500,7 @@ function's own doc comment: "The platform's own SECONDARY_HOME placement can't b
 for this ... so droidtop places its own"). Nothing was left running anywhere to catch this a
 few seconds later either: the periodic self-heal (section 4c, "Self-detection, built") only
 runs while `MainActivity` itself is started, and nothing app-hosted is running at all while
-the person is on Standard or an Alternative-forwarded launcher.
+the person is on Mobile or an Alternative-forwarded launcher.
 
 Fixed by reusing the SAME pattern at the one remaining place it was missing:
 `reassertSecondaryDisplays` (`:shell-default`) explicitly starts
@@ -6487,7 +6518,7 @@ does not depend on `:display`, the same reason `HomeTrampolineActivity` already 
 builds" Off while itself running a debug-signed install -- confirmed the updater fix in the
 same pass (section 10b) -- then, with Alternative set to the console's own stock launcher
 (`com.retroidpocket.gamelauncher`), a Home press forwarded cleanly with no flash and no loop,
-and the mode switcher's "Android" row opened that same launcher.
+and the mode switcher's "Mobile" row opened that same launcher.
 
 ### The task model, and one droidtop in Recents (owner correction, 2026-09-27)
 
@@ -6495,12 +6526,12 @@ The same verification pass also found droidtop's own Recents entries reading as 
 instances -- one process (confirmed via `dumpsys`), but several visible tasks:
 `dev.droidtop.app/.MainActivity` relocated onto the secondary display (an unrelated,
 pre-existing "Main screen: Second display when present" placement, not caused by this pass),
-`dev.droidtop.app/com.android.launcher3.Launcher` left over from earlier Standard navigation,
+`dev.droidtop.app/com.android.launcher3.Launcher` left over from earlier Mobile navigation,
 and (while it was open) the Settings task. Checked each against its manifest declaration:
 
 - `HomeTrampolineActivity` and `AlternativeLauncherActivity` (the two real `CATEGORY_HOME`
   holders) already declare `excludeFromRecents="true"` -- correct, and unchanged.
-- `com.android.launcher3.Launcher` (Standard's actual home screen UI, reached only by
+- `com.android.launcher3.Launcher` (Mobile's actual home screen UI, reached only by
   forwarding from the activity above, never directly) did NOT -- its own real Home screen
   showing up as a separately-switchable Recents card is not how a real Home screen behaves on
   stock Android either. Now declares `excludeFromRecents="true"` too, alongside its existing
@@ -6525,7 +6556,7 @@ app-hosted task -- but that task predates this session's manifest change (create
 build was installed), and `excludeFromRecents` is read at task-creation time, not enforced
 retroactively on an existing one; it was never re-verified from a genuinely cold task history.
 **Needs a rig check**: from a clean state (reboot, or after clearing old droidtop tasks), use
-Standard and Alternative normally, then open Recents the user way (the Recents gesture/
+Mobile and Alternative normally, then open Recents the user way (the Recents gesture/
 button, not `dumpsys`) and confirm exactly one droidtop card appears (or none, when nothing
 app-hosted is running), never `com.android.launcher3.Launcher` as a separate switchable entry.
 
@@ -6565,7 +6596,7 @@ the shell's task and brought it back there. It has a task of its own
 (`taskAffinity=""`).
 
 Behavior is unchanged -- this is a move, not a redesign: explicit launch-display targeting,
-the Standard second screen (via `reassertSecondaryDisplays`, untouched), the Alternative
+the Mobile second screen (via `reassertSecondaryDisplays`, untouched), the Alternative
 forwarder, and `reassertSecondaryDisplays` itself all keep working exactly as before.
 
 **Rig-checked (emulator-5560, 2026-09-27)**, fake second display via
@@ -6574,9 +6605,9 @@ forwarder, and `reassertSecondaryDisplays` itself all keep working exactly as be
 and started `CompanionActivity` on the built-in one; a Desktop-mode launch did the same
 (`DesktopSessionService` itself then failed for an unrelated, pre-existing reason -- no desktop
 image configured on the test install -- which does not touch the orchestrator). No crash, no
-`SecurityException`/relocation-refused log line, in either mode. Standard mode was NOT
-re-verified through this path: `MainActivity` is not how Standard mode actually runs (the real
-Standard home is `com.android.launcher3.Launcher`/`HomeTrampolineActivity`, whose second screen
+`SecurityException`/relocation-refused log line, in either mode. Mobile mode was NOT
+re-verified through this path: `MainActivity` is not how Mobile mode actually runs (the real
+Mobile home is `com.android.launcher3.Launcher`/`HomeTrampolineActivity`, whose second screen
 goes through the untouched `reassertSecondaryDisplays`, not `SecondScreenOrchestrator`), so
 launching `MainActivity` directly with a `standard` mode extra -- which this Activity itself
 only ever draws as a blank screen for -- exercises no code this change moved. A live game
@@ -8075,7 +8106,7 @@ pointer (a Unity configuration window, say) works without touching the screen:
 - R1 clicks and L1 right-clicks (or, per game, A and B), held for a drag;
 - the moving stick's own click held turns that stick into a wheel (up to 12 steps a second);
 - the other buttons and the other stick still reach the game; the stick that moves the pointer does not;
-- both stick clicks held 0.6 s turn it on or off at any time, and the Quick Menu's Game section has a Mouse mode row;
+- both stick clicks held 0.6 s turn it on or off at any time, and the running game's L2 sheet has a Mouse mode row;
   a "Mouse mode" badge in the top corner shows while it is on, and TalkBack hears the change;
 - remembered per game (`PadMousePrefs`); off by default, unless the game's runner says it needs a mouse (none says so
   yet; `PadMouse.initial`).
@@ -8112,7 +8143,7 @@ percent, in screen widths the sink scales; in `joystick_move` mode it is passed 
 (`output_joystick` 0 left, 1 right, else the stick it came from). Pure; time is passed in. Chords, turbo, joystick
 camera, scroll wheel, menus and layers come next, then the Wine sink and the defaults; until then
 Controller mouse mode above is the pad's only pointer. **The Wine sink** (`LayoutDriver`): a Windows
-game's Quick Menu Game section has a Controls row that steps through Gamepad (no layout, the default), "Keyboard
+game's L2 sheet has a Controls row that steps through Gamepad (no layout, the default), "Keyboard
 and mouse" and "Mouse only", kept per game (`WineControls`, `WineControlsPrefs`). "Mouse only" is for point-and-click
 games: left stick the pointer, A click, B right-click, the bumpers scroll, the d-pad the arrows, X Enter, Y Space, Start
 Escape (`res/raw/controls_mouse_only.vdf`). A "Gamepad with mouse" layout is not offered: Android gives both sticks in
@@ -8134,8 +8165,8 @@ the `gestureConfig` launch override (`Container.LAUNCH_OVERRIDE_KEYS`), so a sha
 
 **Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
 Back in a Windows game does **not** end it: it brings the shell forward with
-the Gaming Quick Menu open on its Game section (Resume, Restart, Stop with two
-presses; §7f, tracker#258), the one in-game menu, with no menu of its own in the
+the running game's sheet open (Resume first, then the rest of what L2 offers on
+it, Quit, Restart and Kill asking first; §7f, tracker#740), the one in-game menu, with no menu of its own in the
 game screen. `WineGameActivity` registers itself with `OwnGameScreens`
 (`:library-core`) while it runs. Back starts MainActivity with
 `OwnGameScreens.EXTRA_QUICK_MENU` (and the home-press reinit extra, so the shell
@@ -8591,7 +8622,7 @@ sway's bindings are the distro's stock `/etc/sway/config` plus droidtop's
 `$mod+d` (`DesktopPanel`), so Super+B is sway's `splith` and never reaches foot;
 the rig's `input keycombination META_LEFT B` hit that binding. To check that Meta
 reaches a client, use a combination sway does not bind. While droidtop's Desktop
-is in front, Standard's taskbar key filter leaves Meta alone
+is in front, Mobile's taskbar key filter leaves Meta alone
 (`StandardTaskbar.onKey`). It used to take Meta system-wide to focus the strip,
 so the session got only the meta state on the next key. Android's own Meta
 shortcuts (Meta+Enter as Home, a Meta+letter app launch, depending on the
@@ -8604,7 +8635,7 @@ modifier combos" (Android 13, 14 and current AOSP alike); Alt+Tab is Recents. On
 sway's Super bindings (its stock ones and droidtop's `$mod+d`) work from the on-screen keyboard and the companion,
 which type into the session's seat directly ("Companion input", above), and not from a hardware keyboard. The
 v0.2.0-dev.2011 note above that Super+B reached sway does not hold on current Android. An accessibility service's
-key filter sees keys before that policy; whether Desktop should ask for droidtop's (Standard's taskbar uses it) is
+key filter sees keys before that policy; whether Desktop should ask for droidtop's (Mobile's taskbar uses it) is
 an owner question on #697.
 
 **droidtop's three keyboard shortcuts (decided 2026-10-29, Droidtop/tracker#697).**
@@ -8851,7 +8882,7 @@ that produces.
   keys. The compositor's XKB keymap applies the layout and its own
   auto-repeat, exactly as for a lapdock's physical keyboard. No IME
   involved, no editor focus needed.
-- **Into an Android app** (Gaming and Standard): each key becomes an
+- **Into an Android app** (Gaming and Mobile): each key becomes an
   `InputConnection.sendKeyEvent`, whose contract is precisely "as though a
   hardware key was pressed". `LatinIME.onStartInput` captures the editor
   connection even when Android does not show the IME window; its own
@@ -8910,7 +8941,7 @@ twice:
   of `DesktopShell` constructing its own, because two surfaces now drive
   it and two seats over one bridge would break the one-normalized-seat
   invariant §6 exists for.
-- **Gaming / Standard**: there is no pointer, and droidtop cannot make
+- **Gaming / Mobile**: there is no pointer, and droidtop cannot make
   one — moving a system cursor over another app's window needs
   `INJECT_EVENTS`, a signature permission, and the Gaming shell is
   Compose focus navigation driven by a D-pad, so a drawn arrow would have
@@ -9216,7 +9247,7 @@ theme's cursor in ES-DE too.
 Touch dispatches the same key events (`rememberGamepadTouch`), so a tapped
 hint is a press like any other. Raw passthrough to a guest is outside this
 pipeline by design: the Desktop seat (§6b), Wine's own input, the IME.
-Onboarding is its own activity with its own gate; the Standard launcher's
+Onboarding is its own activity with its own gate; the Mobile launcher's
 View-based dialogs use Android's own focus handling.
 
 ## 7. Library / launcher-readiness
@@ -9234,7 +9265,7 @@ key (`dev.droidtop.shell.standard.BackButtonMenu`, wired into both
 press keeps doing its normal per-shell job in every state), not a separate
 app-drawer icon or a floating switcher button:
 
-- **`:shell-default` ("Standard")** — not a from-scratch touch grid; a real
+- **`:shell-default` ("Mobile")** — not a from-scratch touch grid; a real
   fork of [Murine Launcher](https://github.com/alesimula/Murine-launcher)
   (Apache-2.0, itself an already-de-privileged, standalone-Gradle-buildable
   fork of AOSP Launcher3). This is also what renders when droidtop is
@@ -9253,7 +9284,7 @@ app-drawer icon or a floating switcher button:
   `android.annotation` visibility only available inside a real platform
   source tree compile), not assumed upfront. The fork does not carry that
   source; upstream Murine Launcher and AOSP Launcher3 have it.
-  **droidtop has no separate settings app** — the Standard shell's own
+  **droidtop has no separate settings app** — the Mobile shell's own
   forked-in settings menu (`com.android.launcher3.settings.
   SettingsActivity`) is where display configuration (§4), shell
   preferences, and everything else configurable lives, matching KDE's
@@ -9327,7 +9358,7 @@ app-drawer icon or a floating switcher button:
   the shared model in the same UI pass (H4) that moved them off launcher3 preference XML — the
   paragraph that used to say this was still XML is stale; `SettingsGlobalFragment`/
   `SettingsDesktopFragment` and Gaming's in-shell Settings both chrome the same catalog now. What
-  is still stock launcher3 preferences, deliberately, is only Standard mode's OWN launcher pages
+  is still stock launcher3 preferences, deliberately, is only Mobile mode's OWN launcher pages
   (icons, drawer, home screen, rotation) — the fork's settings for the fork's own surface, not a
   droidtop-wide setting, so migrating them onto the catalog model is not the goal.
 
@@ -9368,7 +9399,7 @@ app-drawer icon or a floating switcher button:
     no new mechanism needed for either. (Built two days later, on the settings home only, by
     `SettingsSearchIndex` — see 7k's "Search across settings" above; the touch surface's own
     entry point followed in the H4 shared-row-language pass, 2026-09-26.)
-  - **Known real gap, confirmed on-device**: the Standard shell as it
+  - **Known real gap, confirmed on-device**: the Mobile shell as it
     ships from Murine Launcher upstream is functional but plain — first
     real-device testing surfaced this directly, not a guess. Backlog item,
     not started: **research third-party Android launchers** for concrete
@@ -9470,7 +9501,7 @@ app-drawer icon or a floating switcher button:
   equally first-class is the actual differentiator), and **Settings** —
   the Gaming settings catalog rendered inside the shell
   (`SettingsCatalogView`), with the pad's focus, the hint row and B back,
-  as the settings architecture above describes. It is not the Standard
+  as the settings architecture above describes. It is not the Mobile
   shell's `SettingsActivity`: that surface chromes the same catalogs for
   touch (`SettingsGamingFragment` in `:shell-default`), so a setting
   changed in either place is the same setting. **Browse themes** opens
@@ -9487,7 +9518,7 @@ app-drawer icon or a floating switcher button:
   them as a stock Material `Preference` list, with no focus ring and no hint
   row, is still broken under H4 even though the data model is already unified.
   `p1-dt-h4-rig-verify` checks this with fresh rig screenshots of Global
-  settings, Desktop mode's settings and the Standard settings surface.
+  settings, Desktop mode's settings and the Mobile settings surface.
 
   **Global settings and Desktop mode's settings are catalogs**
   (`DroidtopWideSettings` in `:app`, registered as `global_settings` and
@@ -9495,7 +9526,7 @@ app-drawer icon or a floating switcher button:
   opens them as its own nested settings pages, with focus, the hint row
   and B back to Settings; `SettingsGlobalFragment` and
   `SettingsDesktopFragment` only chrome the same catalogs for the
-  Standard settings surface, where Global stays the persistent action-bar
+  Mobile settings surface, where Global stays the persistent action-bar
   item on every screen. They were launcher3 preference XML until the UI
   pass of 2026-09-24 (H4): from the Gaming shell they opened a stock
   Android list that the pad could not drive. Global holds which HOME role
@@ -9534,7 +9565,7 @@ app-drawer icon or a floating switcher button:
   they are verified and approved again, as are folder grants. A settings file
   from before (JSON) still restores. Controls profiles are not in it yet. Android's own Settings are reached from
   Settings > Android settings, so Global has no second shortcut to them.
-  Standard mode's launcher pages (icons, drawer, home screen) stay stock
+  Mobile mode's launcher pages (icons, drawer, home screen) stay stock
   launcher3 preferences. A
   persistent, always-visible controller-button hint bar
   (what A/B currently do) avoids ever leaving the user guessing — theme-
@@ -9741,7 +9772,7 @@ displays it."
 
 - **What's new.** Every build carries its changelog (10b, "Every build carries its changelog"): `changelog.json` in
   the APK's assets, every build's entry newest first, the same text as its release notes. The first time one of
-  droidtop's own screens (the shell's `MainActivity`, Standard's home screen, a place's `CatalogScreenActivity`) comes to the front after an
+  droidtop's own screens (the shell's `MainActivity`, Mobile's home screen, a place's `CatalogScreenActivity`) comes to the front after an
   update, `WhatsNewActivity` opens over it with every build newer than the last one the person saw and not newer than
   the one installed, so builds they skipped are there too (`WhatsNew.since`, tested), read from the APK, never from a
   hand-kept list or the network. It is drawn in onboarding's scaffold (title, the builds with their Added, Changed
@@ -9749,6 +9780,16 @@ displays it."
   `last_seen_version_code`). A person updating from a build before What's new sees the installed build's entry. It
   never opens over onboarding or a game, nor before onboarding finished. Settings > About droidtop > What's new
   opens it with every build's entry, any time.
+  **It opens once the shell is placed, and nothing covers it** (Droidtop/tracker#824; the owner on the console after
+  an update: "I don't have a "what's new" splash"). It opened over the first `MainActivity` of a fresh process, and
+  0.4 s later the screen placement started the shell a second time on the second screen, over it. Two changes, no
+  timer: the shell starts where it belongs, once, and What's new waits for the placement's word. A Home press starts
+  the shell on the display it was last in front on (`ShellPlacement.remember`, kept across processes;
+  `ShellPlacement.launchDisplay`: where it is now, else where it last was, when that display is connected), so the
+  placement finds it placed and starts nothing; a display that refuses it leaves the move to the placement, as before.
+  The placement reports after every pass whether it moves the shell (`ShellPlacement.settled`), and What's new opens
+  over the screen in front only when that screen is not the shell or the placement said it stays (`WhatsNew.mayOpen`).
+  The version counts as seen only when it is closed; left any other way, it shows again at the next start.
 - **Feature steps, one registry.** A feature that needs explaining declares a `FeatureStep` in code
   (`FeatureSteps.register`, at droidtop's start in `WhatsNew.registerSteps`): an id; the changelog fragment it
   arrived with (the version, named the way the history names it); its place, the catalog screen where the feature
@@ -9758,7 +9799,7 @@ displays it."
   (`markOnboardingComplete`), so a fresh install is told about nothing it was set up with. After an update every
   step not yet seen shows once, as the shell's confirm card (7k, "Notices": "Not now" on the left with the focus,
   the action on the right, or "Got it" for a step with no action). App-wide steps follow What's new over it; a
-  place's steps show when its screen opens, in Gaming's settings (`CatalogNavigator`) and Standard's
+  place's steps show when its screen opens, in Gaming's settings (`CatalogNavigator`) and Mobile's
   (`CatalogPreferenceBuilder`), after the cursor rests on a linked category as its rows do. A step counts as seen
   once it is shown, whatever the answer; with no surface to draw on it waits.
 - **The steps today.** `home_chords` (app-wide, Droidtop/tracker#740: "HOME + R2 now opens the Quick Menu over any
@@ -9846,8 +9887,8 @@ line.
    screen); **droidtop** ("Home opens Gaming. Android asks you to confirm."); **droidtop's home
    screen** ("Its own app drawer and widgets"); and one row per other installed launcher, by its own
    application label and icon, title only (never a class name; Android's FallbackHome is not a
-   launcher). More rows than fit scroll, by D-pad or by swipe. Forward: Next. What the rows mean: "droidtop" is Standard with the chosen mode as
-   the default mode (Home goes to the default mode, §2c); "droidtop's home screen" is Standard with
+   launcher). More rows than fit scroll, by D-pad or by swipe. Forward: Next. What the rows mean: "droidtop" is Mobile with the chosen mode as
+   the default mode (Home goes to the default mode, §2c); "droidtop's home screen" is Mobile with
    the home screen as the default mode (the old "Opens into Android" answer, folded in here); a
    launcher row is Alternative with that launcher as the target. Next enables the matching HOME
    activity and, when droidtop does not hold Home, asks Android for the role (§2c, "Holding the
@@ -9994,16 +10035,117 @@ not allow it, reading or writing failed). Code that already knows the words a pe
 screen (the owner's review, 2026-10-16: "raw exception text → plain sentences, with the throwable logged").
 A sentence that describes a consequence belongs where the consequence is chosen.
 
-### Permissions are asked at the feature, once, with the reason first
+### Permissions: what droidtop and its plugins may do (Droidtop/tracker#830)
 
-Onboarding asks for exactly one grant, storage, because the library cannot
-exist without it. Every other grant Android makes special is asked where
-the feature that needs it is first used, never at start and never in a
-list on the Welcome step, with the reason stated before the system prompt
-and a row that stays until it is given (§7: "take me to the grant"). A
-declined grant disables the one feature, says which, and is not asked
-again until the person opens that feature. The complete set, and where
-each is asked:
+The owner, 2026-10-30: "We also need a better system than the 'needs something' UI", and, on how: "we want to look
+at Android's permissions UI as a whole as an example of how to do it well". This section is droidtop's equivalent of
+that UI, for two kinds of grant: what a **plugin** may do (its permissions and extension points, plugin-api.md §4)
+and what **droidtop itself** holds (the Android grants in the table below, and what More controls changes for it).
+It replaces the "Needs …" lines each feature wrote in its own words (#830's inventory) with one model, one wording,
+one way to fix in place and one page. Owner decisions so far:
+- **No silent grants.** droidtop takes nothing at start (`ElevatedGrants.takeAll` at start is removed). Each grant
+  is offered as a choice: one press with More controls on, a card that says what changes, and Undo. "Give the user
+  the choice … they can make an informed decision, we aren't making it for them."
+- **One page** for everything outstanding and everything allowed; Settings › Device setup and the "droidtop's
+  access" group go into it. Each plugin's Permissions page stays and is linked from it.
+- **Chores apart.** Missing artwork and similar go under Suggestions and are not counted.
+- **Hints may cover risky choices**, saying the risk plainly; a risky choice is never the default or the focused one.
+- **Removing unused grants can be turned off**, globally and per plugin, and never interrupts: "We want to be
+  unobtrusive".
+- **The page is Permissions, for everything** (2026-10-30): "It'll control everything, droidtop internal, companion,
+  plugins, and etc included. We want to make our UI consistent". Every other permission screen or row becomes a link
+  into it, or is deleted.
+- **Don't allow refuses once; "Don't ask again" is its own checkbox** ("A separate checkbox for 'don't ask again'").
+- **Unused is a setting**, 30 days without a call by default ("configurable, defaulting to 30 days with no calls").
+- **Recent use covers 7 days.**
+
+How Android does each part, and droidtop's equivalent:
+
+**1. Asked at the moment of use** (Android: the request dialog, after the app's own reason).
+- A grant is asked only when the person does the thing that needs it, never at start, never from a Service or at
+  boot, never for a plugin the person has not opened. Onboarding still asks for the one grant the library cannot
+  exist without (storage).
+- **droidtop's own grants:** the feature's row or notice says what does not work yet ("Brightness can't change
+  yet", §"One wording" below) and A opens the ask card: what changes, that it can be undone, Cancel left and
+  focused. With More controls on, the card's Allow makes the change itself through the fixed list of changes droidtop
+  knows how to make and undo, and reads the result back before it says "Allowed". Without it, Allow opens the exact
+  Android screen (`SettingsLaunch.start`), and droidtop reads the state again when the person comes back. The person
+  always acts; droidtop never toggles anything on its own.
+- **A plugin's permissions:** the sheet asks "Allow <Plugin> to <do this>?", then the plugin's own reason quoted as
+  the plugin's ("F95zone says: …"), then the risk in the Danger tone when the permission is dangerous or critical,
+  with Info (Y) for the exact permission. Choices: **Allow**, **Don't allow**, and a separate unticked checkbox
+  **Don't ask again**. Don't allow refuses this call only; with the checkbox ticked it sticks (the permission becomes
+  Don't allow on the plugin's page, and droidtop stops asking until the person changes it there). B is Not now. As
+  today (plugin-api §4.3), a call from the background never asks: it fails, and the plugin's row says what it wanted.
+- **Approval at install stays the tick list** (plugin-api §4.3, "Approval is a list"): consent to everything a plugin
+  declares, one line per item, the risky ones unticked.
+
+**2. Each one's permissions page, sorted into Allowed and Not allowed** (Android: App info › Permissions).
+- **A plugin's Permissions page** lists every permission it declared in two groups, **Allowed** and **Not allowed**
+  (the second holds both "Don't allow" and "Ask every time", the value saying which). Each row: the plain name
+  (a noun, "Your game folders"), the state as its value, and when it was last used from the audit log ("Used 2 h
+  ago"). A row opens that permission for that plugin: what it lets the plugin do, the plugin's reason, the three
+  choices **Allow**, **Ask every time**, **Don't allow**, its recent use (§4 below) and the exact terms in Info.
+  What the plugin adds to droidtop's screens (its extension points) is a third group, **Adds**, with the same
+  choices where an extension point can be turned off. At the foot: **Remove access if unused** (§5).
+- **droidtop's own** page is the Allowed tab of Permissions (§6), sorted the same way.
+
+**3. Every holder of one permission** (Android: Permission manager).
+- On the Allowed tab, **By permission** lists every permission group (plugin-api §4.1) and droidtop's own grants,
+  each with "2 of 5 plugins allowed". A group opens its holders in Allowed and Not allowed, each changeable in
+  place. **By plugin** is the default sort and lists plugins, each opening its Permissions page.
+
+**4. What used it, and when** (Android: the privacy dashboard).
+- **Recent use**, a tab on the one page: the last 7 days of use of each dangerous or critical permission, from the
+  audit log that already exists (plugin-api §4.6), newest first. One row per (permission, plugin), e.g. "F95zone:
+  your game folders, 3 times, last 14:02". A row opens that plugin's entries for it, each with the one-line target
+  the audit already keeps (a domain, a folder name, never contents). droidtop's own changes made through More
+  controls (each Allow and each Undo) are listed the same way, as droidtop's.
+- Nothing about recent use is a pop-up or a notification.
+
+**5. Removing access from plugins that go unused** (Android: "Remove permissions if app isn't used").
+- A plugin droidtop has not called for the set time (no call of any kind, user-started or background; **30 days** by
+  default, set under Permissions) has its dangerous
+  and critical grants set back to **Ask every time**. Normal permissions, extension points and the approval itself
+  are left alone, so nothing stops working that the person did not use.
+- **On by default; can be turned off** in Settings for all plugins, and per plugin at the foot of its Permissions
+  page.
+- **It never interrupts:** no sheet, no notification, no count on the Home card. What it removed is listed quietly
+  on the Allowed tab under **Removed while unused**, with the date and Allow again, and logged
+  (`droidtop.requirements`). The next time the plugin needs it, the moment-of-use sheet asks as usual.
+- droidtop's own grants are Android's to remove (Android's own unused-app reset); when Android does, the feature's
+  row asks again the next time it is opened, as now.
+
+**6. The one page: Permissions** (every grant: droidtop's own, the companion's and every plugin's). Every other
+permission screen or row is a link into it or is deleted; the Home card still reads "3 things need attention".
+- **To do:** everything something the person turned on, pinned, installed or tried cannot work without, grouped by
+  what it blocks, most blocking first: one row each with the status glyph, the name, what does not work, and one verb
+  as the value. A runs the fix in place (§1). Below, **Suggestions** (chores such as missing artwork), not counted.
+- **Allowed:** everything granted, By plugin or By permission (§3), each with its way back: a plugin's
+  Permissions page; droidtop's Undo for what it changed through More controls (it puts back what it found); the
+  exact Android screen for an Android grant (an app cannot take back its own special access, so droidtop does not
+  pretend to); Sign out for a sign-in; Android's Home choice for the Home role. Then **Removed while unused** (§5).
+- **Recent use:** §4.
+- Only To do's blocking items count, on Gaming's Home card, a Quick Menu row and the first Settings row, each shown
+  only while the count is above zero (no permanent dot).
+
+**7. One wording.** Android names a group as a noun ("Camera") and asks with a verb phrase ("Allow … to take
+pictures and record video?"); it never shows a manifest string. droidtop does the same:
+- a missing grant's title is what does not work yet, in the person's words ("<Thing> can't <verb> yet"), never
+  "Needs …" and never the Android or plugin-api permission name;
+- its body is what turns on; its action is one verb ("Allow", "Turn on", "Set up", "Download", "Review", "Sign in");
+- a granted one is named as a noun ("Brightness and screen settings", "Your game folders");
+- the exact Android or plugin-api name, what it allows and where to take it back are in Info (Y), copyable;
+- a risk is said in the Danger tone, plainly, in the sheet and in any hint; it is never the default or focused
+  choice.
+
+**8. Built on one model** (R1): a requirement has a stable id, a kind (Android access, Home role, More controls,
+plugin, download, files, account), the feature that needs it, the one-line effect, a cheap check run off the main
+thread into one snapshot that every list reads (no list touches the disk), a fix route and a way back. Every
+check, fix and removal writes one log line, tag `droidtop.requirements`. Hints come from the shared hint component
+(#829, #827); notices from the shared `Notice`.
+
+droidtop's own Android grants, and the feature each is asked at (unchanged from before #830):
 
 | Grant | Feature that needs it | Where it is asked |
 | --- | --- | --- |
@@ -10953,7 +11095,7 @@ runs (Wine's output so far from the run's `RunLogCollector`, the run's setup, th
 Share diagnostics (`DiagnosticsArchive.share`, the same step as Settings' row), so the person chooses where it goes;
 droidtop sends nothing itself. Every Wine record now also names the run's setup: the Wine build, Direct3D (DXVK or
 VKD3D and its version), the graphics driver and its version, and the emulator. The owner confirmed 45 s
-(2026-10-23, asked "Is 45 seconds right": "yeah"). **Report a problem is also in the Quick Menu's Game section**
+(2026-10-23, asked "Is 45 seconds right": "yeah"). **Report a problem is also in the running game's L2 sheet**
 for a running Wine game (owner, 2026-10-28, asked whether it should be: "Yes"): the same report, headed "Wine report:
 from the Quick Menu", with no frame, the row saying "Saving the report..." and then what happened. **A report never
 links to the tracker** (owner: "no. The tracker is private. We need, like, a bugzilla"); a public bug tracker is
@@ -11489,10 +11631,13 @@ Two checks, both required:
    droidtop's preferences on a background thread at start and answer from memory; **until they have loaded the
    answer is no**.
 2. **The confirmation, every use.** A row that would use a class is a confirm row (`confirmTitle`): the Gaming
-   surface arms it and shows the sentence in place of the hint, with "press A again to confirm" ("tap again"
-   under touch, where the sentence shows too: it used not to, so a tapped trust row never showed the key it
-   trusted, Droidtop/tracker#270); its info glyph is a target of its own that opens Info and disarms the row,
-   never a second press; the Preference surface asks in a dialog. A trust question names the key's fingerprint
+   surface asks in the shell's one confirmation (`ConfirmDialog`): the sentence over Cancel, first and under the
+   cursor, and the action in the danger tone; A on Cancel, B or Back cancel, only A on the action runs it (owner,
+   2026-10-30, Droidtop/tracker#835: "if I hit something like "quit", I can't back out of it, all I can do is
+   confirm it"). It replaced "press A again to confirm", which armed the row and could only be confirmed or left
+   with the whole page. Quit, Restart and Kill in the running game's L2 sheet (over the game and in Gaming) ask the
+   same way; the companion's question card already put "Keep playing" first. The Preference surface asks in a
+   dialog with Cancel. A trust question names the key's fingerprint
    first, so it survives the two lines a row's title gets. The sentence (`RiskyPrompts`) names the app and the exact thing: the package and the
    appop or permission name, or the file path (for "Add a BIOS file", the folder, since the file is picked after),
    or the core files and RetroArch's folder, and says how to undo it. Wherever a row is shown without its class,
@@ -11752,9 +11897,12 @@ credited in NOTICE.md; the owner approved the download, 2026-10-09), else nothin
 most one cue sounds per 50 ms, the launch cue excepted (`CueThrottle`); the
 direction roles (move, bump, tab, system, slider) are not played for a
 touch-driven move, as Steam plays nothing for a pointer hover; a direction held
-against an end does not keep bumping (`moveCue`). One switch silences every role,
-Settings > Shell behaviour > **Navigation sounds** (on by default;
-`SoundSync` observes it). The bundled set loads into the same SoundPool as the
+against an end does not keep bumping (`moveCue`). Every role plays at one level of its own, **Navigation sounds**
+(0 to 100, 70 by default, 0 is silent; a person who had turned the old switch off starts at 0): in Settings > Shell
+behaviour and in the Audio controls the Quick Menu and the companion draw (owner, 2026-10-30, Droidtop/tracker#836:
+"navigation sounds should get their own volume"). They play as game audio (`USAGE_GAME`) on the media volume: as
+sonification the RP5 routed them to the system stream, silent while the ringer was muted. `SoundSync` observes the
+level. The bundled set loads into the same SoundPool as the
 theme's samples, so the launch hand-off below releases and reloads it too.
 **Toasts** go through one helper (`shellToast`): the toast cue, then Android's
 own toast, kept on purpose because Android draws it above every window, where a
@@ -12891,8 +13039,8 @@ sleeps on idle, by the system's own timer; the screensaver keeps its own timer a
   `SessionMonitor`, which releases the lock like any other end; the lock has no check of its own. Droidtop's own Windows
   game screen no longer sets `FLAG_KEEP_SCREEN_ON`: it ignored the setting, and this is the one mechanism.
 - **Return to the game.** With a game running, coming back to the Gaming shell from it (HOME, Recents, or a
-  wake with the shell in front) opens the Quick Menu on its Game section, Resume first and focused: one A
-  resumes. It is decided when the shell resumes (`ShellReturn.returnsToGame`): the shell stopped while a game
+  wake with the shell in front) opens the running game's sheet, the one L2 opens on it, Resume first and
+  focused: one A resumes (#740: the game's controls are L2's, not R2's). It is decided when the shell resumes (`ShellReturn.returnsToGame`): the shell stopped while a game
   ran, the game still runs, and no other droidtop screen came up since (a sign-in page, Type from another
   device; its own Windows game screen counts as the game). HOME cannot decide it: when the shell's task is
   already there, Android brings it to the front and only resumes it, with no new intent and no run of the
@@ -12923,7 +13071,7 @@ transitions (the `<transitions>` profile selection of "View
 transitions": automatic, a declared profile, builtin-slide, builtin-fade
 or instant) and controller family (the `controller` badge and helpsystem
 glyphs). Each row is offered only when the active theme declares that
-axis, as ES-DE greys them out. Navigation sounds have one on/off row,
+axis, as ES-DE greys them out. Navigation sounds have one volume row,
 Settings > Shell behaviour > Navigation sounds (see "Interface sounds"). The
 two `ThemePrefs` writers that exist with no reader (transitions,
 controller family) are what these rows write, and the renderer reads
@@ -13113,7 +13261,7 @@ Gaming, where the owner's ask was sharpest:
 Touch was already covered per surface and stays that way, deliberately
 not consolidated into a single new widget: Gaming's own "Settings" row in
 the left menu (touch-reachable through the hint row's Start / Menu pill, §7j), Desktop's taskbar "Settings" button, and
-Standard's own long-press-wallpaper settings entry (stock launcher3
+Mobile's own long-press-wallpaper settings entry (stock launcher3
 behaviour, left alone per this repo's "vendored trees ... hook or extend,
 never rewrite" rule) are three different, already-obvious touch
 affordances for three different shells with three different settings
@@ -13703,13 +13851,13 @@ id) that pins the placed game to that engine's Enginehost player before it is
 indexed. Neither is part of the update check.
 
 **Facets in place (owner, 2026-10-24, Droidtop/tracker#639).** On the console an update row opened the game's
-page as a separate activity in a new task, so Back left droidtop for the Standard launcher. The owner: "One of the
+page as a separate activity in a new task, so Back left droidtop for the Mobile launcher. The owner: "One of the
 benefits of facets is that we don't have to do stuff like that. Clicking the update should present the facet
 containing the downloads", and after a first fix that depended on Gaming's shell and so did nothing where Updates
 was drawn without it: "Facets go where they fit. No clunky redirects". A row that exists to act on one facet shows
 it over the screen it is on and never navigates away to reach it:
 - **An update row** is a nested screen (`UpdatesPage.sourceUpdateRow`): A pushes the update's own screen,
-  `SourceRecordScreen`, in whatever draws Updates (Gaming's place, Standard's settings, the screen host, the
+  `SourceRecordScreen`, in whatever draws Updates (Gaming's place, Mobile's settings, the screen host, the
   companion), and has nothing of its own to run, so no activity starts and no game page opens from it. The screen is
   the record of the linked source that gave the newest version (`GameLinks.updateLink`; a computer's link has no
   page): Available and Installed first, then Downloads (a System choice when the links differ by system, sign-in and
@@ -14199,7 +14347,7 @@ delay and starts a new one); writing it recomposes nothing.
 **App icons are drawn once per version, never on the model thread.** The
 Apps scan borrows Launcher3's `MODEL_EXECUTOR` (the icon cache refuses
 any other thread), and it used to draw and PNG-encode every app's icon
-there at every scan, stalling Standard's own model work behind it. Now
+there at every scan, stalling Mobile's own model work behind it. Now
 only the cache-owned calls stay on that thread (title and icon lookup,
 Launcher3's icon state, `newIcon`); drawing, encoding and writing run on
 the IO dispatcher. The file is named by package, `lastUpdateTime` and a
@@ -14786,7 +14934,7 @@ follows:
   are the rows it did not list kept, marked missing, as a folder's would be.
   Until 2026-10-08 the store part was merged like a folder, so every row an
   older rule had listed (DLC, soundtracks, tools) stayed as a missing entry:
-  the owner's Gaming tabs showed 6,612 Steam entries while the Standard
+  the owner's Gaming tabs showed 6,612 Steam entries while the Mobile
   launcher, which hides missing entries, showed the 3,338 current ones
   (Droidtop/tracker#360). A `dlcforappid` of 0 means "no base game": GameNative
   read a missing value as 0 and droidtop as `SteamIds.INVALID_APP_ID`, and
@@ -16160,7 +16308,12 @@ minutes after droidtop starts and after a store's library is read, the one libra
 engine games (`LibraryScrapeJob.start(pcOnly = true)`), at most every twelve hours. It uses the PC sources below that
 need no account (Lutris, the Steam store's appdetails for a Steam game) and any the person set up, and the scrape's own
 filter skips games that already have their art and details, so a finished library asks nothing. It is a job in
-Downloads like any scrape (paused or cancelled there; the next run resumes a paused one). Consoles keep the one-time
+Downloads like any scrape (paused or cancelled there; the next run resumes a paused one). An automatic run (this one,
+and *Fetch automatically* after a walk) never runs twice at once (Droidtop/tracker#834): an ask while a scrape that
+covers it is running joins that scrape, and a walk that found the same number of games as the one that last started
+a scrape starts none. It does not ask again about a game whose last answer was "no match" or "needs a pick" under the
+same searched name (Review matches keeps both); that game is asked again when its name changes or the person asks. A
+game is in a pass once, and no picture is fetched without an address. Consoles keep the one-time
 question ("After the first library scan", below): an automatic console scrape is #568's next part, with the rest of
 its scope (a review list, honest states). Built-in sources are droidtop's own code, not the plugin API's
 `library.metadata` point (the owner: "our built-in scrapers don't talk over the API"); plugins fill gaps after them.
@@ -16634,7 +16787,7 @@ it:
 | 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule; that line carries the version management fact too: the installed build and, when a source knows a newer one, "v0.9.6 is available" (`focusLine`, `GameUpdates.line`). No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is Steam's, by the window's tier (`capsuleWidth`, `capsuleWidthFor`; 2026-10-08, Droidtop/tracker#363): 110dp up to an 853dp window (about six across on the console's 768dp window, so a shelf's last capsule is cut and says there is more; three on a phone held upright), 134dp up to 1279dp, 172dp from 1280dp. Shelves and the grid share it; the grid packs whole capsules of that width 12dp apart and centres the row in what is left (`GridCells.FixedSize`), never stretching a capsule to fill. |
 | Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons (**X plays and Y is Favourite from anywhere on the page**, as on the library tile: owner decision, 2026-10-24, Droidtop/tracker#644 slice 4, proposal 6.C; X was Favourite), a quiet facts strip, a tab strip (Overview, Versions, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are one row of Overview, the same row for every source: RetroAchievements fills it for a console game on its detail screen (7h, "RetroAchievements"); a store's achievements (Droidtop/tracker#230) fill this page's row (Steam's, 2026-10-24). |
 | The page's rows are the same rows as Steam's settings | | **Settings' rows.** The page's facts are `MenuRow(uniformHeight = true)` at `uniformRowHeight()`, with one content-sized value column (`LocalValueColumnWidth`) and the selected row's full text in the detail strip under the list (`CatalogDetailStrip`, §7k "Text in rows and tiles"); a long description is read there, never by growing a row. |
-| A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A opens the game, X plays it** (owner, 2026-10-24, Droidtop/tracker#641: "hitting A on the page shouldn't immediately launch the game, it should open the game's page"; it replaced "A is Primary Action" of 2026-10-01). In Gaming, A (or a tap) on a game card or row opens it inside Gaming's stack (`cardPress`): a PC game's page with Play focused, a Retro game's details (the cards, Home's rows and the themed and headless gamelists); an app, which has no game page, still opens. **X is Play now** on PC Games and Home, shown in the hint row only where Play works as it is (no setup step first), and goes through `PcRunnerOptions.resolveAndPlay` as before. PC Games' Filter moved from X to the List options (Select). In a Retro gamelist X stays Favourite and Y Info, ES-DE's own buttons; Play is on the details. Standard's games screen still plays on A. |
+| A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A opens the game, X plays it** (owner, 2026-10-24, Droidtop/tracker#641: "hitting A on the page shouldn't immediately launch the game, it should open the game's page"; it replaced "A is Primary Action" of 2026-10-01). In Gaming, A (or a tap) on a game card or row opens it inside Gaming's stack (`cardPress`): a PC game's page with Play focused, a Retro game's details (the cards, Home's rows and the themed and headless gamelists); an app, which has no game page, still opens. **X is Play now** on PC Games and Home, shown in the hint row only where Play works as it is (no setup step first), and goes through `PcRunnerOptions.resolveAndPlay` as before. PC Games' Filter moved from X to the List options (Select). In a Retro gamelist X stays Favourite and Y Info, ES-DE's own buttons; Play is on the details. Mobile's games screen still plays on A. |
 
 Why shelves and not the 2026-09-30 grid-plus-hero: the hero panel was a
 second surface repeating what the page says, drawn on a theme frame the
@@ -16712,7 +16865,7 @@ finished job opens the new version's page.
 
 **Outside Gaming (decided 2026-10-08, Droidtop/tracker#349).** Owner: "Still
 focus on gaming mode for now, just wire it in OUT from there". The page was
-reachable only from the PC Games tab, so Standard's Games grid and Desktop's
+reachable only from the PC Games tab, so Mobile's Games grid and Desktop's
 Start menu could only press Play: a store game that was not installed could not
 be installed there, and the runner, Windows setup, DLC and versions, saves and
 favourite were Gaming-only. Now the same pieces are hosted outside Gaming, not
@@ -16727,7 +16880,7 @@ copied:
   (`foldPcLibrary`, the tab's fold), finds the game an entry belongs to, and
   calls back to launch (the host's own launch path) and to open Downloads (the
   place, in the screen host).
-- Standard's Games grid: A on a PC or engine game takes the rule; Options > Game page opens the page. A long
+- Mobile's Games grid: A on a PC or engine game takes the rule; Options > Game page opens the page. A long
   press on any game opens its options, the sheet Select opens (gap review, 2026-10-17; it used to pin a console
   game outright): Game page for a PC or engine game, Add to / Remove from favourites (`Library.toggleFavorite`),
   Hide / Show again (`GameHiding`, the `game_metadata` row's `hidden`, the one Hidden rule; the store mirror
@@ -16739,7 +16892,7 @@ copied:
   (`:shell-gamepad`) is the one entry for both hosts: a PC or engine game gets `PcGameStandalone`, a
   console game Gaming's own detail (`EntryDetailScreen`, the screen Y opens on a themed gamelist) in a
   window of its own, with its Launch, Edit metadata, Scrape, Choose match, View media and Collections. Play
-  is the host's launch path. `hasGamePage` says which games have one, so Standard's options and Desktop's
+  is the host's launch path. `hasGamePage` says which games have one, so Mobile's options and Desktop's
   row menu offer Game page for PC, engine and console games. What the themed gamelist draws around a
   game (the theme's own elements) stays Gaming's.
 
@@ -17009,14 +17162,14 @@ own games, in droidtop's own treatment:
   its name on its plate, whatever the option, and a hero card keeps its own
   name under it. Onboarding's look step asks it under "PC Games", with a
   preview, preselected on. The focus line still names the selected game.
-  Retro systems, the ES-DE themed views, Standard's widgets and the companion
+  Retro systems, the ES-DE themed views, Mobile's widgets and the companion
   are not changed by it.
 - **Card size** (DroidDeck's library Display menu, Droidtop/tracker#363): a List
   option beside Show names under images that steps the PC capsules through
-  Smallest, Small, Standard, Large and Largest (0.75, 0.875, 1, 1.2 and 1.45 of
+  Smallest, Small, Mobile, Large and Largest (0.75, 0.875, 1, 1.2 and 1.45 of
   the window's tier width, in whole dp; `CardSize`), on the PC grid and every
   capsule shelf alike, so the games grid has the density control the Apps grid's
-  columns give apps. Standard by default; remembered. The capsule's top-left
+  columns give apps. Mobile by default; remembered. The capsule's top-left
   corner already carries the one fact a card needs (download, update, not
   installed, missing), so DroidDeck's corner chip is not added again.
 - **Art that does not load is no art** (console, build 1386: three empty
@@ -17060,7 +17213,10 @@ own games, in droidtop's own treatment:
   and scaled up under the scrim, so it is soft by construction and costs one
   small bitmap; the games two either side of the cursor are **preloaded**
   with the very same request (`PreloadBackdrops`, `neighbourBackdrops`), so
-  a step finds the next one in the memory cache. No disk work from the
+  a step finds the next one in the memory cache. Every way the cursor can go is read ahead (owner, 2026-10-30,
+  Droidtop/tracker#782, #632: "Should probably read ahead on these"): on the shelves also the game Up and Down land on,
+  the place last kept on that shelf or its first game, with its neighbours (`shelfNeighbourBackdrops`), so moving
+  between the hero shelf and a shelf of posters no longer waits on a decode; in the grid the rows above and below. No disk work from the
   composition: the art is a URI the entry already carries and Coil decodes
   it off the main thread. Colours are theme tokens only (`MenuTokens.Ground`);
   the crossfade is `Motion.AmbientFadeMs`, ambient rather than demanding.
@@ -18036,8 +18192,8 @@ carries an accent dot after its label: Downloads while a job runs, Social while 
 message is unread (`leftMenuAttention`, read while the menu is open, never polled).
 While a game runs, a **Resume** row leads the menu (DroidDeck's Resume item, owner
 2026-10-08): a live dot in the affirmative colour whose ring pulses outwards while
-motion is on, over "Resume" and the game's name; A resumes it through the Quick
-Menu Game section's own path (the shell's `onLaunch`), and which game is running
+motion is on, over "Resume" and the game's name; A resumes it through the running
+game sheet's own path (the shell's `onLaunch`), and which game is running
 is resolved the same way, when either menu opens. Icons come from the one
 Material set (`LeftMenuEntry.glyph`, CatalogIconGlyphs.kt). There is no Power row:
 Android gives an app no call that opens the power menu (the Quick Menu marks its
@@ -18106,7 +18262,7 @@ mechanism per job).
 **Gaming's button map changes this (Droidtop/tracker#644 slice 4, proposal 6.A and 6.B, which the owner approved;
 X became Play on a game in #641):** in Gaming, **Y is Search** on every list as on Home, and Filter and Sort by are
 reached from **Select**: PC Games' List options lead with Filter and Sort by, and on Apps Select opens the Filter
-sheet, whose footer has Sort by. X on Apps does nothing. Standard's games screen (`LauncherGamesScreen`) keeps X
+sheet, whose footer has Sort by. X on Apps does nothing. Mobile's games screen (`LauncherGamesScreen`) keeps X
 Filter and Y Sort By below until its own lane takes up the map.
 
 One vocabulary on every library and app list: **X Filter, Y Sort By,
@@ -18254,7 +18410,7 @@ used, Recently installed.
   (`InstalledAppFacts`), never per row.
 - L2 on an app, or a long press, opens its Options (details, favourite, Mark as game, Hide from
   droidtop, Uninstall); the details screen is no longer a Y press. **Hide** writes the
-  launcher's own hidden list (`AppHiding`, the list the scan and Standard's drawer read), so
+  launcher's own hidden list (`AppHiding`, the list the scan and Mobile's drawer read), so
   one rule hides an app everywhere and the Filter's Hidden view brings it back (the row then
   reads Show in droidtop). **Uninstall** is Android's own prompt (`startUninstall`, shared with
   the app's details screen) and is offered only for an app Android will let go, never a system app.
@@ -18362,7 +18518,7 @@ UI through the one palette (`GamingPalette`) every token reads:
   overlay surface at 92%, so their text keeps 4.5:1 over any artwork. They were the ink at 58%, pale text on a pale
   pill over light art (rig 1931). A theme's own clock or system status that names no colour is white, as in ES-DE,
   unless its declared background is one white cannot be read on; then it is black.
-- **Standard's home screen follows it too** (Droidtop/tracker#560, 2026-10-16). The Launcher3 fork's light or dark
+- **Mobile's home screen follows it too** (Droidtop/tracker#560, 2026-10-16). The Launcher3 fork's light or dark
   came from Murine's own "UI theme" choice (System, Light, Dark on Settings > General); that choice is deleted and
   `ThemeOverride.getThemePref` reads `AppearancePrefs`, so there is one setting for every mode. The launcher's
   activities take it as their configuration's night mode (`ThemeOverride.applyTheme`), and an open one sees itself
@@ -18613,7 +18769,7 @@ running on the console and asked for the visual pass on top of it. Decided and b
 - **A pad/keyboard focus ring on the touch surface too (H4 shared-row-language pass, agent
   settingsh4, 2026-09-26).** The Gaming shell's rows always drew `selectionFrame` (`GamingMenu.kt`,
   a 3dp accent ring); `CatalogPreferenceBuilder`'s rows had no focus state at all — a real gap for
-  a pad or a keyboard plugged into a phone/tablet running the Standard shell, since a stock
+  a pad or a keyboard plugged into a phone/tablet running the Mobile shell, since a stock
   Preference row has no visible focus of its own. `CatalogPreferenceNavigator.ensureFocusRing`
   attaches one `RecyclerView.OnChildAttachStateChangeListener` per fragment (survives every
   `rebuild()`'s `setPreferenceScreen`, so nested screens need no re-attachment) that makes every
@@ -18769,7 +18925,7 @@ result here, read those sentences as the rule the chrome is built to, not as a v
 
 **Colour vision and text size (Droidtop/tracker#87, owner: "if it's simple. build it").** Two
 choice rows in an **Accessibility** group of Global settings (a catalog, so Gaming's rows and
-Standard's preferences both show them, reachable by D-pad and by touch), stored in the launcher
+Mobile's preferences both show them, reachable by D-pad and by touch), stored in the launcher
 prefs (`pref_global_color_vision`, `pref_global_text_scale`) and applied by one mechanism,
 `AccessibilityPrefs`, registered from the Application's activity lifecycle callbacks so no screen
 opts in.
@@ -18789,7 +18945,7 @@ opts in.
   row (`CatalogNavigator`'s savers, pushed screens re-resolved through
   `SettingsScreenRegistry` by id, so no live builder goes into saved state), are saveable and
   restored across it; and MainActivity applies Gaming deep-link extras only on a fresh
-  create, because a recreate is not a new delivery (onNewIntent still is). The Standard
+  create, because a recreate is not a new delivery (onNewIntent still is). The Mobile
   shell's settings screens keep their place across the same recreate
   (Droidtop/tracker#139): Android itself rebuilds the hosting fragment, and
   `CatalogPreferenceNavigator` saves its pushed screen stack (as registry ids) and the row
@@ -18805,14 +18961,14 @@ opts in.
 
 **Not built, with reasons (owner, 2026-09-29: only if simple).**
 - *Screenshot of the running game (#77).* The game runs in another app, so a capture needs the
-  accessibility service's `takeScreenshot` (API 30, an opt-in Accessibility grant the Standard
+  accessibility service's `takeScreenshot` (API 30, an opt-in Accessibility grant the Mobile
   service does not hold) or MediaProjection (a consent prompt per session), a notion of "the
   running game" droidtop does not keep once it hands over, an entry point that is reachable
   while the game has focus, per-game storage and a gallery on the detail page. `PixelCopy` of
   droidtop's own window would capture the menu, not the game. That is a feature, not an entry.
 - *Profiles and parental control (#78).* The UI modes (Kiosk, Kid) are the honest floor: they
   hide Settings and non-kid games, and stay without a passcode (see `UiMode`). A PIN on leaving
-  them would be theatre while the Quick Menu can switch to Standard or Desktop and Android's Home
+  them would be theatre while the Quick Menu can switch to Mobile or Desktop and Android's Home
   and other apps stay reachable; a real one needs those closed first and separate per-profile
   state, which is a design of its own.
 - *Users and guest (#79).* An app cannot switch Android users (`switchUser` is system-only), so
@@ -18868,7 +19024,7 @@ nothing else.
 
 ### The hint bar fits (decided 2026-10-14, Droidtop/tracker#485 F2a)
 
-The bar names every button that acts, and Start and R2 always sit first, on the left. When the hints do not fit on one line at the current text size (measured, not estimated: each hint is its keycap, 4 dp, its label and the gap, plus a touch pill's 8 dp side padding on a touch-first window, Droidtop/tracker#660), the bar gives up room in a fixed order (`HintFit`): first Start and R2 become their glyphs alone (a count such as "3 new" stays beside R2), then L1/R1 drop (the strip they step shows its own shoulder glyphs), then Select drops. **A and B never drop.** Whatever still does not fit wraps in a sheet's bar and scrolls in a full-width one, as before. A screen reader hears the whole set as the bar's description, however much was folded, and the bar offers the custom action **Read controls**. Long-press Select is not used for this: it is the Quick Menu fallback.
+The bar names every button that acts, and Start and R2 always sit first, on the left. When the hints do not fit on one line at the current text size (measured, not estimated: each hint is its keycap, 4 dp, its label and the gap, plus a touch pill's 8 dp side padding on a touch-first window, Droidtop/tracker#660), the bar gives up room in a fixed order (`HintFit`): first Start and R2 become their glyphs alone (a count such as "3 new" stays beside R2), then L1/R1 drop (the strip they step shows its own shoulder glyphs), then Select becomes its glyph alone. **A, B and Select never drop** (Select since 2026-10-30, Droidtop/tracker#839: on several screens its pill is the only touch route to what it opens, List options, Filter, Copy all). **"Show button hints" off hides the bar only while the pad is in use** (`PadModality`): the bar is also the touch route to the pad buttons, the only one to the Start menu, so a person touching always has it (#839, "we can't ASSUME gamepad presence"). Whatever still does not fit wraps in a sheet's bar and scrolls in a full-width one, as before. A screen reader hears the whole set as the bar's description, however much was folded, and the bar offers the custom action **Read controls**. Long-press Select is not used for this: it is the Quick Menu fallback.
 ### Places: stores, friends, downloads, updates and plugins (directed 2026-10-01, Droidtop/tracker#258)
 
 The left menu is where things live. Five **places** exist (Social joined on 2026-10-08 as Friends,
@@ -18890,7 +19046,7 @@ Updates stays a row ("Downloads and Updates stays too, learning from steam"). Th
 (`GamingSection.offLeftMenu`) but every link to one still opens it (`placeForScreen`): Plugins and Social are sections
 of the Quick Menu ("Game sources go into the qam, as does social"), and Game sources is no destination of its own:
 getting games and each source's standing lead and close Downloads and Updates, and the setup page is reached from
-there and from Settings > Accounts and sources. Standard's settings root and Desktop's Start
+there and from Settings > Accounts and sources. Mobile's settings root and Desktop's Start
 menu still list every `listed` place.
 
 - **Game sources** (`stores`, `StoresCatalog`, called Stores until
@@ -19024,7 +19180,8 @@ menu still list every `listed` place.
   the 2026-10-24 placement of #639 where Updates was this place's first row: "This is supposed to be a tab like the
   steam downloads tab, with actually initializing updates and stuff handled in the QAM. Is that not what was settled
   on? I defer a lot for UX stuff, I'm just confused", then, on the coordinator's proposal, "Yes, the new organization
-  you just proposed is what I want"). In order: the one **jobs list** (Current, Paused and Completed, each job with its
+  you just proposed is what I want"). In order: the **Updates** shortcut row, "Updates · N available", which opens
+  the Updates page (owner, 2026-10-30, Droidtop/tracker#792: "Not there directly, but a shortcut"); the one **jobs list** (Current, Paused and Completed, each job with its
   bar, time left and Pause, Resume or Cancel); **Get games** (every source plugin's row, then Add a game, Get new games
   in Gaming, and Get apps; moved from Game sources and from Updates); **Sources** (`StoresCatalog.sourcesGroups`): each
   signed-in store and each game folder, one row each opening its page, with one status glyph from the host set (a
@@ -19074,21 +19231,39 @@ menu still list every `listed` place.
   list ends with a **Download rules** row that opens that screen.
   The name stays the one the rest of the app already uses. Theme downloads
   and update installs are not yet jobs in that list; folding them in is open.
-- **Updates are checked for and started in the Quick Menu's Downloads tab** (owner, 2026-10-29, Droidtop/tracker#749,
-  quoted above; `UpdatesPage.quickMenuScreen`, registered as `PluginJobsScreen.QUICK_MENU_ID`). In order: Check now,
-  Update all with its count, every game, plugin and app with an update (A starts it; Y is its Info, and a folder game's
-  row opens its record with the changelog), then the running and recent jobs (the jobs list's own rows), then Update
-  settings. A started update is a job, so it shows there and in Downloads and Updates alike. Every way to Updates opens
-  it: in Gaming the Updates section (a notification, Home's More card, a link) opens the Quick Menu on Downloads over the
-  section the person was on; elsewhere the `updates` screen is the same rows from the same builder. Not built yet: a
-  plugin's changelog on Y, which needs the plugin catalog's releases to carry one.
+- **Updates are checked for and started on the Updates page** (owner, 2026-10-30, Droidtop/tracker#792, replacing
+  2026-10-29's #749, which put the list in the Quick Menu's Downloads tab). That tab (`UpdatesPage.quickMenuScreen`,
+  registered as `PluginJobsScreen.QUICK_MENU_ID`) is now the shortcut row "Updates · N available", which opens the
+  page, then the running and recent jobs. A started update is a job, so it shows there and in Downloads and Updates
+  alike. Not built yet: a plugin's changelog, which needs the plugin catalog's releases to carry one.
 - **Updates** (`updates`) is **one list, never tabs** (decided 2026-10-16, Droidtop/tracker#570; the owner: "the
   updates menu is fucky, it has a tab that just always shows up to date. WE don't have an option to ask the user if
   they want to install an update (that's an issue), so it will never know about an update, taht tab is useless.
   Updates should be a single tab"). It was a group per kind plus droidtop's settings and Android apps, at least
   three groups and so three tabs in Gaming's category column; the "droidtop" tab read a version only the check at
   process start recorded, which a launcher's process seldom runs, so it said "Up to date" whatever Check now found.
-  Now it is one group (`UpdatesPage`), in this order:
+  Now it is one page (`UpdatesPage`), first-class since 2026-10-30 (Droidtop/tracker#792; the owner: "We need a
+  cleaner and more uniform updates page that covers everything (plugins, games, etc)"). The page's header says when
+  the last check ran (or why droidtop's own check failed), its bar holds **Check now** and **Update all** (Check now's
+  progress, then what it found, is a line at the top of the page in place, the button reading Checking meanwhile;
+  #837: a check that was running when droidtop restarted came back paused with no Resume, Check now joined it and
+  nothing happened, so a job that cannot pause now comes back ended, "Stopped when droidtop restarted", and Check now
+  follows only a check that is running), and its
+  views go on the strip (`CatalogLayout.STRIP`, L1/R1; a strip page is never cut into the settings column, and its
+  column keys are unique even for a game with a linked copy, Droidtop/tracker#837): All, then one per kind that has any, each with its count
+  ("All · 5", "Plugins · 2", "Games · 1", "Apps · 1", "droidtop · 1"). Every row is the same shape whatever it updates:
+  its icon or cover, its name, one line "installed → available · size · from where" ("v0.37 → v0.38 · 12 MB ·
+  from the F95zone catalog"; `GameUpdates.step`, "unknown → v0.38" when the version here is not known, "a newer
+  build" when neither is), and one value that is its state: **Update**, **Updating** (with the moving bar),
+  **Waiting** (queued by Update all) or **Failed · Retry**. A folder game whose source names a newer version opens
+  that source's record in place (its downloads and its changelog); the other kinds have no changelog to show yet,
+  so their rows have none. **One count** (`UpdatesWaiting`) is what every way in says: the "Updates · N available" row
+  heading Downloads and Updates and the Quick Menu's Downloads tab (the owner, 2026-10-30: "An updates link should be
+  in the Downloads and Updates tab. Not there directly, but a shortcut"), and the companion's Home. The left menu has
+  no Updates row of its own (the owner, seeing one: "Uh... There's a separate "updates" item in the left menu, now?";
+  "We don't want a bunch of different ways"): its way in is that row of Downloads and Updates. The page publishes it each time it
+  reads the kinds; the first of those ways in after the process starts reads them off the main thread. What the
+  page does, in that order:
   - **Check now**, saying when the last check ran and, when droidtop's own check failed, why; its value is how many
     have an update, or "Up to date" only after a check that worked, "Check failed" or "Not checked". It asks every
     kind: droidtop's build (recorded, never installed here), every plugin catalog, the trusted plugin repositories
@@ -19113,9 +19288,11 @@ menu still list every `listed` place.
     whole run ended, and the page took about 10 s to show anything. Now the screen is live (`CatalogScreen.live`): a
     row whose update is running says Updating with the moving bar (#738), and the moment its update returns its kind
     is read again, so the row goes or says what is left; Update all is those same updates, one after another, so each
-    row changes on its own. The slow kinds (plugins from the catalogs, apps from the package manager) are read in the
-    background and kept for 30 s: the page draws at once from what is known, and a kind not read yet is one loading
-    row of its own ("Checking your plugins") until its rows fill in. Check now reads every kind again when it ends.
+    row changes on its own. The slow kind (apps from the package manager) is read in the background and kept for 30 s:
+    the page draws at once from what is known, and until it is read it is one loading row of its own ("Checking your
+    apps"). Check now reads every kind again when it ends. Plugins are read each time the rows are, from the catalogs
+    on file, exactly as Settings > Plugins reads them: a kept copy showed none while the Plugins list had updates
+    waiting, which the owner then installed from there (#837). One source, so the two lists never disagree.
   - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
     Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a
     privilege allows a silent install), after the jobs. Get apps and Get new games are Downloads and Updates' Get games
@@ -19138,7 +19315,7 @@ menu still list every `listed` place.
   stop what the game uses, and droidtop's install ends in Android's confirmation over the screen, so while
   `LaunchDisplay.running` holds a game the policy step waits and runs once when the game ends; a scheduled pass's
   wait keeps its droidtop install and its notification. "Only on Wi-Fi" already holds every check and install to an
-  unmetered network, and a capsule's top-left corner already marks a game with an update. **Where Updates is reached:** the Quick Menu's Downloads tab; Settings > About
+  unmetered network, and a capsule's top-left corner already marks a game with an update. **Where Updates is reached:** its page, from the shortcut row in Downloads and Updates and in the Quick Menu's Downloads tab, or the companion; Settings > About
   droidtop > Updates, whose value says when droidtop has a newer build ("droidtop 0.2.0-dev.2700 is out"; it was a
   group of its own under System, now in About, one row); a plugin's page (its version and Update), in Settings and
   as its panel in the Quick Menu and on the companion; the plugin list's "N updates" row, each row's value naming the
@@ -19164,14 +19341,14 @@ menu still list every `listed` place.
   Menu's System tab tile (it closes the menu and opens the place; a link to
   any screen that is a place does the same, `placeForScreen`, never a second
   copy of the screen inside the sheet), Global settings, the ways in of
-  Standard and Desktop below, and the plugin-repository update
+  Mobile and Desktop below, and the plugin-repository update
   notification (`PlaceLinks`, below). Settings > System no longer
   carries a "Software updates" row of its own.
 - **Plugins** (`plugins`): the existing Plugins screen (installed,
   approvals, repositories, catalog), opened in place. In Gaming it is no row of the left menu
   (`GamingSection.inQuickMenu`): the Quick Menu's Plugins section pushes it (Droidtop/tracker#586, "Quick Menu"
   above), and a link to it, a plugin update's notification, still opens it as a place (`placeForScreen` asks
-  `Place.reachable`). Standard's settings root and Desktop's Start menu still list it. Each plugin's card and
+  `Place.reachable`). Mobile's settings root and Desktop's Start menu still list it. Each plugin's card and
   each catalog row carries the plugin's own icon (its presentation icon,
   `PluginStore.iconFile`; a catalog row only once the plugin is installed,
   the catalog index having no icon) and its one-line summary under its
@@ -19181,7 +19358,7 @@ menu still list every `listed` place.
   row's picture too.
 
 **Places in every mode (decided 2026-10-08, Droidtop/tracker#346).** The
-places were Gaming sections only: Standard reached Stores, Social, Downloads
+places were Gaming sections only: Mobile reached Stores, Social, Downloads
 and Plugins only under Settings > Other modes > Gaming mode settings, Desktop
 reached none, and a message or plugin-update notification opened Gaming
 whatever the mode (with Gaming off, Desktop or nothing). Now:
@@ -19193,13 +19370,13 @@ whatever the mode (with Gaming off, Desktop or nothing). Now:
   `ContainersActivity`, which was the same host wired to the container manager;
   the Desktop taskbar's Containers opens through it too. It runs in a task of
   its own, opened fresh each time, so Back returns to what opened it. Opened
-  from Standard's home screen (a long press on droidtop's icon) it goes back
+  from Mobile's home screen (a long press on droidtop's icon) it goes back
   there explicitly (`BackButtonMenu.openHome`): left to Android, the task's end
   resumed the HOME component, droidtop's trampoline, which forwards to the
   default mode, so B from Social landed in Gaming (rig, build 1535). A place
   asked for in Kiosk or Kid is refused with a toast, so a shortcut or a
   notification is not a way around the UI mode.
-- **Standard**: the settings list has a "droidtop" group with the five places
+- **Mobile**: the settings list has a "droidtop" group with the five places
   (`SettingsRootFragment` fills titles and links from `Place`), and droidtop's
   icon has Social, Downloads and Updates as app shortcuts beside Games.
 - **Desktop**: the Start menu lists the places under "droidtop", after what is
@@ -19208,10 +19385,10 @@ whatever the mode (with Gaming off, Desktop or nothing). Now:
   place when Gaming is the mode in use (`Place.opensInGaming`: the last mode
   is Gaming and Gaming is on), else the host. Message notifications and the
   plugin-repository update notification use it.
-- **Updates** is the Quick Menu's Downloads tab in every mode (owner, 2026-10-29, Droidtop/tracker#749). In Gaming the
-  section redirects there; outside it the host, asked for the Updates place by any link (a notification with Gaming
-  not in use, droidtop's icon shortcut), opens `QuickMenuActivity` on Downloads (`QuickMenuActivity.intent`, the tab
-  named by `QuickSection`) instead of a page of its own.
+- **Updates** is its own page in every mode (owner, 2026-10-30, Droidtop/tracker#792, replacing 2026-10-29's
+  #749, which made it the Quick Menu's Downloads tab and redirected every link there). Gaming opens it as a place,
+  the host opens it as a screen; the Quick Menu's Downloads tab and Downloads and Updates head with a shortcut row to
+  it, "Updates · N available", rather than the list itself.
 
 ### Social: one place for every provider (decided 2026-10-08, Droidtop/tracker#327)
 
@@ -19400,7 +19577,7 @@ A condition the person should know about (an unofficial plugin, a feature that i
 
 **Colours** (`NoticeColors`, in the shared library `vendor/notices` (Droidtop/notices, GPL-3.0, pinned as a submodule like the sandbox library; Enginehost adopts it too), derived once per palette from the theme's own `GamingThemeColors`, never in a composition): per tone an ink (glyph, title, edge bar), an opaque plate mixed from the ground toward the ink (0.14 info, 0.20 caution, 0.24 danger) and a body colour, plus the danger fill and its label for the risky button and the Full access chip. Info is the theme accent, unless the accent is within 20 L* and 30 degrees of hue of caution under normal vision or simulated deuteranopia, protanopia or tritanopia; then it is the neutral text colour and the glyph tells the tones apart. Caution is a fixed amber (`#FFC56B` on a dark ground, `#8A5A00` on a light one); danger is the palette's danger. Both keep their hue and move only in lightness: to reach 4.5:1 (7:1 while Android's high-contrast text is on) and, for danger, to stay 20 L* from caution under the three simulations; contrast wins when both cannot hold (on some grounds no readable pair of lightnesses is 20 L* apart, as on Slate's dark scheme; the glyphs then tell caution from danger). Material's error roles are set from these. `:ui-shared` (`NoticePalette`, `LocalNoticePalette`) turns them into Compose colours; the Gaming palette provides the active theme's, and a View surface derives its own from its theme's background, text and accent.
 
-**The card** (`:ui-shared`, `NoticeCard`): the plate with a 4 dp ink bar on the leading edge, a 20 dp glyph (circle i, triangle !, octagon !), the title at 16/20 semibold in the ink, "from <plugin>" at 14 sp muted after it, the body at 15/19, and trailing either the action as a chip (at least 32 dp, 14 sp) or a chevron when there is more in Info. Rows and group notices have 3 dp corners and are at least 48 dp tall (56 with a body); the banner has 6 dp corners and 12 dp below it. It fades in over 150 ms with a 4 dp rise, scaled by the system animator scale; nothing pulses or blinks. Gaming, the companion and Standard draw this one card; Standard's Preference rows host it through a ComposeView (`NoticeViews`), because the forked Launcher3 cannot depend on `:shell-gamepad` -- which is why `:ui-shared` is a module of its own.
+**The card** (`:ui-shared`, `NoticeCard`): the plate with a 4 dp ink bar on the leading edge, a 20 dp glyph (circle i, triangle !, octagon !), the title at 16/20 semibold in the ink, "from <plugin>" at 14 sp muted after it, the body at 15/19, and trailing either the action as a chip (at least 32 dp, 14 sp) or a chevron when there is more in Info. Rows and group notices have 3 dp corners and are at least 48 dp tall (56 with a body); the banner has 6 dp corners and 12 dp below it. It fades in over 150 ms with a 4 dp rise, scaled by the system animator scale; nothing pulses or blinks. Gaming, the companion and Mobile draw this one card; Mobile's Preference rows host it through a ComposeView (`NoticeViews`), because the forked Launcher3 cannot depend on `:shell-gamepad` -- which is why `:ui-shared` is a module of its own.
 
 **Behaviour.** A notice is a stop of the pad only when something happens there (an action, details, or text cut on the row); otherwise the cursor passes over it. A runs the action, or opens Info when details are all it has (so a screen where Y is already bound, Games' Sort By, still reaches Info). Y is Info, the existing verb. The hint row names only what the notice answers. Info is a sheet with the title, body and details and a Copy chip on Select. A screen reader hears one node, tone first ("Caution, Unofficial plugin, ..."), as a polite live region for a group notice or a banner, with the custom actions Info and the action's label.
 
@@ -19530,7 +19707,7 @@ A condition the person should know about (an unofficial plugin, a feature that i
   - **Building blocks, not screens.** Any plugin, of any kind, gives typed facets: info, status, badge, progress, meter, a small chart, action, toggle, choice, slider, input, list, collection, media, text, link, notice, account and group. droidtop draws each kind one way, with its own components, focus, pad, touch and TalkBack, in every mode.
   - **Targets are droidtop's places.** A game's page and its row and capsule, an item's record page, the library's filters and sorts, search results, Home's shelves and cards, the Quick Menu (taking over the left plugin menu, #586), the companion's tabs and cards, a plugin's settings, notifications, the status area, widgets and the plugin's own page. droidtop decides what each target takes, how many per plugin, and the order: its own content first, then plugins in the person's order. Any plugin facet can be hidden or moved by the person, and each target is a permission of its own.
   - **Live, two-way.** Actions, toggles and choices go back to the plugin through the API; replies, and changes the plugin pushes, come back as facets that replace what is shown.
-  - **Information about items is kept.** Standard bundles (metadata, description, image, download, links, store, update, identity) are stored per item beside the source links and attached to every game linked to it. They are shown at once, refreshed in the background, and never fetched again to act: a download, a link and a version comparison use what is kept (Droidtop/tracker#599). With several plugins about one game, the person's source order decides.
+  - **Information about items is kept.** Mobile bundles (metadata, description, image, download, links, store, update, identity) are stored per item beside the source links and attached to every game linked to it. They are shown at once, refreshed in the background, and never fetched again to act: a download, a link and a version comparison use what is kept (Droidtop/tracker#599). With several plugins about one game, the person's source order decides.
   - **One mechanism.** The view schema, settings views, panels, tiles, widgets' snapshots, game sections and the update record become facets; today's plugins are read through a one-to-one mapping until contract 2 is retired.
   - **Facets first (2026-10-23).** The owner: "While plugins CAN present a whole UI, we really want them to use Facets. Small snippets to mix their functions into droidtop". Facets are the default way a plugin shows anything; a full UI of its own (a `ui.settings` page, its own view, a Flutter screen) only for what facets cannot express. A need no facet covers is raised on Droidtop/tracker#602 as a candidate kind or target before any plugin falls back to a full UI, and each gamegrab-sources plugin's bespoke UI moves onto facets with the old path deleted (docs/plugin-api.md 1.10). The owner, 2026-10-23: "they should use facets whenever it's practiceable. Full UIs are available, but they'll rarely be something the user actually uses. facets turn the plugins from 'little bubble the user has to do work to use' into 'part of the application'"; and 2026-10-24: "Facets go where they fit. No clunky redirects, no weird pathing". So in every plugin review a feature reachable only through a plugin's own UI is a finding (unless no facet kind can express it, and then the finding is the kind to propose), and so is a redirect to another screen just to reach a facet: a surface that acts on an item shows its facets in place, inline or as a sheet. The owner, 2026-10-29: "Facets are 'how a plugin presents information and integrates itself'. While a plugin CAN have a full UI, that's unideal, and likely a fallback", approving the audit's six additions (form groups, `toggle` on `item.page`, the `grant` action, the `secret` kind, `parts` on a `download` entry, the `search.filter` target; docs/plugin-api.md 1.10). In the one search a source that gives them has a line "<Source>: search options"; it opens the options as a page drawn by the one renderer, keeps what the person sets (per source plugin, as the System pick is), and searches again on the way back. Their notices and actions (download the game index, turn a site on) run there in place.
 - **Download sites: droidtop's own sign-ins for file hosts (2026-10-17).** The owner: "I also don't know that we have the ability to save logins for download sites", and on how they are listed: "Fixed list, with the user able to add items to it using an \"add site\" button". A plugin's session (above) covers only the sites that plugin declares, and a link on a forum usually leads to a file host (Mega, Gofile, Pixeldrain), where a signed-in person gets more speed, no wait and no captcha. So droidtop keeps sessions of its own for those hosts (`DownloadSites`):
@@ -19553,7 +19730,7 @@ All of it is additive to the contract (plugin-api.md 7 changelog): an older plug
 - **A finished job** says so on the page that started it: the job's own `notice`, or droidtop's Info notice "Finished" with the job's `message` as its body (a bare "Done" adds nothing). There is no success tone: the tones stay Info, Caution and Danger, as #485 decided.
 - **A list's notice** (a catalog's `disclaimer`) is drawn under droidtop's caution card "Notice from the list" (or "The list's notice changed"), marked as from the list, with the text in full below it as before and Accept still opening only once it was read. Both titles are reserved, so no plugin notice can pose as one.
 - **Values and turned-off parts** (items 7 and 5, the next step the same day). A plugin sends a value as data (`{"number": 1500000000, "unit": "bytes"}`, `{"bool": true}`, an `enum` with its labels) and droidtop writes it with `ValueFormat`, so sizes and durations read the same everywhere. A node may name the declared permission it needs; while that permission is off, only that node becomes an inert row saying so, opening Permissions, instead of the whole page failing.
-- **Who made it, and the way out of a panel** (items 2 and 8, the same day). A plugin states its `summary`, `publisher`, `homepage` and `category` in its manifest and droidtop draws them: the summary under its name in the list and on its page, the rest in an "About" group (Made by, Kind, Its page). `icon` and `screenshots` must be files of the signed payload and are read and checked now, drawn once the settings screens have an image row (renderer work shared by Gaming, the companion and Standard). Every plugin panel, on every host, ends with droidtop's Permissions row, so no plugin adds its own "permissions" or "about" row.
+- **Who made it, and the way out of a panel** (items 2 and 8, the same day). A plugin states its `summary`, `publisher`, `homepage` and `category` in its manifest and droidtop draws them: the summary under its name in the list and on its page, the rest in an "About" group (Made by, Kind, Its page). `icon` and `screenshots` must be files of the signed payload and are read and checked now, drawn once the settings screens have an image row (renderer work shared by Gaming, the companion and Mobile). Every plugin panel, on every host, ends with droidtop's Permissions row, so no plugin adds its own "permissions" or "about" row.
 - **Danger for plugins too** (item 1; owner, 2026-10-15, asked whether plugins get danger and success: "Yep! We need to surface appropriate contextual stuff"). This reverses the #485 rule that danger was droidtop's own: a plugin's `notice` and `ui.prompt confirm` may be `danger`, drawn in droidtop's danger colours and still marked "from <plugin>". Danger stays out of the flash (nothing in a flash needs action).
 Not in this step, and why: a success tone (it needs its colours in Droidtop/notices, the shared library, before droidtop can draw it); the plugin icon in a panel's title and the screenshots wait on an image row in the settings screens; a host loading state with a timeout stays the renderers' "Loading <title>".
 
@@ -19587,7 +19764,7 @@ Digits use the root locale, so a decimal point never becomes a comma inside Engl
 
 ### Asking before a change, and the flash (decided 2026-10-14, Droidtop/tracker#485)
 
-**The danger dialog** (`NoticeDialogs.confirmDanger`, drawn by `:ui-shared`'s `ConfirmDialogCard`): Steam's shape. A centred dark card, min(480 dp, 90% of the window) wide, on a 0.6 scrim; the octagon and the title at 22/28 bold; the outcome; the recommendation ("We recommend Cancel.") in the danger ink; the plugins it is about; a Details row; and two 48 dp buttons side by side, **Cancel** on the left with the focus, the risky button on the right in the danger fill. There is no second-press arm and no delay: Cancel has the focus, so a mashed A cancels, and reaching the risky button is a deliberate move and a press. B, a tap on the scrim and Cancel all answer Cancel; Left/Right move between the buttons, Up reaches Details, Y opens Details. A danger dialog appears only when something changes (an install, an update, a different maker, protection failing to start); afterwards the page says it quietly. `NoticeDialogs.confirm` is the same card for an Info or Caution question with no fill on the proceed button. Code anywhere asks and suspends; the surface on top (the last to attach as a host) draws the question in its own window, one question at a time, and with no surface attached the answer is Cancel, so nothing risky happens unseen. Gaming draws the card; Standard's settings ask with a platform dialog whose default button is Cancel.
+**The danger dialog** (`NoticeDialogs.confirmDanger`, drawn by `:ui-shared`'s `ConfirmDialogCard`): Steam's shape. A centred dark card, min(480 dp, 90% of the window) wide, on a 0.6 scrim; the octagon and the title at 22/28 bold; the outcome; the recommendation ("We recommend Cancel.") in the danger ink; the plugins it is about; a Details row; and two 48 dp buttons side by side, **Cancel** on the left with the focus, the risky button on the right in the danger fill. There is no second-press arm and no delay: Cancel has the focus, so a mashed A cancels, and reaching the risky button is a deliberate move and a press. B, a tap on the scrim and Cancel all answer Cancel; Left/Right move between the buttons, Up reaches Details, Y opens Details. A danger dialog appears only when something changes (an install, an update, a different maker, protection failing to start); afterwards the page says it quietly. `NoticeDialogs.confirm` is the same card for an Info or Caution question with no fill on the proceed button. Code anywhere asks and suspends; the surface on top (the last to attach as a host) draws the question in its own window, one question at a time, and with no surface attached the answer is Cancel, so nothing risky happens unseen. Gaming draws the card; Mobile's settings ask with a platform dialog whose default button is Cancel.
 
 **The flash** (`Notices.flash`): a corner card at the bottom right above the hint row, at most 320 dp wide, the tone's glyph and up to two lines (four at font scale 1.3 and above) of 14 sp text, led by the plugin's name for a plugin's flash. It is drawn in a window that never takes focus, so the page's focus and hints are untouched; it stays for the longer of 4 s and Android's recommended accessibility timeout and never less than 1.5 s, and is announced politely. Nothing in a flash needs action; acknowledgements are past tense with no period ("Saved", "Copied"). It slides in from the edge on the panel roles and out again (Droidtop/tracker#643, "Motion and visual status"); a flash of a group (`Notices.merged`) that arrives while one of its group waits counts that card up instead of queueing, and a flash that has details is one target that shows them in place.
 
@@ -19605,7 +19782,7 @@ Every catalog page is built the same way, top to bottom (the final design on tra
 6. **The focus line** (`FocusLine`): the focused row's sentence in 16 sp under the list, with room kept for three lines so the list never changes size as the cursor moves; past three lines it ends "Y Info", never a silent cut. Not a live region.
 7. **The hint bar**, with its fit rule (section 7j, "The hint bar fits").
 
-The model is `CatalogPage(header, buttons, more, groups)`, built once per refresh by `pageScreen(...)`. Every renderer reads it through the `groups` it always read: the header and the bar become the first group's two rows (`PageHeaderItem`, `ButtonBarItem`), so search, the companion and Standard's Preference rows need no second loading path, and the search index skips both. Gaming draws them with its own cursor (Left and Right move along the bar), the companion by touch, Standard through `PageViews` in a ComposeView. `CatalogScreen.layout` says whether a screen is one list, the two-pane category layout (three or more sections) or a strip of views of one list.
+The model is `CatalogPage(header, buttons, more, groups)`, built once per refresh by `pageScreen(...)`. Every renderer reads it through the `groups` it always read: the header and the bar become the first group's two rows (`PageHeaderItem`, `ButtonBarItem`), so search, the companion and Mobile's Preference rows need no second loading path, and the search index skips both. Gaming draws them with its own cursor (Left and Right move along the bar), the companion by touch, Mobile through `PageViews` in a ComposeView. `CatalogScreen.layout` says whether a screen is one list, the two-pane category layout (three or more sections) or a strip of views of one list.
 
 **Empty, loading and error** are one `StateBlock`: a 48 dp glyph, a title of at most 32 characters, one body line and a next action (an empty state always has one); loading names what is slow after two seconds, never a bare title or an endless spinner; an error is a caution notice with one action and the raw text in Details. **Offline (Droidtop/tracker#594):** a screen that needs the network says so (`CatalogScreen.needsNetwork`: Updates, a store's page, the plugin catalogs and More catalogs); while the device has no network (`SystemStatus`, `NetworkKind.NONE`) the Gaming renderer heads it with one caution notice, "You're offline", saying what it shows may be out of date and its actions wait for a connection, instead of letting Check now or Sync fail first.
 
@@ -19742,7 +19919,7 @@ Settings tab, the left menu's places, Console systems and Containers.
   in (Global settings) contribute groups to several categories. **Reorganised into short categories, one home per
   setting (owner, 2026-10-23, Droidtop/tracker#610: "Settings would be very wise to reconfigure, yes. But don't worry
   about the single depth. Settings requires the complexity it deserves").** The Gaming Settings column is, in order:
-  **Modes** (Home screen, the modes, and Desktop's and Standard's own pages, which were "Other shells", then
+  **Modes** (Home screen, the modes, and Desktop's and Mobile's own pages, which were "Other shells", then
   Kids and guests as its section: UI mode, the passkey, Kid's highest volume, Play time),
   **Library** (Console systems, Emulators, Game folders, Windows games,
   Scraper as rows that open their screens; Downloads
@@ -19765,7 +19942,7 @@ Settings tab, the left menu's places, Console systems and Containers.
   account sign-in, a per-emulator page), and that screen replaces the pane,
   never the column. A short screen is marked `CatalogScreen.merged` and is
   drawn as sections of the pane that links it instead
-  (`mergeShortScreens`; Standard mode's one row inside Global settings).
+  (`mergeShortScreens`; Mobile mode's one row inside Global settings).
   Merging is one level deep and keeps each row's id and write path. A
   merged section takes the category and icon of the group that linked it,
   so in a column it is part of that category, never an icon-less category
@@ -19779,7 +19956,7 @@ Settings tab, the left menu's places, Console systems and Containers.
   list varies). A link to a screen the left menu lists as a place is not drawn
   in Gaming's Settings (`withoutPlaceLinks`, fed by `menuSectionsFor`): in
   Gaming, Downloads is the left menu's place, so the Library category has no
-  "Downloads and installs" row; Standard and Desktop, which have no left menu,
+  "Downloads and installs" row; Mobile and Desktop, which have no left menu,
   keep it, and Global settings keeps its Updates link for the same reason. Since 2026-10-23 the filter runs after
   Global settings is merged in and on every screen Settings opens (Accounts and sources' Game sources and Plugins
   links included): in Gaming a place has one way in, the left menu, and Settings no longer shows a second Updates
@@ -19837,7 +20014,7 @@ Settings tab, the left menu's places, Console systems and Containers.
   searchable but is not drawn), a game menu row's summary is a short value
   ("From the folder name", "2 found"), and a sheet carries no instruction line (the footer's pills are the one place buttons are named, so
   they follow the pad's layout and the Swap A and B setting; plain text never names A or B,
-  Droidtop/tracker#365; Standard's View list dialog, which has no pills and whose confirm
+  Droidtop/tracker#365; Mobile's View list dialog, which has no pills and whose confirm
   button Android decides, words its one hint line by role: "Confirm select, Back cancel")
   (Sort by, Search). Sentences stay for failures and for confirmations of a
   consequential or destructive action.
@@ -20056,7 +20233,7 @@ not read; text explains on demand, and is never the primary way to see state.**
 
 - **One job bar, every surface.** `JobProgress` and `JobMark` (`:ui-shared`) draw every job: the Downloads and Updates
   rows in Gaming's place and the Quick Menu (`ShellProgressBar`, Gaming's colours), a game page's Play area, a PC
-  capsule's foot, Home's download cards, the companion's home and catalog rows (`companionJobColors`), and Standard's
+  capsule's foot, Home's download cards, the companion's home and catalog rows (`companionJobColors`), and Mobile's
   settings rows (`JobViews`, a Preference layout of its own). Each host gives its colours (`JobProgressColors`).
 - **States as motion** (`JobLook`, `:runtime-common`, from `PluginJobsScreen.lookOf`): queued (held, or waiting for a
   connection or its next try) is a dim bar with a slow pulse; active glides its fill to each new value over
@@ -22445,7 +22622,7 @@ counter resets on any start that lives for a minute. Implementation: one
 counter in a private preferences file (`droidtop_crash_state`), written with
 a synchronous commit by the crash handler and incremented only when the
 process died less than a minute after starting; `MainActivity` (the entry of
-every non-Standard shell) sends a start to Global settings when it reads
+every non-Mobile shell) sends a start to Global settings when it reads
 three and backs the counter off to two, so the start after that is the
 unthemed Gaming shell rather than settings again. Safe mode is
 `ThemeSafeMode`: `ThemeAssets` resolves no active theme while it is on, which
@@ -22465,7 +22642,7 @@ is up. A, Enter and a touch all press the action. When safe mode is on,
 so the action is immediately reachable by A even before any Up press reaches
 it. Sub-screens that own
 their whole surface (Settings' choice pickers and search results) keep
-their own edges. The Standard launcher entry is routed through safe mode
+their own edges. The Mobile launcher entry is routed through safe mode
 (`HomeTrampolineActivity`: when `ThemeSafeMode.active`, the trampoline
 redirects to Gaming so the banner is reachable and the recovery action works);
 it does not render themes itself, but the safe-mode banner must still be
@@ -22680,7 +22857,7 @@ droidtop and the plugin". Five steps, in this order:
    starts it as a side effect.
 3. **The host starts the plugins**, each step on its own, so one failure
    stays its own: plugins an older build disabled are tried again, then
-   the person's background services and schedules, Standard's plugin
+   the person's background services and schedules, Mobile's plugin
    entries, the apps that carry a plugin, and the elevated grants (whose
    backend may be the Shizuku plugin).
 4. **Each plugin registers** once it is loaded (proposed on #775,
@@ -23144,7 +23321,7 @@ of what is built. The decisions, briefly:
   - droidtop renders a view by translating it into the settings catalog
     model (`CatalogScreen`, `PluginViews` in `library-core`). That model is
     already drawn in all three modes (Gaming's `CatalogNavigator` through
-    the one `onPad` pipeline, Standard's Preference surface, Desktop's
+    the one `onPad` pipeline, Mobile's Preference surface, Desktop's
     Settings app), so plugin pages are themed, D-pad and touch navigable,
     and need no renderer of their own. A plugin never draws a native view,
     never sets droidtop's chrome, and every page names it.
@@ -23229,7 +23406,7 @@ take.
   into its settings, its own app and the app it manages. Plugins with tiles
   but no panel get a panel of their tiles, so existing plugins appear with no
   change. The same panel is the "Panel" row at the top of the plugin's page
-  under Settings, so Standard and Desktop reach it too.
+  under Settings, so Mobile and Desktop reach it too.
 - **Plugins reach the rest of the shell only through declared extension
   points, drawn by droidtop.** Built with this change: rows on a game's page
   (`ui.game_section@1`: the PC game page draws each node as its own row under
@@ -23292,7 +23469,7 @@ take.
 able to act on all the UI modes if they want to. I feel like we've been
 focusing exclusively on gaming mode until now", then "Still focus on gaming
 mode for now, just wire it in OUT from there". So the contribution model is
-mode-neutral and Gaming's surfaces stay the reference; Standard and Desktop
+mode-neutral and Gaming's surfaces stay the reference; Mobile and Desktop
 draw the same contributions where they already have a home, with Gaming's
 components, and get no surface family of their own yet.
 
@@ -24727,7 +24904,7 @@ what the index says is display data, never a trust decision.
 - **D4, several at once**: plugins held back in the background are listed on the Plugins page as a caution notice ("Protection didn't start", Review), which asks for all of them in one dialog ("Run all anyway", this run only).
 - **D3, a different maker**: an update verified under a different trust anchor than the approved version starts pending as before, and now remembers what it replaced (`PluginRecord.replacedKeySha256`/`replacedOrigin`); its page shows "Update made by someone else" with both fingerprints in groups of four in Info, and approving it asks "Update anyway" before anything else.
 
-After it is allowed, the plugin's page carries the Full access chip on its status row and the quiet caution notice "Has full access" with **Limit access**, which takes the grant away when the plugin can run with normal protection and otherwise turns the plugin off; there is no permanent red banner. The permission titles are plain words (`host.full_trust` is "Full access", `priv.shell.root` "Full control of the device", the full list in plugin-api.md 4.1), and the approval list's "(high risk)" suffix moved into the row's explanation. The Standard surface asks the same questions with a platform dialog (Cancel the default button); Gaming draws the Steam-shaped card.
+After it is allowed, the plugin's page carries the Full access chip on its status row and the quiet caution notice "Has full access" with **Limit access**, which takes the grant away when the plugin can run with normal protection and otherwise turns the plugin off; there is no permanent red banner. The permission titles are plain words (`host.full_trust` is "Full access", `priv.shell.root` "Full control of the device", the full list in plugin-api.md 4.1), and the approval list's "(high risk)" suffix moved into the row's explanation. The Mobile surface asks the same questions with a platform dialog (Cancel the default button); Gaming draws the Steam-shaped card.
 
 **What is built vs. open.** Built: the manifest format and validation,
 signing/hashing, install/uninstall/enable/approve, the approval screen,
@@ -24800,7 +24977,7 @@ describes.
   exact convention); `RetroArchPlugin.statusResult` uses this to offer
   "download a core by name" without droidtop knowing anything
   RetroArch-specific. **Not built**: a droidtop-owned surface for the
-  Standard shell's drawer long-press menu (AOSP `launcher3`'s own popup
+  Mobile shell's drawer long-press menu (AOSP `launcher3`'s own popup
   menu, `:shell-default`) -- real scope, deliberately left open rather
   than a shallow, unverified change to that vendored tree; the Player
   choice surface above is the one this pass actually shipped and rig-
@@ -25392,7 +25569,7 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 **One search: where it opens (decided 2026-10-14, Droidtop/tracker#485 F7c; owner: "We also want per-console search items").** One runner (`UnifiedSearch`, drawn by `LibrarySearchDialog`), three kinds of entry (`SearchEntry`):
 
 - **Everything**: **Y on Home**: the device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope. The left menu has one **Search** row, the one in its order above (under Resume, not in Kiosk and Kid), which opens the same runner through `LauncherSearchScreen` with the matching settings too; there is no second Search row under Home (two branches each added one; the merge of 2026-10-15 kept that one).
-- **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). The Quick Menu's Game section has the same row for a running console game's system ("Search SNES", between Emulator and Restart; it opens the one search over that system's games and the sources that serve it, the Quick Menu closing first). Home's system tiles get it with Your library's systems (#485 F7b), which are not built yet.
+- **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). The running console game's L2 sheet in Gaming has the same row for its system ("Search SNES", after Guides; it opens the one search over that system's games and the sources that serve it, the sheet closing first). Home's system tiles get it with Your library's systems (#485 F7b), which are not built yet.
 - **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
 
 The games a search looks through are the games the lists show (`searchablePool`): the person's own ownership
@@ -25497,13 +25674,13 @@ match" for games Gaming listed (console, 2026-10-17).
   (Droidtop/tracker#12, #315, #351): Gaming's left menu has a **Search** row right
   under Resume (Start, then A; a tap works too), which opens the dialog with the
   shell's games and apps as the device's rows (`LauncherSearchScreen`, so the
-  shell and Standard share the one wiring); Kiosk and Kid have no such row, as they
-  have no downloads or settings. Standard's drawer search field, Desktop's Start menu,
+  shell and Mobile share the one wiring); Kiosk and Kid have no such row, as they
+  have no downloads or settings. Mobile's drawer search field, Desktop's Start menu,
   and the companion's Home (a **Search** pill under the status line, touch only, which
   starts the same search window on the companion's screen) open the same dialog.
   Settings has its own full search over settings rows (`SettingsSearchIndex`, 7k),
   a different thing being searched, not a plugin mode; where a surface has settings
-  of its own (Gaming, Standard's Global settings, Desktop's) the one search also
+  of its own (Gaming, Mobile's Global settings, Desktop's) the one search also
   shows the matching ones, at most five, as a **Settings** section after the
   rows (`LibrarySearchDialog.settingsRoot`; the index is built once, off the main
   thread, when the text first reaches two letters). A press opens the screen the
@@ -25515,12 +25692,12 @@ match" for games Gaming listed (console, 2026-10-17).
 - **Picking.** The owner, 2026-10-16: "Clicking on the game entry should give the game's page, or options if it's
   available from multiple sources. When I clicked, it just gave an f95zone error". So:
   - **A game row opens the game's page**, where Play or Install is, never a raw start (`LauncherSearchScreen.onOpen`):
-    Gaming's left-menu search and a system search open `nav.openDetail`; Standard opens the Games screen on the page
-    (`LauncherGamesActivity.pageIntent`) for a PC or engine game, the games Standard gives a page; Desktop has no game
-    page and plays it. An app row opens the app. **A console or Android game in Standard's search opens a mini-popup**
-    (the owner, 2026-10-16, asked whether Standard should get a page for them: "we can create a mini-popup"): a small
+    Gaming's left-menu search and a system search open `nav.openDetail`; Mobile opens the Games screen on the page
+    (`LauncherGamesActivity.pageIntent`) for a PC or engine game, the games Mobile gives a page; Desktop has no game
+    page and plays it. An app row opens the app. **A console or Android game in Mobile's search opens a mini-popup**
+    (the owner, 2026-10-16, asked whether Mobile should get a page for them: "we can create a mini-popup"): a small
     card over the search with Play and the game's few key actions and facts, not a full page. Until it is built,
-    Standard starts such a game as before.
+    Mobile starts such a game as before.
   - **One game is one row.** The library's row and every source's row whose titles fold to one key
     (`StoreIdentity.titleKey`, the fold matching uses: case, accents, "&" as "and", a leading "The" and edition labels)
     are one row (`UnifiedSearch.merge`), the best-ranked in front, its detail naming every place ("Steam · Installed ·
@@ -25864,12 +26041,11 @@ a sheet can hold a heading (`ActionHeading`) and a line of text (`ActionNote`) t
 under its title (the game menu's source, engine and size). Up and Down move, A chooses, Select or L2 closes, and B and
 the system Back go back: out of a page first where the sheet has pages (the game menu's categories), else they close
 it. The sheet holds the pad and keeps the system bars hidden. A row that has a choice of its own opens a page or a
-task, never a second sheet. The Quick Menu's Game section is a pane of the Quick Menu, not a sheet, but its rows are
-`ActionRow`s too (its `GameQuickTile` is gone). Desktop's taskbar menus are on it since Droidtop/tracker#690 (a
+task, never a second sheet. The running game's sheet (`RunningGameSheet`, #740) is one of them, wherever it is drawn. Desktop's taskbar menus are on it since Droidtop/tracker#690 (a
 window's, a pin's, an Android app's and the clipboard notice's), so `:shell-desktop` has no `DropdownMenu` left, and
 `ActionSheet` and its rows are public for it. The same change made the bar's window, pin and app rows and its tray
 and clipboard buttons at least 48 dp tall, the touch target (DESIGN-LANGUAGE); the tray and clipboard items are the
-bar's own `TaskbarButton` chip, not Material's `TextButton`. Standard's dialogs move onto it in later steps. `scripts/check-ui-rules.sh` lists the raw dialogs left (`raw-dialog`, off until its last site is
+bar's own `TaskbarButton` chip, not Material's `TextButton`. Mobile's dialogs move onto it in later steps. `scripts/check-ui-rules.sh` lists the raw dialogs left (`raw-dialog`, off until its last site is
 moved).
 
 **Run once with…, and Manage (owner, 2026-10-23, Droidtop/tracker#636).** The owner, asked to run MGQ Paradox's
@@ -26036,6 +26212,19 @@ without its runtime said "Running". Decisions:
 
   A source's settings (sign-in, account, options) stay on its plugin page. The data and the merging are
   library-core's; the Gaming shell draws the section (the UI lane).
+  **How it is drawn.** Every Get games entry (a place's chip, Downloads and Updates' one Get games row) opens the one
+  search dialog in its Get games form (`GetGamesSearch`, `LibrarySearchDialog(getGames = true)`), titled Get games:
+  the field first, with the cursor in it; under it the chip row (`sourceChips`: the sources asked, then the ones off;
+  a turning ring beside a chip while its source answers, "· failed" on a chip whose source failed, with its fix as a
+  row under the results); then the rows. Left and Right move between the chips, A turns one over, kept, and the
+  search runs again. With no text the rows are what the sources feature, under "Featured"; with text, matches. Each
+  source result shows its box art, and one game several sources have reads "from F95zone · LewdCorner"
+  (`sourcesLine`). Downloads and Updates lists one Get games row, not a row per source plugin: in Gaming it opens the
+  search over the place; elsewhere `LauncherSearchActivity` hosts the same dialog. The rows are the search list's
+  rows with art, not a grid of cards.
+  **A text field is an input box.** The settings renderer draws every `TextInputItem` (a plugin's text or search field
+  on any page) as its name over a box holding its text, or a dim "Type here" / "Type to search", never a row whose
+  value reads "not set" (owner: "why "not set"? It's not a freeform search bar?"). A opens the same edit.
   **Get new games: under the results, and a page of Updates (owner, 2026-10-23, Droidtop/tracker#612, #621).** "Get new
   games should be presented under the search results, presenting matches that are relevant (so roms from romgi, abd
   etc). Also add a 'get new games' under 'updates' that's its own UI." Earlier the same day: Get More Games "is
@@ -26112,7 +26301,7 @@ without its runtime said "Running". Decisions:
   `PluginRecord.disabledDetail`, shown under "Technical details" on the
   plugin page and on a failed source row in search.
 - **One entry for downloads and jobs.** "Downloads and installs" in
-  Settings is the single entry for the jobs screen in Standard (it carries
+  Settings is the single entry for the jobs screen in Mobile (it carries
   that title now); the Gaming left menu has the same screen as its place of
   that name; the second "Jobs" row under Accounts and sources is gone.
 - **Permissions never contradict their own summary.** Once a plugin is

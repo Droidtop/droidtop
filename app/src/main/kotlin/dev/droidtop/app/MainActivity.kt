@@ -216,7 +216,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         gamingTriggerBrowseThemes = intent.getBooleanExtra(BackButtonMenu.EXTRA_GAMING_BROWSE_THEMES, false)
         // Back from a game screen of droidtop's own asks for the menu; so does a HOME press while a game runs
         // (the warm HOME forwarded by Launcher carries the reinit extra): the person is coming back from the
-        // game, and the menu's Game section has Resume first (docs/SPEC.md 7f, "Sleep and return to game").
+        // game, and the shell opens the running game's sheet, Resume first (docs/SPEC.md 7f, "Sleep and return to game").
         val homePress = intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, false)
         val running = dev.droidtop.library.LaunchDisplay.runningGame
         gamingQuickMenu = intent.getBooleanExtra(dev.droidtop.library.OwnGameScreens.EXTRA_QUICK_MENU, false) ||
@@ -668,7 +668,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // A screen nobody has answered for yet (found at start, or left while setup ran) is asked about now (ScreenRoleAsk).
         ScreenRoleAsk.check()
         // Back from a running game, by HOME, Recents or a wake with the shell in front: the game is what the person is
-        // coming back to, so the Quick Menu opens on its Game section with Resume first (docs/SPEC.md 7f, "Sleep and
+        // coming back to, so the shell opens the running game's sheet with Resume first (docs/SPEC.md 7f, "Sleep and
         // return to game"; ShellReturn says why this is decided here and not on HOME's intent).
         val returning = mode == Mode.GAMING && ShellReturn.returnsToGame(
             stoppedWithGameAtMs, dev.droidtop.library.LaunchDisplay.runningGame != null, ShellReturn.otherScreenAt,
@@ -685,10 +685,17 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // Gaming mode: this window, through ordinary dispatchKeyEvent.
         // See ForegroundShell for why that is the only route available.
         ForegroundShell.set(this)
+        // A companion that became the top activity before this shell was in front hands the pad over now (#820).
+        dev.droidtop.display.TouchOnlySurfaceFocus.shellResumed()
         // Home on this display brings the shell back (dev.droidtop.runtime.HomeDisplays).
         val shellDisplay = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) display?.displayId else android.view.Display.DEFAULT_DISPLAY
         dev.droidtop.runtime.HomeDisplays.shellShown(shellDisplay)
         dev.droidtop.runtime.HomeDisplays.used(shellDisplay)
+        // Kept for the next process's Home press, which starts the shell here rather than moving it (Droidtop/tracker#824).
+        if (shellDisplay != null) {
+            val app = applicationContext
+            dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.runtime.ShellPlacement.remember(app, shellDisplay) }
+        }
     }
 
     override fun onPause() {

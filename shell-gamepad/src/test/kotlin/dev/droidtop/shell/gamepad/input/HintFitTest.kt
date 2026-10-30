@@ -40,13 +40,15 @@ class HintFitTest {
     }
 
     @Test
-    fun `then L1 and R1 drop, then Select, and A and B never do`() {
+    fun `then L1 and R1 drop, then Select keeps only its glyph, and A and B never shrink`() {
         val glyphs = width(HintFit.at(hints, HintFit.Stage.MENUS_AS_GLYPHS))
         val noShoulders = HintFit.fit(hints, glyphs - 1, width)
         assertTrue(noShoulders.none { it.action == GamepadAction.L })
         assertTrue(noShoulders.any { it.action == GamepadAction.SELECT })
         val tiny = HintFit.fit(hints, 1f, width)
-        assertTrue(tiny.none { it.action == GamepadAction.SELECT || it.action == GamepadAction.L })
+        assertTrue(tiny.none { it.action == GamepadAction.L })
+        // Select's pill can be the only touch route to what it opens (Droidtop/tracker#839): its glyph stays, tappable.
+        assertEquals(HintFit.Shown(GamepadAction.SELECT, null), tiny.single { it.action == GamepadAction.SELECT })
         assertTrue(tiny.any { it.action == GamepadAction.A } && tiny.any { it.action == GamepadAction.B })
     }
 

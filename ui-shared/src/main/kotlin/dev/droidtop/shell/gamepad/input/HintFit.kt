@@ -7,9 +7,10 @@ package dev.droidtop.shell.gamepad.input
  *
  * 1. Start and R2 become their glyphs alone (a count such as "3 new" stays beside R2);
  * 2. L1/R1 drop (the strip they step shows its own shoulder glyphs);
- * 3. Select drops (the Options it opens is also on long press).
+ * 3. Select becomes its glyph alone. It never drops: on several screens its pill is the only touch route to what it
+ *    opens (List options, Filter, Copy all), and a touch never assumes a pad (Droidtop/tracker#839).
  *
- * A and B never drop. Start and R2 always sit first, on the left. What still does not fit after the last
+ * A, B and Select never drop. Start and R2 always sit first, on the left. What still does not fit after the last
  * step wraps (a sheet) or scrolls (a full-width bar), as before. Pure, so the order is a JVM test.
  */
 object HintFit {
@@ -18,7 +19,7 @@ object HintFit {
     data class Shown(val action: GamepadAction, val label: String?)
 
     /** The stages, in the order they are tried. */
-    enum class Stage { FULL, MENUS_AS_GLYPHS, NO_SHOULDERS, NO_SELECT }
+    enum class Stage { FULL, MENUS_AS_GLYPHS, NO_SHOULDERS, SELECT_AS_GLYPH }
 
     private val MENUS = setOf(GamepadAction.START, GamepadAction.R2)
     private val SHOULDERS = setOf(GamepadAction.L, GamepadAction.R)
@@ -32,7 +33,7 @@ object HintFit {
         return ordered.mapNotNull { (action, label) ->
             when {
                 stage >= Stage.NO_SHOULDERS && action in SHOULDERS -> null
-                stage >= Stage.NO_SELECT && action == GamepadAction.SELECT -> null
+                stage >= Stage.SELECT_AS_GLYPH && action == GamepadAction.SELECT -> Shown(action, null)
                 stage >= Stage.MENUS_AS_GLYPHS && action in MENUS -> Shown(action, label.substringAfter(COUNT_SEPARATOR, "").ifEmpty { null })
                 else -> Shown(action, label)
             }

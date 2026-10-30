@@ -177,6 +177,27 @@ class PcShelvesTest {
     }
 
     @Test
+    fun `on the shelves the games Up and Down land on are read ahead too`() {
+        val hero = listOf(game("/h0").copy(artworkUri = "box-h0", heroUri = "hero-h0"))
+        val posters = (0..5).map { game("/p$it").copy(artworkUri = "box-p$it") }
+        val more = (0..3).map { game("/m$it").copy(artworkUri = "box-m$it") }
+        val shelves = listOf(hero, posters, more)
+        // On the hero: Down lands on the posters' first game (no place kept yet).
+        assertEquals(listOf("box-p0", "box-p1"), shelfNeighbourBackdrops(shelves, 0, 0, landing = { 0 }, reach = 2))
+        // On the posters at 4, with the place 2 kept on the shelf below: Up to the hero, Down to box-m2 and beside it.
+        val fromPosters = shelfNeighbourBackdrops(shelves, 1, 4, landing = { if (it == 2) 2 else 0 }, reach = 2)
+        assertEquals(listOf("box-p2", "box-p3", "box-p5", "hero-h0", "box-m2", "box-m1", "box-m3"), fromPosters)
+        // A kept place past a shorter shelf's end lands on its last game.
+        assertTrue("box-m3" in shelfNeighbourBackdrops(shelves, 1, 0, landing = { 9 }, reach = 0))
+    }
+
+    @Test
+    fun `in the grid the rows above and below are read ahead`() {
+        val grid = (0..11).map { game("/g$it").copy(artworkUri = "box$it") }
+        assertEquals(listOf("box4", "box6", "box1", "box9"), neighbourBackdrops(grid, 5, reach = 1, columns = 4))
+    }
+
+    @Test
     fun `the hero card is Steam's featured card, 3_2 capsules wide at a capsule's height`() {
         assertEquals(3.2f, heroWidth(androidx.compose.ui.unit.Dp(1f)).value, 0.001f)
         assertEquals(CAPSULE_ASPECT * 3.2f, HERO_ASPECT, 0.001f)

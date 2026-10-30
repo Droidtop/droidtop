@@ -64,7 +64,7 @@ class ModeSwitcherActivity : ComponentActivity() {
                     }
                     ModeSwitcherSheet(
                         choices = answers,
-                        title = "Android mode needs droidtop as Home",
+                        title = "Mobile mode needs droidtop as Home",
                         onDismiss = { if (!requesting) finish() },
                         hideSystemBars = immersive,
                     )

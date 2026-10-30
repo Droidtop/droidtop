@@ -309,6 +309,7 @@ class SecondScreenOrchestrator(
                 val disconnectedShellDestination = DualScreenOrchestration
                     .disconnectedShellDestination(currentDisplay, displayIds)
                 if (disconnectedShellDestination != null) {
+                    dev.droidtop.runtime.ShellPlacement.settle(stays = false)
                     host.clearParkedDisplayId()
                     host.relaunchOnDisplay(disconnectedShellDestination)
                     return@collectLatest
@@ -408,6 +409,9 @@ class SecondScreenOrchestrator(
                     cooledDown = now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS,
                 )
                 relocate(step, second?.androidDisplayId, now)
+                // The placement's word that the shell stays where it is: what What's new waits for before it opens,
+                // so no move covers it (Droidtop/tracker#824).
+                dev.droidtop.runtime.ShellPlacement.settle(stays = move == DualScreenOrchestration.ShellMove.NONE)
 
                 host.setDualScreenBroken(
                     DualScreenOrchestration.secondScreenNeedsReinit(
