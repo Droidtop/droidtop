@@ -39,10 +39,22 @@ object HomeRolePrefs {
     /** What Android starts on Home, to ask which app that is. */
     private fun homeIntent() = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
 
-    /** Android's Home role, on 10 and later where the device offers it; null where Home is a plain preference. */
-    private fun homeRole(context: Context): RoleManager? {
+    /**
+     * Whether droidtop holds Android's Home role; null where there is none (before Android 10, or a device that does
+     * not offer it) and Home is a plain preference. RoleManager stays inside these two bodies, behind the version
+     * check: in a signature it would stop this class loading on Android 8 and 9 (check_class_load_api).
+     */
+    private fun homeRoleHeld(context: Context): Boolean? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
-        return context.getSystemService(RoleManager::class.java)?.takeIf { it.isRoleAvailable(RoleManager.ROLE_HOME) }
+        val roles = context.getSystemService(RoleManager::class.java)?.takeIf { it.isRoleAvailable(RoleManager.ROLE_HOME) }
+        return roles?.isRoleHeld(RoleManager.ROLE_HOME)
+    }
+
+    /** Android's request for the Home role, or null where there is no role to ask for ([homeRoleHeld]). */
+    private fun homeRoleRequest(context: Context): Intent? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+        val roles = context.getSystemService(RoleManager::class.java)?.takeIf { it.isRoleAvailable(RoleManager.ROLE_HOME) }
+        return roles?.createRequestRoleIntent(RoleManager.ROLE_HOME)
     }
 
     enum class HomeImplementation { STANDARD, ALTERNATIVE, NONE }
@@ -103,7 +115,7 @@ object HomeRolePrefs {
      * read "On" (dq-onboard-01).
      */
     fun isDroidtopHome(context: Context): Boolean {
-        homeRole(context)?.let { return it.isRoleHeld(RoleManager.ROLE_HOME) }
+        homeRoleHeld(context)?.let { return it }
         val resolved = context.packageManager.resolveActivity(homeIntent(), PackageManager.MATCH_DEFAULT_ONLY)
         return resolved?.activityInfo?.packageName == context.packageName
     }
@@ -116,7 +128,7 @@ object HomeRolePrefs {
      * the request offers only an enabled one.
      */
     fun homeRequestIntent(context: Context): Intent {
-        homeRole(context)?.let { return it.createRequestRoleIntent(RoleManager.ROLE_HOME) }
+        homeRoleRequest(context)?.let { return it }
         // Below 10 there is no role request. When no Home app has been
         // chosen "Always" yet, Home itself resolves to Android's chooser,
         // which is the Home choice with droidtop in it: open that. Only when
