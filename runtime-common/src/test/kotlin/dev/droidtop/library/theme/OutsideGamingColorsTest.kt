@@ -4,6 +4,7 @@ import dev.droidtop.library.settings.AppearancePrefs
 import dev.droidtop.notices.ColorMath
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,20 +16,20 @@ class OutsideGamingColorsTest {
     private val violet = OutsideGamingColors.accentOf("violet")
 
     @Test
-    fun `match the gaming theme is the stored theme colours as they are`() {
-        assertSame(themed, OutsideGamingColors.choose(AppearancePrefs.MATCH_GAMING, themed, violet, light = false, highContrast = false))
+    fun `gaming theme is the stored theme colours as they are`() {
+        assertSame(themed, OutsideGamingColors.choose(AppearancePrefs.GAMING_THEME, themed, null, violet, light = false, highContrast = false))
     }
 
     @Test
     fun `a choice that is not custom matches the gaming theme`() {
-        assertSame(themed, OutsideGamingColors.choose("something else", themed, violet, light = true, highContrast = true))
+        assertSame(themed, OutsideGamingColors.choose("something else", themed, null, violet, light = true, highContrast = true))
     }
 
     @Test
     fun `custom ignores the gaming theme and is droidtop's own palette`() {
-        val chosen = OutsideGamingColors.choose(AppearancePrefs.CUSTOM, themed, blue, light = false, highContrast = false)
+        val chosen = OutsideGamingColors.choose(AppearancePrefs.CUSTOM, themed, null, blue, light = false, highContrast = false)
         assertEquals(GamingThemeColors.DEFAULT, chosen)
-        val light = OutsideGamingColors.choose(AppearancePrefs.CUSTOM, themed, blue, light = true, highContrast = false)
+        val light = OutsideGamingColors.choose(AppearancePrefs.CUSTOM, themed, null, blue, light = true, highContrast = false)
         assertEquals(GamingThemeMapping.defaultFor(light = true), light)
     }
 
@@ -65,5 +66,26 @@ class OutsideGamingColorsTest {
     fun `high contrast applies to the custom theme too`() {
         val plain = OutsideGamingColors.custom(violet, light = false, highContrast = false)
         assertEquals(GamingThemeMapping.highContrast(plain), OutsideGamingColors.custom(violet, light = false, highContrast = true))
+    }
+
+    @Test
+    fun `device colours are the mapped system palette`() {
+        val device = GamingThemeMapping.fromDevicePalette(DevicePaletteFixture.palette, light = false)
+        assertSame(device, OutsideGamingColors.choose(AppearancePrefs.DEVICE, themed, device, violet, light = false, highContrast = false))
+    }
+
+    @Test
+    fun `device colours with no system palette fall back to the gaming theme`() {
+        assertSame(themed, OutsideGamingColors.choose(AppearancePrefs.DEVICE, themed, null, violet, light = false, highContrast = false))
+    }
+
+    @Test
+    fun `the tint is the active palette's accent only while it is on and the source is not the gaming theme`() {
+        val active = OutsideGamingColors.custom(violet, light = false, highContrast = false)
+        assertEquals(active.accent, OutsideGamingColors.tintAccent(AppearancePrefs.CUSTOM, tintOn = true, active = active))
+        assertEquals(active.accent, OutsideGamingColors.tintAccent(AppearancePrefs.DEVICE, tintOn = true, active = active))
+        assertNull(OutsideGamingColors.tintAccent(AppearancePrefs.CUSTOM, tintOn = false, active = active))
+        assertNull(OutsideGamingColors.tintAccent(AppearancePrefs.GAMING_THEME, tintOn = true, active = active))
+        assertNull(OutsideGamingColors.tintAccent(AppearancePrefs.DEVICE, tintOn = true, active = null))
     }
 }

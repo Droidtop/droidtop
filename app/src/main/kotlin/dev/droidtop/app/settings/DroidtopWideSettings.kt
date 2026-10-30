@@ -131,9 +131,10 @@ object DroidtopWideSettings {
                     category = "Appearance",
                     items = listOf(
                         dev.droidtop.library.settings.AppearancePrefs.item(context),
-                        // Colours outside Gaming (docs/SPEC.md 7k, Droidtop/tracker#827).
-                        dev.droidtop.library.settings.AppearancePrefs.outsideGamingItem(context),
+                        // The colour source and the theme tint (docs/SPEC.md 7k, Droidtop/tracker#827 and #844).
+                        dev.droidtop.library.settings.AppearancePrefs.colourSourceItem(context),
                         dev.droidtop.library.settings.AppearancePrefs.customAccentItem(context),
+                        dev.droidtop.library.settings.AppearancePrefs.tintThemesItem(context),
                     ),
                 ),
                 CatalogGroup(

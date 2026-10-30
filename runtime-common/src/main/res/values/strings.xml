@@ -28,9 +28,10 @@
     <string name="quick_menu_order_quick_menu_order">Quick Menu order</string>
     <string name="quick_menu_order_which_section_comes_where_on">Which section comes where on the Quick Menu\'s rail. Picking one for a place swaps it with the one there</string>
     <string name="appearance_light_or_dark">Light or dark</string>
-    <string name="appearance_colours_outside_gaming">Colours outside Gaming</string>
-    <string name="appearance_colours_outside_gaming_explained">What Mobile, Desktop, the taskbar and the menus are drawn in</string>
-    <string name="appearance_match_the_gaming_theme">Match the Gaming theme (recommended)</string>
+    <string name="appearance_colour_source">Colour source</string>
+    <string name="appearance_colour_source_explained">What Mobile, Desktop, the taskbar and the menus are drawn in</string>
+    <string name="appearance_device_colours">Device colours</string>
+    <string name="appearance_gaming_theme">Gaming theme</string>
     <string name="appearance_custom_droidtop_theme">Custom droidtop theme</string>
     <string name="appearance_custom_accent">Custom theme accent</string>
     <string name="appearance_custom_accent_explained">The accent of the Custom droidtop theme</string>
@@ -40,6 +41,9 @@
     <string name="appearance_accent_violet">Violet</string>
     <string name="appearance_accent_pink">Pink</string>
     <string name="appearance_accent_orange">Orange</string>
+    <string name="appearance_tint_themes">Tint themes to my colours</string>
+    <string name="appearance_tint_themes_explained">Gaming themes take your accent and highlight; can look off where a theme\'s art has its own colours</string>
+    <string name="appearance_tint_themes_off_with_gaming_theme">Has no effect while the colour source is Gaming theme</string>
     <string name="accessibility_font_size">Font size</string>
     <string name="accessibility_text_size_in_every_app">Text size in every app</string>
     <string name="accessibility_display_size">Display size</string>

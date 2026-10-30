@@ -21,12 +21,12 @@ import kotlinx.serialization.json.JsonPrimitive
  * owner, 2026-10-30, Droidtop/tracker#827): what Mobile, Desktop, Mobile's taskbar and the shared menus draw in by
  * default, whether or not Gaming has ever opened. The ES-DE theme is parsed and mapped
  * ([GamingThemeMapping.resolved]) on [AppScopes.io], never on the main thread, when its [Key] changes (the theme, its
- * colour scheme, variant or aspect ratio, Light or dark, High contrast) or a theme is re-downloaded in place; the answer
+ * colour scheme, variant or aspect ratio, Light or dark, High contrast, the tint) or a theme is re-downloaded in place; the answer
  * is written to its own preferences file with the key it was worked out for, so a later start reads it back instead of
  * parsing again. The screen's shape is not in the key: the colours a theme declares do not follow it.
  *
- * Read through [OutsideGamingColors], which also applies the person's choice between this and the Custom droidtop
- * theme; nothing else reads this.
+ * Read through [OutsideGamingColors], which also applies the colour source (Device colours, this, or the Custom
+ * droidtop theme); nothing else reads this.
  */
 object ThemeColorStore {
     private const val FILE = "droidtop_theme_colours"
@@ -41,12 +41,14 @@ object ThemeColorStore {
         val aspectRatio: String?,
         val light: Boolean,
         val highContrast: Boolean,
+        /** "Tint themes to my colours": the accent the theme's accent and highlight become, or null (Droidtop/tracker#844). */
+        val tint: Int? = null,
     ) {
         /** The key as it is stored beside the colours: a JSON array, so a missing value and the word "null" differ. Pure. */
         fun encode(): String = JsonArray(
             listOf(
                 JsonPrimitive(theme), JsonPrimitive(colorScheme), JsonPrimitive(variant), JsonPrimitive(aspectRatio),
-                JsonPrimitive(light), JsonPrimitive(highContrast),
+                JsonPrimitive(light), JsonPrimitive(highContrast), JsonPrimitive(tint),
             ),
         ).toString()
     }
@@ -100,6 +102,14 @@ object ThemeColorStore {
         prefsWatch = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key in ReadingPrefs.PALETTE_KEYS || key in AppearancePrefs.OUTSIDE_GAMING_KEYS) refreshSoon(app, force = false)
         }.also { CatalogPrefs.prefs(app).registerOnSharedPreferenceChangeListener(it) }
+        // A new wallpaper's colours (Device colours, Droidtop/tracker#844); the system palette itself arrives with the
+        // configuration change below, which looks again too.
+        runCatching {
+            app.getSystemService(android.app.WallpaperManager::class.java)?.addOnColorsChangedListener(
+                { _, _ -> refreshSoon(app, force = false) },
+                android.os.Handler(android.os.Looper.getMainLooper()),
+            )
+        }
         app.registerComponentCallbacks(object : android.content.ComponentCallbacks {
             override fun onConfigurationChanged(newConfig: android.content.res.Configuration) = refreshSoon(app, force = false)
 
@@ -131,7 +141,7 @@ object ThemeColorStore {
                 state.value = GamingThemeMapping.defaultFor(key.light)
                 lastKey = null
             } else {
-                write(context, key, GamingThemeMapping.resolved(theme, key.light, key.colorScheme != null, key.highContrast))
+                write(context, key, GamingThemeMapping.resolved(theme, key.light, key.colorScheme != null, key.highContrast, key.tint))
             }
         }
         OutsideGamingColors.publish(context, state.value)
@@ -150,13 +160,15 @@ object ThemeColorStore {
     /** The key for the active theme as things are now. Reads preferences and lists the themes: not the main thread's work. */
     fun keyFor(context: Context): Key {
         val name = ThemeAssets.activeThemeName(context)
+        val light = AppearancePrefs.light(context)
         return Key(
             theme = name,
             colorScheme = name?.let { ThemePrefs.colorScheme(context, it) },
             variant = name?.let { ThemePrefs.variant(context, it) },
             aspectRatio = name?.let { ThemePrefs.aspectRatio(context, it) },
-            light = AppearancePrefs.light(context),
+            light = light,
             highContrast = highContrast(context),
+            tint = OutsideGamingColors.tintFor(context, light),
         )
     }
 
