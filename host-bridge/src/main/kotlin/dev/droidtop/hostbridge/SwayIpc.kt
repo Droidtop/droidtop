@@ -25,6 +25,9 @@ class SwayIpc(private val socketPath: String) {
     /** The layout tree, as GET_TREE returns it. */
     fun tree(): JSONObject = JSONObject(request(GET_TREE, ""))
 
+    /** The process of the window that has the focus, as sway sees it; null with none, or 0 when sway cannot see it. */
+    fun focusedPid(): Int? = focusedPid(tree())
+
     private fun request(type: Int, payload: String): String =
         LocalSocket().use { socket ->
             socket.connect(LocalSocketAddress(socketPath, LocalSocketAddress.Namespace.FILESYSTEM))
@@ -81,6 +84,16 @@ class SwayIpc(private val socketPath: String) {
          * sway/tree/view.c and ipc-json.c ipc_json_describe_view). A missing app id (an Xwayland window) is "".
          * The scratchpad's hidden windows are included, as sway lists them under its `__i3_scratch` workspace.
          */
+        /** The focused view's `pid` in [tree], walking tiled and floating nodes alike. Pure. */
+        internal fun focusedPid(tree: JSONObject): Int? {
+            if (tree.optBoolean("focused") && tree.has("pid")) return tree.optInt("pid")
+            for (key in listOf("nodes", "floating_nodes")) {
+                val children = tree.optJSONArray(key) ?: continue
+                for (i in 0 until children.length()) focusedPid(children.getJSONObject(i))?.let { return it }
+            }
+            return null
+        }
+
         internal fun windows(tree: JSONObject, appId: String, title: String): List<SwayWindow> = buildList {
             fun walk(node: JSONObject, floating: Boolean) {
                 val isView = node.has("pid") || node.has("app_id")

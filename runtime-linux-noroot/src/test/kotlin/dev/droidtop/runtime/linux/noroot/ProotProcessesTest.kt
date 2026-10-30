@@ -58,4 +58,18 @@ class ProotProcessesTest {
     fun `the parent is read after a command name holding spaces and parentheses`() {
         assertEquals(42, ProotProcesses.parentFromStat("7 (a (b) c) S 42 7 7 0"))
     }
+
+    @Test
+    fun `a window's process belongs to the container its own or its nearest ancestor's marker names`() {
+        process(100, 1, "dev.droidtop.app", "ANDROID_DATA=/data")
+        process(400, 100, "libproot.so", "DROIDTOP_CONTAINER=droidtop-sibling-1")
+        process(401, 400, "gedit", "DROIDTOP_CONTAINER=droidtop-sibling-1")
+        // Cleared its environment; its parent still says.
+        process(402, 401, "gedit-helper", "PATH=/bin")
+        val processes = ProotProcesses(proc) {}
+        assertEquals("droidtop-sibling-1", processes.containerOf(401))
+        assertEquals("droidtop-sibling-1", processes.containerOf(402))
+        assertEquals(null, processes.containerOf(100))
+        assertEquals(null, processes.containerOf(999))
+    }
 }

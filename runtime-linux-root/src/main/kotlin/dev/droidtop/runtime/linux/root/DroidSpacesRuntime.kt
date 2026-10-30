@@ -590,6 +590,14 @@ class DroidSpacesRuntime(
     private fun readLook(name: String): ContainerLook =
         ContainerLook.decode(lookFile(name).takeIf { it.isFile }?.readText().orEmpty())
 
+    /**
+     * Each container has its own process space, and the compositor runs in the desktop's own: a window from another
+     * container reaches it with no process it can see, so which container it came from is unknown (docs/SPEC.md 3d
+     * "Keyboard").
+     */
+    override val windowOwnerUnavailableReason: String =
+        "Each container has its own processes here, so droidtop can't tell which one a window is from"
+
     override suspend fun look(container: Container): ContainerLook = withContext(Dispatchers.IO) { readLook(container.id) }
 
     override suspend fun setLook(container: Container, look: ContainerLook) = withContext(Dispatchers.IO) {

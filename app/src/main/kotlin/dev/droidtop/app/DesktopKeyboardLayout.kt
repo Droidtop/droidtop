@@ -50,6 +50,13 @@ object DesktopKeyboardLayout {
 
     @Volatile private var listener: InputManager.InputDeviceListener? = null
 
+    /** Compiled keymaps by layout id: one exec per layout, not per focus change. Guarded by [applying]. */
+    private val compiled = HashMap<String, String>()
+
+    /** The layout the desktop's keyboard has now, and on which bridge; a new desktop starts again from its US map. */
+    @Volatile private var applied: String? = null
+    @Volatile private var appliedTo: Any? = null
+
     fun setting(context: Context): String =
         CatalogPrefs.prefs(context).getString(KeyboardLayouts.KEY, KeyboardLayouts.AUTOMATIC) ?: KeyboardLayouts.AUTOMATIC
 
@@ -109,6 +116,35 @@ object DesktopKeyboardLayout {
         return KeyboardLayouts.fromLanguageTag(subtype.languageTag.ifEmpty { subtype.locale })
     }
 
+    /** Compiles [layout] in the desktop's container, by the distro's own `xkbcli`; null when that failed. Blocking. */
+    private suspend fun compile(context: Context, session: DesktopSessionState.Connected, layout: XkbLayout): String? {
+        val dir = ContainerLauncher.hostDir(context.filesDir).apply { mkdirs() }
+        val keymapFile = File(dir, KEYMAP_FILE)
+        keymapFile.delete()
+        // Into a file on the channel directory, not through the exec's output, which keeps only its last lines.
+        val inContainer = ContainerLayout.hostStorageToContainerPath(context.filesDir, keymapFile)
+        val argv = listOf("sh", "-c", "exec \"\$@\" > \"\$0\"", inContainer) + KeyboardLayouts.compileCommand(layout)
+        val result = runCatching { session.runtime.exec(session.container, argv, emptyMap()) }.getOrNull()
+        val keymap = keymapFile.takeIf { result?.exitCode == 0 && it.isFile }?.readText()
+        if (keymap.isNullOrBlank()) Log.w(TAG, "Compiling ${layout.id} in the desktop failed (${result?.stderr?.trim()})")
+        return keymap?.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * The layout of the container whose window has the focus, when it chose one of its own; null for the desktop's.
+     * The window's process is sway's to name ([SwayIpc.focusedPid]); its container is the backend's to tell
+     * ([dev.droidtop.runtime.ContainerRuntime.containerOfProcess]), and a backend that cannot gives the desktop's.
+     */
+    private suspend fun ownLayoutOfFocused(session: DesktopSessionState.Connected): XkbLayout? {
+        val runtime = session.runtime
+        if (runtime.windowOwnerUnavailableReason != null) return null
+        val socket = ContainerLayout.findSwayIpcSocket(runtime.hostSocketDir()) ?: return null
+        val pid = runCatching { dev.droidtop.hostbridge.SwayIpc(socket.absolutePath).focusedPid() }.getOrNull()?.takeIf { it > 0 } ?: return null
+        val id = runtime.containerOfProcess(pid) ?: return null
+        val container = runCatching { runtime.listContainers() }.getOrNull()?.firstOrNull { it.container.id == id }?.container ?: return null
+        return runCatching { runtime.look(container) }.getOrNull()?.keyboardLayout?.let(XkbLayout::fromId)
+    }
+
     /** The container's layout names (id to description), from the copy taken the last time a desktop ran; empty before. */
     fun layoutNames(context: Context): Map<String, String> =
         runCatching { KeyboardLayouts.parseLayoutList(File(ContainerLauncher.hostDir(context.filesDir), LAYOUT_LIST_FILE).readText()) }
@@ -117,6 +153,7 @@ object DesktopKeyboardLayout {
     /** Starts following keyboards for the running desktop and applies the layout now. */
     fun startWatching(context: Context) {
         val app = context.applicationContext
+        dev.droidtop.runtime.DesktopFocus.listener = { reapply(app) }
         val input = app.getSystemService(InputManager::class.java)
         if (input != null && listener == null) {
             val watching = object : InputManager.InputDeviceListener {
@@ -132,6 +169,7 @@ object DesktopKeyboardLayout {
     }
 
     fun stopWatching(context: Context) {
+        dev.droidtop.runtime.DesktopFocus.listener = null
         val watching = listener ?: return
         listener = null
         context.applicationContext.getSystemService(InputManager::class.java)?.unregisterInputDeviceListener(watching)
@@ -145,25 +183,24 @@ object DesktopKeyboardLayout {
 
     private suspend fun apply(context: Context) {
         val session = DesktopSessionService.state.value as? DesktopSessionState.Connected ?: return
-        val choice = resolve(context)
-        val dir = ContainerLauncher.hostDir(context.filesDir).apply { mkdirs() }
-        val keymapFile = File(dir, KEYMAP_FILE)
-        keymapFile.delete()
-        // Into a file on the channel directory, not through the exec's output, which keeps only its last lines.
-        val inContainer = ContainerLayout.hostStorageToContainerPath(context.filesDir, keymapFile)
-        val argv = listOf("sh", "-c", "exec \"\$@\" > \"\$0\"", inContainer) + KeyboardLayouts.compileCommand(choice.layout)
-        val result = runCatching { session.runtime.exec(session.container, argv, emptyMap()) }.getOrNull()
-        val keymap = keymapFile.takeIf { result?.exitCode == 0 && it.isFile }?.readText()
-        if (keymap.isNullOrBlank()) {
-            Log.w(TAG, "Compiling ${choice.layout.id} in the desktop failed (${result?.stderr?.trim()}); the keyboard keeps its keymap")
-        } else if (session.hostBridge.setKeymap(keymap)) {
-            Log.i(TAG, "Desktop keyboard layout ${choice.layout.id} (${choice.source.phrase})")
-        }
         // The container's own layout list, for the setting's choices; copied once.
-        val list = File(dir, LAYOUT_LIST_FILE)
+        val list = File(ContainerLauncher.hostDir(context.filesDir).apply { mkdirs() }, LAYOUT_LIST_FILE)
         if (!list.isFile) {
             val target = ContainerLayout.hostStorageToContainerPath(context.filesDir, list)
             runCatching { session.runtime.exec(session.container, listOf("cp", KeyboardLayouts.LAYOUT_LIST, target), emptyMap()) }
+        }
+        val choice = resolve(context)
+        // The focused window's container's own layout, when it has one (docs/SPEC.md 3d "Keyboard").
+        val own = ownLayoutOfFocused(session)
+        val layout = own ?: choice.layout
+        if (layout.id == applied && session.hostBridge === appliedTo) return
+        val keymap = compiled[layout.id] ?: compile(context, session, layout)?.also { compiled[layout.id] = it }
+        if (keymap.isNullOrBlank()) {
+            Log.w(TAG, "No keymap for ${layout.id}; the keyboard keeps its keymap")
+        } else if (session.hostBridge.setKeymap(keymap)) {
+            applied = layout.id
+            appliedTo = session.hostBridge
+            Log.i(TAG, "Desktop keyboard layout ${layout.id} (${if (own != null) "the focused container's own" else choice.source.phrase})")
         }
     }
 }

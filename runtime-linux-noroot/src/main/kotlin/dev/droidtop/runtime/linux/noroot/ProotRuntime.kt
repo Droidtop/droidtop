@@ -318,19 +318,28 @@ class ProotRuntime(
     }
 
     /** Kept in the container's own config, beside its sockets (docs/SPEC.md 3d "Scale and theme"). */
+    /** Every container's processes are droidtop's own, each marked with its container (docs/SPEC.md 3d "Keyboard"). */
+    override val windowOwnerUnavailableReason: String? = null
+
+    override fun containerOfProcess(pid: Int): String? = processes.containerOf(pid)
+
     override suspend fun look(container: Container): ContainerLook = withContext(Dispatchers.IO) { readLookSync(container.id) }
 
     override suspend fun setLook(container: Container, look: ContainerLook) = withContext(Dispatchers.IO) {
         val config = readConfig(container.id)
         config[KEY_LOOK_SCALE] = look.scale.toString()
         config[KEY_LOOK_THEME] = look.followTheme.toString()
+        config[KEY_LOOK_KEYBOARD] = look.keyboardLayout.orEmpty()
         configOf(container.id).outputStream().use { config.store(it, "droidtop proot container") }
         Unit
     }
 
     private fun readLookSync(name: String): ContainerLook {
         val config = runCatching { readConfig(name) }.getOrNull() ?: return ContainerLook()
-        return ContainerLook.decode("scale=${config.getProperty(KEY_LOOK_SCALE).orEmpty()}\ntheme=${config.getProperty(KEY_LOOK_THEME).orEmpty()}")
+        return ContainerLook.decode(
+            "scale=${config.getProperty(KEY_LOOK_SCALE).orEmpty()}\ntheme=${config.getProperty(KEY_LOOK_THEME).orEmpty()}\n" +
+                "keyboard=${config.getProperty(KEY_LOOK_KEYBOARD).orEmpty()}",
+        )
     }
 
     /**
@@ -902,6 +911,7 @@ class ProotRuntime(
         private const val KEY_SOCKET_AUDIO = "socket.audio"
         private const val KEY_LOOK_SCALE = "look.scale"
         private const val KEY_LOOK_THEME = "look.theme"
+        private const val KEY_LOOK_KEYBOARD = "look.keyboard"
 
         private const val CHECK_TOKEN = "droidtop-proot-ok"
         private const val CHECK_TIMEOUT_S = 30L

@@ -190,6 +190,9 @@ fun DesktopShell(
     }
     // One listener on the bridge feeds the taskbar and the windows sheet alike.
     val toplevels = rememberToplevels(hostBridge)
+    // Another window in front: a container with a keyboard layout of its own types in it (SPEC 3d "Keyboard").
+    val focusedWindow = toplevels.firstOrNull { it.activated }?.id
+    LaunchedEffect(focusedWindow) { dev.droidtop.runtime.DesktopFocus.changed() }
     FollowTextFields(hostBridge)
     LaunchedEffect(windows, toplevels) { windows?.forget(toplevels) }
     // What Android is running that droidtop started (a game or an app launched from here is a fullscreen

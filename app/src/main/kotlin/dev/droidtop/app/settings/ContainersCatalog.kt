@@ -430,6 +430,7 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
         groups += CatalogGroup(id = "look", title = "Scale and theme", items = lookItems(runtime, info))
+        groups += CatalogGroup(id = "keyboard", title = "Keyboard", items = listOf(keyboardItem(context, runtime, info)))
         runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
             ?.let { image -> withContext(Dispatchers.IO) { ContainerProgram.effectiveConfig(context.filesDir, info.container.id, image) } }
             ?.takeIf { it.program().isNotEmpty() }
@@ -719,6 +720,40 @@ object ContainersCatalog {
             ),
         )
     }
+
+    /**
+     * The layout a physical keyboard types in while one of the container's windows has the focus (docs/SPEC.md 3d
+     * "Keyboard", Droidtop/tracker#787 slice 6): the desktop's own by default, or one of the desktop's layouts. A
+     * backend that cannot tell a window's container says why in its place.
+     */
+    private suspend fun keyboardItem(context: Context, runtime: ContainerRuntime, info: ContainerInfo): CatalogItem {
+        runtime.windowOwnerUnavailableReason?.let { reason ->
+            return ActionItem(id = "container_keyboard", title = "Keyboard layout", subtitle = reason, value = "The desktop's")
+        }
+        val container = info.container
+        val look = runCatching { runtime.look(container) }.getOrDefault(ContainerLook())
+        val names = withContext(Dispatchers.IO) { dev.droidtop.app.DesktopKeyboardLayout.layoutNames(context) }
+        val ids = names.keys.ifEmpty { dev.droidtop.runtime.KeyboardLayouts.KNOWN }
+        val options = listOf(ChoiceOption(AS_DESKTOP, "As the desktop")) +
+            (ids + listOfNotNull(look.keyboardLayout)).distinct().map { id -> ChoiceOption(id, names[id]?.let { "$it ($id)" } ?: id) }
+        return ChoiceItem(
+            id = "container_keyboard",
+            title = "Keyboard layout",
+            subtitle = "A physical keyboard's layout while one of its windows has the focus",
+            options = options,
+            current = look.keyboardLayout ?: AS_DESKTOP,
+            onSelect = { ctx, value ->
+                val app = ctx.applicationContext
+                dev.droidtop.runtime.util.AppScopes.io.launch {
+                    runCatching { runtime.setLook(container, look.copy(keyboardLayout = value.takeIf { it != AS_DESKTOP })) }
+                    dev.droidtop.app.DesktopKeyboardLayout.reapply(app)
+                }
+            },
+        )
+    }
+
+    /** The keyboard row's "As the desktop": no layout of its own. */
+    private const val AS_DESKTOP = "desktop"
 
     /** "As the desktop" for 1, else the percentage: "75%", "150%". Pure. */
     internal fun scaleLabel(scale: Float): String = if (scale == 1f) "As the desktop" else "${(scale * 100).toInt()}%"

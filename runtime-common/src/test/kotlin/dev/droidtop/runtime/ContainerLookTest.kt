@@ -29,4 +29,12 @@ class ContainerLookTest {
         assertFalse("ADW_DEBUG_COLOR_SCHEME" in own)
         assertFalse("GTK_THEME" in own)
     }
+
+    @Test
+    fun `a keyboard layout of its own reads back, and a malformed one is the desktop's`() {
+        val look = ContainerLook(keyboardLayout = "de:nodeadkeys")
+        assertEquals(look, ContainerLook.decode(look.encode()))
+        assertEquals(null, ContainerLook.decode("keyboard=").keyboardLayout)
+        assertEquals(null, ContainerLook.decode("keyboard=../etc").keyboardLayout)
+    }
 }

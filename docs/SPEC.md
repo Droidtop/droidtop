@@ -3451,6 +3451,27 @@ the `ContainerRuntime` interface that already exists (§3):
     root. The row says so in place of the switch
     (`networkUnavailableReason`).
   "What it can reach" says "None at all" for a container without network.
+  **Keyboard (Droidtop/tracker#787 slice 6).** A container's page has
+  "Keyboard layout": As the desktop (the default), or one of the
+  desktop's layouts (6b "Keyboard layout"). While one of its windows has
+  the focus, a physical keyboard types in that layout; elsewhere, in the
+  desktop's. Every container shares the compositor's one seat, so this is
+  droidtop changing the seat's keymap as the focus moves: the Desktop
+  shell reports each change (`DesktopFocus`), sway names the focused
+  window's process (`SwayIpc.focusedPid`), and the backend names its
+  container (`ContainerRuntime.containerOfProcess`). Each layout is
+  compiled once per desktop by the distro's `xkbcli`, as the desktop's
+  own is, and kept for the next focus change. On-screen typing keeps its
+  US keyboard as everywhere.
+  - **proot:** every process carries its container's marker
+    (`DROIDTOP_CONTAINER`, or its nearest ancestor's), and sway sees the
+    real process, so the window's container is read from `/proc`.
+  - **droidspaces:** each container has its own process space and sway
+    runs in the desktop's, so a window from another container comes with
+    no process sway can see. The row says so in place of the choice
+    (`windowOwnerUnavailableReason`), and the desktop's layout applies.
+  - **The pad layout** per container is the second half of this slice. It
+    takes #618 C6's per-app layouts, not yet built, and is built on them.
   **Clipboard per container (Droidtop/tracker#787 slice 2, owner
   2026-10-30: "A sounds good").** Every container's windows share one
   compositor, and the clipboard is the core protocol's `wl_data_device`,

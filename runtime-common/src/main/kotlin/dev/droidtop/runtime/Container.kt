@@ -94,9 +94,17 @@ data class ContainerSockets(val waylandShared: Boolean = true, val audioShared: 
  * window already), and [followTheme] whether GTK takes droidtop's Light or dark ([DesktopAppearance]) or the image's own
  * look. Read when a program starts, so a change applies to the programs started after it.
  */
-data class ContainerLook(val scale: Float = 1f, val followTheme: Boolean = true) {
+data class ContainerLook(
+    val scale: Float = 1f,
+    val followTheme: Boolean = true,
+    /**
+     * The layout a physical keyboard types in while one of its windows has the focus, as a [KeyboardLayouts.XkbLayout]
+     * id; null is the desktop's own (docs/SPEC.md 3d "Keyboard", Droidtop/tracker#787 slice 6).
+     */
+    val keyboardLayout: String? = null,
+) {
     /** The line form the backends keep it in, beside the container's other settings. */
-    fun encode(): String = "scale=$scale\ntheme=$followTheme\n"
+    fun encode(): String = "scale=$scale\ntheme=$followTheme\nkeyboard=${keyboardLayout.orEmpty()}\n"
 
     companion object {
         /** The scales offered, against the desktop's: smaller, the same, larger. */
@@ -109,6 +117,7 @@ data class ContainerLook(val scale: Float = 1f, val followTheme: Boolean = true)
             return ContainerLook(
                 scale = lines["scale"]?.toFloatOrNull()?.takeIf { it in SCALES } ?: 1f,
                 followTheme = lines["theme"]?.toBooleanStrictOrNull() ?: true,
+                keyboardLayout = lines["keyboard"]?.takeIf { KeyboardLayouts.XkbLayout.fromId(it) != null },
             )
         }
     }
@@ -227,6 +236,15 @@ interface ContainerRuntime {
 
     /** Records which sockets to share with [container] from its next start/exec. */
     suspend fun setSockets(container: Container, sockets: ContainerSockets)
+
+    /**
+     * Why this backend cannot tell which container a desktop window belongs to, so that a container's own keyboard
+     * layout cannot follow its windows (docs/SPEC.md 3d "Keyboard"); null when it can.
+     */
+    val windowOwnerUnavailableReason: String? get() = "This backend cannot tell which container a window belongs to"
+
+    /** The id of the container whose process [pid] is, as the compositor sees it; null when unknown. Blocking: IO only. */
+    fun containerOfProcess(pid: Int): String? = null
 
     /** How [container]'s programs look ([ContainerLook]); the default for a backend that keeps none. */
     suspend fun look(container: Container): ContainerLook = ContainerLook()

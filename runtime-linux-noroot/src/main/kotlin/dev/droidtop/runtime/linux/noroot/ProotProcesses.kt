@@ -60,6 +60,25 @@ internal class ProotProcesses(
         }
     }
 
+    /**
+     * The container [pid] belongs to: the [CONTAINER_VARIABLE] in its own environment, else in its nearest ancestor's
+     * (a program sway started has sway's). Null when none of them carries one.
+     */
+    fun containerOf(pid: Int): String? {
+        var at: Int? = pid
+        var steps = 0
+        while (at != null && at > 1 && steps++ < MAX_ANCESTORS) {
+            environmentValue(at, CONTAINER_VARIABLE)?.let { return it }
+            at = parentOf(at)
+        }
+        return null
+    }
+
+    private fun environmentValue(pid: Int, name: String): String? {
+        val bytes = runCatching { File(procRoot, "$pid/environ").readBytes() }.getOrNull() ?: return null
+        return String(bytes, Charsets.UTF_8).split('\u0000').firstOrNull { it.startsWith("$name=") }?.substringAfter('=')
+    }
+
     /** Processes whose environment holds [entry] exactly, plus all of their descendants. */
     private fun matching(entry: String): Set<Int> {
         val parents = HashMap<Int, Int>()
@@ -101,6 +120,9 @@ internal class ProotProcesses(
 
         private const val KILL_TIMEOUT_MS = 5_000L
         private const val KILL_POLL_MS = 100L
+
+        /** How far up [containerOf] looks before giving up. */
+        private const val MAX_ANCESTORS = 64
 
         /** The two entries one session's proot and guest processes carry. */
         fun sessionEnvironment(container: String, sessionId: String): Map<String, String> =

@@ -69,4 +69,13 @@ class SwayIpcTest {
             ]}
         """.trimIndent()
     }
+
+    @Test
+    fun `the focused window's process is found among tiled and floating windows`() {
+        val tiled = JSONObject("""{"nodes":[{"nodes":[{"id":4,"pid":120,"app_id":"foot","focused":false},{"id":5,"pid":130,"app_id":"gedit","focused":true}]}]}""")
+        assertEquals(130, SwayIpc.focusedPid(tiled))
+        val floating = JSONObject("""{"nodes":[{"floating_nodes":[{"id":6,"pid":0,"app_id":"xterm","focused":true}]}]}""")
+        assertEquals(0, SwayIpc.focusedPid(floating))
+        assertEquals(null, SwayIpc.focusedPid(JSONObject("""{"nodes":[{"id":4,"pid":120,"focused":false}]}""")))
+    }
 }
