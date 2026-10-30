@@ -1155,14 +1155,19 @@ type and the data source, which a third-party home cannot have.
   through `enqueueModelUpdateTask`, never a second list) and not over droidtop's own screens. Only when
   droidtop is the Home app, and only while the setting is on (Home settings, "Taskbar on large screens",
   default on; on turning it on the accessibility permission is asked for).
-- *Running apps.* An honest limit: Android gives a non-privileged app no list of other apps' tasks. The
-  taskbar lists the apps that came to the front since the service connected, from the service's
-  window-state events, of which it reads only the package and the activity name of the window (an
+- *Running apps.* The taskbar lists the apps that came to the front since the service connected, from the
+  service's window-state events, of which it reads only the package and the activity name of the window (an
   `Activity` that resolves in the package manager, so dialogs, the keyboard and its own overlay do not
-  count; never window content, `canRetrieveWindowContent` stays false). The list is per process, capped at
-  eight (`TaskbarPolicy.withOpened`), keeps an app's place while the person switches, and an app is taken
-  off it by a long press; it is "opened this session", not a live task list. The events are requested only
-  while the setting is on.
+  count; the taskbar never reads window content). The list is per process, capped at eight
+  (`TaskbarPolicy.withOpened`), and keeps an app's place while the person switches. At each app switch
+  it is checked against what still runs, and an app that no longer runs leaves it; a dot marks the
+  pinned and opened apps that run (Droidtop/tracker#771: the dot used to mean "opened since the service
+  started"). What still runs is Android's task list when droidtop has More controls
+  (`TaskManager.snapshotWithin`, the list the Quick Menu shows). Without it Android tells another app only
+  that an app was force-stopped, so an app that closed by itself keeps its place and dot until it is opened
+  again or long-pressed off the bar. What a switch means (activity or not, home app or not, droidtop Home
+  or not, what runs) is worked out off the main thread, the home apps are read again only when a package
+  changes, and a bar is rebuilt only when what it shows changed.
 - *Recents.* The same single path as the gesture slot: `GLOBAL_ACTION_RECENTS` through the service.
 - *D-pad.* The window is not focusable, so it never steals keys from the app. The service's key filter
   (`canRequestFilterKeyEvents`, requested only while the setting is on) looks for exactly two keys, the Meta
