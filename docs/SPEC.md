@@ -5170,11 +5170,15 @@ droidtop 0.2.0-dev.1931).
   else every five seconds while the companion shows; never while no companion shows. The video stays a
   picture-in-picture window on the companion; filling the companion screen instead is not built (it needs a shell
   command for the windowing mode that has not been checked on the console).
-- **Game (slice C8).** `CompanionGameTab`: a header (art, name, this session's play time), then the rows
-  `GameControls` (`:runtime-common`, pure) gives for the UI mode and the runner: Resume, Quit, Restart, Kill, the
-  game's emulator (`GameEmulatorChoice`, the model the Quick Menu's Emulator row cycles; only for a console game
-  with an emulator to choose, from the next start; see "Launch resolution"), the overlay level and performance mode,
-  then Guides, the running game's guides in a pane that fills the tab (`CompanionGuides`; 7i "Guides"). Kid and Kiosk get Resume and Quit. A stream (`REMOTE_STREAM`, windowcast)
+- **Game (slice C8; dense since 2026-10-30, Droidtop/tracker#835 part 2).** `CompanionGameTab`: a header (art,
+  name, this session's play time), then one list of 48dp rows (`GameActionRow`: the label left, its value right, no
+  second line) from what `GameControls` (`:runtime-common`, pure) gives for the UI mode and the runner. **Resume** is
+  the one filled row, and plain while a Quit or Kill is ending the game. Then **Pause the game** for a console game
+  (RetroArch's `PAUSE_TOGGLE`), the game's **Emulator** (`GameEmulatorChoice`, the model the running game's L2 sheet
+  cycles; only for a console game with an emulator to choose, from the next start; see "Launch resolution"), the
+  **Overlay** level, **Performance mode**, **Screenshot**, and **Mouse mode**, **Controls** and **Report a problem**
+  for a game in droidtop's own screen: the L2 sheet's set, so the companion keeps everything. **Quit, Restart and
+  Kill sit together last, under Stop, in the danger tone.** Then Guides, the running game's guides in a pane that fills the tab (`CompanionGuides`; 7i "Guides"). Kid and Kiosk get Resume and Quit. A stream (`REMOTE_STREAM`, windowcast)
   hides Restart and Kill unless its runner says they apply and uses its own Quit label and question
   ("Disconnect"). `GameControls.asks` is the one decision whether a row asks first: the runner's or a plugin's
   `confirm` flag; **Ask before stopping** (Companion group, on by default) for Quit, Restart, Kill, an Apps row's
