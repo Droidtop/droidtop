@@ -32,6 +32,7 @@ fixture catalog-literals runtime-common/src/main/kotlin/A.kt 'ActionItem(id = "x
 fixture bare-click shell-gamepad/src/main/kotlin/A.kt 'Modifier.clickable { open() }'
 fixture raw-corners shell-gamepad/src/main/kotlin/A.kt 'Modifier.clip(RoundedCornerShape(8.dp))'
 fixture press-target shell-gamepad/src/main/kotlin/A.kt 'Modifier.heightIn(min = window.minTouchTarget)'
+fixture companion-words app/src/main/kotlin/dev/droidtop/app/CompanionA.kt 'CompanionNote("Needs the helper app")'
 
 status=0
 for dir in "$tmp"/*/; do
@@ -47,6 +48,7 @@ done
 fixture allowed ui-shared/src/main/kotlin/A.kt 'val c = MaterialTheme.colorScheme.error'
 fixture allowed ui-shared/src/main/kotlin/TextEntry.kt 'BasicTextField(value = v, onValueChange = {})'
 fixture allowed runtime-common/src/main/kotlin/ValueFormat.kt 'val s = String.format("%.1f GB", b / 1e9)'
+fixture allowed app/src/main/kotlin/dev/droidtop/app/OtherScreen.kt 'Text(stringResource(R.string.x), "Needs the helper app")'
 if ! "$check" --check --all --root "$tmp/allowed" >/dev/null; then echo "FAIL: an allowlisted site failed"; status=1; fi
 
 mkdir -p "$tmp/clean/app"

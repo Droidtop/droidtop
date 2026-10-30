@@ -9,7 +9,8 @@
 # --check never fails on work not yet done and never lets a cleared rule come
 # back. --all treats every rule as on (the fixture test uses it); --root DIR
 # scans another tree. Each rule has an allowlist of paths (extended regex on
-# the path relative to the root) where its pattern is the mechanism itself.
+# the path relative to the root) where its pattern is the mechanism itself, or,
+# written "only:INCLUDE [except EXCLUDE]", the only paths it applies to.
 set -eu
 
 mode=""
@@ -51,6 +52,7 @@ RULES=(
 "raw-corners @@ 1 @@ RoundedCornerShape\( @@ ^(app|display|host-bridge|input-keyboard|input-mapping|input-seat|library-core|net-core|plugin-host|plugin-host-testing|runtime-common|runtime-linux-noroot|runtime-linux-root|runtime-windows|shell-default|shell-desktop|stores|ui-shared)/|/theme/|/DesignTokens\.kt$ @@ a Gaming shape is one of Corners (Crisp, Tile, Panel, Plate, Pill, Icon); a theme's own radius is the theme's data (Droidtop/tracker#670)"
 "bare-dialog @@ 1 @@ (^|[^A-Za-z0-9_.])Dialog\(|window\.Dialog\( @@ ^(app|display|host-bridge|input-keyboard|input-mapping|input-seat|library-core|net-core|plugin-host|plugin-host-testing|runtime-common|runtime-linux-noroot|runtime-linux-root|runtime-windows|shell-default|shell-desktop|stores|ui-shared)/|/ShellDialog\.kt$ @@ the shell's modal windows are ShellDialog, so they also open inside an in-game overlay (Droidtop/tracker#740)"
 "press-target @@ 1 @@ \.minTouchTarget\b @@ /ShellWindow\.kt$ @@ a press target's size is ShellWindow.pressTarget: a finger's where touch comes first, the shell's 48dp where the pad drives (Droidtop/tracker#740: read directly, the finger size made the Quick Menu sparse)"
+"companion-words @@ 1 @@ \"[^\"]*\b(helper|Helper|Shizuku|provider|Provider|Risky|root|Root|adb|ADB|IME|kernel)\b[^\"]*\" @@ only:^app/src/main/kotlin/dev/droidtop/app/Companion[^/]*\.kt$ except /CompanionPins\.kt$ @@ machinery words (helper, Shizuku, provider, Risky, root, adb, IME, kernel) never appear in what the companion says (Droidtop/tracker#786 rule 10); the helper's own page in CompanionPins.kt is excused until it moves to droidtop > Advanced, and leaves this allowlist in that commit"
 "literal-text @@ 1 @@ \bText\(\"[A-Z] @@ ^(display|host-bridge|input-keyboard|input-seat|library-core|net-core|plugin-host|plugin-host-testing|runtime-common|runtime-linux-noroot|runtime-linux-root|runtime-windows|shell-default|stores)/ @@ a word on screen is a string resource (Droidtop/tracker#177); a module leaves this allowlist in the commit that clears it"
 )
 
@@ -60,6 +62,20 @@ sources() {
         -o -path ./scripts/ui-rules-fixtures -prune -o -name '*.kt' -print 2>/dev/null | sed 's|^\./||'
 }
 files="$(sources)"
+
+# The paths a rule looks at: all but its allowlist, or with "only:INCLUDE [except EXCLUDE]" just the paths it names.
+scope() { # allow
+    case "$1" in
+        -) cat ;;
+        only:*)
+            local spec="${1#only:}" include exclude=""
+            include="${spec%% except *}"
+            [ "$include" != "$spec" ] && exclude="${spec#* except }"
+            if [ -n "$exclude" ]; then grep -E -- "$include" | grep -Ev -- "$exclude" || true; else grep -E -- "$include" || true; fi
+            ;;
+        *) grep -Ev -- "$1" || true ;;
+    esac
+}
 
 report() { # name on count sites what
     local name="$1" on="$2" count="$3" sites="$4" what="$5"
@@ -81,7 +97,7 @@ for rule in "${RULES[@]}"; do
     allow="${rest%% @@ *}"; what="${rest#* @@ }"
     sites=""
     if [ -n "$files" ]; then
-        sites="$(printf '%s\n' "$files" | { if [ "$allow" = "-" ]; then cat; else grep -Ev -- "$allow" || true; fi; } \
+        sites="$(printf '%s\n' "$files" | scope "$allow" \
             | xargs -d '\n' -r grep -EnH -- "$pattern" 2>/dev/null || true)"
     fi
     count=0

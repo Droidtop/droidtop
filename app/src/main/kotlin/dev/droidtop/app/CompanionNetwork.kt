@@ -74,7 +74,7 @@ internal fun CompanionNetworkTab() {
                 Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
             }
             // Read with the helper app only (it was System > Connections' line before the Network tab).
-            now.adbWifi?.let { CompanionNote(if (it) "ADB over Wi-Fi: on" else "ADB over Wi-Fi: off") }
+            now.adbWifi?.let { CompanionNote(if (it) "Wireless debugging: on" else "Wireless debugging: off") }
         }
         CompanionPill("Refresh") { version++ }
     }
@@ -171,7 +171,7 @@ internal fun detailFacts(net: NetFact): List<String> = buildList {
 internal fun vpnNameMissing(helper: Boolean): String = if (helper) {
     "Android names the VPN's app only when it is the always-on VPN"
 } else {
-    "Android does not tell other apps which app provides the VPN; with the helper app droidtop can read it"
+    "Android does not tell other apps which app provides the VPN"
 }
 
 /** The transport that decides a network's kind, a VPN first since it rides on another. Pure. */
