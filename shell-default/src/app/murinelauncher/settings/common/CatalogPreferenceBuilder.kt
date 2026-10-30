@@ -373,6 +373,9 @@ class CatalogPreferenceNavigator(
     private fun push(screen: CatalogScreen, focusKey: String? = null) {
         stack.addLast(screen)
         rebuild(focusKey)
+        // A new feature that lives on this screen is explained once it is open (docs/SPEC.md 7b, "Update onboarding").
+        val context = fragment.requireContext()
+        fragment.lifecycleScope.launch { dev.droidtop.library.settings.FeatureSteps.showAt(context, screen.id) }
     }
 
     private fun pop() {

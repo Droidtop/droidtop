@@ -182,6 +182,11 @@
             android:name="dev.droidtop.app.OnboardingActivity"
             android:exported="false" />
 
+        <!-- What's new after an update, and from Settings (docs/SPEC.md 7b, "Update onboarding"). -->
+        <activity
+            android:name="dev.droidtop.app.WhatsNewActivity"
+            android:exported="false" />
+
         <!--
           Launching one library entry with no mode attached: how the
           Launcher's shortcut path, pinned icons, the widget and `am start`
