@@ -358,6 +358,31 @@ class ProotRuntime(
         log.line("restored ${container.id}")
     }
 
+    override val usageUnavailableReason: String? = null
+
+    /**
+     * A proot container's processes are droidtop's own (the same user), so `/proc` answers for them without root:
+     * every process [processes] finds for it, proot included, read twice [sampleMs] apart.
+     */
+    override suspend fun usage(container: Container, sampleMs: Long): dev.droidtop.runtime.ContainerUsage? =
+        withContext(Dispatchers.IO) {
+            fun sample(): List<dev.droidtop.runtime.ProcUsage.Process> = processes.ofContainer(container.id).mapNotNull { pid ->
+                val ticks = runCatching { File("/proc/$pid/stat").readText() }.getOrNull()
+                    ?.let(dev.droidtop.runtime.ProcUsage::cpuTicks) ?: return@mapNotNull null
+                val memory = runCatching { dev.droidtop.runtime.ProcUsage.memoryBytes(File("/proc/$pid/status").readText()) }.getOrDefault(0L)
+                dev.droidtop.runtime.ProcUsage.Process(pid, ticks, memory)
+            }
+            val first = sample()
+            if (first.isEmpty()) return@withContext null
+            val started = android.os.SystemClock.elapsedRealtime()
+            delay(sampleMs)
+            val second = sample()
+            dev.droidtop.runtime.ProcUsage.usage(
+                first, second, android.os.SystemClock.elapsedRealtime() - started,
+                dev.droidtop.runtime.ProcUsage.ticksPerSecond(), Runtime.getRuntime().availableProcessors(),
+            )
+        }
+
     override val cloneUnavailableReason: String? = null
 
     override suspend fun clone(container: Container, name: String): Container {

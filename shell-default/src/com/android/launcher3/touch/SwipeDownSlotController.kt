@@ -13,9 +13,10 @@ import dev.droidtop.shell.standard.HomeActions
 import kotlin.math.abs
 
 /**
- * TouchController that detects a downward swipe on the workspace and expands the notifications.
+ * The swipe-down gesture slot on the workspace: a one-finger swipe down runs whatever the slot is set to
+ * ([LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION], through [HomeActions.runSlot]; the notifications by default).
  */
-class NotificationSwipeController(private val mLauncher: Launcher) : TouchController {
+class SwipeDownSlotController(private val mLauncher: Launcher) : TouchController {
     private val mTouchSlop: Float
     private var mCanIntercept = false
     private val mDownPoint = PointF()
@@ -48,11 +49,7 @@ class NotificationSwipeController(private val mLauncher: Launcher) : TouchContro
         return false
     }
 
-    override fun onControllerTouchEvent(ev: MotionEvent): Boolean {
-        // After intercept, just consume until the gesture ends.
-        val action = ev.getActionMasked()
-        return action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL
-    }
+    override fun onControllerTouchEvent(ev: MotionEvent): Boolean = consumeUntilGestureEnds(ev)
 
     private fun canInterceptTouch(ev: MotionEvent) = !MotionEventsUtils.isTrackpadScroll(ev) &&
             HomeActions.isSet(mLauncher, LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION) &&

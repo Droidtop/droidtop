@@ -346,7 +346,7 @@ class PluginCrashPolicy(
         // 2026-09-26: this list still named only NATIVE_BUNDLE/PYTHON after
         // flutter_embed's runner landed (63627015) -- PluginRuntimeService's
         // own dispatch handled FLUTTER_EMBED fine, but every call from the
-        // Settings UI goes through THIS class first (AppSettingsCatalogs.kt),
+        // Settings UI goes through THIS class first (PluginsCatalog.kt),
         // so a flutter_embed plugin could install, approve and show
         // "Running", but never actually be called: every invoke/startJob
         // failed here with "no runner for kind flutter_embed yet" before

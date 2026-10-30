@@ -152,6 +152,13 @@ object DownloadSites {
         runCatching { PluginVault.forContext(context).put(VAULT_ID, domain, kept.copy(cookies = kept.cookies + (domain to header)).toJson()) }
     }
 
+    /** [renew] for each of [renewed], on a thread of its own: sealing touches the Keystore, never on the main thread. */
+    fun renewLater(context: Context, renewed: List<Pair<String, String>>) {
+        if (renewed.isEmpty()) return
+        val app = context.applicationContext
+        Thread { renewed.forEach { (domain, header) -> renew(app, domain, header) } }.start()
+    }
+
     /** Sign out: [site]'s cookies are forgotten, and no other site's. */
     fun signOut(context: Context, site: Site): Boolean {
         setExpired(context, site.domain, false)

@@ -90,23 +90,23 @@ class DrawerTabsRow @JvmOverloads constructor(context: Context, attrs: Attribute
 
     private fun edit(anchor: View, tab: String) {
         val menu = PopupMenu(context, anchor)
-        menu.menu.add(0, 0, 0, R.string.drawer_tab_rename)
-        menu.menu.add(0, 1, 1, R.string.drawer_tab_move_left)
-        menu.menu.add(0, 2, 2, R.string.drawer_tab_move_right)
-        menu.menu.add(0, 4, 3, R.string.drawer_tab_as_folder).apply {
+        menu.menu.add(0, MENU_RENAME, 0, R.string.drawer_tab_rename)
+        menu.menu.add(0, MENU_MOVE_LEFT, 1, R.string.drawer_tab_move_left)
+        menu.menu.add(0, MENU_MOVE_RIGHT, 2, R.string.drawer_tab_move_right)
+        menu.menu.add(0, MENU_AS_FOLDER, 3, R.string.drawer_tab_as_folder).apply {
             isCheckable = true
             isChecked = DrawerTabs.tabs(context).firstOrNull { it.name == tab }?.folder == true
         }
-        menu.menu.add(0, 3, 4, R.string.drawer_tab_delete)
+        menu.menu.add(0, MENU_DELETE, 4, R.string.drawer_tab_delete)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                0 -> askName(context, tab) { name ->
+                MENU_RENAME -> askName(context, tab) { name ->
                     DrawerTabs.rename(context, tab, name).also { if (it) onTabsChanged() }
                 }
-                1 -> { DrawerTabs.move(context, tab, -1); onTabsChanged() }
-                2 -> { DrawerTabs.move(context, tab, +1); onTabsChanged() }
-                3 -> { DrawerTabs.delete(context, tab); onTabsChanged() }
-                4 -> { DrawerTabs.setFolder(context, tab, !item.isChecked); onTabsChanged() }
+                MENU_MOVE_LEFT -> { DrawerTabs.move(context, tab, -1); onTabsChanged() }
+                MENU_MOVE_RIGHT -> { DrawerTabs.move(context, tab, +1); onTabsChanged() }
+                MENU_DELETE -> { DrawerTabs.delete(context, tab); onTabsChanged() }
+                MENU_AS_FOLDER -> { DrawerTabs.setFolder(context, tab, !item.isChecked); onTabsChanged() }
             }
             true
         }
@@ -116,6 +116,13 @@ class DrawerTabsRow @JvmOverloads constructor(context: Context, attrs: Attribute
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     companion object {
+        // A tab's long-press menu, by what each row does.
+        private const val MENU_RENAME = 0
+        private const val MENU_MOVE_LEFT = 1
+        private const val MENU_MOVE_RIGHT = 2
+        private const val MENU_DELETE = 3
+        private const val MENU_AS_FOLDER = 4
+
         /**
          * Asks for a tab's name, filled with [current]; [accept] says whether it was taken. A blank or
          * taken name keeps the dialog open and says why on the field.
@@ -127,7 +134,7 @@ class DrawerTabsRow @JvmOverloads constructor(context: Context, attrs: Attribute
                 setSingleLine()
                 selectAll()
             }
-            val dialog = AlertDialog.Builder(context)
+            val dialog = AlertDialog.Builder(context, R.style.DroidtopDialog)
                 .setTitle(if (current == null) R.string.drawer_tab_new else R.string.drawer_tab_rename)
                 .setView(field)
                 .setPositiveButton(android.R.string.ok, null)

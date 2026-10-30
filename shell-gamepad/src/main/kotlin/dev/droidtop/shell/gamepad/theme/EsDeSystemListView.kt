@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -93,6 +94,7 @@ import dev.droidtop.library.theme.esDeHorizontalScrollState
 import dev.droidtop.library.theme.esDeIndicatorPrefix
 import dev.droidtop.library.theme.esDeTextListConfig
 import dev.droidtop.library.theme.layoutEsDeCarousel
+import dev.droidtop.library.theme.esDeCarouselAnimMs
 import dev.droidtop.library.theme.layoutEsDeGrid
 import dev.droidtop.library.theme.layoutEsDeTextList
 import dev.droidtop.shell.gamepad.esDeSwipeSteps
@@ -576,28 +578,39 @@ private fun EsDeCarousel(
         }
     }
 
-    LaunchedEffect(focusedIndex, config.instantItemTransitions) {
+    // ES-DE's IList scroll state: the direction the pad is moving the cursor (`mScrollVelocity`: 1, -1, or 0 for a
+    // move that is not the pad's, such as a tap; each move sets it), whether a held direction has started running
+    // (`isScrolling`: a repeat came), and a tick for the release that ends a run (`CURSOR_STOPPED`,
+    // CarouselComponent::input).
+    var scrollVelocity by remember { mutableIntStateOf(0) }
+    var scrolling by remember { mutableStateOf(false) }
+    var stoppedTick by remember { mutableIntStateOf(0) }
+
+    // CarouselComponent::onCursorChanged: each cursor move, and the release after a held run, restarts the camera
+    // from where it is towards the cursor, eased out, for as long as esDeCarouselAnimMs says (Droidtop/tracker#782).
+    // A move made while the camera is still sliding (a quick tap, a held run) retargets it in a short slide, so the
+    // camera keeps pace with the cursor; that is droidtop's one deviation from ES-DE, see esDeCarouselAnimMs.
+    // Whether the camera is sliding is kept here rather than read from the Animatable: a new move cancels the old
+    // slide before the next one starts.
+    val camSliding = remember { booleanArrayOf(false) }
+    LaunchedEffect(focusedIndex, stoppedTick, config.instantItemTransitions) {
         val startPos = camOffset.value
         val target = shortestCamOffsetStep(startPos, focusedIndex, items.size)
         if (config.instantItemTransitions) {
             camOffset.snapTo(target)
             return@LaunchedEffect
         }
-        val distance = kotlin.math.abs(target - startPos)
-        // Real formula (CarouselComponent::onCursorChanged): full 400ms
-        // for a whole-item step; scaled down when restarting mid-flight.
-        val animTimeMs = if (distance != 1f) {
-            (distance * 1.5f * 400f).coerceIn(200f, 400f)
-        } else {
-            400f
-        }
+        if (target == startPos) return@LaunchedEffect
+        val retarget = camSliding[0]
+        camSliding[0] = true
         camOffset.animateTo(
             targetValue = target,
             animationSpec = tween(
-                durationMillis = animTimeMs.toInt(),
+                durationMillis = esDeCarouselAnimMs(startPos, target, scrollVelocity, retarget),
                 easing = Easing { t -> 1f - (1f - t) * (1f - t) },
             ),
         )
+        camSliding[0] = false
     }
 
     // Real ES-DE input architecture: the CAROUSEL is the focus/input
@@ -638,8 +651,10 @@ private fun EsDeCarousel(
     )
 
     val verticalType = config.type == EsDeCarouselType.VERTICAL || config.type == EsDeCarouselType.VERTICAL_WHEEL
-    fun step(delta: Int): Boolean {
+    fun step(delta: Int, byPad: Boolean = false, repeat: Boolean = false): Boolean {
         if (items.isEmpty()) return true
+        scrollVelocity = if (byPad) delta.coerceIn(-1, 1) else 0
+        scrolling = byPad && repeat
         positiveDirection = delta > 0
         focusedIndex = (focusedIndex + delta + items.size) % items.size
         onFocusedIndexChanged(focusedIndex)
@@ -658,17 +673,30 @@ private fun EsDeCarousel(
                 horizontal = if (verticalType) 0 else 1,
                 vertical = if (verticalType) 1 else 0,
             ) { step(it) }
-            // ES-DE's own list cadence (IList's QUICK tiers), through the
-            // shell's one input pipeline (docs/SPEC.md 6e): each press
-            // steps once, a held direction runs, the release does nothing.
-            .onPad(cadence = PadCadence.THEMED_LIST) { press ->
+            // ES-DE's own carousel cadence (IList's SLOW tiers, MEDIUM with
+            // the theme's fastScrolling), through the shell's one input
+            // pipeline (docs/SPEC.md 6e): each press steps once and a held
+            // direction runs.
+            // The release of a direction ends the pad's move (CarouselComponent::input): after a held run the camera
+            // restarts once over what is left, then the move is no longer the pad's. Seen ahead of onPad, which owns
+            // releases, and never consumed.
+            .onPreviewKeyEvent { event ->
+                val code = event.nativeKeyEvent.keyCode
+                if (event.nativeKeyEvent.action == android.view.KeyEvent.ACTION_UP && code in CAROUSEL_DIRECTION_KEYS) {
+                    // Still the held direction for this last restart, as ES-DE's is; the next move sets its own.
+                    if (scrolling) stoppedTick++
+                    scrolling = false
+                }
+                false
+            }
+            .onPad(cadence = if (config.fastScrolling) PadCadence.THEMED_CAROUSEL_FAST else PadCadence.THEMED_CAROUSEL) { press ->
                 when (press.action) {
                     GamepadAction.A -> {
                         items.getOrNull(focusedIndex)?.onSelect?.invoke()
                         true
                     }
                     GamepadAction.LEFT, GamepadAction.RIGHT -> {
-                        if (!verticalType) step(if (press.action == GamepadAction.LEFT) -1 else 1)
+                        if (!verticalType) step(if (press.action == GamepadAction.LEFT) -1 else 1, byPad = true, repeat = press.repeat)
                         true
                     }
                     // Up is owned only where this carousel can really use
@@ -680,9 +708,9 @@ private fun EsDeCarousel(
                     // finds the banner's action (docs/SPEC.md 10c) and
                     // otherwise finds nothing, because the top bar cannot
                     // take focus (docs/SPEC.md 7k).
-                    GamepadAction.UP -> verticalType && step(-1)
+                    GamepadAction.UP -> verticalType && step(-1, byPad = true, repeat = press.repeat)
                     GamepadAction.DOWN -> {
-                        if (verticalType) step(1)
+                        if (verticalType) step(1, byPad = true, repeat = press.repeat)
                         true
                     }
                     else -> false
@@ -720,7 +748,7 @@ private fun EsDeCarousel(
                     item = item,
                     width = itemWidth,
                     height = itemHeight,
-                    isFocused = placement.index == focusedIndex,
+                    isFocused = placement.index == focusedIndex && kotlin.math.abs(placement.distance) < 1f,
                     text = itemTextStyle,
                     imageCornerRadius = config.imageCornerRadius.dp,
                     imageColorShift = imageColor,
@@ -763,7 +791,7 @@ private fun EsDeCarousel(
                 item = item,
                 width = itemWidth,
                 height = itemHeight,
-                isFocused = placement.index == focusedIndex,
+                isFocused = placement.index == focusedIndex && kotlin.math.abs(placement.distance) < 1f,
                 text = itemTextStyle,
                 imageCornerRadius = config.imageCornerRadius.dp,
                 imageColorShift = imageColor,
@@ -1962,3 +1990,11 @@ private fun EsDeMarqueeText(
         }
     }
 }
+
+/** The keys whose release ends a carousel's pad move: the D-pad's four directions. */
+private val CAROUSEL_DIRECTION_KEYS = setOf(
+    android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+    android.view.KeyEvent.KEYCODE_DPAD_RIGHT,
+    android.view.KeyEvent.KEYCODE_DPAD_UP,
+    android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+)

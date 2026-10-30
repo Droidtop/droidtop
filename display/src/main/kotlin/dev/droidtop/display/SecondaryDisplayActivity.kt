@@ -44,11 +44,11 @@ class SecondaryDisplayActivity : ComponentActivity() {
          * `CompanionActivity.visible` already does for the built-in
          * companion. Null while this Activity is not resumed anywhere --
          * a home activity can exist without being the resumed one, e.g.
-         * a live Presentation drawn above it on the same display.
+         * a live Presentation drawn above it on the same display. Kept in
+         * [dev.droidtop.runtime.SecondaryCover], where Standard's Home path
+         * reads it too.
          */
-        @Volatile
-        var resumedDisplayId: Int? = null
-            private set
+        val resumedDisplayId: Int? get() = dev.droidtop.runtime.SecondaryCover.resumedDisplayId
 
         /**
          * The display this cover was paused on by something else (a user
@@ -147,13 +147,13 @@ class SecondaryDisplayActivity : ComponentActivity() {
         // resumed rather than recreated, so the content is re-resolved
         // here rather than only at creation.
         render()
-        resumedDisplayId = displayIdCompat()
+        dev.droidtop.runtime.SecondaryCover.resumedDisplayId = displayIdCompat()
         if (coveredDisplayId == displayIdCompat()) coveredDisplayId = null
     }
 
     override fun onPause() {
         if (resumedDisplayId == displayIdCompat()) {
-            resumedDisplayId = null
+            dev.droidtop.runtime.SecondaryCover.resumedDisplayId = null
             if (!isFinishing) coveredDisplayId = displayIdCompat()
         }
         super.onPause()

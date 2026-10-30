@@ -210,6 +210,12 @@ interface BrokerEnvironment {
     fun webSession(request: WebSessionRequest): WebSessionResult? = null
 
     /**
+     * An Open view's link opened out of sight first ([HiddenWebSession], Droidtop/tracker#783). Null where there is no
+     * hidden view or no droidtop screen to run it behind, and then [webSession] shows the page as before.
+     */
+    fun hiddenWebSession(request: WebSessionRequest, expiredText: List<String>): HiddenWebSession.Outcome? = null
+
+    /**
      * A GET loaded by droidtop's web view instead of its HTTP client, for a host that shows a browser check
      * (Droidtop/tracker#600, [WebFetch]). Null where there is no web view, and then the request goes as before.
      */

@@ -27,15 +27,13 @@ object HomeRolePrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_ALTERNATIVE_TARGET = "droidtop_alternative_launcher_target"
 
-    private const val STANDARD_ACTIVITY = dev.droidtop.library.settings.Modes.LAUNCHER_ACTIVITY
-    private const val ALTERNATIVE_ACTIVITY = "dev.droidtop.shell.standard.AlternativeLauncherActivity"
 
     enum class HomeImplementation { STANDARD, ALTERNATIVE, NONE }
 
     fun setActiveHomeImplementation(context: Context, implementation: HomeImplementation) {
         val pm = context.packageManager
-        setHomeComponent(pm, context.packageName, STANDARD_ACTIVITY, implementation == HomeImplementation.STANDARD)
-        setHomeComponent(pm, context.packageName, ALTERNATIVE_ACTIVITY, implementation == HomeImplementation.ALTERNATIVE)
+        setHomeComponent(pm, context.packageName, StandardComponents.HOME_TRAMPOLINE, implementation == HomeImplementation.STANDARD)
+        setHomeComponent(pm, context.packageName, StandardComponents.ALTERNATIVE, implementation == HomeImplementation.ALTERNATIVE)
     }
 
     /**
@@ -57,8 +55,8 @@ object HomeRolePrefs {
     fun activeHomeImplementation(context: Context): HomeImplementation {
         val pm = context.packageManager
         return when {
-            isEnabled(pm, context.packageName, ALTERNATIVE_ACTIVITY) -> HomeImplementation.ALTERNATIVE
-            isEnabled(pm, context.packageName, STANDARD_ACTIVITY) -> HomeImplementation.STANDARD
+            isEnabled(pm, context.packageName, StandardComponents.ALTERNATIVE) -> HomeImplementation.ALTERNATIVE
+            isEnabled(pm, context.packageName, StandardComponents.HOME_TRAMPOLINE) -> HomeImplementation.STANDARD
             else -> HomeImplementation.NONE
         }
     }
@@ -71,7 +69,7 @@ object HomeRolePrefs {
         return when (state) {
             PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> true
             PackageManager.COMPONENT_ENABLED_STATE_DISABLED -> false
-            else -> activity == STANDARD_ACTIVITY
+            else -> activity == StandardComponents.HOME_TRAMPOLINE
         }
     }
 

@@ -575,10 +575,16 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         val (record, entry) = providers().firstOrNull { (_, e) -> e.id == source } ?: return "The source $source is not installed or not running"
         val label = entry.label ?: record.manifest.label
         val (placement, name) = placementFor(label, gameName, version, newest).getOrElse { return it.message ?: "The update has nowhere to go" }
-        onStatus("Start the download on the page that opens")
-        // The link the record gave, opened as it is: the person starts the download there (Droidtop/tracker#599). A link
-        // that no longer works starts nothing, so the record's own page opens next for the person to pick again.
-        var captured = dev.droidtop.pluginhost.PluginWebAccount.openForDownloads(app, record, url, dev.droidtop.pluginhost.DownloadJobs.MAX_FILES)
+        onStatus("Opening the link from $label")
+        // The link the record gave, opened out of sight first (Droidtop/tracker#783): a host droidtop serves takes it with
+        // no page shown, and a page the person must act on opens for them (#599). A link the page says has expired is asked
+        // of the source again, from its thread, once. A link that no longer works starts nothing, so the record's own page
+        // opens next for the person to pick again.
+        val refresh = {
+            onStatus("That link had expired. Asking $label for a current one")
+            kotlinx.coroutines.runBlocking { currentLink(source, externalId, url) }
+        }
+        var captured = dev.droidtop.pluginhost.PluginWebAccount.openForDownloads(app, record, url, dev.droidtop.pluginhost.DownloadJobs.MAX_FILES, refresh)
         if (captured.isEmpty() && fallbackUrl != null && fallbackUrl != url) {
             onStatus("That link started nothing. Pick the download again on ${label}'s page")
             captured = dev.droidtop.pluginhost.PluginWebAccount.openForDownloads(app, record, fallbackUrl, dev.droidtop.pluginhost.DownloadJobs.MAX_FILES)
@@ -596,6 +602,21 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         val done = AcquireDownload.run(app, record, title, JSONObject(), emptyMap(), descriptors, say, update = placement)
         if (!done.ok) Log.w(TAG, "update $source/$externalId: the download from the web view failed: ${done.error}")
         return if (done.ok) done.values["summary"] ?: "Added $name" else "${record.manifest.label}: ${done.error ?: "the download failed"}"
+    }
+
+    /**
+     * The address [source]'s record [externalId] gives now for the mirror whose address was [expired] (Droidtop/tracker#783):
+     * the mirror is found in droidtop's saved copy of the record by that address, and the same mirror in the record asked
+     * again ([RecordMirrors.sameIn]). Null when the record cannot be asked or no longer lists it.
+     */
+    private suspend fun currentLink(source: String, externalId: String, expired: String): String? {
+        val before = savedRecord(source, externalId)?.record?.downloads.orEmpty()
+        val picked = before.firstOrNull { it.url == expired } ?: run {
+            Log.w(TAG, "update $source/$externalId: the expired link is in no saved record, so it cannot be asked for again")
+            return null
+        }
+        val fresh = record(source, externalId).takeIf { it.failure == null }?.record ?: return null
+        return dev.droidtop.library.RecordMirrors.sameIn(picked, before, fresh.downloads)?.url?.takeIf { it != expired }
     }
 
     /**

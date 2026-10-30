@@ -279,7 +279,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
 
     private fun openDrawer(displayId: Int) {
         val intent = Intent(Intent.ACTION_ALL_APPS)
-            .setClassName(service.packageName, LAUNCHER_ACTIVITY)
+            .setClassName(service.packageName, StandardComponents.LAUNCHER)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
         try {
@@ -504,7 +504,6 @@ class StandardTaskbar(private val service: AccessibilityService) {
         const val TAG = "StandardTaskbar"
         const val ICON_DP = 32
         const val SYSTEM_UI = "com.android.systemui"
-        const val LAUNCHER_ACTIVITY = "com.android.launcher3.Launcher"
         const val BAR_COLOR = 0xE61F2124.toInt()
         const val TEXT_COLOR = 0xFFFFFFFF.toInt()
         const val ACCENT_COLOR = 0xFF8AB4F8.toInt()

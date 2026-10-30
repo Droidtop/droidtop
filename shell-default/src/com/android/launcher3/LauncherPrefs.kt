@@ -354,9 +354,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         // hardcoded action toggled on/off (docs/SPEC.md, Launcher mode
         // survey, "Assignable gesture actions"). Defaults match the old
         // booleans' own defaults exactly (double-tap off, swipe-down onto
-        // notifications), so a fresh install behaves identically; an
-        // existing install's old boolean value is carried over once by
-        // GestureActionMigration, run from LauncherApplication.onCreate.
+        // notifications).
         @JvmField
         val GESTURE_DOUBLE_TAP_ACTION =
             backedUpItem(SettingsHomeFragment.DOUBLE_TAP_ACTION, com.android.launcher3.touch.GestureAction.NONE)

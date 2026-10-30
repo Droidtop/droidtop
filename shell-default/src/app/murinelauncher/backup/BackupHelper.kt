@@ -209,7 +209,6 @@ object BackupHelper {
 
     private fun tmpStagingDir(context: Context) = File(context.filesDir, "$STAGING_DIR.tmp")
 
-    //private val SNAPPY_MAGIC = byteArrayOf(0xFF.toByte(), 0x06, 0x00, 0x00)
     private val ZSTD_MAGIC = byteArrayOf(0x28, 0xB5.toByte(), 0x2F, 0xFD.toByte())
     private val ZIP_MAGIC = byteArrayOf('P'.code.toByte(), 'K'.code.toByte())
 
@@ -228,12 +227,10 @@ object BackupHelper {
     }
 
     /**
-     * Wraps the stream with the proper decompressor based on its magic bytes;
-     * If none of the magic bytes are matched, it returns the original stream;
-     * NOTE: unused formats have been commented for code optimization
+     * The archive inside a backup file: zstd-compressed when it starts with zstd's magic, else plain. A backup is a
+     * tar archive (current) or a zip (older backups, still read so a person's old file restores; see restore).
      */
     private fun BufferedInputStream.decompressed() = when {
-        //peek(4).contentEquals(SNAPPY_MAGIC) -> SnappyFramedInputStream(this)
         peek(4).contentEquals(ZSTD_MAGIC) -> ZstdInputStream(this)
         else -> this // Plain (uncompressed) archive
     }

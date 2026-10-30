@@ -45,6 +45,17 @@ class WidgetStackActivity : Activity() {
         }
     }
 
+    // Gone without a choice and not just rotating (Don't keep activities, a task cleared): the allocated id is freed
+    // here, so no widget id is left behind until the next ghost-widget cleanup (Droidtop/tracker#771). A rotation
+    // keeps it for the recreated activity, which frees it in onCreate.
+    override fun onDestroy() {
+        if (allocated != 0 && !isChangingConfigurations) {
+            host.deleteAppWidgetId(allocated)
+            allocated = 0
+        }
+        super.onDestroy()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putInt(STATE_ALLOCATED, allocated)

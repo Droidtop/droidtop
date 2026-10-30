@@ -1,11 +1,9 @@
 package dev.droidtop.shell.standard
 
-import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.EditText
@@ -30,42 +28,38 @@ object ItemCustomize {
     /** The options dialog for [info], an app icon on the home screen, in the dock or in a folder. */
     fun show(context: Context, info: ItemInfo, view: View?) {
         val id = info.id
-        val hasPicture = HomeItemExtras.picture(info) != null
-        val rows = buildList {
-            add(context.getString(R.string.item_customize_title, HomeItemExtras.title(info) ?: info.title ?: ""))
-            add(context.getString(R.string.item_customize_picture))
-            if (hasPicture) add(context.getString(R.string.item_customize_picture_remove))
-            add(context.getString(R.string.item_customize_swipe_up, HomeActions.label(context, HomeItemExtras.swipe(context, id, up = true))))
-            add(context.getString(R.string.item_customize_swipe_down, HomeActions.label(context, HomeItemExtras.swipe(context, id, up = false))))
+        fun swipeRow(up: Boolean): Pair<String, () -> Unit> = context.getString(
+            if (up) R.string.item_customize_swipe_up else R.string.item_customize_swipe_down,
+            HomeActions.label(context, HomeItemExtras.swipe(context, id, up)),
+        ) to {
+            HomeActions.pickAction(
+                context,
+                context.getString(if (up) R.string.item_customize_swipe_up_pick else R.string.item_customize_swipe_down_pick),
+                HomeItemExtras.swipe(context, id, up),
+            ) { action -> HomeItemExtras.setSwipe(context, id, up, action) }
         }
-        val removeRow = if (hasPicture) 2 else -1
-        val upRow = if (hasPicture) 3 else 2
+        // Each row's label with what it does, so no row is found again by a computed index.
+        val rows: List<Pair<String, () -> Unit>> = buildList {
+            add(context.getString(R.string.item_customize_title, HomeItemExtras.title(info) ?: info.title ?: "") to { askTitle(context, info, view) })
+            add(context.getString(R.string.item_customize_picture) to { choosePicture(context, id) })
+            if (HomeItemExtras.picture(info) != null) {
+                add(context.getString(R.string.item_customize_picture_remove) to { removePicture(context, id) })
+            }
+            add(swipeRow(up = true))
+            add(swipeRow(up = false))
+        }
         RadioListDialog.show(
             context = context,
             title = context.getString(R.string.item_customize),
             entryCount = rows.size,
             iconPosition = RadioGroupBottomSheet.IconPosition.START,
             currentIndex = -1,
-            textProvider = { rows[it] },
+            textProvider = { rows[it].first },
             iconProvider = null,
             iconTint = null,
             isVisibleProvider = null,
             isEnabledProvider = null,
-            onSelected = { row ->
-                when (row) {
-                    0 -> askTitle(context, info, view)
-                    1 -> choosePicture(context, id)
-                    removeRow -> removePicture(context, id)
-                    upRow, upRow + 1 -> {
-                        val up = row == upRow
-                        HomeActions.pickAction(
-                            context,
-                            context.getString(if (up) R.string.item_customize_swipe_up_pick else R.string.item_customize_swipe_down_pick),
-                            HomeItemExtras.swipe(context, id, up),
-                        ) { action -> HomeItemExtras.setSwipe(context, id, up, action) }
-                    }
-                }
-            },
+            onSelected = { row -> rows.getOrNull(row)?.second?.invoke() },
         )
     }
 
@@ -109,17 +103,7 @@ object ItemCustomize {
         val app = context.applicationContext
         Executors.THREAD_POOL_EXECUTOR.execute {
             val saved = try {
-                val bytes = app.contentResolver.openInputStream(uri)?.use { input ->
-                    val out = java.io.ByteArrayOutputStream()
-                    val buffer = ByteArray(64 * 1024)
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        out.write(buffer, 0, n)
-                        if (out.size() > MAX_IMAGE_BYTES) throw java.io.IOException("larger than $MAX_IMAGE_BYTES bytes")
-                    }
-                    out.toByteArray()
-                }
+                val bytes = app.contentResolver.openInputStream(uri)?.use { readAtMost(it, MAX_IMAGE_BYTES) }
                 bytes != null && HomeItemExtras.setPicture(app, id, bytes)
             } catch (e: Exception) {
                 Log.w(TAG, "could not read the picture for item $id", e)
@@ -135,37 +119,41 @@ object ItemCustomize {
         }
     }
 
+    /**
+     * All of [input], refused when it is larger than [max] bytes. InputStream.readNBytes would do this, but it is
+     * Android 13's and droidtop runs from Android 8.
+     */
+    private fun readAtMost(input: java.io.InputStream, max: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(64 * 1024)
+        var n = input.read(buffer)
+        while (n >= 0) {
+            out.write(buffer, 0, n)
+            if (out.size() > max) throw java.io.IOException("larger than $max bytes")
+            n = input.read(buffer)
+        }
+        return out.toByteArray()
+    }
+
     private const val MAX_IMAGE_BYTES = 16 * 1024 * 1024
 }
 
-/** Shows the system's image picker for one home-screen item and hands the choice to [ItemCustomize]. */
-class ItemPictureActivity : Activity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        if (savedInstanceState != null) return
-        val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
-        try {
-            @Suppress("DEPRECATION")
-            startActivityForResult(pick, REQUEST_PICK)
-        } catch (e: Exception) {
-            Log.w("droidtop.ItemPicture", "no file picker", e)
-            Notices.flash(getString(R.string.item_customize_picture_failed), tone = NoticeTone.Caution, context = this)
-            finish()
-        }
+/** The system's image picker for one home-screen item; the image chosen goes to [ItemCustomize.savePicture]. */
+class ItemPictureActivity : DocumentPickActivity() {
+    override val mimeTypes = arrayOf("image/*")
+
+    override fun onPicked(uri: Uri) {
+        val id = intent.getIntExtra(EXTRA_ID, -1)
+        if (id >= 0) ItemCustomize.savePicture(this, id, uri)
+        finish()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, data)
-        val id = intent.getIntExtra(EXTRA_ID, -1)
-        val uri = data?.data
-        if (requestCode == REQUEST_PICK && resultCode == RESULT_OK && uri != null && id >= 0) ItemCustomize.savePicture(this, id, uri)
+    override fun onNoPicker() {
+        Notices.flash(getString(R.string.item_customize_picture_failed), tone = NoticeTone.Caution, context = this)
         finish()
     }
 
     companion object {
         const val EXTRA_ID = "dev.droidtop.extra.ITEM_ID"
-        private const val REQUEST_PICK = 1
     }
 }

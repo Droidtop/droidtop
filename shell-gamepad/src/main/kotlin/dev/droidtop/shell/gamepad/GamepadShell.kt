@@ -229,7 +229,7 @@ fun GamepadShell(
 }
 
 @Composable
-private fun GamepadShellBody(
+internal fun GamepadShellBody(
     library: Library,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit = {},
     /**
@@ -399,26 +399,8 @@ private fun GamepadShellBody(
     // detail itself; null is the generic "Select". Reset per detail.
     var detailPrimaryLabel by remember(nav.detailId) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    // Real user-visible launch-failure state -- see launchError's render
-    // site. A failed launch must inform, never kill.
-    var launchError by remember { mutableStateOf<String?>(null) }
-    // Live setup progress for the same launch path (Droidtop/tracker#140):
-    // what a Windows setup is fetching and how far along it is. A
-    // different state from launchError because it is not a failure --
-    // painted as one, the system-files download read as an error the
-    // person never asked for. Cleared when the attempt ends either way.
-    var launchProgress by remember { mutableStateOf<String?>(null) }
-    // The fixable half of a launch failure: which system had no
-    // emulator, so the banner can offer to go get one.
-    var missingEmulator by remember {
-        mutableStateOf<dev.droidtop.library.consoles.NoEmulatorInstalled?>(null)
-    }
-    // The other fixable kind: a Windows game whose program droidtop could
-    // not tell (Droidtop/tracker#308), and the program choice once opened.
-    var unknownProgram by remember { mutableStateOf<dev.droidtop.library.ProgramNotIdentified?>(null) }
-    // A RetroArch core droidtop saw missing or incomplete before the launch (Droidtop/tracker#271).
-    var missingCore by remember { mutableStateOf<dev.droidtop.library.consoles.RetroArchCores.Missing?>(null) }
-    var programScreen by remember { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
+    // What the last launch left to say or fix ([LaunchProblems]).
+    val launchProblems = remember { LaunchProblems() }
     // The game being started, if any: drives the launch screen (real
     // ES-DE has one; without it the shell simply freezes mid-frame for
     // the several seconds a cold emulator start takes, which reads as a
@@ -468,11 +450,9 @@ private fun GamepadShellBody(
     // more than one candidate; state renders LaunchDisplayChooserDialog
     // below. Installed only while this composition is live.
     // Quick Menu (hold SELECT) -- see QuickMenu.kt for the paradigm.
-    var quickMenuOpen by remember { mutableStateOf(false) }
-    // The section the Quick Menu opens on when something asked for one (Downloads, for a link to Updates); cleared on
-    // close.
-    var quickMenuStart by remember { mutableStateOf<QuickSection?>(null) }
-    LaunchedEffect(quickMenuOpen) { if (!quickMenuOpen) quickMenuStart = null }
+    // Which of the shell's own overlays is open ([ShellOverlays]).
+    val overlays = remember { ShellOverlays() }
+    LaunchedEffect(overlays.quickMenuOpen) { if (!overlays.quickMenuOpen) overlays.quickMenuStart = null }
     // A quick menu left open when this shell lost the foreground (the
     // Switch-mode dialog's own "Android"/"Desktop" rows, or Home) must not
     // still be showing when a fresh, real deep-link brings this same
@@ -482,16 +462,11 @@ private fun GamepadShellBody(
     // Quick Menu stacked on top of Gaming.
     // The left menu (Start; docs/SPEC.md 7j "Gaming controls") closes for
     // the same reason.
-    var leftMenuOpen by remember { mutableStateOf(false) }
-    // The one search over the library, the apps, the download sources and the settings (the left menu's Search row).
-    var globalSearchOpen by remember { mutableStateOf(false) }
-    // One system's search, opened from the Quick Menu's Game section: its id and name.
-    var systemSearch by remember { mutableStateOf<Pair<String, String>?>(null) }
     // The game screen of a Windows game sends Back here with openQuickMenu set (OwnGameScreens): the
     // menu opens on its Game section, since the game is running.
     LaunchedEffect(deepLinkToken) {
-        quickMenuOpen = openQuickMenu
-        leftMenuOpen = false
+        overlays.quickMenuOpen = openQuickMenu
+        overlays.leftMenuOpen = false
         Log.i("droidtop.ReturnToGame", "deep link $deepLinkToken applied: quickMenu=$openQuickMenu")
     }
     // Updates is the Quick Menu's Downloads tab (owner, 2026-10-29, Droidtop/tracker#749): every way into the Updates
@@ -501,8 +476,8 @@ private fun GamepadShellBody(
     LaunchedEffect(nav.section) {
         if (nav.section == GamingSection.UPDATES) {
             nav.openSection(lastSection.takeIf { it != GamingSection.UPDATES } ?: GamingSection.DOWNLOADS)
-            quickMenuStart = QuickSection.DOWNLOADS
-            quickMenuOpen = true
+            overlays.quickMenuStart = QuickSection.DOWNLOADS
+            overlays.quickMenuOpen = true
         } else {
             lastSection = nav.section
         }
@@ -513,7 +488,7 @@ private fun GamepadShellBody(
     // dialog opening or closing, resume, and window-focus regain; the glyphs and the key map both
     // read ControllerLayouts.layout, so they change together and nothing else recomposes.
     LaunchedEffect(Unit) { ControllerLayouts.attach(context) }
-    LaunchedEffect(nav.place.key, quickMenuOpen, leftMenuOpen, focusedHints.layerOpen) {
+    LaunchedEffect(nav.place.key, overlays.quickMenuOpen, overlays.leftMenuOpen, focusedHints.layerOpen) {
         ControllerLayouts.recheck(context)
     }
     val windowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
@@ -544,12 +519,12 @@ private fun GamepadShellBody(
     val shellMenus = remember {
         ShellMenus(
             openLeft = {
-                quickMenuOpen = false
-                leftMenuOpen = true
+                overlays.quickMenuOpen = false
+                overlays.leftMenuOpen = true
             },
             openQuick = {
-                leftMenuOpen = false
-                quickMenuOpen = true
+                overlays.leftMenuOpen = false
+                overlays.quickMenuOpen = true
             },
         )
     }
@@ -564,7 +539,7 @@ private fun GamepadShellBody(
         // there arrives here rather than through library.launch.
         dev.droidtop.library.LaunchDisplay.onLaunchFailed = {
             launching = null
-            launchError = LaunchFailureMessage.userMessage(null, it)
+            launchProblems.error = LaunchFailureMessage.userMessage(null, it)
         }
         onDispose {
             dev.droidtop.library.LaunchDisplay.chooser = null
@@ -679,7 +654,7 @@ private fun GamepadShellBody(
         )
         EsDeNavigationSounds.play(UiSound.LAUNCH)
         scope.launch {
-            launchError = null
+            launchProblems.error = null
             launching = entry
             // The audio hand-off happens where the app is actually
             // dispatched (LaunchDisplay.startOn), after the display
@@ -688,10 +663,10 @@ private fun GamepadShellBody(
                 .onFailure {
                     android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)
                     launching = null
-                    missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled
-                    unknownProgram = it as? dev.droidtop.library.ProgramNotIdentified
-                    missingCore = it as? dev.droidtop.library.consoles.RetroArchCores.Missing
-                    launchError = LaunchFailureMessage.userMessage(entry.title, it)
+                    launchProblems.missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled
+                    launchProblems.unknownProgram = it as? dev.droidtop.library.ProgramNotIdentified
+                    launchProblems.missingCore = it as? dev.droidtop.library.consoles.RetroArchCores.Missing
+                    launchProblems.error = LaunchFailureMessage.userMessage(entry.title, it)
                 }
             // Held briefly after the launch call returns: the call
             // returns as soon as the intent is dispatched, while the
@@ -714,8 +689,8 @@ private fun GamepadShellBody(
     val onLaunch: (LibraryEntry) -> Unit = { entry ->
         if (entry.isPcOrEngineGame) {
             scope.launch {
-                launchError = null
-                launchProgress = null
+                launchProblems.error = null
+                launchProblems.progress = null
                 dev.droidtop.library.PcRunnerOptions.resolveAndPlay(
                     context = context,
                     entry = entry,
@@ -724,15 +699,15 @@ private fun GamepadShellBody(
                     // which stay until the attempt ends. A successful
                     // Windows setup ends with nothing more to say -- the
                     // next A press launches, exactly as the offer said.
-                    onStatus = { message -> launchProgress = message },
+                    onStatus = { message -> launchProblems.progress = message },
                     onFailure = { message ->
-                        launchProgress = null
-                        launchError = message
+                        launchProblems.progress = null
+                        launchProblems.error = message
                     },
                     // An installer's row installed (or said why not): a flash, not a failure.
                     onDone = { message -> dev.droidtop.library.settings.Notices.flash(message, context = context) },
                 )
-                launchProgress = null
+                launchProblems.progress = null
             }
         } else {
             dispatchLaunch(entry)
@@ -767,7 +742,7 @@ private fun GamepadShellBody(
     // same answer (docs/SPEC.md 7j). A game that ended unseen ends the
     // session in SessionMonitor, which this follows, so a menu never
     // offers a dead launch.
-    val sideMenuOpen = quickMenuOpen || leftMenuOpen
+    val sideMenuOpen = overlays.quickMenuOpen || overlays.leftMenuOpen
     val runningSession by dev.droidtop.library.LaunchDisplay.running.collectAsState()
     val runningEntry = remember(sideMenuOpen, runningSession, gameEntries, appEntries) {
         if (!sideMenuOpen) {
@@ -787,11 +762,11 @@ private fun GamepadShellBody(
     // closing; reset whenever the running game changes.
     var quitOutcome by remember { mutableStateOf<dev.droidtop.library.QuitResult?>(null) }
     LaunchedEffect(runningEntry?.id) { quitOutcome = null }
-    if (quickMenuOpen) {
+    if (overlays.quickMenuOpen) {
         QuickMenu(
             runningEntry = runningEntry,
             library = library,
-            startSection = quickMenuStart,
+            startSection = overlays.quickMenuStart,
             // The same launch path every entry already goes through
             // (console ROM, PC and engine games alike) -- relaunching the
             // entry is what "resume" already means for the planned
@@ -799,12 +774,12 @@ private fun GamepadShellBody(
             // reused here rather than a second resume mechanism.
             quitOutcome = quitOutcome,
             onResume = { entry ->
-                quickMenuOpen = false
+                overlays.quickMenuOpen = false
                 onLaunch(entry)
             },
             onSearchSystem = { id, name ->
-                quickMenuOpen = false
-                systemSearch = id to name
+                overlays.quickMenuOpen = false
+                overlays.systemSearch = id to name
             },
             onQuit = { entry, restart ->
                 // The sheet stays open until the game really ended, so a
@@ -815,7 +790,7 @@ private fun GamepadShellBody(
                     val outcome = library.quitRunning(context, entry)
                     quitOutcome = outcome
                     if (outcome is dev.droidtop.library.QuitResult.Ended) {
-                        quickMenuOpen = false
+                        overlays.quickMenuOpen = false
                         // Restart (the Quick Menu's Game section): start the
                         // entry again, but only now that it really ended.
                         if (restart) onLaunch(entry)
@@ -827,57 +802,57 @@ private fun GamepadShellBody(
                 scope.launch {
                     val outcome = library.killRunning(context, entry)
                     quitOutcome = outcome
-                    if (outcome is dev.droidtop.library.QuitResult.Ended) quickMenuOpen = false
+                    if (outcome is dev.droidtop.library.QuitResult.Ended) overlays.quickMenuOpen = false
                 }
             },
             onOpenLeftMenu = {
-                quickMenuOpen = false
-                leftMenuOpen = true
+                overlays.quickMenuOpen = false
+                overlays.leftMenuOpen = true
             },
             openPlace = { screenId ->
                 placeForScreen(screenId, uiMode)?.let { place ->
-                    quickMenuOpen = false
+                    overlays.quickMenuOpen = false
                     nav.openSection(place)
                 } != null
             },
             placeAvailable = { screenId -> placeForScreen(screenId, uiMode) != null },
             onDismiss = {
                 Log.i("droidtop.ReturnToGame", "Quick Menu closed")
-                quickMenuOpen = false
+                overlays.quickMenuOpen = false
             },
         )
     }
-    if (leftMenuOpen) {
+    if (overlays.leftMenuOpen) {
         LeftMenu(
             entries = leftMenuEntries(menuSectionsFor(uiMode)),
             current = section,
             runningTitle = runningEntry?.let { dev.droidtop.library.GameNaming.displayName(it.title) },
             // The Quick Menu Game section's Resume: the one launch path, reused.
             onResume = {
-                leftMenuOpen = false
+                overlays.leftMenuOpen = false
                 runningEntry?.let(onLaunch)
             },
             onSelect = { entry ->
-                leftMenuOpen = false
+                overlays.leftMenuOpen = false
                 selectSection(entry.section)
             },
             onOpenQuickMenu = {
-                leftMenuOpen = false
-                quickMenuOpen = true
+                overlays.leftMenuOpen = false
+                overlays.quickMenuOpen = true
             },
             // Kiosk and Kid keep the library and leave out what manages the device, downloads and settings with it.
             onSearch = if (menuSectionsFor(uiMode).any { it.managesDevice }) {
                 {
-                    leftMenuOpen = false
-                    globalSearchOpen = true
+                    overlays.leftMenuOpen = false
+                    overlays.globalSearchOpen = true
                 }
             } else {
                 null
             },
-            onDismiss = { leftMenuOpen = false },
+            onDismiss = { overlays.leftMenuOpen = false },
         )
     }
-    if (globalSearchOpen) {
+    if (overlays.globalSearchOpen) {
         dev.droidtop.shell.gamepad.query.LauncherSearchScreen(
             initialText = "",
             games = gameEntries,
@@ -894,14 +869,14 @@ private fun GamepadShellBody(
             },
             // Every game opens its page (Play or Install is there), never a raw start (docs/SPEC.md 12a).
             onOpen = { entry ->
-                globalSearchOpen = false
+                overlays.globalSearchOpen = false
                 nav.openDetail(entry.id)
             },
             settingsRoot = remember(uiMode) { gamingSettingsRoot(menuSectionsFor(uiMode).filter { it.isPlace }.mapNotNull { it.placeScreenId }.toSet()) },
-            onDismiss = { globalSearchOpen = false },
+            onDismiss = { overlays.globalSearchOpen = false },
         )
     }
-    systemSearch?.let { (systemId, systemName) ->
+    overlays.systemSearch?.let { (systemId, systemName) ->
         // One system's search (docs/SPEC.md 12a, "One search: where it opens"): its games, matched in memory over the
         // list already loaded, and the sources that serve it.
         // Missing games too, as the system's list shows them (searchablePool).
@@ -911,7 +886,7 @@ private fun GamepadShellBody(
             matchCount = 0,
             totalCount = systemGames.size,
             onTextChange = {},
-            onDismiss = { systemSearch = null },
+            onDismiss = { overlays.systemSearch = null },
             systemId = systemId,
             localKey = systemGames,
             local = { text ->
@@ -922,7 +897,7 @@ private fun GamepadShellBody(
                         dev.droidtop.library.GameNaming.displayName(game.title),
                         listOf(systemName, if (game.needsInstall()) "Not installed" else "Installed").joinToString(" · "),
                     ) {
-                        systemSearch = null
+                        overlays.systemSearch = null
                         // Its page, with Play or Install, as the global search does (docs/SPEC.md 12a).
                         nav.openDetail(game.id)
                     }
@@ -1095,7 +1070,7 @@ private fun GamepadShellBody(
                     // release is this owner's and goes nowhere, and a fresh
                     // press inside the menu closes it there.
                     GamepadAction.R2 -> {
-                        if (!quickMenuOpen) quickMenuOpen = true
+                        if (!overlays.quickMenuOpen) overlays.quickMenuOpen = true
                         true
                     }
                     // Start, the left menu's button: navigation, where the
@@ -1104,7 +1079,7 @@ private fun GamepadShellBody(
                     // once a launched game is in front the shell is not
                     // the foreground and receives no input.
                     GamepadAction.START -> {
-                        if (!leftMenuOpen) leftMenuOpen = true
+                        if (!overlays.leftMenuOpen) overlays.leftMenuOpen = true
                         true
                     }
                     // L1/R1 step the page's own nearest strip only. A page
@@ -1142,7 +1117,7 @@ private fun GamepadShellBody(
         // system-files setup came to read as an error nobody asked for.
         // No self-dismiss: the line stays honest for as long as the
         // attempt runs, and onLaunch clears it when the attempt ends.
-        launchProgress?.let { message ->
+        launchProblems.progress?.let { message ->
             Text(
                 message,
                 color = MenuTokens.OnSurface,
@@ -1158,10 +1133,10 @@ private fun GamepadShellBody(
         // visible behind it, and the pad's B, a row tap or a tap outside
         // dismisses it; a failure the user can fix offers the fix on the
         // spot instead of getting out of the way.
-        launchError?.let { message ->
+        launchProblems.error?.let { message ->
             LaunchFailureDialog(
                 message = message,
-                actions = listOfNotNull(missingEmulator?.let { problem ->
+                actions = listOfNotNull(launchProblems.missingEmulator?.let { problem ->
                     LaunchFailureAction("Get an emulator") {
                         // The players database's own package for this
                         // system, straight to the store: the fix, at
@@ -1180,40 +1155,40 @@ private fun GamepadShellBody(
                                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                             )
                         }
-                        missingEmulator = null
-                        launchError = null
+                        launchProblems.missingEmulator = null
+                        launchProblems.error = null
                     }
-                }, unknownProgram?.let { problem ->
+                }, launchProblems.unknownProgram?.let { problem ->
                     // The game's program choice, the same screen its options open.
                     LaunchFailureAction("Choose the program") {
-                        programScreen = dev.droidtop.library.WindowsPrograms.screen(problem.entryId, problem.title, problem.gameRoot)
-                        unknownProgram = null
-                        launchError = null
+                        launchProblems.programScreen = dev.droidtop.library.WindowsPrograms.screen(problem.entryId, problem.title, problem.gameRoot)
+                        launchProblems.unknownProgram = null
+                        launchProblems.error = null
                     }
-                }, missingCore?.let { problem ->
+                }, launchProblems.missingCore?.let { problem ->
                     // The launch watchdog's Get the core, here before anything started: RetroArch's Core
                     // Downloader, or droidtop placing it once the person confirms on the emulator screen.
                     LaunchFailureAction("Get the core") {
-                        missingCore = null
-                        launchError = null
+                        launchProblems.missingCore = null
+                        launchProblems.error = null
                         scope.launch {
                             when (val outcome = dev.droidtop.library.consoles.RetroArchCores.ensure(context, problem.need, asked = true)) {
                                 dev.droidtop.library.consoles.RetroArchCores.Outcome.Ready -> Unit
-                                is dev.droidtop.library.consoles.RetroArchCores.Outcome.Manual -> launchError = outcome.line
-                                is dev.droidtop.library.consoles.RetroArchCores.Outcome.Failed -> launchError = outcome.line
+                                is dev.droidtop.library.consoles.RetroArchCores.Outcome.Manual -> launchProblems.error = outcome.line
+                                is dev.droidtop.library.consoles.RetroArchCores.Outcome.Failed -> launchProblems.error = outcome.line
                             }
                         }
                     }
                 }),
                 onDismiss = {
-                    missingEmulator = null
-                    unknownProgram = null
-                    missingCore = null
-                    launchError = null
+                    launchProblems.missingEmulator = null
+                    launchProblems.unknownProgram = null
+                    launchProblems.missingCore = null
+                    launchProblems.error = null
                 },
             )
         }
-        programScreen?.let { screen -> CatalogSheet(root = screen, onExit = { programScreen = null }) }
+        launchProblems.programScreen?.let { screen -> CatalogSheet(root = screen, onExit = { launchProblems.programScreen = null }) }
         // A launch that never answered or left at once (LaunchWatchdog, docs/SPEC.md "The launch
         // watchdog"): plain words and the three ways out, never a black screen.
         val watchAlert by dev.droidtop.library.LaunchWatchdog.alert.collectAsState()
@@ -1226,7 +1201,7 @@ private fun GamepadShellBody(
                             val outcome = dev.droidtop.library.LaunchWatchdog.closeIt(context, alert)
                             if (outcome !is dev.droidtop.runtime.tasks.CloseOutcome.Closed) {
                                 dev.droidtop.library.LaunchWatchdog.dismiss()
-                                launchError = outcome.text
+                                launchProblems.error = outcome.text
                             }
                         }
                     },
@@ -1240,7 +1215,7 @@ private fun GamepadShellBody(
                     val core = alert.retroArchCore?.let {
                         LaunchFailureAction("Get the core") {
                             scope.launch {
-                                dev.droidtop.library.LaunchWatchdog.getCore(context, alert)?.let { launchError = it }
+                                dev.droidtop.library.LaunchWatchdog.getCore(context, alert)?.let { launchProblems.error = it }
                             }
                         }
                     }
@@ -1512,7 +1487,7 @@ private fun GamepadShellBody(
                                 onCanGoBackChanged = { canGoBack = it },
                                 onRequestRescan = { rescanTrigger++ },
                                 onOpenSection = { target -> selectSection(target) },
-                                onOpenQuickMenu = { quickMenuOpen = true },
+                                onOpenQuickMenu = { overlays.quickMenuOpen = true },
                             ) }
                             GamingSection.APPS -> {
                                 canGoBack = false
@@ -1568,12 +1543,12 @@ private fun GamepadShellBody(
             val homeBand = section == GamingSection.HOME && nav.place is ShellPlace.Section
             if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && retroView in GamingTheme.palette.ownStatusViews)) {
                 FloatingStatusCluster(
-                    onClick = { quickMenuOpen = true },
+                    onClick = { overlays.quickMenuOpen = true },
                     // The activity spot opens where the jobs are: the Quick Menu's Downloads tab
                     // (Droidtop/tracker#742).
                     onActivity = {
-                        quickMenuStart = QuickSection.DOWNLOADS
-                        quickMenuOpen = true
+                        overlays.quickMenuStart = QuickSection.DOWNLOADS
+                        overlays.quickMenuOpen = true
                     },
                     modifier = Modifier.align(Alignment.TopEnd),
                 )
@@ -1637,7 +1612,7 @@ private fun GamepadShellBody(
  * start) is dropped so Gaming opens on its default, Home; a recreate in
  * this process (the Text size setting) keeps the user's place.
  */
-private val PROCESS_MARK: Long = System.currentTimeMillis()
+internal val PROCESS_MARK: Long = System.currentTimeMillis()
 
 /**
  * Whether the Activity that was just destroyed was destroyed for a
@@ -1653,7 +1628,7 @@ object ShellRestore {
     var keepPlace: Boolean = false
 }
 
-private fun <T : Any> sessionOnly(inner: Saver<T, Any>): Saver<T, Any> = Saver(
+internal fun <T : Any> sessionOnly(inner: Saver<T, Any>): Saver<T, Any> = Saver(
     save = { value -> with(inner) { save(value) }?.let { listOf(PROCESS_MARK, it) } },
     restore = { saved ->
         val parts = saved as? List<*>
@@ -1667,7 +1642,7 @@ private fun <T : Any> sessionOnly(inner: Saver<T, Any>): Saver<T, Any> = Saver(
  * Standard's SettingsGamingFragment render that catalog); this only reads
  * them, from the same file ([CatalogPrefs]).
  */
-private object GamingPrefs {
+internal object GamingPrefs {
     private fun prefs(context: Context) = CatalogPrefs.prefs(context)
 
     /** The section Gaming opens on: Home (the default), PC Games ("pc"), Retro Games or Apps. */
@@ -1694,368 +1669,6 @@ private object GamingPrefs {
 }
 
 /**
- * Full-screen detail view for one entry — one horizontal row of primary
- * actions (Launch, leading/highlighted) instead of launch being a card's
- * only behavior. Reached via a card's Y/Info action, closed via B/Back.
- */
-@Composable
-internal fun EntryDetailScreen(
-    entry: LibraryEntry,
-    library: Library,
-    onLaunch: () -> Unit,
-    onClose: () -> Unit,
-    onPrimaryFocus: (String?) -> Unit = {},
-) {
-    val context = LocalContext.current
-    val launchFocus = remember { FocusRequester() }
-    LaunchedEffect(entry) { launchFocus.requestFocus() }
-
-    var editingMetadata by remember { mutableStateOf(false) }
-    var viewingMedia by remember(entry) { mutableStateOf(false) }
-    var pickingMatch by remember(entry) { mutableStateOf(false) }
-    var scrapeStatus by remember(entry) { mutableStateOf<String?>(null) }
-    var scrapeResult by remember(entry) { mutableStateOf<String?>(null) }
-    var pluginActionStatus by remember(entry) { mutableStateOf<String?>(null) }
-    var pluginActionScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
-    // Everything scraped for this game, for the media viewer: listed on
-    // IO once per entry, never while drawing (the same as PcGameMenu).
-    val media by produceState(emptyList<Pair<String, String>>(), entry) {
-        value = withContext(Dispatchers.IO) {
-            val romFile = java.io.File(entry.id)
-            val gamesRoot = dev.droidtop.library.GamesRoots.rootOf(dev.droidtop.library.GamesRoots.current(context), romFile)
-            val systemId = entry.systemId
-            if (gamesRoot != null && systemId != null) {
-                dev.droidtop.library.EsDeArtwork.allMedia(gamesRoot, systemId, romFile.nameWithoutExtension)
-            } else {
-                emptyList()
-            }
-        }
-    }
-    var editingCollections by remember { mutableStateOf(false) }
-
-    // The user's own "open with" hooks (docs/SPEC.md section 12), paired
-    // with the real files on this entry droidtop itself cannot open.
-    // Resolved off the main thread: which of the entry's files exist,
-    // the integrations folder, and whether the PackageManager has each
-    // declared target app.
-    var openWithTargets by remember(entry) { mutableStateOf<List<dev.droidtop.library.integrations.OpenWithTarget>>(emptyList()) }
-    var openWith by remember(entry) { mutableStateOf<List<Integration>>(emptyList()) }
-    var integrationError by remember(entry) { mutableStateOf<String?>(null) }
-    LaunchedEffect(entry) {
-        val (targets, integrations) = withContext(Dispatchers.IO) {
-            val targets = openWithTargetsFor(entry)
-            targets to if (targets.isEmpty()) {
-                emptyList()
-            } else {
-                IntegrationStore.available(context, IntegrationCapability.OPEN_WITH)
-            }
-        }
-        openWithTargets = targets
-        openWith = integrations
-    }
-
-    // Context actions plugins offer on this game or app (docs/plugin-api.md 3 C4). Which ones apply comes from
-    // manifests alone, and `enabled` is asked once, when this screen opens, never while drawing.
-    val contextTarget = remember(entry) { dev.droidtop.library.integrations.PluginContextActions.targetOf(entry) }
-    var pluginActions by remember(entry) { mutableStateOf<List<dev.droidtop.library.integrations.PluginContextActions.Action>>(emptyList()) }
-    // Rows plugins add to a game's page (docs/plugin-api.md 3 C18): on this screen each section is a chip that opens
-    // it as a page, where its rows, inputs and actions work; the PC game page draws them as its own rows instead.
-    var pluginSections by remember(entry) { mutableStateOf<List<dev.droidtop.library.integrations.PluginGameSections.Section>>(emptyList()) }
-    LaunchedEffect(entry) {
-        pluginActions = withContext(Dispatchers.IO) {
-            dev.droidtop.library.integrations.PluginContextActions.actionsFor(context, contextTarget, dev.droidtop.pluginhost.PluginModes.GAMING)
-                .filter { dev.droidtop.library.integrations.PluginContextActions.enabled(context, it, contextTarget) }
-        }
-        pluginSections = withContext(Dispatchers.IO) {
-            dev.droidtop.library.integrations.PluginGameSections.sectionsFor(context, contextTarget)
-        }
-    }
-
-    // Console ROMs and native apps only: a PC or engine game never
-    // reaches this screen (see the PC branch at the call site). Its
-    // launch-strategy picker, scrape action and "choose match" live in
-    // PcGameMenu alone.
-    val isRomEntry = entry.kind == LibraryEntryKind.CONSOLE_ROM
-    // Achievements, play time and an emulator's compatibility, asked for once when the page opens (docs/SPEC.md 7h,
-    // "Game info"); a console game only, an app has none of them.
-    val gameInfo = rememberGameInfoRows(entry, enabled = isRomEntry)
-
-    if (editingMetadata) {
-        GameMetadataEditor(
-            entry = entry,
-            library = library,
-            onDismiss = { editingMetadata = false },
-        )
-        return
-    }
-    if (pickingMatch) {
-        ManualMatchPicker(
-            entry = entry,
-            onApplied = { scrapeResult = it },
-            onDismiss = { pickingMatch = false },
-        )
-    }
-    if (viewingMedia) {
-        MediaViewer(title = entry.title, media = media, onClose = { viewingMedia = false })
-        return
-    }
-    if (editingCollections) {
-        CollectionMembershipEditor(
-            entry = entry,
-            library = library,
-            onDismiss = { editingCollections = false },
-        )
-        return
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(LocalShellWindow.current.edgePadding)
-            // B closes the detail; the system back key reaches the same
-            // close through the shell's BackHandler for it (SPEC 6e).
-            .onPad { press ->
-                if (press.action == GamepadAction.B) {
-                    onClose()
-                    true
-                } else {
-                    false
-                }
-            },
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (entry.artworkUri != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .background(MenuTokens.Card, Corners.Plate),
-            ) {
-                if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
-                    // An app's artwork is its launcher icon: drawn at an
-                    // icon's size on the plate, never cropped and blown up
-                    // into a blurred banner (UI pass 2026-09-24, L1).
-                    AsyncImage(
-                        model = entry.artworkUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.size(96.dp).align(Alignment.Center),
-                    )
-                } else {
-                    AsyncImage(
-                        model = entry.artworkUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().background(MenuTokens.Card, Corners.Plate),
-                    )
-                }
-                // Platform/kind label overlaid on the art, matching Daijishō's
-                // own detail-screen layout (boxart with the platform name
-                // overlaid at the bottom of the art) -- structure, not pixels.
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomStart)
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, MenuTokens.Scrim)))
-                        .padding(12.dp),
-                ) {
-                    Text(entry.kind.itemName(), color = MenuTokens.OnSurface, style = MaterialTheme.typography.labelMedium)
-                }
-            }
-        }
-        Text(dev.droidtop.library.GameNaming.displayName(entry.title), color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineMedium)
-        if (entry.artworkUri == null) {
-            Text(entry.kind.itemName(), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.titleMedium)
-        }
-        if (entry.playtimeSeconds > 0) {
-            Text(stringResource(R.string.played_for, dev.droidtop.library.format.ValueFormat.duration(entry.playtimeSeconds)), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
-        }
-        gameInfo.forEach { row ->
-            Text(
-                row.value?.let { "${row.title}: $it" } ?: row.title,
-                color = MenuTokens.OnSurface,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            row.subtitle?.let { Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall) }
-        }
-        // What this game's Switch files add up to -- "Update v131072 ·
-        // 2 DLC", or, for a row that is itself an update/DLC whose base
-        // game is missing, that fact. Empty (and so drawn not at all)
-        // for a base game with nothing beside it.
-        entry.switchFacts?.line()?.takeIf { it.isNotEmpty() }?.let {
-            Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
-        }
-        val detailScope = rememberCoroutineScope()
-        // Scrolls rather than clipping: on a phone the chips outgrow the
-        // width, and a chip off the edge is an action nobody can reach.
-        Row(
-            modifier = Modifier.padding(top = 16.dp).horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            ShellChip(
-                "Launch",
-                primary = true,
-                modifier = Modifier
-                    .focusRequester(launchFocus)
-                    .onFocusChanged { onPrimaryFocus(if (it.isFocused) "Launch" else null) },
-                onClick = onLaunch,
-            )
-            gameInfo.filter { it.chip != null }.forEach { row ->
-                ShellChip(
-                    row.chip.orEmpty(),
-                    onClick = {
-                        val page = row.screen
-                        val address = row.url
-                        val step = row.run
-                        if (step != null) step(context) else if (page != null) pluginActionScreen = page else if (address != null) dev.droidtop.library.Links.open(context, address)
-                    },
-                )
-            }
-            // Real ConsoleRomProvider-specific concept -- same honest
-            // "not applicable" gating Library.toggleFavorite/
-            // saveMetadata already use for a non-ROM entry.
-            if (isRomEntry) {
-                ShellChip("Choose match", onClick = { pickingMatch = true })
-            }
-            // A Switch game with an update or DLC beside it: opens its emulator and names the files to pick
-            // (SwitchContentHandoff).
-            if (dev.droidtop.library.consoles.SwitchContentHandoff.applies(entry)) {
-                ShellChip(
-                    "Add update and DLC",
-                    onClick = {
-                        detailScope.launch {
-                            integrationError = dev.droidtop.library.consoles.SwitchContentHandoff.open(context, entry)
-                        }
-                    },
-                )
-            }
-            if (media.size > 1) {
-                ShellChip("View media (${media.size})", onClick = { viewingMedia = true })
-            }
-            pluginActions.forEach { action ->
-                ShellChip(
-                    action.label,
-                    onClick = {
-                        pluginActionStatus = "${action.label}…"
-                        pluginActionScreen = null
-                        detailScope.launch {
-                            val outcome = withContext(Dispatchers.IO) {
-                                dev.droidtop.library.integrations.PluginContextActions.run(context, action, contextTarget)
-                            }
-                            pluginActionStatus = outcome.message
-                            pluginActionScreen = outcome.screen
-                        }
-                    },
-                )
-            }
-            pluginSections.forEach { section ->
-                ShellChip(
-                    section.label,
-                    onClick = {
-                        detailScope.launch {
-                            // Built off the main thread: the page's game context reads the plugin's grants.
-                            pluginActionScreen = withContext(Dispatchers.IO) {
-                                dev.droidtop.library.integrations.PluginGameSections.screenFor(context, section, contextTarget)
-                            }
-                        }
-                    },
-                )
-            }
-            // One chip per (hook, openable file). Never a substitution and
-            // never a silent pick: droidtop has no manual reader and no
-            // full video player of its own, so these open a door rather
-            // than taking over a behaviour, and if the user declared two
-            // hooks they both appear and the user chooses -- droidtop does
-            // not rank them.
-            openWith.forEach { integration ->
-                openWithTargets.forEach { target ->
-                    ShellChip(
-                        openWithChipLabel(integration, target, openWithTargets.size),
-                        onClick = {
-                            integrationError = runCatching {
-                                IntegrationStore.run(
-                                    context = context,
-                                    integration = integration,
-                                    systemId = entry.systemId,
-                                    file = target.file,
-                                )
-                            }.exceptionOrNull()?.let { failure ->
-                                Log.w("droidtop.gamepad", "Integration failed: ${integration.label}", failure)
-                                "${integration.label} failed: ${userFacingErrorMessage(failure)}"
-                            }
-                        },
-                    )
-                }
-            }
-            if (isRomEntry) {
-                ShellChip("Edit metadata", onClick = { editingMetadata = true })
-                ShellChip("Collections", onClick = { editingCollections = true })
-                ShellChip(
-                    scrapeStatus?.let { "Scraping…" } ?: "Scrape",
-                    onClick = {
-                        if (scrapeStatus == null) {
-                            scrapeStatus = "Scraping ${entry.title}…"
-                            detailScope.launch {
-                                val romFile = java.io.File(entry.id)
-                                val folder = romFile.parentFile
-                                val systemsById = withContext(Dispatchers.IO) {
-                                    dev.droidtop.library.consoles.ConsoleSystemsRepository.allSystems(context)
-                                }.associateBy { it.id }
-                                val system = entry.systemId?.let { systemsById[it] }
-                                scrapeResult = if (folder == null || system == null) {
-                                    "Can't resolve this game's system folder."
-                                } else {
-                                    dev.droidtop.library.scraper.scrapeSystemArtwork(
-                                        context,
-                                        folder,
-                                        system,
-                                        onlyRom = romFile,
-                                    )
-                                }
-                                scrapeStatus = null
-                            }
-                        }
-                    },
-                )
-            }
-            // An app's own actions, on its own screen (UI pass 2026-09-24,
-            // L1). Android's screens do the work and Uninstall asks its own
-            // confirmation. There is no Back chip: B is on the hint row,
-            // which is also its touch route.
-            if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
-                ShellChip("App info", onClick = {
-                    runCatching {
-                        context.startActivity(
-                            android.content.Intent(
-                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                android.net.Uri.fromParts("package", entry.id, null),
-                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
-                    }
-                })
-                ShellChip("Uninstall", onClick = { startUninstall(context, entry.id) })
-            }
-        }
-        (pluginActionStatus ?: scrapeStatus ?: scrapeResult)?.let {
-            Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
-        }
-        // An integration drives another app's own real Activity, so it can
-        // fail for reasons droidtop cannot see coming (the template names a
-        // component that app no longer exports). Shown, not swallowed.
-        integrationError?.let {
-            Text(it, color = MenuTokens.NoticeDanger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
-        }
-    }
-    pluginActionScreen?.let { screen ->
-        val close = { pluginActionScreen = null }
-        // The one sheet with the ground painted (CatalogSheet), so the screen behind never shows through (rig,
-        // 0.2.0-dev.2070).
-        CatalogSheet(root = screen, onExit = close)
-    }
-}
-
-
-/**
  * A persistent, always-visible legend for what the controller's face
  * buttons currently do — never leaves the user guessing, a real,
  * valuable pattern not present in this shell before (docs/SPEC.md §7).
@@ -2068,7 +1681,7 @@ internal fun EntryDetailScreen(
  * needs a second copy of what a press does.
  */
 @Composable
-private fun ButtonHintFooter(
+internal fun ButtonHintFooter(
     aLabel: String = "Select",
     canGoBack: Boolean,
     showInfo: Boolean,
@@ -2233,8 +1846,8 @@ internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<G
 // Which kinds are Apps and which are Games is the library's split, not
 // this shell's: the Launcher's Games screen reads the same two sets
 // (LibraryEntry.kt, LibraryKinds).
-private val APP_KINDS = LibraryKinds.APPS
-private val GAME_KINDS = LibraryKinds.GAMES
+internal val APP_KINDS = LibraryKinds.APPS
+internal val GAME_KINDS = LibraryKinds.GAMES
 
 internal fun GamingSection.displayName(): String = when (this) {
     GamingSection.HOME -> "Home"
@@ -2293,9 +1906,9 @@ internal suspend fun retryEachFrame(attempts: Int, attempt: () -> Boolean, nextF
     return false
 }
 
-private const val FOCUS_ATTEMPTS = 60
+internal const val FOCUS_ATTEMPTS = 60
 
-private sealed interface GameGroup {
+internal sealed interface GameGroup {
     val key: String
     val label: String
 
@@ -2355,7 +1968,7 @@ private sealed interface GameGroup {
  * the user built themselves is custom, which here is exactly the
  * [GameGroup.Collection] whose theme folder is the custom one.
  */
-private fun GameGroup.esDeCollectionKind(): EsDeCollectionKind = when {
+internal fun GameGroup.esDeCollectionKind(): EsDeCollectionKind = when {
     this !is GameGroup.Collection -> EsDeCollectionKind.NONE
     themeFolder == AutoCollections.CUSTOM_THEME_FOLDER -> EsDeCollectionKind.CUSTOM
     else -> EsDeCollectionKind.AUTO
@@ -2367,7 +1980,7 @@ private fun GameGroup.esDeCollectionKind(): EsDeCollectionKind = when {
  * neighbour slots, the gamelist and the carousel's logos all ask for a
  * group's theme through this one key, so they share one parse.
  */
-private data class GroupThemeKey(
+internal data class GroupThemeKey(
     val systemId: String?,
     val collectionThemeFolder: String?,
     val systemFullName: String?,
@@ -2382,7 +1995,7 @@ private data class GroupThemeKey(
     )
 }
 
-private fun GameGroup.themeKey() = GroupThemeKey(
+internal fun GameGroup.themeKey() = GroupThemeKey(
     systemId = systemThemeFolder,
     collectionThemeFolder = (this as? GameGroup.Collection)?.themeFolder,
     systemFullName = label,
@@ -2406,7 +2019,7 @@ private fun GameGroup.themeKey() = GroupThemeKey(
  * [wanted] false is "no group is open": no parse, and null.
  */
 @Composable
-private fun rememberActiveTheme(group: GameGroup?, wanted: Boolean = true): dev.droidtop.library.theme.EsDeTheme? {
+internal fun rememberActiveTheme(group: GameGroup?, wanted: Boolean = true): dev.droidtop.library.theme.EsDeTheme? {
     val context = LocalContext.current
     val key = group?.themeKey() ?: GroupThemeKey(null, null, null, EsDeCollectionKind.NONE)
     val version = ThemePrefs.version
@@ -2440,7 +2053,7 @@ private fun rememberActiveTheme(group: GameGroup?, wanted: Boolean = true): dev.
  * condition the non-sliding path already checks before rendering anything.
  */
 @Composable
-private fun rememberEsDeSystemSlot(
+internal fun rememberEsDeSystemSlot(
     group: GameGroup?,
     entries: List<LibraryEntry>,
     countsOnly: Boolean,
@@ -2463,7 +2076,7 @@ private fun rememberEsDeSystemSlot(
  * Real ES-DE auto-collection ids/theme-folder names, confirmed against `CollectionSystemsManager.cpp`'s own real
  * declaration table -- not guessed.
  */
-private object AutoCollections {
+internal object AutoCollections {
     const val ALL_GAMES_ID = "all"
     const val FAVORITES_ID = "favorites"
     const val LAST_PLAYED_ID = "recent"
@@ -2496,7 +2109,7 @@ internal object CollectionsRefresh {
  * [LibraryEntry.onPcGamesTab]'s complement, so every one carries a real
  * console systemId.
  */
-private fun LibraryEntry.gameGroup(): GameGroup =
+internal fun LibraryEntry.gameGroup(): GameGroup =
     GameGroup.System(checkNotNull(systemId) { "Retro Games entries must have a console system id" })
 
 /**
@@ -2514,1580 +2127,6 @@ internal fun retroGamesSystemIds(entries: List<LibraryEntry>): List<String> =
         .mapNotNull { it.systemId }
         .distinct()
         .toList()
-
-/**
- * System-first, then per-system game grid — ES-DE's System → Game
- * hierarchy, applied both to droidtop's own engine [LibraryEntryKind]s and
- * to real console systems (see [GameGroup]). `selectedGroup == null` shows
- * the system list; picking one drills into that system's games. Back
- * (D-pad-focused "Back" card, or the controller's B/Back key) returns to
- * the system list.
- */
-@Composable
-private fun GamesSection(
-    entries: List<LibraryEntry>,
-    library: Library,
-    nav: ShellBackStack,
-    onLaunch: (LibraryEntry) -> Unit,
-    onShowDetail: (LibraryEntry) -> Unit,
-    onDrillDownChanged: (Boolean) -> Unit,
-    onFocusedEntryChanged: (LibraryEntry?) -> Unit,
-    onHelpRowClaim: (HelpRowClaim) -> Unit = {},
-    onToggleFavorite: (LibraryEntry) -> Unit = {},
-    onRequestRescan: () -> Unit = {},
-) {
-    // The in-gamelist options overlay (sort, scrape, import) -- see
-    // GamelistOptionsMenu. sortVersion invalidates the games ordering
-    // below when the overlay cycles the stored sort; scrapeVersion does
-    // the same for artwork after an in-place scrape.
-    var gamelistOptionsOpen by remember { mutableStateOf(false) }
-    var sortVersion by remember { mutableIntStateOf(0) }
-    // The focused game's own menu, from L2 or a long press on its card (Droidtop/tracker#621 M6).
-    var optionsFor by remember { mutableStateOf<LibraryEntry?>(null) }
-    val firstFocus = remember { FocusRequester() }
-    val context = LocalContext.current
-
-    // Real custom collections + membership, loaded once and refreshed
-    // whenever collectionsVersion bumps (mirrors ThemePrefs.version's own
-    // "force a real refresh, not just recomposition-by-luck" pattern) --
-    // CollectionMembershipEditor calls CollectionsRefresh.bump() after
-    // any real create/toggle.
-    var customCollections by remember { mutableStateOf<List<dev.droidtop.library.consoles.CollectionEntity>>(emptyList()) }
-    var customCollectionMembership by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
-    LaunchedEffect(CollectionsRefresh.version) {
-        customCollections = library.getCollections()
-        customCollectionMembership = library.getCollectionMembership()
-    }
-    val entriesById = remember(entries) { entries.associateBy { it.id } }
-    // Real ES-DE auto-collections -- computed on the fly, never stored
-    // (see GameGroup.Collection's own doc comment). Only shown when
-    // non-empty, same "present-and-non-empty groups" convention the
-    // real system/engine groups below already use.
-    val autoCollectionGroups = remember(entries) {
-        buildList {
-            if (entries.isNotEmpty()) add(GameGroup.Collection(AutoCollections.ALL_GAMES_ID, "All games", "auto-allgames"))
-            if (entries.any { it.favorite }) add(GameGroup.Collection(AutoCollections.FAVORITES_ID, "Favorites", "auto-favorites"))
-            if (entries.any { it.lastPlayedEpochMs != null }) add(GameGroup.Collection(AutoCollections.LAST_PLAYED_ID, "Last played", "auto-lastplayed"))
-        }
-    }
-    // One rule with PC Games (docs/SPEC.md 7g, "A store's collections"): a
-    // collection is a Retro one only while it has a Retro member, so a store's
-    // collections of PC games never show here, and it lists its Retro members only.
-    val retroMembership = remember(customCollections, customCollectionMembership) {
-        dev.droidtop.library.CollectionMembership(customCollections, customCollectionMembership)
-    }
-    val customCollectionGroups = remember(retroMembership, entriesById) {
-        dev.droidtop.library.CollectionScope.retroCollections(retroMembership) { it in entriesById }
-            .map { GameGroup.Collection(it.id, it.name, AutoCollections.CUSTOM_THEME_FOLDER) }
-    }
-    val collectionGroups = autoCollectionGroups + customCollectionGroups
-    // Real cross-cutting membership -- a game can be in several
-    // collections at once, unlike the strict system/engine partition
-    // below (see GameGroup.Collection's own doc comment).
-    val collectionGroupMembers = remember(collectionGroups, entries, retroMembership) {
-        collectionGroups.associateWith { group ->
-            when (group.id) {
-                AutoCollections.ALL_GAMES_ID -> entries
-                AutoCollections.FAVORITES_ID -> entries.filter { it.favorite }
-                AutoCollections.LAST_PLAYED_ID -> entries
-                    .filter { it.lastPlayedEpochMs != null }
-                    .sortedByDescending { it.lastPlayedEpochMs }
-                    .take(AutoCollections.LAST_PLAYED_LIMIT)
-                else -> dev.droidtop.library.CollectionScope.retroMembers(group.id, retroMembership, entriesById)
-            }
-        }
-    }
-    // Present-and-non-empty groups -- engines first (in GAME_KINDS'
-    // declaration order), then real console systems (alphabetical by
-    // display name) -- hoisted so both the system-list view and the
-    // per-system grid view share one ordering (needed for ES-DE-style
-    // Left/Right sibling-system switching below).
-    val byGroup = entries.filter { it.systemId != null }.groupBy { it.gameGroup() }
-    // Keyed on the platform database's load version as well as the
-    // groups: labels resolve through its cache, which warms on a
-    // background thread -- sorting before the warm lands used raw
-    // system ids and froze "switch" at the end of the carousel
-    // (observed live) instead of "Nintendo Switch" among the Nintendos.
-    val platformsLoadVersion by dev.droidtop.library.consoles.PlatformsDatabase.loadVersion.collectAsState()
-    val orderedSystemGroups = remember(entries, platformsLoadVersion) {
-        retroGamesSystemIds(entries).map { GameGroup.System(it) }.sortedBy { it.label.lowercase() }
-    }
-    // Carousel order, per direction (2026-08-31): "All games" leads
-    // straight into the real systems -- Favorites/Last played/custom
-    // collections were wedged between them, which meant scrolling past
-    // chrome to reach content. They trail at the end instead.
-    val leadingCollections = collectionGroups.filter { it.id == AutoCollections.ALL_GAMES_ID }
-    val trailingCollections = collectionGroups.filterNot { it.id == AutoCollections.ALL_GAMES_ID }
-    val orderedGroups: List<GameGroup> =
-        leadingCollections + orderedSystemGroups + trailingCollections
-
-    // WHERE the shell is, asked rather than owned (see ShellBackStack):
-    // this screen is rebuilt from scratch every time something else is
-    // drawn over it, so a group it remembered itself would be lost every
-    // time a game detail opened.
-    val selectedGroup = orderedGroups.firstOrNull { it.key == nav.groupKey }
-    val selectGroup: (GameGroup?) -> Unit = { group -> nav.openGroup(group?.key) }
-    // Real per-game navigation index for the drilled-into-a-system
-    // "gamelist" screen, ONLY used when the active theme's own real
-    // gamelist view has no <carousel>/<grid>/<textlist> of its own to
-    // delegate D-pad focus-tracking to (DEcaffe's real gamelist view is
-    // exactly this case -- see EsDeThemeView.primaryListElement's own
-    // updated doc comment). Reset whenever the drilled-into system
-    // changes, matching real ES-DE's own "selection resets per gamelist"
-    // convention.
-    val selectedGroupLabel = selectedGroup?.label
-    val gamelistTheme = rememberActiveTheme(selectedGroup, wanted = selectedGroup != null)
-    // Real navigation-sound (re)binding -- <sound> elements are parsed
-    // like any other themed element (declared under the special `all`
-    // view, expanded into system+gamelist by the parser), so whichever
-    // theme parse this screen just loaded carries the current sound set.
-    // Keyed on the theme object itself: reparses for a different focused
-    // system rebind to identical paths (cache hits, see
-    // EsDeNavigationSounds.load's own doc comment).
-    LaunchedEffect(gamelistTheme) { EsDeNavigationSounds.load(gamelistTheme) }
-    val gamelistView = gamelistTheme?.views?.get("gamelist")
-    val gamelistHasListWidget = remember(gamelistView) { gamelistView?.primaryListElement() != null }
-    // Alphabetical -- real ES-DE's own default gamelist sort order, and a
-    // real, stable Up/Down order for the headless (no list widget) case
-    // below, unlike allGames' own natural Library order.
-    // The group's own filter and sort: the same query model, sheets and
-    // remembered state every library list uses (docs/SPEC.md 7j). The
-    // stored view is read once per group and written back, both off the
-    // main thread (PersistQuery).
-    val retroScope = remember(selectedGroup?.label) { retroQueryScope(selectedGroup?.label.orEmpty()) }
-    // Real ES-DE's Last Played collection opens in recency order, the one list where A to Z would defeat its
-    // purpose; the person can still pick another sort and it is remembered like any list's.
-    val retroDefault = remember(selectedGroup) {
-        if ((selectedGroup as? GameGroup.Collection)?.id == AutoCollections.LAST_PLAYED_ID) {
-            LibraryQuery(sort = dev.droidtop.shell.gamepad.query.LibrarySortKey.RECENT)
-        } else {
-            LibraryQuery()
-        }
-    }
-    // The default draws until the stored view, read off the main thread, lands.
-    var retroQuery by remember(retroScope.id) { mutableStateOf(retroDefault) }
-    var retroQueryLoaded by remember(retroScope.id) { mutableStateOf(false) }
-    PersistQuery(retroScope.id, retroQuery, retroQueryLoaded, default = retroDefault) {
-        retroQuery = it
-        retroQueryLoaded = true
-    }
-    val retroSaved = rememberSavedViews(retroScope.id)
-    val retroBase = remember(entries, selectedGroup, collectionGroupMembers) {
-        when (val group = selectedGroup) {
-            null -> emptyList()
-            // A collection's members are not a system's games: its own list, through the same model.
-            is GameGroup.Collection -> collectionGroupMembers[group].orEmpty()
-            else -> entries.filter { it.gameGroup() == group }
-        }
-    }
-    var retroSortOpen by remember { mutableStateOf(false) }
-    var retroFilterOpen by remember { mutableStateOf(false) }
-    val systemGamesBeforeSearch = remember(selectedGroup, sortVersion, retroQuery, retroScope, retroBase) {
-        // The stored per-group sort and filter: NAME by default, which is real ES-DE's own gamelist
-        // default, and no filter. A collection is a list like any other.
-        if (selectedGroup == null) emptyList() else retroQuery.applyTo(retroBase, retroScope)
-    }
-    // The console gamelist's search (Select menu -> Search, the shared
-    // LibrarySearchDialog, docs/SPEC.md 12a "Search fan-out"): narrows the
-    // list by the one shared text rule.
-    var gamelistSearchText by remember(selectedGroup) { mutableStateOf("") }
-    val systemGamesForGroup = remember(systemGamesBeforeSearch, gamelistSearchText) {
-        if (gamelistSearchText.isBlank()) {
-            systemGamesBeforeSearch
-        } else {
-            systemGamesBeforeSearch.filter { dev.droidtop.shell.gamepad.query.matchesSearchText(it, gamelistSearchText) }
-        }
-    }
-    // Which game the gamelist is on. Restored from the stack, so coming
-    // back from a game's detail lands on that game rather than at the top
-    // of the list; 0 -- ES-DE's own "selection resets per gamelist" -- for
-    // a group this session has not been in.
-    var focusedGameIndex by remember(selectedGroup) {
-        mutableStateOf(systemGamesForGroup.indexOfFirst { it.id == nav.focusHere }.coerceAtLeast(0))
-    }
-    if (gamelistOptionsOpen) {
-        val group = selectedGroup
-        run {
-            GamelistOptionsMenu(
-                // An empty key is the library scope: no group is open.
-                groupKey = group?.label.orEmpty(),
-                groupLabel = group?.label ?: "Library",
-                systemId = (group as? GameGroup.System)?.systemId,
-                // A finished scrape/import refreshes the REAL library
-                // scan -- cached rows now live-resolve media, so the
-                // refresh is what makes new art visible immediately.
-                onScraped = {
-                    sortVersion += 1
-                    onRequestRescan()
-                },
-                onDismiss = { gamelistOptionsOpen = false },
-                games = systemGamesForGroup,
-                searchText = gamelistSearchText,
-                totalGames = systemGamesBeforeSearch.size,
-                onSearchTextChange = if (group == null) null else { text ->
-                    gamelistSearchText = text
-                    focusedGameIndex = 0
-                },
-                onJumpTo = { index ->
-                    focusedGameIndex = index.coerceIn(0, (systemGamesForGroup.lastIndex).coerceAtLeast(0))
-                },
-                onOpenSort = if (group == null) null else ({ retroSortOpen = true }),
-                onOpenFilter = if (group == null) null else ({ retroFilterOpen = true }),
-            )
-        }
-    }
-    if (retroSortOpen) {
-        LibrarySortSheet(
-            scope = retroScope,
-            query = retroQuery,
-            onQueryChange = {
-                retroQuery = it
-                focusedGameIndex = 0
-            },
-            onDismiss = { retroSortOpen = false },
-        )
-    }
-    if (retroFilterOpen) {
-        LibraryFilterSheet(
-            scope = retroScope,
-            base = retroBase,
-            query = retroQuery,
-            savedViews = retroSaved.views,
-            onQueryChange = {
-                retroQuery = it
-                focusedGameIndex = 0
-            },
-            onSaveView = { retroSaved.save(it, retroQuery) },
-            onForgetView = { retroSaved.forget(it) },
-            onSearch = null,
-            onDismiss = { retroFilterOpen = false },
-        )
-    }
-
-    // Real, unified themed-gamelist condition -- ONE real render path
-    // below handles ANY theme with a real "gamelist" view, whether or not
-    // it declares its own <carousel>/<grid>/<textlist>
-    // (gamelistHasListWidget is an internal detail EsDeThemedView/
-    // EsDeSystemListView already decide for themselves, exactly like the
-    // system-list screen's own carousel/grid/textlist dispatch -- NOT a
-    // droidtop-level "which theme is this" branch. Two real themes
-    // (DEcaffe: no widget: Art Book Next: real <textlist>/<grid>) already
-    // confirm both real shapes render correctly through this one path;
-    // an arbitrary third-party theme should too, since nothing here is
-    // keyed off theme identity, only off what the theme itself declares.
-    // The OLD hand-built grid is only the real fallback for "no active
-    // theme" or "the loaded theme genuinely has no gamelist view at all"
-    // (invalid for a real ES-DE theme, but a real crash-guard, not a
-    // normal case).
-    val hasThemedGamelist = gamelistView != null
-    // Real EsDeListItem per game, only built when actually needed (the
-    // widget-driven render path) -- boxart as the item's "logo" image,
-    // no item count (a real game has none, unlike a system group).
-    // onSelect matches the system-list screen's own real convention (A
-    // activates the focused item) -- launching directly on select, since
-    // a themed gamelist view has no separate "drill in further" step the
-    // way the system list's onSelect (open this system) does.
-    // Keyed on the group too: whether a game shows its own system as a
-    // suffix depends on whether the list being shown IS a collection.
-    val inCollectionGamelist = selectedGroup is GameGroup.Collection
-    // A theme whose list does not name the source system (its own `systemNameSuffix` off, or no list
-    // widget at all) would show the same title for two systems as two identical rows (tracker#497).
-    val themeNamesSystem = gamelistView?.primaryListElement()?.let { it.boolOrNull("systemNameSuffix") ?: true } ?: false
-    val gamelistWidgetItems = remember(systemGamesForGroup, inCollectionGamelist, themeNamesSystem) {
-        val labels = if (inCollectionGamelist && !themeNamesSystem) {
-            dev.droidtop.library.theme.esDeDisambiguatedTitles(
-                systemGamesForGroup.map { it.title },
-                systemGamesForGroup.map { it.systemId },
-            )
-        } else {
-            systemGamesForGroup.map { it.title }
-        }
-        systemGamesForGroup.mapIndexed { index, entry ->
-            EsDeListItem(
-                key = entry.id,
-                label = labels[index],
-                logoPath = entry.artworkUri,
-                // A opens the game's details, where Play is (Droidtop/tracker#641).
-                onSelect = { onShowDetail(entry) },
-                // Lets a themed carousel/grid honour its own real
-                // <imageType> for this game instead of always drawing the
-                // one pre-resolved artwork. Coordinates only, no I/O here.
-                mediaLocator = entry.mediaLocator,
-                // Real ES-DE textlist indicators: a favorite game gets a
-                // leading marker before its name in a gamelist.
-                favorite = entry.favorite,
-                // Real `systemNameSuffix`: inside a COLLECTION's gamelist
-                // every game names the system it really comes from
-                // (GamelistBase.cpp:789-806). Outside one this stays null,
-                // which is ES-DE's own `isCollection` guard.
-                // ES-DE appends the SHORT system name here
-                // (getSourceFileData()->getSystem()->getName(), e.g.
-                // "megadrive"), which is what systemId is.
-                sourceSystemName = if (inCollectionGamelist) entry.systemId else null,
-            )
-        }
-    }
-    LaunchedEffect(selectedGroup, hasThemedGamelist, focusedGameIndex) {
-        // Real regardless of whether the theme's gamelist has its own
-        // list widget -- a widget's onFocusedIndexChanged (wired at the
-        // render call site below) updates the exact same focusedGameIndex
-        // state the headless case's own Up/Down handling uses.
-        // PC and engine games go through this same themed gamelist
-        // (docs/SPEC.md 7i, revised 2026-09-26).
-        if (hasThemedGamelist) {
-            val focused = systemGamesForGroup.getOrNull(focusedGameIndex)
-            onFocusedEntryChanged(focused)
-            // What to come back to. Recorded as the user moves, not only
-            // when they open something, so B out of a detail and B out of
-            // the gamelist agree about where they were.
-            nav.rememberFocus(systemGamesForGroup.getOrNull(focusedGameIndex)?.id)
-        }
-    }
-    LaunchedEffect(selectedGroup, hasThemedGamelist, nav.optionsOpen) {
-        onDrillDownChanged(selectedGroup != null)
-        if (selectedGroup != null) {
-            // A THEMED view lays the help row out itself, at its own
-            // <helpsystem> position or -- declaring none -- at ES-DE's own
-            // default for that component, which exists whether a theme
-            // styles it or not (HelpComponent.cpp:23-27). So the claim is
-            // about the canvas, not about the element: it is what stops the
-            // shell putting its bar in a strip BELOW a themed canvas and
-            // shortening the canvas to fit (rig, build 548). The
-            // hand-built grid (the fallback for "no active theme" / "theme
-            // has no real gamelist view at all") is not a themed canvas and
-            // keeps the shell's bar in the column.
-            onHelpRowClaim(
-                when {
-                    // A group's own options screen (ShellBackStack.Options,
-                    // a level above the group) is a plain droidtop screen
-                    // drawn over the group: it has no row of its own, so
-                    // the shell's bar draws there -- and its B hint is the
-                    // only touch route out.
-                    nav.optionsOpen -> HelpRowClaim.NONE
-                    hasThemedGamelist -> HelpRowClaim.THEME
-                    else -> HelpRowClaim.NONE
-                },
-            )
-        }
-    }
-
-    // System-back route for the drill-up: on this hardware B doubles as
-    // KEYCODE_BACK, which Android delivers through the back DISPATCHER
-    // (Activity back), not as a key event any composable sees, so the
-    // onKeyEvent branch below never receives it. BackHandler registers on
-    // the dispatcher so B drills up instead of finishing the Activity;
-    // composed
-    // deeper than GamepadShell's own root swallow, so it wins while a
-    // group is open.
-    androidx.activity.compose.BackHandler(enabled = selectedGroup != null) {
-        // Real ES-DE back sound (GamelistBase.cpp:144/156 -- leaving a
-        // gamelist for the system view plays BACKSOUND) -- this dispatcher
-        // route and the onKeyEvent branch below are the same real drill-up,
-        // just different hardware paths (see this handler's own comment).
-        EsDeNavigationSounds.play(UiSound.BACK)
-        // One level at a time: a group's own options screen is above the
-        // group, so back leaves THAT first.
-        nav.back()
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            // The shoulders mean "switch system" at this level and "switch
-            // section" above it; inside a screen opened from the group they
-            // mean nothing, so they never reach the group or tab under that
-            // screen (rig, build 549). Taken before
-            // anything below sees them.
-            .onPad(preview = true) { press ->
-                nav.optionsOpen && (press.action == GamepadAction.L || press.action == GamepadAction.R)
-            }
-            // B is not here: it is the back dispatcher's, through the shell's
-            // root, and this group's BackHandler above is the one that answers
-            // it -- one route for the pad's B and the system back key alike
-            // (SPEC 6e). The guard this handler kept against the release of a
-            // B that had closed the options screen above it is gone with it:
-            // a release belongs to the press that began it.
-            .onPad(cadence = PadCadence.THEMED_LIST) { press ->
-                // A screen opened FROM the group owns its own presses while
-                // it is up.
-                if (nav.optionsOpen) return@onPad false
-                val group = selectedGroup
-                val themed = hasThemedGamelist
-                val headless = group != null && themed && !gamelistHasListWidget &&
-                    systemGamesForGroup.isNotEmpty()
-                when (press.action) {
-                    // Gamelist options (sort/scrape/import) right where the
-                    // user is -- the ES-DE GuiGamelistOptions PATTERN in
-                    // droidtop's own placement (Select; the Quick Menu is R2
-                    // or a held Select). A system's gamelist gets sort/
-                    // scrape/import, the carousel the library-wide actions.
-                    GamepadAction.SELECT -> {
-                        gamelistOptionsOpen = true
-                        true
-                    }
-                    // ES-DE's "General navigation": Left/Right inside a
-                    // gamelist jumps to the adjacent system's gamelist, with
-                    // ES-DE's quicksysselect sound (ViewController.cpp:718/
-                    // 728). The shoulders mean switch section everywhere
-                    // (owner, 2026-09-27), so they fall through to the root.
-                    GamepadAction.LEFT, GamepadAction.RIGHT -> {
-                        if (group == null || orderedGroups.size <= 1) return@onPad false
-                        EsDeNavigationSounds.play(UiSound.TAB)
-                        val index = orderedGroups.indexOf(group)
-                        val step = if (press.action == GamepadAction.LEFT) -1 else 1
-                        selectGroup(orderedGroups[(index + step + orderedGroups.size) % orderedGroups.size])
-                        true
-                    }
-                    // Headless per-game navigation, only when the theme's
-                    // gamelist has no list widget of its own to own the
-                    // cursor. Clamped (tracker#1): ES-DE's textlist pauses
-                    // at its ends, and wrapping here read as "Up escaped the
-                    // list". ES-DE's scroll sound (GamelistBase.cpp:133).
-                    GamepadAction.UP, GamepadAction.DOWN -> {
-                        if (!headless) return@onPad false
-                        val next = (focusedGameIndex + if (press.action == GamepadAction.UP) -1 else 1)
-                            .coerceIn(0, systemGamesForGroup.size - 1)
-                        if (next != focusedGameIndex) EsDeNavigationSounds.play(UiSound.MOVE)
-                        focusedGameIndex = next
-                        true
-                    }
-                    GamepadAction.A -> headless && systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onShowDetail(it) } != null
-                    // Y/Info, with or without a list widget.
-                    GamepadAction.Y -> group != null && themed &&
-                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onShowDetail(it) } != null
-                    // X/favourite, with or without a list widget.
-                    GamepadAction.X -> group != null && themed &&
-                        systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onToggleFavorite(it) } != null
-                    else -> false
-                }
-            },
-    ) {
-        // Real ES-DE view transitions (ViewController.cpp:664-1010,
-        // chosen per transition kind by ThemeData::setThemeTransitions at
-        // :1042-1120). droidtop cut between the system view and a gamelist
-        // no matter what the theme asked for; decaffe's own default
-        // profile fades both ways, and twelve of the fifteen themes
-        // measured for this pass declare a profile of some kind.
-        //
-        // The animation depends on WHICH transition this is, so the
-        // animated state is the selected group itself rather than a
-        // boolean: the outgoing content has to keep rendering the group it
-        // was showing while it leaves.
-        val esDeTransitions = remember(ThemePrefs.version) { ThemeAssets.activeTransitions(context) }
-        // Which of ES-DE's six transitions the move currently on screen
-        // is, which is what both of the transition-time element
-        // behaviours turn on. The pair of endpoints is plain bookkeeping,
-        // not state: it is read in the same composition that changes it
-        // and never needs to trigger one of its own.
-        val groupHistory = remember { EsDeGroupHistory() }
-        if (groupHistory.current != selectedGroup) {
-            groupHistory.previous = groupHistory.current
-            groupHistory.current = selectedGroup
-        }
-        val transitionKind = esDeTransitionKind(groupHistory.previous, groupHistory.current)
-        val transitionAnimation = esDeTransitions[transitionKind] ?: EsDeTransitionAnimation.INSTANT
-        val transitionTowardsGamelist = groupHistory.previous == null && groupHistory.current != null
-        androidx.compose.animation.AnimatedContent(
-            targetState = selectedGroup,
-            // Both views are full-screen; without this the animated
-            // container would wrap its content instead of owning the
-            // screen a themed full-bleed background needs.
-            modifier = Modifier.fillMaxSize(),
-            transitionSpec = {
-                val towardsGamelist = initialState == null && targetState != null
-                val kind = esDeTransitionKind(initialState, targetState)
-                esDeViewTransition(
-                    esDeTransitions[kind] ?: EsDeTransitionAnimation.INSTANT,
-                    towardsGamelist = towardsGamelist,
-                )
-            },
-            label = "ES-DE view transition",
-        ) { group ->
-            // One context for every themed element below: what this copy
-            // of the view is doing right now. See EsDeTransitionContext.
-            val esDeTransition = esDeTransitionContext(
-                kind = transitionKind,
-                animation = transitionAnimation,
-                towardsGamelist = transitionTowardsGamelist,
-                outgoing = group != selectedGroup,
-            )
-            if (group == null) {
-                val continuePlaying = entries.filter { it.lastPlayedEpochMs != null }.sortedByDescending { it.lastPlayedEpochMs }
-                // NOTE: the focus request for this screen lives INSIDE the
-                // render branch below, where whether firstFocus will actually
-                // ATTACH to anything is knowable (see its own comment). A
-                // theme whose system view declares no carousel/grid/textlist
-                // (ES-DWEE) gives the requester nothing to attach to.
-                if (entries.isEmpty()) {
-                    // An empty library offers the one thing that fills it,
-                    // never a sentence with nothing to press
-                    // (Droidtop/tracker#172): the same Game folders screen
-                    // Settings and the Launcher's games grid open, drawn in
-                    // place. CatalogNavigator owns its own B, so B leaves it.
-                    val foldersScreen = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(GAME_FOLDERS_SCREEN_ID) }
-                    var addingFolders by remember { mutableStateOf(false) }
-                    if (addingFolders && foldersScreen != null) {
-                        // The footer promises what this page does: A selects, B leaves it. Without this it kept
-                        // the Games tab's own Options hint, which opens nothing over an empty library (#537).
-                        Box(Modifier.fillMaxSize().declaresHints(EMPTY_FOLDERS_HINTS)) {
-                            CatalogNavigator(root = foldersScreen, onExit = { addingFolders = false })
-                        }
-                    } else {
-                        // The one empty state of a games place (Droidtop/tracker#533).
-                        EmptyLibrary(
-                            line = "No games yet",
-                            actionLabel = "Add a folder",
-                            onAction = { if (foldersScreen != null) addingFolders = true },
-                            onChanged = onRequestRescan,
-                        )
-                    }
-                } else {
-                    // Box, not Column: EsDeThemedView needs to genuinely fill
-                    // the whole screen (a real full-bleed background image is
-                    // one of its own themed elements) -- a Column sibling would
-                    // have measured it against the Column's remaining-height
-                    // constraint and clipped/overlapped continuePlaying instead,
-                    // the same class of sizing bug fillMaxSize itself just
-                    // fixed at the EsDeThemedView call site below. continuePlaying
-                    // renders on top, anchored to the top -- the reference
-                    // theme has no equivalent concept, so this is droidtop's
-                    // own addition layered over the theme rather than part of it.
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        val context = LocalContext.current
-                        // Real per-system metadata (systemName/systemManufacturer/
-                        // systemReleaseYear/...) needs a theme parsed with the
-                        // CURRENTLY FOCUSED system's own ${system.theme}
-                        // substituted -- see ThemeAssets.loadActiveTheme's own
-                        // doc comment for why this can't be one static parse.
-                        // focusedSystemIndex is fed by EsDeThemedView's own
-                        // onFocusedIndexChanged, driven by whichever carousel
-                        // item actually has focus right now.
-                        // Starts on the system the person came from when they
-                        // press Back out of its gamelist (this branch is rebuilt
-                        // every time), found by id in the current carousel so a
-                        // rescan that reorders the cards cannot move it
-                        // (Droidtop/tracker#642).
-                        val restoredSystemIndex = remember {
-                            restoredFocusIndex(orderedGroups.map { it.key }, nav.focusHere)
-                        }
-                        var focusedSystemIndex by remember { mutableStateOf(restoredSystemIndex) }
-                        // ES-DE's system-to-system FADE (SystemView.cpp:
-                        // 447-458): the element layer fades to black over
-                        // the first fifth of the animation, holds, swaps
-                        // the system underneath at the midpoint and fades
-                        // back in -- the carousel itself keeps moving
-                        // throughout, which is why the swap is a second,
-                        // delayed index rather than the one the carousel
-                        // reads. With any other animation the element
-                        // layer follows the carousel immediately, as it
-                        // always has.
-                        val systemToSystem = esDeTransitions[EsDeViewTransition.SYSTEM_TO_SYSTEM]
-                            ?: EsDeTransitionAnimation.INSTANT
-                        var elementSystemIndex by remember { mutableStateOf(focusedSystemIndex) }
-                        val systemFadeOpacity = remember { Animatable(0f) }
-                        LaunchedEffect(focusedSystemIndex, systemToSystem) {
-                            if (systemToSystem != EsDeTransitionAnimation.FADE ||
-                                elementSystemIndex == focusedSystemIndex
-                            ) {
-                                elementSystemIndex = focusedSystemIndex
-                                systemFadeOpacity.snapTo(0f)
-                            } else {
-                                launch {
-                                    systemFadeOpacity.animateTo(
-                                        0f,
-                                        esDeSystemFadeSpec(systemFadeOpacity.value),
-                                    )
-                                }
-                                delay(ES_DE_SYSTEM_FADE_MS / 2)
-                                elementSystemIndex = focusedSystemIndex
-                            }
-                        }
-                        val focusedGroup = orderedGroups.getOrNull(elementSystemIndex)
-                        val focusedGroupLabel = focusedGroup?.label
-                        val theme = rememberActiveTheme(focusedGroup)
-                        // Same real navigation-sound rebinding as the gamelist
-                        // screen's own hook (see that LaunchedEffect's comment)
-                        // -- this is the site that runs FIRST after app start /
-                        // a live theme switch, so sounds bind before any
-                        // gamelist is ever entered.
-                        LaunchedEffect(theme) { EsDeNavigationSounds.load(theme) }
-                        val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
-                        // Every group's theme parse, and the carousel logo
-                        // read out of it, worked out in the background, never
-                        // in composition and never again on every library
-                        // publish. Keyed on the groups' theme keys, not on
-                        // the group list, which is a new list on every
-                        // publish of a walk. Each logo lands as its group is
-                        // done; until then that group draws its name, which
-                        // is what a logo-less system draws anyway. The same
-                        // loop warms the parse cache rememberActiveTheme
-                        // reads, so moving to another system or opening its
-                        // gamelist does not parse.
-                        val groupThemeKeys = remember(orderedGroups) {
-                            orderedGroups.map { it.key to it.themeKey() }
-                        }
-                        var logos by remember { mutableStateOf<Map<String, String?>>(emptyMap()) }
-                        LaunchedEffect(groupThemeKeys, ThemePrefs.version) {
-                            for ((groupKey, themeKey) in groupThemeKeys) {
-                                val logo = withContext(Dispatchers.Default) {
-                                    if (themeKey.systemId == null) null
-                                    else themeKey.load(context)?.let { ThemeAssets.systemLogoPath(it) }
-                                }
-                                logos = logos + (groupKey to logo)
-                            }
-                        }
-                        // remember(): the carousel recomposes every
-                        // animation frame, and this list only changes with
-                        // the groups or their logos.
-                        val items = remember(orderedGroups, logos) {
-                            orderedGroups.map { entryGroup ->
-                                EsDeListItem(
-                                    key = entryGroup.key,
-                                    label = entryGroup.label,
-                                    logoPath = logos[entryGroup.key],
-                                    // Real `letterCaseAutoCollections` /
-                                    // `letterCaseCustomCollections`: ES-DE cases a
-                                    // collection's own name by which KIND of
-                                    // collection it is (SystemView.cpp:835-849).
-                                    collectionKind = entryGroup.esDeCollectionKind(),
-                                    // Real ES-DE select sound -- entering a
-                                    // system from the system view plays
-                                    // SELECTSOUND (SystemView.cpp:129).
-                                    onSelect = {
-                                        EsDeNavigationSounds.play(UiSound.CONFIRM)
-                                        selectGroup(entryGroup)
-                                    },
-                                )
-                            }
-                        }
-                        // The theme drives this whole screen's layout. The
-                        // carousel/grid/textlist is positioned at the theme's
-                        // own pos/size (see EsDeThemedView's own doc comment)
-                        // alongside every other themed element (background
-                        // art, info text, help icons), composited together by
-                        // z-index. fillMaxSize lets a full-bleed background
-                        // image cover the whole screen. There is no separate
-                        // "Systems" label: the theme's own carousel title
-                        // treatment says what is selected, matching the
-                        // reference theme.
-                        // The real games backing whichever system the carousel
-                        // currently has focus on -- feeds EsDeThemedView's own
-                        // gameselector-driven elements (screen2's game-preview
-                        // poster, the game1..game9 mosaic, the metadata-bound
-                        // title caption).
-                        // A function of the GROUP, not of the focused one:
-                        // while the element layer slides between systems it
-                        // draws the neighbours too, each bound to its own
-                        // system's games (SystemView.cpp's mSystemElements is
-                        // parsed and fed per system).
-                        //
-                        // byGroup only partitions system groups --
-                        // a Collection's members live in collectionGroupMembers
-                        // (cross-cutting, see GameGroup.Collection's own doc
-                        // comment). Reading byGroup for a collection returned
-                        // an empty list, which showed up on-device as
-                        // "0 games (0 favorites)" in the themed gamecount strip
-                        // and an empty game-preview for every collection.
-                        fun entriesOf(entryGroup: GameGroup?): List<LibraryEntry> = when (entryGroup) {
-                            null -> emptyList()
-                            is GameGroup.Collection -> collectionGroupMembers[entryGroup].orEmpty()
-                            else -> byGroup[entryGroup].orEmpty()
-                        }
-                        // Real ES-DE special case (SystemView.cpp's own
-                        // favoriteSystem/recentSystem flags): those two
-                        // auto-collections show a bare game count.
-                        fun countsOnly(entryGroup: GameGroup?): Boolean =
-                            (entryGroup as? GameGroup.Collection)?.id
-                                ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true
-                        val focusedSystemEntries = entriesOf(orderedGroups.getOrNull(elementSystemIndex))
-                        // The hints this screen can keep (docs/SPEC.md 7j: a hint
-                        // row promises only what dispatches). No Y: on the
-                        // carousel nothing is focused that has info -- Y acts on
-                        // a focused GAME, in a gamelist or on a card -- and the
-                        // row said "Info" to a button that did nothing (UI pass
-                        // 2026-09-24, screenshots 01/06). No shoulder either: L1/R1
-                        // never switch sections (docs/SPEC.md 7j, "Gaming controls"),
-                        // and nothing here is a tab strip they could step.
-                        val systemListHints = listOf(
-                            GamepadAction.A to "Select",
-                        )
-                        val systemView = theme?.views?.get("system")
-                        // Same rule as the gamelist's own claim above: a
-                        // themed canvas lays the help row out itself,
-                        // whether or not this theme styles <helpsystem>.
-                        val themedSystemView = systemView != null
-                        LaunchedEffect(themedSystemView) {
-                            onHelpRowClaim(if (themedSystemView) HelpRowClaim.THEME else HelpRowClaim.NONE)
-                        }
-                        // Crash boundary (a downloaded community theme,
-                        // ES-DWEE): firstFocus only ATTACHES when a list widget
-                        // composes with at least one item. The themed path
-                        // does that only when the theme's system view declares
-                        // a carousel/grid/textlist; the fallback path always
-                        // does. Requesting focus on an unattached
-                        // FocusRequester can throw IllegalStateException, so
-                        // the request is gated on the attachment condition and
-                        // also guarded: a theme must never be able to kill the
-                        // app.
-                        val willAttachFocus = items.isNotEmpty() &&
-                            (systemView == null || systemView.primaryListElement() != null)
-                        LaunchedEffect(willAttachFocus, systemView) {
-                            if (willAttachFocus) {
-                                requestFocusWhenAttached(firstFocus, "System list")
-                            }
-                        }
-                        if (systemView != null) {
-                            // Real ES-DE systembrowse sound: moving the
-                            // system carousel plays SYSTEMBROWSESOUND
-                            // (CarouselComponent.h:108-110 -- the primary
-                            // component's own scroll plays systembrowse
-                            // when NOT hosted in a gamelist, scroll when it
-                            // is). Guarded on a real index CHANGE: this
-                            // callback also fires for the initial focus
-                            // attach, which is not a browse.
-                            val onSystemFocused: (Int) -> Unit = {
-                                if (it != focusedSystemIndex) EsDeNavigationSounds.play(UiSound.SYSTEM)
-                                focusedSystemIndex = it
-                            }
-                            val systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
-                                name = focusedGroupLabel,
-                                gameCount = focusedSystemEntries.size,
-                                favoriteCount = focusedSystemEntries.count { it.favorite },
-                                countsOnly = countsOnly(focusedGroup),
-                            )
-                            // ES-DE's system-to-system SLIDE
-                            // (SystemView.cpp:1565-1745): the element layer
-                            // does not swap between systems, it travels. Each
-                            // system's elements are drawn at their own
-                            // distance from the carousel's continuous camera
-                            // offset, so the neighbours slide in from the
-                            // sides while the carousel scrolls; the carousel
-                            // itself, and the window-level clock, status bar
-                            // and help bar, stay put (:204, :255). That needs
-                            // the view drawn in separate passes, which is the
-                            // one shape this branch has that the others do
-                            // not.
-                            val slidingSystems = systemToSystem == EsDeTransitionAnimation.SLIDE &&
-                                orderedGroups.size > 1
-                            val camOffset = remember { mutableFloatStateOf(0f) }
-                            val slideHorizontal = remember(listElement) {
-                                EsDeSystemSlide.slidesHorizontally(listElement?.type, listElement.strOrNull("type"))
-                            }
-                            val systemSlot: @Composable (Int) -> EsDeSystemSlot? = { index ->
-                                val slotGroup = orderedGroups.getOrNull(index)
-                                rememberEsDeSystemSlot(
-                                    group = slotGroup,
-                                    entries = entriesOf(slotGroup),
-                                    countsOnly = countsOnly(slotGroup),
-                                )
-                            }
-                            if (slidingSystems) {
-                                EsDeSystemElementLayer(
-                                    layer = EsDeViewLayer.BELOW_PRIMARY,
-                                    camOffset = camOffset,
-                                    systemCount = orderedGroups.size,
-                                    slideHorizontal = slideHorizontal,
-                                    backgroundDimmed = gamelistOptionsOpen,
-                                    transition = esDeTransition,
-                                    slot = systemSlot,
-                                )
-                                EsDeThemedView(
-                                    view = systemView,
-                                    items = items,
-                                    firstItemFocus = firstFocus,
-                                    modifier = Modifier.fillMaxSize(),
-                                    onFocusedIndexChanged = onSystemFocused,
-                                    initialFocusIndex = restoredSystemIndex,
-                                    focusedSystemEntries = focusedSystemEntries,
-                                    systemContext = systemContext,
-                                    backgroundDimmed = gamelistOptionsOpen,
-                                    transition = esDeTransition,
-                                    layer = EsDeViewLayer.PRIMARY,
-                                    onCamOffsetChanged = { camOffset.floatValue = it },
-                                )
-                                EsDeSystemElementLayer(
-                                    layer = EsDeViewLayer.ABOVE_PRIMARY,
-                                    camOffset = camOffset,
-                                    systemCount = orderedGroups.size,
-                                    slideHorizontal = slideHorizontal,
-                                    backgroundDimmed = gamelistOptionsOpen,
-                                    transition = esDeTransition,
-                                    slot = systemSlot,
-                                )
-                                // Drawn last and never moved, which is where
-                                // ES-DE draws them from: the focused system's
-                                // own clock, status bar and help bar are handed
-                                // to the Window (SystemView.cpp:255).
-                                EsDeThemedView(
-                                    view = systemView,
-                                    items = emptyList(),
-                                    firstItemFocus = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    focusedSystemEntries = focusedSystemEntries,
-                                    hints = systemListHints,
-                                    systemContext = systemContext,
-                                    backgroundDimmed = gamelistOptionsOpen,
-                                    transition = esDeTransition,
-                                    layer = EsDeViewLayer.WINDOW,
-                                )
-                            } else {
-                                EsDeThemedView(
-                                    view = systemView,
-                                    items = items,
-                                    firstItemFocus = firstFocus,
-                                    modifier = Modifier.fillMaxSize(),
-                                    onFocusedIndexChanged = onSystemFocused,
-                                    initialFocusIndex = restoredSystemIndex,
-                                    focusedSystemEntries = focusedSystemEntries,
-                                    hints = systemListHints,
-                                    systemContext = systemContext,
-                                    // droidtop's own real equivalent of ES-DE's
-                                    // Window::isBackgroundDimmed -- the options
-                                    // menu is a Compose Dialog drawn over this
-                                    // view with a scrim, so the theme's own
-                                    // helpsystem *Dimmed variants apply while it
-                                    // is open. See EsDeThemedHelpSystem.
-                                    backgroundDimmed = gamelistOptionsOpen,
-                                    transition = esDeTransition,
-                                    systemFadeOpacity = systemFadeOpacity.value,
-                                )
-                            }
-                            // NO droidtop chrome over a themed screen: the
-                            // "Continue Playing" overlay sat directly on top of
-                            // decaffe's own real metadata sidebar (and collided
-                            // on every other real theme tested) -- a themed view
-                            // owns its whole surface, same as real ES-DE. The
-                            // row stays on the unthemed fallback below, which IS
-                            // droidtop's own surface. (docs/SPEC.md §7f's
-                            // "needs real per-theme-aware safe-zone placement"
-                            // note is resolved by this simpler decision:
-                            // themed screens get no overlay at all.)
-                        } else {
-                            EsDeSystemListView(
-                                element = listElement,
-                                items = items,
-                                firstItemFocus = firstFocus,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = LocalShellWindow.current.edgePadding),
-                                initialFocusIndex = restoredSystemIndex,
-                            )
-                            if (continuePlaying.isNotEmpty()) {
-                                HomeSectionRow(
-                                    HomeSection("Continue Playing", continuePlaying),
-                                    firstCardFocus = null,
-                                    onShowDetail = onShowDetail,
-                                    onOptions = { optionsFor = it },
-                                    onFocusedEntryChanged = onFocusedEntryChanged,
-                                    modifier = Modifier.align(Alignment.TopStart).padding(top = 16.dp),
-                                    onToggleFavorite = onToggleFavorite,
-                                )
-                            }
-                        }
-                    }
-                }
-            } else if (hasThemedGamelist && gamelistView != null) {
-                // Real, unified theme-driven gamelist render -- ONE call into
-                // the same generic EsDeThemedView/EsDeSystemListView machinery
-                // the system-list screen already uses: a game is laid out by
-                // the theme's own element positions, sizes, variants and md_*
-                // metadata bindings. PC and engine games are not here at all
-                // any more (docs/SPEC.md 7i, 2026-10-01): they have their own
-                // tab, which no theme draws.
-                // A widget owns its own D-pad focus movement (real Compose
-                // focus + EsDeListItem.onSelect, firstItemFocus attaches to
-                // its first item); with no widget, this composable's own
-                // headless Up/Down handling above drives focusedGameIndex
-                // instead -- either way, onFocusedIndexChanged and
-                // focusedGameIndex both point at the exact same state, so
-                // every other element (metadata/rating/datetime/video) always
-                // binds to whichever game is actually current.
-                LaunchedEffect(group, gamelistHasListWidget, gamelistWidgetItems) {
-                    // Same never-crash boundary AND same frame-retry as the
-                    // system-list screen's own focus request above (see
-                    // requestFocusWhenAttached).
-                    if (gamelistHasListWidget && gamelistWidgetItems.isNotEmpty()) {
-                        requestFocusWhenAttached(firstFocus, "Gamelist")
-                    }
-                }
-                // Per-game hints below are gated on this: every one of
-                // them acts on the game under the cursor, and an empty
-                // gamelist has none.
-                val gameUnderCursor = systemGamesForGroup.isNotEmpty()
-                EsDeThemedView(
-                    view = gamelistView,
-                    items = gamelistWidgetItems,
-                    firstItemFocus = if (gamelistHasListWidget) firstFocus else null,
-                    modifier = Modifier.fillMaxSize(),
-                    // Same real SCROLLSOUND as the headless Up/Down
-                    // branch above (a widget hosted in a gamelist
-                    // scrolls with the scroll sound, CarouselComponent.
-                    // h:105-108) -- guarded on a real index change,
-                    // same reason as the system carousel.
-                    onFocusedIndexChanged = {
-                        if (it != focusedGameIndex) EsDeNavigationSounds.play(UiSound.MOVE)
-                        focusedGameIndex = it
-                    },
-                    initialFocusIndex = focusedGameIndex,
-                    focusedSystemEntries = systemGamesForGroup,
-                    focusedGameIndex = focusedGameIndex,
-                    hints = rememberHintList(
-                        listOf(
-                            HintBinding(GamepadAction.A, "Launch") { gameUnderCursor },
-                            HintBinding(GamepadAction.Y, "Info") { gameUnderCursor },
-                            HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
-                            HintBinding(GamepadAction.B, "Back"),
-                        )
-                    ),
-                    systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
-                        name = selectedGroupLabel,
-                        gameCount = systemGamesForGroup.size,
-                        favoriteCount = systemGamesForGroup.count { it.favorite },
-                        countsOnly = (group as? GameGroup.Collection)?.id
-                            ?.let { it == AutoCollections.FAVORITES_ID || it == AutoCollections.LAST_PLAYED_ID } == true,
-                    ),
-                    backgroundDimmed = gamelistOptionsOpen,
-                    gamelist = true,
-                    collectionGamelist = inCollectionGamelist,
-                    transition = esDeTransition,
-                )
-            } else {
-                // The group's list through the one query model, like the themed list above.
-                val games = systemGamesForGroup
-                // Same "don't request focus on an unattached FocusRequester" fix
-                // as the system-list view above -- games can be empty here too
-                // (the "recent" filter selected with zero recently-played entries).
-                LaunchedEffect(group, retroQuery) { if (games.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Game grid") }
-                // Same real per-system accent as GroupCard's own border, applied
-                // as a subtle top-down vignette behind the whole grid -- carries
-                // the "dynamic per-system," not just per-card, through into the
-                // actual game-browsing view rather than stopping at the system
-                // list.
-                val drillDownAccent = group.systemThemeFolder
-                    ?.let { SystemThemeColors.forSystem(LocalContext.current, it) }
-                    ?.let { Color(it) }
-                Column(
-                    modifier = Modifier.fillMaxSize().let {
-                        if (drillDownAccent != null) {
-                            it.background(Brush.verticalGradient(listOf(drillDownAccent.copy(alpha = 0.16f), Color.Transparent)))
-                        } else {
-                            it
-                        }
-                    },
-                ) {
-                    // The one pill the other lists draw while something filters ("Favourites, 12 of 80"),
-                    // cleared by one press; no count line and no chip row otherwise.
-                    retroQuery.pillText(retroScope, games.size, retroQuery.totalIn(retroBase, retroScope))?.let { pill ->
-                        Row(
-                            modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
-                        ) {
-                            ShellChip(pill, on = true, onClick = { retroQuery = retroQuery.cleared })
-                        }
-                    }
-                    val pad = rememberGridPad()
-                    LazyVerticalGrid(
-                        state = pad.state,
-                        columns = GridCells.Adaptive(minSize = 220.dp),
-                        // The hint bar's own room (MenuTokens.HintBarRoom).
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            bottom = MenuTokens.HintBarRoom,
-                        ),
-                        // Arrow keys move focus between games here: GameCard
-                        // handles only A/Center/Enter/Y, and Compose has no
-                        // automatic arrow-key focus movement in a grid.
-                        // FocusManager.moveFocus's return value (true = moved,
-                        // false = no further focusable target that direction)
-                        // is what onKeyEvent needs: false lets Left/Right
-                        // bubble up to the outer Box's sibling-system switcher
-                        // (see GamesSection's own onKeyEvent above) only at a
-                        // grid edge, matching ES-DE's "switch system at the
-                        // edge" convention.
-                        //
-                        // Up at the TOP row does not answer true either: it
-                        // leaves like Left/Right at an edge, so Compose's own
-                        // focus search reaches the rows above this grid: the
-                        // filter chips first, and in safe mode the banner's
-                        // action behind them (docs/SPEC.md 10c). Destinations
-                        // are chosen in the left menu, never through focus
-                        // traversal.
-                        modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding)
-                            .onPad { press ->
-                                val direction = gridDirection(press.action) ?: return@onPad false
-                                // One card per step (GridPad); at an edge
-                                // it answers false and Left/Right reach the
-                                // switch-system handler above.
-                                if (pad.canMove(direction)) {
-                                    pad.move(direction)
-                                    true
-                                } else {
-                                    false
-                                }
-                            },
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(24.dp),
-                    ) {
-                        gridItemsIndexed(games, key = { _, entry -> entry.id }) { index, entry ->
-                            GameCard(
-                                entry = entry,
-                                modifier = Modifier
-                                    .focusRequester(pad.requester(index))
-                                    .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier),
-                                // A opens the details, where Play is (Droidtop/tracker#641).
-                                onActivate = { onShowDetail(entry) },
-                                onShowDetail = { onShowDetail(entry) },
-                                onOptions = { optionsFor = entry },
-                                onFocused = {
-                                    pad.focused = index
-                                    onFocusedEntryChanged(entry)
-                                },
-                                onToggleFavorite = { onToggleFavorite(entry) },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-    }
-    optionsFor?.let { entry ->
-        AppOptionsMenu(
-            entry = entry,
-            detailsLabel = "Game details",
-            onPrimary = {
-                optionsFor = null
-                onLaunch(entry)
-            },
-            onDetails = {
-                optionsFor = null
-                onShowDetail(entry)
-            },
-            onToggleFavorite = {
-                optionsFor = null
-                onToggleFavorite(entry)
-            },
-            onDismiss = { optionsFor = null },
-        )
-    }
-}
-
-
-
-/** What the Game folders page promises while it is drawn in place of an empty library's Games tab. */
-private val EMPTY_FOLDERS_HINTS = listOf(
-    HintBinding(GamepadAction.A, "Select"),
-    HintBinding(GamepadAction.B, "Back"),
-)
-
-/**
- * What an app tile promises while it has the focus: A opens, Y searches and
- * Select opens the list's Filter sheet (with Sort by in it), as every list
- * does (proposal 6.A, Droidtop/tracker#644 slice 4), and L2 is the app's own
- * options. The list around the tile answers Y and Select. The one footer
- * draws these ([declaresHints]).
- */
-private val APP_TILE_HINTS = listOf(
-    HintBinding(GamepadAction.A, "Open"),
-    HintBinding(GamepadAction.Y, "Search"),
-    HintBinding(GamepadAction.SELECT, "Filter"),
-    HintBinding(GamepadAction.L2, "Options"),
-)
-
-/**
- * The Apps tab (docs/SPEC.md 7j, "Filters, sort and the hint bar"): every
- * launchable thing that is not a game library, as one list over the same
- * query model the game libraries use. All apps, A to Z until the person
- * says otherwise; X opens the Filter sheet (Category, Running, Recently
- * used, Recently installed, Favourites, Hidden, Source, each with counts),
- * Y Sort By, Select the focused app's options, and a long press marks an
- * app as a game. One strip sits above the list ([ViewStrip]): All, Games,
- * Emulators, Tools and Recently used with their counts, stepped by L1/R1,
- * and the filters no view stands for as its one pill. The view's filters
- * and sort are remembered, and nothing here reads a disk while drawing:
- * the category rules, the usage log, the counts and the filtered list are
- * worked out off the main thread.
- */
-@Composable
-private fun AppsSection(
-    entries: List<LibraryEntry>,
-    onLaunch: (LibraryEntry) -> Unit,
-    onShowDetail: (LibraryEntry) -> Unit,
-    onFocusedEntryChanged: (LibraryEntry?) -> Unit,
-    onToggleFavorite: (LibraryEntry) -> Unit = {},
-) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-
-    // Which apps are running, from the task manager's one list (read here
-    // once, and again whenever the Filter sheet opens, so its Running count
-    // is current); nothing polls while this tab is not showing.
-    val running by TaskManager.snapshot.collectAsState()
-    val runningPackages = remember(running) { running?.apps?.mapTo(HashSet()) { it.packageName }.orEmpty() }
-
-    // Apps hidden or shown from the options menu in this visit: the list follows at once, and the
-    // launcher's own hidden list (written off the main thread) is what the next scan reads.
-    var hiddenNow by remember { mutableStateOf(emptyMap<String, Boolean>()) }
-    val apps = remember(entries, hiddenNow) {
-        if (hiddenNow.isEmpty()) entries else entries.map { e -> hiddenNow[e.id]?.let { e.copy(hidden = it) } ?: e }
-    }
-
-    var query by remember { mutableStateOf(LibraryQuery()) }
-    var queryLoaded by remember { mutableStateOf(false) }
-    PersistQuery(APPS_SCOPE_ID, query, queryLoaded) {
-        query = it
-        queryLoaded = true
-    }
-    val savedViews = rememberSavedViews(APPS_SCOPE_ID)
-
-    // What the rules and the usage log say, loaded off the main thread and
-    // reloaded when the person changes a mark or comes back from granting
-    // Usage access.
-    var marksTick by remember { mutableIntStateOf(0) }
-    var usageTick by remember { mutableIntStateOf(0) }
-    val rules by produceState(AppCategoryRules(), marksTick) {
-        value = withContext(Dispatchers.IO) { AppCategoryRules.load(context) }
-    }
-    val usage by produceState(emptyMap<String, Long>(), usageTick) {
-        value = withContext(Dispatchers.IO) { AppUsageAccess.lastUsed(context) }
-    }
-    val usageGranted by produceState(false, usageTick) {
-        value = withContext(Dispatchers.IO) { AppUsageAccess.granted(context) }
-    }
-    val scope = remember(rules, usage, runningPackages) { appsQueryScope(rules, usage, runningPackages) }
-
-    val shown by produceState<List<LibraryEntry>?>(null, apps, query, scope) {
-        value = withContext(Dispatchers.Default) { query.applyTo(apps, scope) }
-    }
-    val total = remember(apps, query, scope) { query.totalIn(apps, scope) }
-    // The strip's views and their counts (docs/SPEC.md 7j).
-    val views = remember(savedViews.views) { appsStripViews(savedViews.views) }
-    val counts by produceState(emptyMap<String, Int>(), apps, scope, views) {
-        value = withContext(Dispatchers.Default) { appsViewCounts(apps, scope, views) }
-    }
-    // Opening on a view that holds nothing lands on All instead, once the counts are in.
-    var landed by remember { mutableStateOf(false) }
-    LaunchedEffect(counts, queryLoaded) {
-        if (landed || !queryLoaded || counts.isEmpty()) return@LaunchedEffect
-        landed = true
-        appsLandingQuery(views, query, counts)?.let { query = it }
-    }
-
-    var filterOpen by remember { mutableStateOf(false) }
-    var searchOpen by remember { mutableStateOf(false) }
-    var sortOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(filterOpen) { TaskManager.refresh(context) }
-    var optionsFor by remember { mutableStateOf<LibraryEntry?>(null) }
-
-    val toggleHidden: (LibraryEntry) -> Unit = { entry ->
-        val nowHidden = !entry.hidden
-        hiddenNow = hiddenNow + (entry.id to nowHidden)
-        coroutineScope.launch {
-            withContext(Dispatchers.IO) { dev.droidtop.library.AppHiding.set(context, entry.id, nowHidden) }
-            dev.droidtop.library.settings.Notices.flash(if (nowHidden) "${entry.title} hidden" else "${entry.title} shown", context = context)
-        }
-    }
-
-    // "Mark as game" from a long press and from the app's options: the
-    // one answer is stored, then the category rules reload.
-    val markGame: (LibraryEntry) -> Unit = { entry ->
-        if (entry.appFacts != null) {
-            val nowGame = !rules.isGame(entry.id, entry.appFacts)
-            coroutineScope.launch {
-                withContext(Dispatchers.IO) { AppGameMarks.set(context, entry.id, nowGame) }
-                marksTick++
-                dev.droidtop.library.settings.Notices.flash(if (nowGame) "${entry.title} marked as a game" else "${entry.title} is not a game", context = context)
-            }
-        }
-    }
-
-    val list = shown
-    if (list == null || !queryLoaded) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            ShellLoading()
-        }
-        return
-    }
-
-    val sections = remember(list) { buildAppSections(list) }
-    val firstFocus = remember { FocusRequester() }
-    val emptyFocus = remember { FocusRequester() }
-    // The first tile takes the focus when the list first arrives, and the
-    // empty state when a filter leaves nothing, so X and Y always have a
-    // focused element to answer them.
-    LaunchedEffect(list.isEmpty()) {
-        if (list.isEmpty()) requestFocusWhenAttached(emptyFocus, "Apps") else requestFocusWhenAttached(firstFocus, "Sections")
-    }
-
-    // L1/R1 step the strip's views, never wrapping; the strip owns the
-    // press even at its end (docs/SPEC.md 7j, "Gaming controls"). With a
-    // pill showing (no view lit) the first press lands on All.
-    val activeView = appsActiveView(views, query)
-    OwnShoulders { step ->
-        val next = if (activeView < 0) 0 else menuStep(activeView, views.size, step)
-        if (next != activeView) {
-            EsDeNavigationSounds.play(UiSound.MOVE)
-            query = appsViewQuery(views[next], query)
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .onPad { press ->
-                when (press.action) {
-                    GamepadAction.SELECT -> {
-                        filterOpen = true
-                        true
-                    }
-                    GamepadAction.Y -> {
-                        searchOpen = true
-                        true
-                    }
-                    else -> false
-                }
-            },
-    ) {
-        ViewStrip(
-            labels = views.map { appsStripLabel(it, counts) },
-            active = activeView,
-            focused = null,
-            pill = if (activeView >= 0) null else query.pillText(scope, list.size, total),
-            onSelect = { query = appsViewQuery(views[it], query) },
-            onClearPill = { query = query.cleared },
-            modifier = Modifier.padding(top = MenuTokens.SectionListTopGap),
-        )
-        if (list.isEmpty()) {
-            // A lit view is not a filter: only what no view stands for is cleared, and an empty view
-            // offers All (Droidtop/tracker#500).
-            val emptyHints = remember(activeView) {
-                listOf(
-                    HintBinding(GamepadAction.A, if (activeView > 0) "Show all apps" else "Clear filters") { activeView > 0 || !query.isEmpty },
-                    HintBinding(GamepadAction.Y, "Search"),
-                    HintBinding(GamepadAction.SELECT, "Filter"),
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .focusRequester(emptyFocus)
-                    .declaresHints(emptyHints)
-                    .onPad { press ->
-                        if (press.action == GamepadAction.A && activeView > 0) {
-                            query = appsViewQuery(views[0], query)
-                            true
-                        } else if (press.action == GamepadAction.A && !query.isEmpty) {
-                            query = query.cleared
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                    .focusable(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        appsEmptyMessage(apps.isNotEmpty(), views.getOrNull(activeView)?.name),
-                        color = MenuTokens.OnSurfaceMuted,
-                    )
-                    if (apps.isEmpty()) GetAppsChip()
-                }
-            }
-        } else {
-            var firstAssigned = false
-            LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(32.dp),
-                // The hint bar's own room (MenuTokens.HintBarRoom).
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
-            ) {
-                items(sections, key = { it.title }) { homeSection ->
-                    // Native Android apps get their own dense, icon-first grid
-                    // (columns configurable via SettingsGamingFragment's
-                    // "Apps grid columns" -- see GamingPrefs.appsGridColumns),
-                    // separate from the artwork-carousel HomeSectionRow every other
-                    // kind still uses: apps have square launcher icons, not
-                    // portrait artwork, so the same 220x260 GameCard layout wastes
-                    // most of a real handheld's screen on empty card background.
-                    if (homeSection.entries.firstOrNull()?.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
-                        AppIconGrid(
-                            homeSection,
-                            columns = GamingPrefs.appsGridColumns(context),
-                            firstTileFocus = if (!firstAssigned) firstFocus else null,
-                            onLaunch = onLaunch,
-                            onOptions = { optionsFor = it },
-                            onFocusedEntryChanged = onFocusedEntryChanged,
-                        )
-                    } else {
-                        HomeSectionRow(
-                            homeSection,
-                            firstCardFocus = if (!firstAssigned) firstFocus else null,
-                            onShowDetail = onShowDetail,
-                            onOptions = { optionsFor = it },
-                            onFocusedEntryChanged = onFocusedEntryChanged,
-                            onToggleFavorite = onToggleFavorite,
-                        )
-                    }
-                    firstAssigned = true
-                }
-                // Games are not apps, but this is where a person on the Apps tab looks for more of anything.
-                // The app catalogs are one screen with two doors, here and under Updates (tracker#501).
-                item(key = "get_games") {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding),
-                    ) {
-                        GetAppsChip()
-                        GetGamesChip()
-                    }
-                }
-            }
-        }
-    }
-
-    if (filterOpen) {
-        val usageAction = SheetAction(
-            title = "Include apps opened outside droidtop",
-            subtitle = "Needs usage access",
-            onClick = { runCatching { SettingsLaunch.start(context, AppUsageAccess.settingsIntent()) } },
-        )
-        LibraryFilterSheet(
-            scope = scope,
-            base = apps,
-            query = query,
-            savedViews = savedViews.views,
-            onQueryChange = { query = it },
-            onSaveView = { savedViews.save(it, query) },
-            onForgetView = { savedViews.forget(it) },
-            // The same Search row every library list's Filter opens with (tracker#498).
-            onSearch = {
-                filterOpen = false
-                searchOpen = true
-            },
-            onDismiss = {
-                filterOpen = false
-                // Back from the system's Usage access screen lands here.
-                usageTick++
-            },
-            facetActions = if (usageGranted) emptyMap() else mapOf(LibraryFacet.RECENTLY_USED to listOf(usageAction)),
-            // Sort by lives here now that Y is Search (Droidtop/tracker#644 slice 4).
-            footerActions = listOf(
-                SheetAction("Sort by", null) {
-                    filterOpen = false
-                    sortOpen = true
-                },
-            ) + if (usageGranted) emptyList() else listOf(usageAction),
-        )
-    }
-    if (sortOpen) {
-        LibrarySortSheet(scope = scope, query = query, onQueryChange = { query = it }, onDismiss = { sortOpen = false })
-    }
-    if (searchOpen) {
-        LibrarySearchDialog(
-            query = query,
-            matchCount = list.size,
-            totalCount = total,
-            onTextChange = { query = query.copy(text = it) },
-            onDismiss = { searchOpen = false },
-        )
-    }
-    optionsFor?.let { entry ->
-        AppOptionsMenu(
-            entry = entry,
-            isGame = rules.isGame(entry.id, entry.appFacts),
-            onPrimary = {
-                optionsFor = null
-                onLaunch(entry)
-            },
-            onDetails = {
-                optionsFor = null
-                onShowDetail(entry)
-            },
-            onToggleFavorite = {
-                optionsFor = null
-                onToggleFavorite(entry)
-            },
-            onMarkGame = {
-                optionsFor = null
-                markGame(entry)
-            },
-            hidden = entry.hidden,
-            onToggleHidden = {
-                optionsFor = null
-                toggleHidden(entry)
-            },
-            onUninstall = {
-                optionsFor = null
-                startUninstall(context, entry.id)
-            },
-            onDismiss = { optionsFor = null },
-        )
-    }
-}
-
-/**
- * Dense, non-scrolling-per-row icon grid for the Apps tab — Android app
- * drawer style (icon + label, no artwork card), unlike [HomeSectionRow]'s
- * portrait-artwork carousel. [columns] comes from
- * [GamingPrefs.appsGridColumns] so density is user-configurable
- * independent of :shell-default's own app-drawer grid width.
- */
-@Composable
-private fun AppIconGrid(
-    section: HomeSection,
-    columns: Int,
-    firstTileFocus: FocusRequester?,
-    onLaunch: (LibraryEntry) -> Unit,
-    onOptions: (LibraryEntry) -> Unit,
-    onFocusedEntryChanged: (LibraryEntry?) -> Unit,
-) {
-    Column {
-        Text(
-            section.title,
-            color = MenuTokens.OnSurface,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(
-                start = LocalShellWindow.current.edgePadding,
-                end = LocalShellWindow.current.edgePadding,
-                top = MenuTokens.SectionHeadingTopGap,
-                bottom = MenuTokens.SectionHeadingGap,
-            ),
-        )
-        // Sized to fit every row with no internal scrolling of its own --
-        // this grid lives inside AppsSection's outer LazyColumn (one item
-        // per kind-section), and a LazyVerticalGrid can't nest inside
-        // another scrollable without a fixed height. Row count is exact
-        // (no clamping), so every app is always reachable, just via the
-        // outer LazyColumn's scroll rather than this grid's own.
-        val rowCount = (section.entries.size + columns - 1) / columns.coerceAtLeast(1)
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(columns.coerceAtLeast(1)),
-            userScrollEnabled = false,
-            modifier = Modifier
-                .fillMaxWidth()
-                // One tile's whole anatomy, measured rather than guessed:
-                // 8dp of focus-ring padding, the 64dp icon, 6dp, the name
-                // and the kind line under it, and 8dp again. The grid has
-                // no scroll of its own, so a height that is short by a
-                // line clips the line rather than scrolling to it.
-                .height(APP_TILE_HEIGHT * rowCount.coerceAtLeast(1))
-                .padding(horizontal = LocalShellWindow.current.edgePadding),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            gridItemsIndexed(section.entries, key = { _, entry -> entry.id }) { index, entry ->
-                AppIconTile(
-                    entry = entry,
-                    modifier = if (index == 0 && firstTileFocus != null) Modifier.focusRequester(firstTileFocus) else Modifier,
-                    onLaunch = { onLaunch(entry) },
-                    onOptions = { onOptions(entry) },
-                    onFocused = { onFocusedEntryChanged(entry) },
-                )
-            }
-        }
-    }
-}
-
-private val APP_TILE_HEIGHT = 136.dp
-
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable
-private fun AppIconTile(
-    entry: LibraryEntry,
-    modifier: Modifier = Modifier,
-    onLaunch: () -> Unit,
-    onOptions: () -> Unit = {},
-    onFocused: () -> Unit = {},
-) {
-    var focused by remember { mutableStateOf(false) }
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .onFocusChanged {
-                focused = it.isFocused
-                if (it.isFocused) onFocused()
-            }
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onPad { press ->
-                when (press.action) {
-                    GamepadAction.A -> {
-                        onLaunch()
-                        true
-                    }
-                    // L2 is the focused thing's own menu (docs/SPEC.md 7j):
-                    // its details, favourite and Mark as game; a long press
-                    // opens the same one (owner, 2026-10-23,
-                    // Droidtop/tracker#621). X and Y are the list's (Filter
-                    // and Sort By) and bubble to the section around the grid.
-                    GamepadAction.L2 -> {
-                        onOptions()
-                        true
-                    }
-                    else -> false
-                }
-            }
-            .declaresHints(APP_TILE_HINTS)
-            .focusable()
-            // Taps work the same way as on GameCard (see its own comment).
-            // A long press opens the app's menu, as a long press does on
-            // every thing (owner, 2026-10-23, Droidtop/tracker#610); Mark as
-            // game is a row of that menu.
-            .padRow(onClick = onLaunch, onLongClick = onOptions)
-            // The shell's ONE selection idiom, the same one [GameCard]
-            // and the menus draw: the accent ring over a brightened
-            // surface, so both grids of the shell give one answer to "what
-            // does selected look like" (rig, build 546).
-            .selectionFrame(
-                selected = focused,
-                shape = Corners.Plate,
-                rest = Color.Transparent,
-                restOutline = MenuTokens.CardOutline,
-            )
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .background(MenuTokens.Card, Corners.Plate),
-        ) {
-            if (entry.artworkUri != null) {
-                AsyncImage(
-                    model = entry.artworkUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize().padding(8.dp),
-                )
-            }
-        }
-        // The tile's own anatomy, the same one every card in this shell
-        // has: the name, then the one line that says what the thing IS.
-        // This grid holds more than one kind (`REMOTE_STREAM` is an Apps
-        // kind too), so the second line matters (rig, build 546).
-        //
-        // It says what the TILE is, never the heading it sits under: the
-        // app's own declared category when it has one, and what one entry
-        // of its kind is called when it does not. Never the tab's name,
-        // which the heading above already says (rig, build 547).
-        Text(
-            entry.title,
-            color = MenuTokens.OnSurface,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp).focusMarquee(focused),
-        )
-        // An app that declares no category says nothing: "Android app" under every tile said nothing
-        // about this one (tracker#500).
-        entry.genre?.takeIf { it.isNotBlank() }?.let { line ->
-            Text(
-                line,
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.focusMarquee(focused),
-            )
-        }
-    }
-}
 
 /**
  * Real, focused theme-browser screen -- the one real piece of Gaming's
@@ -4123,7 +2162,7 @@ internal fun buildAppSections(entries: List<LibraryEntry>): List<HomeSection> {
 // second-screen companion panel) -- see its doc comment there.
 
 @Composable
-private fun HomeSectionRow(
+internal fun HomeSectionRow(
     section: HomeSection,
     firstCardFocus: FocusRequester?,
     onShowDetail: (LibraryEntry) -> Unit,
@@ -4335,7 +2374,7 @@ internal fun GameCard(
 
 
 /** One pending "launch on which screen?" question, as handed to [LaunchDisplayChooserDialog]. */
-private data class DisplayChoiceRequest(
+internal data class DisplayChoiceRequest(
     val options: List<dev.droidtop.library.LaunchDisplayOption>,
     val canRemember: Boolean,
     val onChosen: (dev.droidtop.library.LaunchDisplayOption, Boolean) -> Unit,
@@ -4348,7 +2387,41 @@ private data class DisplayChoiceRequest(
  * and read within one composition, and making it observable would only
  * cause a second one.
  */
-private class EsDeGroupHistory {
+internal class EsDeGroupHistory {
     var previous: GameGroup? = null
     var current: GameGroup? = null
+}
+
+/**
+ * What the last launch left for the person (Droidtop/tracker#763: the shell body's launch state, held together).
+ * [error] is the user-visible failure: a failed launch must inform, never kill. [progress] is a Windows setup's live
+ * progress on the same path (Droidtop/tracker#140), kept apart from [error] because it is not a failure, and cleared
+ * when the attempt ends either way. The fixable kinds a banner offers to fix: [missingEmulator] (the system had no
+ * emulator), [unknownProgram] (a Windows game whose program droidtop could not tell, Droidtop/tracker#308) and
+ * [missingCore] (a RetroArch core missing or incomplete, Droidtop/tracker#271); [programScreen] is the program
+ * choice once opened.
+ */
+@androidx.compose.runtime.Stable
+internal class LaunchProblems {
+    var error by mutableStateOf<String?>(null)
+    var progress by mutableStateOf<String?>(null)
+    var missingEmulator by mutableStateOf<dev.droidtop.library.consoles.NoEmulatorInstalled?>(null)
+    var unknownProgram by mutableStateOf<dev.droidtop.library.ProgramNotIdentified?>(null)
+    var missingCore by mutableStateOf<dev.droidtop.library.consoles.RetroArchCores.Missing?>(null)
+    var programScreen by mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null)
+}
+
+/**
+ * The shell's own overlays and which is open (Droidtop/tracker#763: held together): the Quick Menu (hold Select) and
+ * the section it opens on when something asked for one ([quickMenuStart], Downloads for a link to Updates, cleared on
+ * close); the left menu (Start, docs/SPEC.md 7j); the one search over the library, apps, sources and settings; and one
+ * system's search, by its id and name, from the Quick Menu's Game section.
+ */
+@androidx.compose.runtime.Stable
+internal class ShellOverlays {
+    var quickMenuOpen by mutableStateOf(false)
+    var quickMenuStart by mutableStateOf<QuickSection?>(null)
+    var leftMenuOpen by mutableStateOf(false)
+    var globalSearchOpen by mutableStateOf(false)
+    var systemSearch by mutableStateOf<Pair<String, String>?>(null)
 }

@@ -42,11 +42,20 @@ class PadCadence internal constructor(private val tiers: List<Pair<Long, Long>>)
         val CHROME = PadCadence(listOf(500L to 500L, 1100L to 180L, 0L to 80L))
 
         /**
-         * A themed ES-DE list (carousel, textlist, grid): ES-DE's own QUICK
-         * tiers, `IList`'s default, which is what those components scroll
-         * with in ES-DE itself.
+         * A themed ES-DE textlist or grid: ES-DE's own QUICK tiers, `IList`'s
+         * default, which is what those components scroll with in ES-DE
+         * itself. A carousel has its own ([THEMED_CAROUSEL]).
          */
         val THEMED_LIST = PadCadence(listOf(500L to 500L, 1200L to 114L, 0L to 16L))
+
+        /**
+         * A themed carousel: ES-DE's SLOW tiers, what CarouselComponent is built with (CarouselComponent.h:225,
+         * IList.h:77), so a held direction steps every 200 ms and the 400 ms camera keeps up (Droidtop/tracker#782).
+         */
+        val THEMED_CAROUSEL = PadCadence(listOf(500L to 500L, 0L to 200L))
+
+        /** A themed carousel whose theme sets `fastScrolling`: ES-DE's MEDIUM tiers (CarouselComponent.h:1765). */
+        val THEMED_CAROUSEL_FAST = PadCadence(listOf(500L to 500L, 1100L to 180L, 0L to 80L))
     }
 }
 

@@ -75,17 +75,27 @@ object LauncherImport {
         return Read(ImportCheck.fit(plan, device(context)), files.source, db?.userVersion)
     }
 
-    /** The backup's database, copied to the cache and read only, as rows. The copy is removed at once. */
+    /**
+     * The backup's database, copied to the cache and read only, as rows. The copy has a name of its own, so a second
+     * read racing this one (a recreated screen) never writes the same file, and is removed at once. A table with more
+     * than [MAX_ROWS] rows is refused rather than cut short: a layout read in part would be applied as if whole.
+     */
     private fun readDatabase(context: Context, bytes: ByteArray): DbTables {
-        val file = File(context.cacheDir, "launcher_import.db")
+        val file = File.createTempFile("launcher_import", ".db", context.cacheDir)
         try {
             file.writeBytes(bytes)
             SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
                 val tables = TABLES.filter { table ->
                     db.rawQuery("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", arrayOf(table)).use { it.moveToFirst() }
-                }.associateWith { table -> db.query(table, null, null, null, null, null, null, MAX_ROWS.toString()).use(::rows) }
+                }.associateWith { table -> db.query(table, null, null, null, null, null, null, (MAX_ROWS + 1).toString()).use(::rows) }
+                tables.entries.firstOrNull { it.value.size > MAX_ROWS }?.let { (table, _) ->
+                    Log.w(TAG, "the backup's $table table has more than $MAX_ROWS rows")
+                    throw BackupReader.NotABackup("This backup holds more than $MAX_ROWS items in one list, more than droidtop reads")
+                }
                 return DbTables(tables, db.version)
             }
+        } catch (e: BackupReader.NotABackup) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "the backup's database could not be read", e)
             throw BackupReader.NotABackup("The layout in this backup could not be read")
@@ -215,19 +225,22 @@ object LauncherImport {
             transaction.commit()
         }
         // The old items' own titles, pictures and swipes, then the new ones'.
-        old.forEach { HomeItemExtras.forget(context, it) }
+        HomeItemExtras.forget(context, old)
+        val swipes = ArrayList<HomeItemExtras.SwipeChange>()
         for ((id, item) in written) {
             when (item) {
                 is PlanItem.App -> {
                     item.customTitle?.let { HomeItemExtras.setTitle(id, it) }
                     item.customIcon?.let { if (!HomeItemExtras.setPicture(context, id, it)) Log.w(TAG, "item $id's picture is not an image") }
-                    item.swipeUp?.let { HomeItemExtras.setSwipe(context, id, up = true, it) }
-                    item.swipeDown?.let { HomeItemExtras.setSwipe(context, id, up = false, it) }
+                    item.swipeUp?.let { swipes += HomeItemExtras.SwipeChange(id, up = true, it) }
+                    item.swipeDown?.let { swipes += HomeItemExtras.SwipeChange(id, up = false, it) }
                 }
                 is PlanItem.Folder -> item.customIcon?.let { HomeItemExtras.setPicture(context, id, it) }
                 is PlanItem.Widget -> {}
             }
         }
+        // Saved once for the whole layout, not once per swipe.
+        HomeItemExtras.setSwipes(context, swipes)
     }
 
     private fun ContentValues.app(component: String) {

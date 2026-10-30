@@ -43,9 +43,12 @@ import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerReach
 import dev.droidtop.runtime.ContainerSockets
+import dev.droidtop.runtime.ContainerUsage
+import dev.droidtop.runtime.PackageUpgrade
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.CraneImageCatalogResolver
+import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerApplications
 import dev.droidtop.runtime.ContainerEnter
 import dev.droidtop.runtime.ContainerExports
@@ -328,6 +331,7 @@ object ContainersCatalog {
         // buildList's block below isn't suspend, so anything that needs a
         // suspend call (the real disk-usage walk) is computed up front.
         val diskUsageBytes = runCatching { runtime.diskUsageBytes(container) }.getOrNull()
+        val usage = if (running) readUsage(runtime, container, PAGE_USAGE_SAMPLE_MS) else null
         val main = buildList<CatalogItem> {
             // The state, and the one action that changes it.
             when {
@@ -380,7 +384,9 @@ object ContainersCatalog {
             if (running) add(restartItem(info, runtime))
             add(recreateItem(info, runtime))
             add(storageItem(diskUsageBytes))
+            if (running) add(usageItem(runtime, container, usage))
             add(terminalItem(info, runtime, desktopUp))
+            add(updateSoftwareItem(info, runtime))
             add(
                 TextInputItem(
                     id = "container_name",
@@ -543,6 +549,43 @@ object ContainersCatalog {
         return ContainerReach.lines(settings).map { line ->
             ActionItem(id = "container_reach_${line.kind.lowercase().replace(' ', '_')}", title = line.kind, subtitle = line.what)
         }
+    }
+
+    /** A reading of [container]'s use, or why there is none: the backend's reason, or what went wrong. */
+    private suspend fun readUsage(runtime: ContainerRuntime, container: Container, sampleMs: Long): Result<ContainerUsage?> {
+        runtime.usageUnavailableReason?.let { return Result.failure(IllegalStateException(it)) }
+        return runCatching { runtime.usage(container, sampleMs) }
+    }
+
+    /** "512 MB · 12% of the processor", or null with no reading. Pure. */
+    internal fun usageLine(usage: ContainerUsage?): String? = usage?.let {
+        "${dev.droidtop.library.format.ValueFormat.size(it.memoryBytes)} · ${usageShare(it.cpuPercent)} of the processor"
+    }
+
+    /** A processor share as a person reads it: "under 1%" for a trace, else whole percents. Pure. */
+    internal fun usageShare(percent: Double): String = if (percent > 0 && percent < 1) "under 1%" else "${percent.toInt()}%"
+
+    /**
+     * Memory and processor use of a running container (docs/SPEC.md 3d, "Resource usage"; Droidtop/tracker#757 slice
+     * 3), read from its processes when the page opens; A reads it again.
+     */
+    private fun usageItem(runtime: ContainerRuntime, container: Container, usage: Result<ContainerUsage?>?): CatalogItem {
+        val reading = usage?.getOrNull()
+        val problem = usage?.exceptionOrNull()?.let { FailureText.of("Containers", it) }
+        return AsyncActionItem(
+            id = "container_usage",
+            title = "Memory and processor",
+            subtitle = when {
+                problem != null -> problem
+                reading != null -> "${reading.processes} processes, measured over half a second. Press to measure again"
+                else -> "No process of it is running"
+            },
+            value = usageLine(reading) ?: "Unknown",
+            run = { _, _ ->
+                val again = readUsage(runtime, container, dev.droidtop.runtime.USAGE_SAMPLE_MS)
+                again.exceptionOrNull()?.let { FailureText.of("Containers", it) } ?: usageLine(again.getOrNull()) ?: "Not running"
+            },
+        )
     }
 
     // ---- sockets (docs/SPEC.md 3d) ----
@@ -903,6 +946,41 @@ object ContainersCatalog {
         var n = 2
         while ("$base $n" in existing) n++
         return "$base $n"
+    }
+
+    /**
+     * "Update its software" (docs/SPEC.md 3d; Droidtop/tracker#757 slice 4): the container's own package manager,
+     * found inside it ([PackageUpgrade.FIND_SCRIPT]), refreshes and upgrades what is installed, as root, a step at a
+     * time on the row; it ends with what was upgraded or what the manager said when it failed.
+     */
+    private fun updateSoftwareItem(info: ContainerInfo, runtime: ContainerRuntime): CatalogItem {
+        val container = info.container
+        return AsyncActionItem(
+            id = "container_update_software",
+            title = "Update its software",
+            subtitle = "Upgrades what is installed in it with its own package manager (apk, apt, dnf, pacman or zypper). " +
+                "Nothing new is installed",
+            confirmTitle = "Upgrade the software in ${info.displayName}? Programs running in it may need restarting afterwards.",
+            run = { _, onStatus ->
+                if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart && !info.running) {
+                    onStatus("Starting it")
+                    runtime.start(container)
+                }
+                onStatus("Finding its package manager")
+                val root = dev.droidtop.runtime.ContainerUser.Spec("root", null)
+                val found = runtime.exec(container, listOf("/bin/sh", "-c", PackageUpgrade.FIND_SCRIPT), emptyMap(), root)
+                val manager = PackageUpgrade.byId(found.stdout)
+                    ?: error("it has none droidtop knows (apk, apt, dnf, pacman or zypper)")
+                var last = ""
+                for (step in manager.steps) {
+                    onStatus("${step.line} (${manager.label})")
+                    val result = runtime.exec(container, step.command, step.env, root)
+                    last = result.stdout + "\n" + result.stderr
+                    check(result.succeeded) { "${manager.label} stopped: ${PackageUpgrade.failureLine(last)}" }
+                }
+                PackageUpgrade.summary(manager, last) ?: "Done (${manager.label})"
+            },
+        )
     }
 
     private fun terminalItem(info: ContainerInfo, runtime: ContainerRuntime, desktopUp: Boolean): CatalogItem {
@@ -1374,3 +1452,6 @@ object ContainersCatalog {
         )
     }
 }
+
+/** How long the container page measures a running container's use when it opens: half a second, so the page is quick. */
+private const val PAGE_USAGE_SAMPLE_MS = 500L

@@ -230,7 +230,7 @@ import com.android.launcher3.states.RotationHelper;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.AllAppsSwipeController;
-import com.android.launcher3.touch.NotificationSwipeController;
+import com.android.launcher3.touch.SwipeDownSlotController;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.ActivityResultInfo;
@@ -445,51 +445,9 @@ public class Launcher extends StatefulActivity<LauncherState>
         return fromContext(context);
     }
 
-    // droidtop patch (not upstream Murine/Launcher3): set in onCreate,
-    // consumed in onStart -- see onStart's own comment for why the actual
-    // redirect can't happen from inside onCreate itself.
-    private String mDroidtopPendingModeRedirect;
-    // droidtop patch: set in onCreate, consumed in onStart, like the mode
-    // redirect above -- resumes unfinished onboarding over this home screen.
-    private boolean mDroidtopResumeOnboarding;
-    // Double-tap-home window tracking for the hard display reinit (see
-    // onNewIntent). Static: home presses span onNewIntent calls.
-    private static long sDroidtopLastHomePressMs = 0L;
-
     @Override
     @TargetApi(Build.VERSION_CODES.S)
     protected void onCreate(Bundle savedInstanceState) {
-        // droidtop patch (not upstream Murine/Launcher3): resume the user's
-        // last-used shell mode (Desktop/Gaming) instead of always landing
-        // on Standard's own home grid, so a device reboot or a launcher
-        // process restart returns to where the user actually left off.
-        // Only redirects on a genuine fresh task start (isTaskRoot() + no
-        // saved state) -- not on every warm onCreate/config change/multi-
-        // window reattach -- and only away from Standard: picking "Android"
-        // from BackButtonMenu records "standard" as the last mode first,
-        // which is what stops this from immediately bouncing back.
-        // isTaskRoot() is safe to call this early (the task token is
-        // attached before onCreate runs). Only *recorded* here, not acted
-        // on -- see onStart for why. See dev.droidtop.shell.standard.
-        // Modes's own doc comment for the follow-up this closes out
-        // (auto-redirect was deliberately deferred, then asked for
-        // explicitly). Where it redirects is Modes.homeTarget: the default
-        // mode the person chose, else the last one used (SPEC 2c). An
-        // explicit "Android" (BackButtonMenu.openHome) never redirects.
-        if (savedInstanceState == null && isTaskRoot()
-                && !dev.droidtop.shell.standard.BackButtonMenu.isExplicitHome(getIntent())) {
-            if (!dev.droidtop.shell.standard.OnboardingGate.isComplete(this)) {
-                // Unfinished setup wins over every mode (SPEC 7b): becoming
-                // the Home app mid-onboarding used to draw this home screen
-                // over it with nothing saying setup was unfinished.
-                mDroidtopResumeOnboarding = true;
-            } else {
-                String target = dev.droidtop.library.settings.Modes.homeTarget(this, getIntent());
-                if (!dev.droidtop.library.settings.Mode.LAUNCHER.getId().equals(target)) {
-                    mDroidtopPendingModeRedirect = target;
-                }
-            }
-        }
         mIsReCreated = true;
         // TODO why did Lawnchair comment async sections? https://github.com/LawnchairLauncher/lawnchair/commit/c8cdde1531a603890fdac8fb948102b1f1cd25fe
         mStartupLatencyLogger = createStartupLatencyLogger(
@@ -1222,37 +1180,6 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     @Override
     protected void onStart() {
-        // droidtop patch (not upstream Murine/Launcher3): the actual mode
-        // redirect (see onCreate's own comment) has to happen here, not
-        // from inside onCreate -- a real crash found by testing this on
-        // the actual device: finishing early from onCreate skips the rest
-        // of Launcher's own real initialization (mModel and friends never
-        // get assigned), and Launcher.onDestroy() unconditionally uses
-        // them, causing a real NullPointerException
-        // ("LauncherModel.removeCallbacks on a null object reference") the
-        // moment Android destroys this half-initialized Activity. onStart
-        // is guaranteed to run only after onCreate's *entire* body has
-        // completed, so by here Launcher is genuinely, fully initialized,
-        // and finishing is safe. Guarded to fire at most once (onStart can
-        // run again later in this Activity's life, e.g. after a stop/
-        // restart cycle -- this must not redirect on every one of those).
-        if (mDroidtopPendingModeRedirect != null) {
-            String mode = mDroidtopPendingModeRedirect;
-            mDroidtopPendingModeRedirect = null;
-            Intent redirect = new Intent(Intent.ACTION_MAIN);
-            redirect.setClassName(getPackageName(), "dev.droidtop.app.MainActivity");
-            redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_MODE, mode);
-            redirect.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(redirect);
-            finish();
-        }
-        if (mDroidtopResumeOnboarding) {
-            // Not finished: this stays the home screen underneath, and the
-            // next Home press brings setup back again (onNewIntent).
-            mDroidtopResumeOnboarding = false;
-            dev.droidtop.shell.standard.OnboardingGate.resumeIfUnfinished(this, true);
-        }
-
         TraceHelper.INSTANCE.beginSection(ON_START_EVT);
         super.onStart();
         if (!mDeferOverlayCallbacks) {
@@ -1804,53 +1731,6 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
         TraceHelper.INSTANCE.beginSection(ON_NEW_INTENT_EVT);
         super.onNewIntent(intent);
-
-        // droidtop: a HOME press while the last-used shell is Desktop/
-        // Gaming forwards straight back to that shell (same lastMode
-        // redirect as onCreate/onStart's cold-start path, but for the
-        // warm case where this Launcher instance already exists), with a
-        // display-reinit flag: MainActivity re-runs its dual-screen role
-        // orchestration on it, restoring shell/widgets ownership of both
-        // displays -- Android silently falls back to MIRRORING a second
-        // display nothing presents on (confirmed live on the Dual-Screen
-        // Add-On), and a home press is the user's natural "fix my
-        // screens" gesture. The reinit deliberately leaves any app the
-        // user launched onto a display alone (see MainActivity's parked-
-        // display handling).
-        //
-        // Where it forwards is Modes.homeTarget -- the default mode the
-        // person chose, else the last one used -- not the last one alone:
-        // "Opens into Android" followed by one visit to Gaming used to make
-        // every later Home press land in Gaming (rig, dq-coordinator-24).
-        // An explicit "Android" from the mode switcher shows this screen.
-        // Unfinished onboarding comes before all of it (SPEC 7b).
-        if (Intent.ACTION_MAIN.equals(intent.getAction())
-                && !dev.droidtop.shell.standard.BackButtonMenu.isExplicitHome(intent)) {
-            if (dev.droidtop.shell.standard.OnboardingGate.resumeIfUnfinished(this, true)) {
-                return;
-            }
-            // Double-tap detection: two HOME presses within the window is
-            // the HARD display reinit (re-assert droidtop on BOTH
-            // displays regardless of what runs on them -- per direction);
-            // a single press stays the soft reinit that never covers a
-            // launched app.
-            long nowMs = android.os.SystemClock.elapsedRealtime();
-            boolean doubleTap = nowMs - sDroidtopLastHomePressMs < 600;
-            sDroidtopLastHomePressMs = nowMs;
-            String droidtopHomeTarget = dev.droidtop.library.settings.Modes.homeTarget(this, intent);
-            if (!dev.droidtop.library.settings.Mode.LAUNCHER.getId().equals(droidtopHomeTarget)) {
-                Intent redirect = new Intent(Intent.ACTION_MAIN);
-                redirect.setClassName(getPackageName(), "dev.droidtop.app.MainActivity");
-                redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_MODE, droidtopHomeTarget);
-                redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_DISPLAY_REINIT, true);
-                if (doubleTap) {
-                    redirect.putExtra(dev.droidtop.shell.standard.BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE, true);
-                }
-                redirect.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(redirect);
-                return;
-            }
-        }
 
         boolean alreadyOnHome = hasWindowFocus() && ((intent.getFlags() &
                 Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT)
@@ -2984,7 +2864,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     public TouchController[] createTouchControllers() {
-        return new TouchController[] {getDragController(), new com.android.launcher3.touch.MultiFingerGestureController(this), new NotificationSwipeController(this), new AllAppsSwipeController(this)};
+        return new TouchController[] {getDragController(), new com.android.launcher3.touch.MultiFingerGestureController(this), new SwipeDownSlotController(this), new AllAppsSwipeController(this)};
     }
 
     public void onDragLayerHierarchyChanged() {

@@ -9,46 +9,21 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * No-UI stub matching `farmerbb/Taskbar`'s real, shipping `HSLActivity`
- * (verified against its actual source this session): holds the
- * `CATEGORY_HOME` role droidtop needs for its own mode-switcher to stay
- * reachable, but immediately forwards to a *different* installed
- * launcher's own HOME activity instead of rendering anything itself.
- * Disabled by default in the manifest -- only enabled at runtime via
- * [HomeRolePrefs.setActiveHomeImplementation] when the user picks
- * "Alternative" during onboarding or in Settings.
+ * The `CATEGORY_HOME` component when the person chose another launcher ("Alternative", during onboarding or in
+ * Settings): droidtop keeps the Home role, so its mode switcher stays reachable, and forwards to that launcher's own
+ * HOME activity instead of drawing anything itself, the way farmerbb/Taskbar's HSLActivity does. Disabled in the
+ * manifest until [HomeRolePrefs.setActiveHomeImplementation] enables it.
  *
- * A Home press goes where `com.android.launcher3.Launcher` sends it too
- * ([dev.droidtop.library.settings.Modes.homeTarget]): the default mode
- * when one was chosen, else the last one used. Without this, picking
- * Alternative as the home implementation but Desktop/Gaming as the
- * default mode would always forward to the other launcher instead, since
- * this activity (not Launcher.java) is what actually runs on boot when
- * Alternative is active. An explicit "Android" from the mode switcher
- * ([BackButtonMenu.openHome]) forwards to the other launcher as asked.
+ * A Home press is decided the same way as Standard's ([HomeEntry.route]): setup first, the companion's screen, an
+ * explicit "Android", a crash-looping theme, the default or last mode with its display reinit and double tap. Only
+ * when that answers Standard does it forward to the other launcher. A recreated activity forwards without deciding
+ * again.
  */
 class AlternativeLauncherActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Unfinished setup comes first, whichever home activity is live
-        // (docs/SPEC.md 7b).
-        if (OnboardingGate.resumeIfUnfinished(this, fromHome = true)) {
-            finish()
-            return
-        }
-
-        val target = dev.droidtop.library.settings.Modes.homeTarget(this, intent)
-        if (savedInstanceState == null &&
-            !BackButtonMenu.isExplicitHome(intent) &&
-            target != dev.droidtop.library.settings.Mode.LAUNCHER.id
-        ) {
-            val redirect = Intent(Intent.ACTION_MAIN).apply {
-                setClassName(packageName, "dev.droidtop.app.MainActivity")
-                putExtra(BackButtonMenu.EXTRA_MODE, target)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            startActivity(redirect)
+        if (savedInstanceState == null && HomeEntry.route(this, intent) == HomeEntry.Route.HANDLED) {
             finish()
             return
         }
@@ -66,28 +41,14 @@ class AlternativeLauncherActivity : Activity() {
             return
         }
 
-        // Standard is the active surface here too, even though the
-        // chosen launcher is what actually renders on the primary
-        // display: droidtop still holds Home (this Activity IS the
-        // enabled HOME one), and the secondary display still gets
-        // droidtop's own SECONDARY_HOME placement (docs/SPEC.md 4c, "The
-        // Alternative forwarder keeps the second screen") -- but only if
-        // it reads the right mode, which needs this recorded the same
-        // way HomeTrampolineActivity.forwardToStandard records it.
-        dev.droidtop.library.settings.Modes.setLastMode(this, dev.droidtop.library.settings.Mode.LAUNCHER)
-        // Nudges the platform's own SECONDARY_HOME placement rather than
-        // waiting for it to notice on its own -- see that function's own
-        // doc comment for the confirmed-live gap this closes.
-        reassertSecondaryDisplays(this)
+        HomeEntry.enterStandard(this)
         val forwardIntent = intent.apply {
             component = forwardTo
             removeExtra(BackButtonMenu.EXTRA_MODE)
         }
         startActivity(forwardIntent)
-        // Fired a second time via a Handler.post -- same real fix
-        // farmerbb/Taskbar's HSLActivity uses (its own comment: "to fix
-        // launchers that specifically listen for home button presses,
-        // i.e. to jump to the default panel"), not guessed.
+        // Started a second time on the next frame, as farmerbb/Taskbar's HSLActivity does: some launchers move to their
+        // default page only on a Home intent that reaches them while already in front (docs/SPEC.md 2c).
         Handler(Looper.getMainLooper()).post { startActivity(Intent(forwardIntent)) }
         finish()
     }

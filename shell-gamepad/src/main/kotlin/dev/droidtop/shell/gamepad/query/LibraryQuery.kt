@@ -346,9 +346,13 @@ data class LibraryQuery(
         }
     }
 
-    /** The list as this query shows it: filtered, then sorted, ties by title. */
+    /**
+     * The list as this query shows it: filtered, then sorted, ties by name. With a collection picked, a game's
+     * collection sort name orders it ([sortTitle]).
+     */
     fun applyTo(base: List<LibraryEntry>, scope: LibraryQueryScope): List<LibraryEntry> =
-        base.filter { matches(it, scope) }.sortedWith(sort.comparator(scope.context, reversed))
+        base.filter { matches(it, scope) }
+            .sortedWith(sort.comparator(scope.context, reversed, inCollection = selected(LibraryFacet.COLLECTION).isNotEmpty()))
 
     /**
      * The facets this list offers with the values it holds and their counts,
@@ -528,16 +532,27 @@ fun matchesSearchText(entry: LibraryEntry, text: String): Boolean {
 }
 
 /**
+ * The name [entry] sorts by, as ES-DE sorts (Droidtop/tracker#766): inside a custom collection its
+ * `collectionsortname`, then its `sortname`, then its title; elsewhere its `sortname`, then its title. The metadata
+ * editor's "Sort name" and "Custom collections sort name" set them.
+ */
+fun sortTitle(entry: LibraryEntry, inCollection: Boolean = false): String =
+    ((if (inCollection) entry.collectionSortName?.takeIf { it.isNotBlank() } else null)
+        ?: entry.sortName?.takeIf { it.isNotBlank() }
+        ?: entry.title).lowercase()
+
+/**
  * The comparator for [LibrarySortKey]. An entry the sort has no fact for
  * (never played, no release date) is last in BOTH directions, so flipping
- * a sort never puts the blanks first; ties are by title, and only a flipped
- * name sort reverses those too.
+ * a sort never puts the blanks first; ties are by name ([sortTitle]), and only a flipped
+ * name sort reverses those too. [inCollection]: the list is one custom collection's.
  */
 fun LibrarySortKey.comparator(
     context: LibraryQueryContext = LibraryQueryContext(),
     reversed: Boolean = false,
+    inCollection: Boolean = false,
 ): Comparator<LibraryEntry> {
-    val byTitle = compareBy<LibraryEntry> { it.title.lowercase() }
+    val byTitle = compareBy<LibraryEntry> { sortTitle(it, inCollection) }
     val missingLast = compareBy<LibraryEntry> { !hasFact(it, context) }
     val primary: Comparator<LibraryEntry> = when (this) {
         LibrarySortKey.NAME -> return if (reversed) byTitle.reversed() else byTitle

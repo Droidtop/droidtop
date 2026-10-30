@@ -86,7 +86,8 @@
           "packages": { "type": "array", "items": { "type": "string" } },
           "paths": { "type": "array", "items": { "type": "string" }, "description": "files.shared.read / files.shared.write: folders relative to a storage volume, or \"*\" for all of it." },
           "scope": { "type": "string" },
-          "signIn": { "type": "string", "description": "web.session only: the https sign-in page on one of its domains; droidtop's own Sign in opens it (docs/plugin-api.md G3)." }
+          "signIn": { "type": "string", "description": "web.session only: the https sign-in page on one of its domains; droidtop's own Sign in opens it (docs/plugin-api.md G3)." },
+          "expiredText": { "type": "array", "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 200 }, "description": "web.session only: the sentences the site's page shows for a download link that has expired; droidtop then asks the source for a current link (docs/plugin-api.md G3, Droidtop/tracker#783)." }
         }
       }
     },

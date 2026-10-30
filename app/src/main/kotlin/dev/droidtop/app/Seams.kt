@@ -21,6 +21,9 @@ internal object Seams {
                 androidx.webkit.WebSettingsCompat.setRequestedWithHeaderOriginAllowList(view.settings, emptySet())
             }
         }
+        // droidtop's hidden web views run behind the screen in front, where a site's check finishes (Droidtop/tracker#783).
+        ForegroundScreen.track(app)
+        dev.droidtop.pluginhost.HiddenWebViews.window = { ForegroundScreen.content() }
         // What `host.info` tells a plugin about the mode droidtop is in (docs/plugin-api.md 3 J4).
         // One spelling for a mode wherever a plugin meets it (docs/plugin-api.md 1.9): `standard`, `gaming`, `desktop`.
         dev.droidtop.pluginhost.PluginBrokers.modeProvider = { dev.droidtop.library.settings.Modes.lastMode(app) }

@@ -501,6 +501,9 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun webSession(request: WebSessionRequest): WebSessionResult? = WebSessionActivity.show(appContext, request)
 
+    override fun hiddenWebSession(request: WebSessionRequest, expiredText: List<String>): HiddenWebSession.Outcome? =
+        HiddenWebSession.open(appContext, request, expiredText)
+
     override fun webFetch(url: String, cookies: String?, timeoutMs: Long, maxBytes: Int): WebFetch.Result? =
         WebFetch.fetch(appContext, url, cookies, timeoutMs, maxBytes)
 

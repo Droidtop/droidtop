@@ -78,16 +78,7 @@ class WebSessionActivity : Activity() {
         request = asked
         val browse = asked.mode == WebSessionRequest.Mode.BROWSE
         val cookies = CookieManager.getInstance()
-        cookies.setAcceptCookie(true)
-        asked.domains.forEach { purge(cookies, it) }
-        asked.session?.cookies?.forEach { (domain, header) -> inject(cookies, domain, header) }
-        // droidtop's own signed-in download sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648), for their
-        // domains only and only while this view is open.
-        siteCookies[id]?.forEach { (domain, header) ->
-            purge(cookies, domain)
-            inject(cookies, domain, header)
-        }
-        cookies.flush()
+        WebSessionCookies.putIn(cookies, asked, siteCookies[id])
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -298,26 +289,11 @@ class WebSessionActivity : Activity() {
         answered = true
         val asked = request
         val id = intent.getStringExtra(EXTRA_ID)
-        val cookies = CookieManager.getInstance()
-        val session = asked?.let {
-            WebSessions.Stored(
-                userAgent = webView?.settings?.userAgentString,
-                cookies = it.domains.associateWith { domain -> cookies.getCookie("https://$domain").orEmpty() }.filterValues { v -> v.isNotBlank() },
-            )
-        }
-        asked?.domains?.forEach { purge(cookies, it) }
+        val sites = id?.let { siteCookies.remove(it) }
         // The download sites go back to droidtop's vault, as the site left them, and out of the store.
-        val renewed = id?.let { siteCookies.remove(it) }?.keys?.mapNotNull { domain ->
-            val left = cookies.getCookie("https://$domain")
-            purge(cookies, domain)
-            left?.let { domain to it }
-        }.orEmpty()
-        // Sealing touches the Keystore: not on the main thread.
-        if (renewed.isNotEmpty()) {
-            val app = applicationContext
-            Thread { renewed.forEach { (domain, header) -> DownloadSites.renew(app, domain, header) } }.start()
-        }
-        cookies.flush()
+        val (session, renewed) = asked?.let { WebSessionCookies.takeOut(CookieManager.getInstance(), it, sites, webView?.settings?.userAgentString) }
+            ?: (null to emptyList())
+        DownloadSites.renewLater(applicationContext, renewed)
         id?.let { requests.remove(it) }
         // An Open view answers with everything it took; a single capture is the first of them.
         val taken = (captured + listOfNotNull(download)).distinctBy { it.url }
@@ -392,30 +368,8 @@ class WebSessionActivity : Activity() {
          */
         fun forget(domains: List<String>) {
             val cookies = CookieManager.getInstance()
-            domains.forEach { purge(cookies, it) }
+            domains.forEach { WebSessionCookies.purge(cookies, it) }
             cookies.flush()
-        }
-
-        /** Puts a stored `name=value; ...` header back for [domain] (and its subdomains). */
-        private fun inject(cookies: CookieManager, domain: String, header: String) {
-            header.split(';').map { it.trim() }.filter { it.contains('=') }.forEach { pair ->
-                cookies.setCookie("https://$domain", "$pair; Domain=.$domain; Path=/; Secure")
-            }
-        }
-
-        /**
-         * Takes every cookie droidtop's store sends to [domain] out of it: each name is expired as a host cookie and as a
-         * domain cookie at the root path, which is how sign-in cookies are set. A cookie a site scoped to a deeper path
-         * stays; it is sent only to that path of that site.
-         */
-        private fun purge(cookies: CookieManager, domain: String) {
-            val names = cookies.getCookie("https://$domain").orEmpty().split(';')
-                .map { it.substringBefore('=').trim() }.filter { it.isNotEmpty() }.distinct()
-            for (name in names) {
-                cookies.setCookie("https://$domain", "$name=; Max-Age=0; Path=/")
-                cookies.setCookie("https://$domain", "$name=; Max-Age=0; Path=/; Domain=.$domain")
-                cookies.setCookie("https://$domain", "$name=; Max-Age=0; Path=/; Domain=$domain")
-            }
         }
     }
 }

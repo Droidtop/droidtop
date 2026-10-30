@@ -9,34 +9,24 @@ import dev.droidtop.library.settings.ModeGate
 import dev.droidtop.library.settings.Modes
 
 /**
- * droidtop's mode switcher — Android, Desktop, Gaming, or Settings.
+ * droidtop's mode switcher: "Android", the modes that are on, then "Modes and settings", "Reinitialize displays" and
+ * "Close all apps" ([choices]).
  *
- * One switcher, several ways to open it, so no mode is reachable only by a
- * gesture a newcomer cannot see (docs/SPEC.md 2c, "Switching modes"):
+ * One switcher, several ways to open it, so no mode is reachable only by a gesture a newcomer cannot see
+ * (docs/SPEC.md 2c, "Switching modes"):
  *
- * - a long-press of the back key (`Activity.onKeyLongPress(
- *   KeyEvent.KEYCODE_BACK, ...)`) in the launcher and in `MainActivity`;
+ * - a long-press of the back key (`Activity.onKeyLongPress(KeyEvent.KEYCODE_BACK, ...)`) in the launcher and in
+ *   `MainActivity`, the one route from anywhere, though not every device delivers it;
  * - the Android home screen's own long-press menu ("droidtop modes");
  * - the Gaming Quick Menu's System tab ("Switch mode");
  * - the Desktop taskbar ("Modes");
  * - droidtop's games screen, when it is the only droidtop surface on.
  *
- * Every route opens it through [ModeSwitcher.open]: one translucent
- * activity in `:app` (`ModeSwitcherActivity`) draws the shell's own modal
- * sheet over whatever is on screen, so the switcher looks and answers the
- * pad the same in every mode (it was a platform AlertDialog in the system
- * face until 2026-10-08, rig build 1535).
- *
- * The long press stays because it is the one route from anywhere, but on
- * its own it failed the rig: BlueStacks never delivers a long-pressed Back,
- * and a newcomer is never told it exists (dq-coordinator-24, finding 3).
- * On gesture navigation, whether a held back-swipe reaches onKeyLongPress
- * at all is OS-version/OEM-dependent.
+ * Every route opens it through [ModeSwitcher.open]: one translucent activity in `:app` (`ModeSwitcherActivity`)
+ * draws the shell's own modal sheet over whatever is on screen, so the switcher looks and answers the pad the same
+ * in every mode.
  */
 object BackButtonMenu {
-    private const val APP_MAIN_ACTIVITY = "dev.droidtop.app.MainActivity"
-    private const val STANDARD_LAUNCHER_ACTIVITY = "com.android.launcher3.Launcher"
-    private const val ALTERNATIVE_LAUNCHER_ACTIVITY = "dev.droidtop.shell.standard.AlternativeLauncherActivity"
     private const val GLOBAL_SETTINGS_FRAGMENT = "app.murinelauncher.settings.SettingsGlobalFragment"
     const val EXTRA_MODE = "dev.droidtop.app.EXTRA_MODE"
 
@@ -83,24 +73,10 @@ object BackButtonMenu {
      */
     const val EXTRA_DISPLAYS_BACK = "dev.droidtop.app.EXTRA_DISPLAYS_BACK"
 
-    /**
-     * "Android" is always offered: it is the home screen the Home button
-     * opens, droidtop's or not. A mode that is off is not listed; "Settings" opens
-     * Global settings, where every mode is switched on and off, so turning
-     * a mode off is always reversible from here (dq-coordinator-23, F5: it
-     * used to open the launcher's Home settings, which have no Modes, and
-     * recovering Gaming took a data clear).
-     */
+    /** Opens the mode switcher over [activity] ([ModeSwitcher.open]). */
     @JvmStatic
     fun show(activity: Activity) = ModeSwitcher.open(activity)
 
-    /**
-     * The switcher's rows, in order, each with what choosing it does: "Android" always, Desktop and
-     * Gaming while they are on ([ModeGate.switcherModes]), then "Modes and settings", "Reinitialize
-     * displays" and "Close all apps". The rows are drawn by the shell's own modal sheet
-     * (`ModeSwitcherSheet` in `:shell-gamepad`, hosted by `dev.droidtop.app.ModeSwitcherActivity`),
-     * the same in every mode; this module cannot depend on that one, so it hands over the list.
-     */
     /** Whether "Android" must first ask to make droidtop the Home app ([ModeGate.androidAsksForHome]). */
     fun androidAsksForHome(context: Context): Boolean = ModeGate.androidAsksForHome(
         launcherOn = HomeRolePrefs.activeHomeImplementation(context) != HomeRolePrefs.HomeImplementation.NONE,
@@ -113,7 +89,16 @@ object BackButtonMenu {
      */
     class Choice(val label: String, val mode: Mode?, val choose: () -> Unit)
 
-    /** [askForHome], when given, runs instead of "Android" while [androidAsksForHome] says it must ask first. */
+    /**
+     * The switcher's rows, in order, each with what choosing it does. "Android" always: it is the home screen the Home
+     * button opens, droidtop's or not; [askForHome], when given, runs instead while [androidAsksForHome] says it must
+     * ask first. Then Desktop and Gaming while they are on ([ModeGate.switcherModes]); a mode that is off is not
+     * listed. Then "Modes and settings", which opens Global settings, where every mode is switched on and off, so
+     * turning one off is always reversible from here; "Reinitialize displays"; and "Close all apps". The rows are
+     * drawn by the shell's own modal sheet (`ModeSwitcherSheet` in `:shell-gamepad`, hosted by
+     * `dev.droidtop.app.ModeSwitcherActivity`), the same in every mode; this module cannot depend on that one, so it
+     * hands over the list.
+     */
     fun choices(context: Context, askForHome: (() -> Unit)? = null): List<Choice> {
         val homeImplementation = HomeRolePrefs.activeHomeImplementation(context)
         return buildList {
@@ -171,7 +156,7 @@ object BackButtonMenu {
     fun reinitializeDisplays(context: Context) {
         context.startActivity(
             Intent(Intent.ACTION_MAIN).apply {
-                setClassName(context.packageName, APP_MAIN_ACTIVITY)
+                setClassName(context.packageName, StandardComponents.MAIN)
                 putExtra(EXTRA_DISPLAY_REINIT_FORCE, true)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             },
@@ -195,8 +180,8 @@ object BackButtonMenu {
     @JvmStatic
     fun homeIntent(context: Context, implementation: HomeRolePrefs.HomeImplementation): Intent {
         val activityName = when (implementation) {
-            HomeRolePrefs.HomeImplementation.STANDARD -> STANDARD_LAUNCHER_ACTIVITY
-            HomeRolePrefs.HomeImplementation.ALTERNATIVE -> ALTERNATIVE_LAUNCHER_ACTIVITY
+            HomeRolePrefs.HomeImplementation.STANDARD -> StandardComponents.LAUNCHER
+            HomeRolePrefs.HomeImplementation.ALTERNATIVE -> StandardComponents.ALTERNATIVE
             HomeRolePrefs.HomeImplementation.NONE -> null
         }
         if (activityName == null || !HomeRolePrefs.isDroidtopHome(context)) {
@@ -223,14 +208,19 @@ object BackButtonMenu {
 
     private fun launchAppMode(context: Context, mode: Mode) {
         Modes.setLastMode(context, mode)
-        val intent = Intent(Intent.ACTION_MAIN).apply {
-            setClassName(context.packageName, APP_MAIN_ACTIVITY)
-            putExtra(EXTRA_MODE, mode.id)
-            putExtra(EXTRA_DISPLAYS_BACK, true)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
+        context.startActivity(appModeIntent(context, mode.id).putExtra(EXTRA_DISPLAYS_BACK, true))
     }
+
+    /**
+     * The one way Standard starts an app-hosted mode's screen: `:app`'s MainActivity in its own task, on the mode
+     * [modeId] (Droidtop/tracker#771). Callers add their own extras (the display reinit, displays back).
+     */
+    @JvmStatic
+    fun appModeIntent(context: Context, modeId: String): Intent =
+        Intent(Intent.ACTION_MAIN)
+            .setClassName(context.packageName, StandardComponents.MAIN)
+            .putExtra(EXTRA_MODE, modeId)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /** Global settings, on the settings surface every mode shares. */
     @JvmStatic

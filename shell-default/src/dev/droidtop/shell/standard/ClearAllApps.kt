@@ -6,11 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import dev.droidtop.runtime.tasks.RunningApp
+import dev.droidtop.runtime.util.AppScopes
 import dev.droidtop.runtime.tasks.TaskManager
 import dev.droidtop.runtime.tasks.TaskPolicy
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
@@ -21,10 +19,10 @@ import kotlinx.coroutines.launch
  *
  * It is an activity of its own, translucent over whatever was on screen, because the confirm for more
  * than a few apps has to be shown after the list is read, and the menu that started it has gone by
- * then. The close itself outlives the screen: it runs in a process scope, and its result is a toast.
+ * then. The close itself outlives the screen: it runs in droidtop's process-wide scope ([AppScopes]; the task
+ * manager's calls suspend), and its result is a flash.
  */
 object ClearAllApps {
-    internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @JvmStatic
     fun open(context: Context) {
@@ -38,7 +36,7 @@ class ClearAllAppsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val app = applicationContext
-        ClearAllApps.scope.launch {
+        AppScopes.io.launch {
             val targets = TaskManager.clearAllTargets(app)
             runOnUiThread { decide(targets) }
         }
@@ -62,7 +60,7 @@ class ClearAllAppsActivity : Activity() {
 
     private fun closeAll(targets: List<RunningApp>) {
         val app = applicationContext
-        ClearAllApps.scope.launch {
+        AppScopes.io.launch {
             val summary = TaskManager.clearAll(app, targets)
             runOnUiThread { say(summary.message) }
         }

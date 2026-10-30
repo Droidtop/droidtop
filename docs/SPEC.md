@@ -965,11 +965,27 @@ case. When the target IS Standard, the trampoline forwards to
 exactly as before. The double-tap "hard display reinit" detection that used
 to live in `Launcher.onNewIntent`'s own redirect branch moved to the
 trampoline too (a process-lifetime timestamp, since every Home press
-recreates the trampoline fresh); `Launcher.java`'s own three copies of this
-decision (`onCreate`, `onStart`, `onNewIntent`) are unreachable now that it
-no longer holds `CATEGORY_HOME`, and are left in place as a harmless no-op
-safety net rather than removed, since ripping working vendored lifecycle
-code out is its own risk for no behavioural gain.
+recreates the trampoline fresh).
+
+**One Home decision for both HOME activities (2026-10-30, Droidtop/tracker#771).**
+`HomeEntry.route` is the decision, in order: unfinished setup, Home on the
+companion's screen, an explicit "Android", a crash-looping theme (to Gaming),
+the home target's mode with the display reinit (forced on a double tap within
+600 ms, timed once per press before any branch), else Standard.
+`HomeTrampolineActivity` and `AlternativeLauncherActivity` both run it, so
+the Alternative forwarder now escapes a theme crash loop, brings the
+companion back on its screen and does the double-tap reinit as Standard does.
+On Standard each does its own step after `HomeEntry.enterStandard`: the
+trampoline starts `com.android.launcher3.Launcher` marked as the explicit
+"Android" (`EXTRA_MODE=launcher`), and the forwarder starts the other
+launcher. `Launcher.java`'s own three copies of the decision (`onCreate`,
+`onStart`, `onNewIntent`) are deleted. They could disagree: the trampoline's
+Standard forward carried no mode, so Launcher3 ran `Modes.homeTarget` again
+and could send an explicit "Android" back to the default mode. The forwarder
+starts the other launcher a second time on the next frame, as farmerbb/Taskbar's
+HSLActivity does, because some launchers move to their default page only on a
+Home intent that reaches them while already in front. Which ones is not
+recorded here; the second start costs nothing on those that ignore it.
 
 **The cold-start splash shows droidtop's own icon, not the platform's
 (decided 2026-09-26).** The UX review found droidtop's Android 12+
@@ -1307,7 +1323,7 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Backup/restore | HAVE, wired to Settings | `backup/BackupHelper.kt`, `SettingsMiscFragment.BACKUP_EXPORT`/`BACKUP_IMPORT` |
 | Smartspace/clock widget | HAVE | `widget/smartspace/{MurineClockView,SmartspaceMode}.kt` |
 | Configurable QSB with web search providers | HAVE; the bar opens the one search (2026-10-16, Droidtop/tracker#564) | `widget/search/{SearchProvider,MurineSearchBarView,WebSearch}.kt` (8 providers + custom). Decided by the coordinator: one search. A tap on the home search bar, or what its mic heard, opens `LauncherSearchActivity`; the web is one row there, "Search the web" with the query as its detail, last in the list (`SearchRowKind.WEB`), searching with the bar's provider (`WebSearch`). Murine's own search box, its history and its bubble settings are deleted; upstream's search-bar app search (`e4e124c`) is skipped on purpose |
-| Gestures: double-tap, swipe down, two-finger swipe down and up, pinch in and out, and the Home button pressed on the first page, each assignable to nothing/lock screen/notifications/app drawer/recent apps/close all apps/companion, or droidtop's Search, Quick Menu, Switch mode and Games, or an app the person picks (Open an app, added 2026-10-16 for the Nova and Apex import, which brings across gestures that open apps) (**slots and droidtop targets added 2026-10-16**, Droidtop/tracker#564; double-tap and swipe down built 2026-09-26) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), one `LauncherPrefs.GESTURE_*_ACTION` per slot, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows; double-tap in `WorkspaceTouchListener.java`, swipe down in `NotificationSwipeController.kt`, the two-finger slots in `MultiFingerGestureController.kt` (whichever of the swipe or the pinch crosses three touch slops first wins), Home in `Launcher.onNewIntent` (on any other page Home still goes to the first page). Two-finger swipe down opens the Quick Menu out of the box, and the home screen's long-press menu has a Quick Menu row: before, Standard had no way into it. The Quick Menu is `QuickMenuActivity` (`:app`), a translucent window over the home screen holding `QuickMenuStandalone`, the sheet Desktop's tray opens; Start closes it, Standard having no Start menu. `:shell-default` opens it and the Games grid by class name (`DroidtopScreens`). An existing install's old two-boolean prefs are carried over once by `GestureActionMigration`. Swipe up stays Launcher3's own drawer swipe. Which gesture is which slot (two-finger swipe or pinch, and when Home runs its slot) is `StandardGestures` in `:runtime-common`, tested there (`StandardGesturesTest`); `StandardGestureTargetsTest` checks that the class names and the search action `:shell-default` opens droidtop's screens by are the real activities. The rig cannot inject these gestures (2026-10-16), so the tests carry them. Open an app is `GestureAction.LAUNCH_APP`, the app kept in a preference beside the slot's own (`<slot key>_app`); every slot runs through `HomeActions` (`dev.droidtop.shell.standard`), which starts the app through `LauncherApps.startMainActivity` (a launcher activity only, never an arbitrary intent) and says so with a notice when it is gone. A gesture's action and an icon's swipe share one type and stored form, `HomeAction` in `:runtime-common` (the action's name, or `app:` and the component; `HomeActionTest`). Choosing Open an app shows the launchable apps in the same focusable list as the other choices; the slot changes only once an app is picked |
+| Gestures: double-tap, swipe down, two-finger swipe down and up, pinch in and out, and the Home button pressed on the first page, each assignable to nothing/lock screen/notifications/app drawer/recent apps/close all apps/companion, or droidtop's Search, Quick Menu, Switch mode and Games, or an app the person picks (Open an app, added 2026-10-16 for the Nova and Apex import, which brings across gestures that open apps) (**slots and droidtop targets added 2026-10-16**, Droidtop/tracker#564; double-tap and swipe down built 2026-09-26) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), one `LauncherPrefs.GESTURE_*_ACTION` per slot, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows; double-tap in `WorkspaceTouchListener.java`, swipe down in `SwipeDownSlotController.kt`, the two-finger slots in `MultiFingerGestureController.kt` (whichever of the swipe or the pinch crosses three touch slops first wins), Home in `Launcher.onNewIntent` (on any other page Home still goes to the first page). Two-finger swipe down opens the Quick Menu out of the box, and the home screen's long-press menu has a Quick Menu row: before, Standard had no way into it. The Quick Menu is `QuickMenuActivity` (`:app`), a translucent window over the home screen holding `QuickMenuStandalone`, the sheet Desktop's tray opens; Start closes it, Standard having no Start menu. `:shell-default` opens it and the Games grid by class name (`DroidtopScreens`). Swipe up stays Launcher3's own drawer swipe. Which gesture is which slot (two-finger swipe or pinch, and when Home runs its slot) is `StandardGestures` in `:runtime-common`, tested there (`StandardGesturesTest`); `StandardGestureTargetsTest` checks that the class names and the search action `:shell-default` opens droidtop's screens by are the real activities. The rig cannot inject these gestures (2026-10-16), so the tests carry them. Open an app is `GestureAction.LAUNCH_APP`, the app kept in a preference beside the slot's own (`<slot key>_app`); every slot runs through `HomeActions` (`dev.droidtop.shell.standard`), which starts the app through `LauncherApps.startMainActivity` (a launcher activity only, never an arbitrary intent) and says so with a notice when it is gone. A gesture's action and an icon's swipe share one type and stored form, `HomeAction` in `:runtime-common` (the action's name, or `app:` and the component; `HomeActionTest`). Choosing Open an app shows the launchable apps in the same focusable list as the other choices; the slot changes only once an app is picked |
 | Drawer search over apps, droidtop's own library and the download sources, in one ranked list | **built (Droidtop/tracker#12)** | the drawer's search field opens `LauncherSearchActivity` on the shared `LibrarySearchDialog`; see "Launcher search" below |
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
 | Light or dark from droidtop's one Appearance setting, not a launcher setting of its own (2026-10-16) | HAVE | `ThemeOverride` reads `AppearancePrefs`; see 7k "Light and dark" |
@@ -3356,6 +3372,44 @@ the `ContainerRuntime` interface that already exists (§3):
   settings the rows below write, so the summary cannot say what the rows
   do not; each later slice of #787 (clipboard, network, GPU, scale and
   theme, keyboard and pad) adds its line here.
+  **Resource usage (Droidtop/tracker#757 slice 3).** A running
+  container's page has "Memory and processor" under Storage used: the
+  memory its processes hold (their resident sets, summed) and their share
+  of the whole device's processor ("512 MB · 12% of the processor"), with
+  how many processes there are. It is read from `/proc`
+  (`ContainerRuntime.usage`, `ProcUsage`): each process's CPU time twice,
+  half a second apart when the page opens and a second apart when the
+  row is pressed to measure again, so the share is the ticks used over
+  the ticks the device's cores had in that time (0 to 100). A process
+  that starts or ends between the readings adds memory but no share.
+  - **proot:** the processes are droidtop's own user, found as for Stop
+    (`ProotProcesses.ofContainer`, proot included), and read directly.
+  - **droidspaces:** the processes are root's. droidspaces' own `pid`
+    command names the container's init, and one root shell (Shizuku or
+    Sui) reads every process in that init's PID namespace. Without the
+    root shell the row says so, in place of a number.
+  - Nothing is kept: each reading is made when asked for, and a stopped
+    container has no row.
+  **Update its software (Droidtop/tracker#757 slice 4).** A container's
+  page has "Update its software", which asks first. It runs the
+  container's own package manager as root inside it (`PackageUpgrade`):
+  the first of apk, apt, dnf, pacman and zypper that the container has
+  (found inside it with `command -v`, so a droidspaces container whose
+  tree droidtop cannot read from outside works the same). Each manager
+  refreshes its package list and upgrades what is installed: `apk update`
+  and `apk upgrade`; `apt-get update` and `apt-get -y upgrade`
+  (noninteractive, keeping changed configuration files); `dnf -y upgrade`
+  without weak dependencies; `pacman -Syu --noconfirm`; `zypper refresh`
+  and `zypper update --no-recommends`. Never a distribution upgrade, so
+  nothing the person did not have is installed where the manager allows
+  it (pacman and dnf pull a new dependency an upgraded package needs, as
+  they must). The row says each step while it runs ("Refreshing the
+  package list (apt)", "Upgrading (apt)"), then what happened, read from
+  the manager's own output ("12 packages upgraded", "Already up to
+  date"), or the manager's last words when a step fails. A sibling that
+  needs starting is started first. droidtop never builds or changes an
+  image: this changes the container's own tree, as the person would in
+  its terminal.
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend
@@ -6032,7 +6086,9 @@ the person is on Standard or an Alternative-forwarded launcher.
 Fixed by reusing the SAME pattern at the one remaining place it was missing:
 `reassertSecondaryDisplays` (`:shell-default`) explicitly starts
 `dev.droidtop.display.SecondaryDisplayActivity` on every attached secondary display
-(`DisplayManager.displays`, filtered to non-default `FLAG_PRESENTATION` displays), called
+(`DisplayManager.displays`, filtered to non-default `FLAG_PRESENTATION` displays) that does
+not already show it (`SecondaryCover.resumedDisplayId`, in `:runtime-common` so both modules
+read the one value; a start that fails is logged, Droidtop/tracker#771), called
 from both `HomeTrampolineActivity.forwardToStandard` and `AlternativeLauncherActivity`'s
 forward path, right alongside the `Modes.setLastMode(LAUNCHER)` call each already makes. A
 string component name (`Intent().setClassName(...)`), not a class reference: `:shell-default`
@@ -6107,7 +6163,18 @@ relocation give-up policy, which surface covers which display -- is now orchestr
 Activity code. The relocation cooldown counters stay process-wide (a companion object on the
 orchestrator class, same as `MainActivity`'s own former `DisplayRelocation` companion
 object), since a relocation recreates the Activity (and with it a fresh
-`SecondScreenOrchestrator` instance) mid-guard-window.
+`SecondScreenOrchestrator` instance) mid-guard-window. So do the displays the
+last pass saw and the display the shell was last on (Droidtop/tracker#785):
+kept per instance, a fresh instance read every relocation as a new topology and
+reset the cooldown and the attempts, and the configuration change a move
+delivers reset them too, so a relocation that did not stick retried at once and
+for ever. That was the owner's "constantly reinitializes both screens until it
+only has one" on a start with two screens attached. A configuration change now
+resets them only when the shell stayed on its display (a foldable's new
+shape). What made the relocation not stick: `CompanionActivity` shared
+`MainActivity`'s task affinity, so starting it on the built-in display found
+the shell's task and brought it back there. It has a task of its own
+(`taskAffinity=""`).
 
 Behavior is unchanged -- this is a move, not a redesign: explicit launch-display targeting,
 the Standard second screen (via `reassertSecondaryDisplays`, untouched), the Alternative
@@ -8640,8 +8707,27 @@ key code or an edge.
   droidtop's own chrome (menus, settings, sheets, pickers, grids) uses
   ES-DE's MEDIUM tiers: half a second before the first repeat, then every
   180 ms, then every 80 ms after 1.6 s, so a long list runs smoothly and a
-  tap is never two steps. A themed ES-DE list uses ES-DE's own default,
-  QUICK (500 ms, then 114 ms, then every frame).
+  tap is never two steps. A themed ES-DE textlist or grid uses ES-DE's own
+  default, QUICK (500 ms, then 114 ms, then every frame). A themed carousel
+  uses what ES-DE builds a carousel with, SLOW (500 ms, then every 200 ms),
+  or MEDIUM when the theme sets `fastScrolling` (CarouselComponent.h:225,
+  :1765), so a held run never outpaces its camera (Droidtop/tracker#782).
+  The carousel's camera follows ES-DE's `onCursorChanged`: a move from
+  rest starts a 400 ms ease-out; the release after a held run restarts it
+  once over what is left (200 to 400 ms, `esDeCarouselAnimMs`); and the
+  selected colours are drawn on the cursor's entry only once the camera is
+  within one entry of it (CarouselComponent.h:1233). Everything that marks
+  the selection (the selected colours, the zoom and opacity, the system
+  view's sliding elements) is drawn from that one camera, never from the
+  cursor, so there is one timer on screen. **One deviation from ES-DE, for
+  quick presses.** ES-DE restarts a full 400 ms slide on a press made while
+  the camera is still moving; at 120 to 150 ms between taps the camera
+  then trails and lands 400 ms after the last tap, which the owner reported
+  on the RP5 (Droidtop/tracker#782): "moves "stack"... the outline moves,
+  but the highlight waits for me to be finished moving". droidtop
+  retargets such a press in 200 ms over what is left, so the camera stays
+  within about a fifth of an item of the cursor and settles 200 ms after
+  the last press (`EsDeCarouselTimingTest`).
 - **Menus never wrap.** Real ES-DE's menus are `LIST_NEVER_LOOP`
   (`ComponentList.cpp:17`): the cursor stops at both ends, held or not, so
   a held direction can never spin round a menu (`menuStep`). A themed
@@ -11119,7 +11205,7 @@ Generalizing the
 real gamelist list-widget path (`EsDeListItem`) to badge/rating overlays
 the way a real theme's own game GRID entries sometimes show them inline;
 droidtop's own "Continue Playing" row (a real bolt-on with no equivalent
-in real ES-DE, see its own doc comment in `GamepadShell.kt`) visually
+in real ES-DE, see its own doc comment in `GamesSection.kt`) visually
 collides with decaffe's real metadata sidebar now that the sidebar
 actually renders — needs real per-theme-aware safe-zone placement, not
 a hardcoded top-left anchor; not yet designed. Also unverified: the
@@ -17909,7 +17995,7 @@ to call `FocusManager.moveFocus(FocusDirection.Up)` at the TOP row, which does n
 grid: Compose's focus search kept going and landed on `SectionTabBar`, so a D-pad press meant to
 mean "there is nothing further up" instead silently reassigned the pad to switching
 Games/Apps/Settings. Up at the grid's top row is now simply consumed and left there
-(`GamepadShell.kt`'s `GamesSection`); nothing before this shell had a bound way to reach the tab
+(`GamesSection.kt`); nothing before this shell had a bound way to reach the tab
 row by pad at all, since the row does not receive focus during ordinary play, so none was taken
 away. The tab row's own control is L1/R1, unconditionally, whether or not anything is focused on
 it (`esDeHelpRowOwner`/`GamingMenu`'s pad routing is untouched by this) -- the same binding
@@ -18782,6 +18868,38 @@ A condition the person should know about (an unofficial plugin, a feature that i
     `BROWSER_CHECK_REQUIRED` as before. Other methods still use the client. A guest page is still the site's page:
     the plugin answers `SIGN_IN_REQUIRED` for it, not "could not read" (docs/plugin-api.md 1.3), and that change is
     the F95 plugin's.
+  - **The hidden view runs in droidtop's window, and a download link opens there first (2026-10-30, Droidtop/tracker#783).**
+    On the console, F95's check passed at once in the visible view but "did not pass by itself" in the hidden one,
+    on the same WebView, and the person was shown the site for nothing. The hidden view was in no window, which to its
+    browser is a hidden page: no frames are drawn and its timers are slowed, and a check's script does not finish.
+    The owner, on what follows from it: "The site says the link works for "a few hours", so let's open the link in the
+    hidden webview, check for the text currently onscreen, and if we see it, refresh the link and launch that.
+    Otherwise, display the webview to the user (if they need to look at it). I have a torbox key saved, so since I'm
+    using pixeldrain, it should just hand it off". So:
+    - **Where it runs.** Every hidden view (`WebFetch`, `HiddenWebSession`) is put behind the content of droidtop's
+      screen in front, at its size, unfocusable and out of the accessibility tree (`HiddenWebViews`), and taken out
+      before it is destroyed. Not behind the companion or a cover parked on the other screen, nor a running game. With
+      no droidtop screen in front a fetch runs in no window as before, and a download link opens in the visible view.
+    - **The same session as the visible view.** The plugin's session and droidtop's download-site sign-ins are put into
+      the cookie store and taken out again exactly as for the visible view (`WebSessionCookies`).
+    - **A download link opens out of sight first** (`PluginWebAccount.openForDownloads`, and a plugin's own
+      `web.session open_in_session`), and ends one of four ways:
+      - **A host droidtop serves.** The page leads there, and the host's resolvers take it as from the visible view
+        (#650): with a TorBox key a pixeldrain link comes "via your TorBox". No page is shown.
+      - **A download.** The page starts one, and it is taken as the visible view takes one.
+      - **Expired.** The page shows a sentence the plugin declared for an expired link (`web.session`'s `expiredText`,
+        docs/plugin-api.md 3 G3). droidtop never guesses at a site's page. For a record's link droidtop asks the source
+        for the record again, finds the same mirror in it by section, host and label, and opens that link out of sight
+        the same way, once. A plugin's own `open_in_session` answers `{captured: false, expired: true}` instead, for
+        the plugin to ask its site again.
+      - **The person's.** A check that did not pass by itself in about 12 seconds, a page that neither moves on nor
+        starts anything within 3 seconds of finishing, or 40 seconds in all: the visible view opens on the same link,
+        and what the hidden one cleared on the way is kept first.
+    - **The record's links are kept.** A masked link works for a few hours, so the address droidtop saved with the
+      record is opened as it is, and is asked for again only when its page says it has expired.
+    - **The plugin stays loaded while a view of its site is open** (`PluginProcesses.keep`): a check or a download page
+      the person takes minutes on no longer outlasts the plugin's idle unload, which ended F95's process on the console
+      while the person was on its page.
   - **Asked once, never in a loop:** nothing retries by itself; a background call that meets a check fails with the error and waits for the person. A download asked again right after the person passed the check says so once ("<source>'s site still asked for its check after it was passed, so nothing was downloaded") and does not open the check again for it.
 - **Sign-in and browser checks.** A source answers `SIGN_IN_REQUIRED` or the new `BROWSER_CHECK_REQUIRED` (no made-up "Sign in to <site>" result row, no paragraph about opening Settings). The search shows "Sign in to search here" / "The site checks the browser first" under the source's name with droidtop's own Sign in / Open the site, which searches again after; a view page offers the same as its notice's action and reads the page again. Both open the plugin's `web.session` in droidtop's web view (`PluginWebAccount`, a new `CHECK` mode with Done for the browser check): the `signIn` page the plugin declares on its `web.session` entry, or the site's home page.
 - **The account row.** A plugin holding `web.session` gets "<site> account", Signed in / Not signed in, with Sign in or Sign out and "Your sign-in stays in droidtop: <plugin> never sees your password", on its page, from the session droidtop keeps (the vault entry the plugin cannot read). Pressing droidtop's Sign in is the person allowing `web.session`: an unanswered grant becomes allowed when a session is kept; a refused one is never overridden, and the row says to turn it on in Permissions.
@@ -24321,7 +24439,7 @@ failure mode), checked byte-for-byte against
 disables the plugin with that reason rather than failing deep inside
 native engine init. Settings → Plugins gets the same "separate, explicit
 download" row shape the Python runtime already has
-(`AppSettingsCatalogs.kt`).
+(`PluginsCatalog.kt`).
 
 **The readiness handshake (found needed 2026-09-26, part of the
 flutter_embed contract).** The acquire_content UI's own first real
@@ -24401,7 +24519,7 @@ and fixed before a flutter_embed plugin could actually run at all:**
 1. **`PluginCrashPolicy` never let a flutter_embed plugin run.** The
    Settings UI's "Call ... status tile" action goes through
    `PluginCrashPolicy.invoke()`/`startJob()` (called from
-   `AppSettingsCatalogs.kt`), NOT directly through
+   `PluginsCatalog.kt`), NOT directly through
    `PluginRuntimeService`'s own dispatch. That class's own kind gate was
    still `!= PluginKind.NATIVE_BUNDLE && != PluginKind.PYTHON` -- never
    updated when the flutter_embed runner landed earlier the same day. A

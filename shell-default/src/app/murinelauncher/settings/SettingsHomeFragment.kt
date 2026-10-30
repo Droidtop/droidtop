@@ -41,11 +41,6 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val LOCK_HOME_SCREEN: String = "pref_lock_home_screen"
         const val DOCK_ICONS_OVERRIDE_SWITCH: String = "pref_dock_icons_override_switch"
         const val DOCK_ICONS: String = "pref_dock_icons"
-        // droidtop patch: superseded by DOUBLE_TAP_ACTION/SWIPE_DOWN_ACTION
-        // below -- kept only as the migration source key
-        // (GestureActionMigration), never bound to a preference row itself.
-        const val DOUBLE_TAP_TO_SLEEP: String = "pref_double_tap_to_sleep"
-        const val SWIPE_DOWN_NOTIFICATIONS: String = "pref_swipe_down_notifications"
         const val DOUBLE_TAP_ACTION: String = "pref_gesture_double_tap_action"
         const val SWIPE_DOWN_ACTION: String = "pref_gesture_swipe_down_action"
         const val TWO_FINGER_DOWN_ACTION: String = "pref_gesture_two_finger_down_action"
@@ -251,8 +246,7 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
             }
             // Pre-P devices lock the screen through a device admin
             // (GestureAction.LOCK_SCREEN's own legacy path), which needs
-            // requesting once, same as the old DOUBLE_TAP_TO_SLEEP switch
-            // used to do on change; P+ (every real target device) uses the
+            // requesting once when the action is chosen; P+ (every real target device) uses the
             // accessibility service instead and needs nothing here.
             setOnPreferenceChangeListener { newValue ->
                 // "Open an app" asks which first; the slot changes only once one is picked.
