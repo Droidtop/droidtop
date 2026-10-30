@@ -1,9 +1,6 @@
 package dev.droidtop.shell.standard
 
-import android.app.Activity
 import android.app.AlertDialog
-import android.content.Intent
-import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.LinearLayout
@@ -20,29 +17,12 @@ import dev.droidtop.runtime.launcherimport.ImportCheck
  * the system's file picker, then a summary of what comes across, what changes on the way and what does not come
  * across with the reason for each, and only then, on Import, [LauncherImport.apply].
  */
-class LauncherImportActivity : Activity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        if (savedInstanceState != null) return
-        val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
-        try {
-            @Suppress("DEPRECATION")
-            startActivityForResult(pick, REQUEST_PICK)
-        } catch (e: Exception) {
-            Log.w(TAG, "no file picker", e)
-            fail(getString(R.string.launcher_import_failed))
-        }
-    }
+class LauncherImportActivity : DocumentPickActivity() {
+    override val mimeTypes = arrayOf("*/*")
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, data)
-        val uri = data?.data
-        if (requestCode != REQUEST_PICK || resultCode != RESULT_OK || uri == null) {
-            finish()
-            return
-        }
+    override fun onNoPicker() = fail(getString(R.string.launcher_import_failed))
+
+    override fun onPicked(uri: android.net.Uri) {
         Executors.THREAD_POOL_EXECUTOR.execute {
             val read = try {
                 LauncherImport.read(applicationContext, uri)
@@ -154,7 +134,6 @@ class LauncherImportActivity : Activity() {
 
     companion object {
         private const val TAG = "droidtop.LauncherImport"
-        private const val REQUEST_PICK = 1
         private const val TITLE_COLOR = 0xFFEDEDED.toInt()
         private const val ROW_COLOR = 0xFFD0D0D0.toInt()
     }
