@@ -19225,7 +19225,11 @@ menu still list every `listed` place.
   process start recorded, which a launcher's process seldom runs, so it said "Up to date" whatever Check now found.
   Now it is one page (`UpdatesPage`), first-class since 2026-10-30 (Droidtop/tracker#792; the owner: "We need a
   cleaner and more uniform updates page that covers everything (plugins, games, etc)"). The page's header says when
-  the last check ran (or why droidtop's own check failed), its bar holds **Check now** and **Update all**, and its
+  the last check ran (or why droidtop's own check failed), its bar holds **Check now** and **Update all** (Check now's
+  progress, then what it found, is a line at the top of the page in place, the button reading Checking meanwhile;
+  #837: a check that was running when droidtop restarted came back paused with no Resume, Check now joined it and
+  nothing happened, so a job that cannot pause now comes back ended, "Stopped when droidtop restarted", and Check now
+  follows only a check that is running), and its
   views go on the strip (`CatalogLayout.STRIP`, L1/R1; a strip page is never cut into the settings column, and its
   column keys are unique even for a game with a linked copy, Droidtop/tracker#837): All, then one per kind that has any, each with its count
   ("All · 5", "Plugins · 2", "Games · 1", "Apps · 1", "droidtop · 1"). Every row is the same shape whatever it updates:

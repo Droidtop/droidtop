@@ -204,6 +204,10 @@ object UpdatesPage {
     private val waiting: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val failed: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val changes = MutableStateFlow(0)
+
+    /** Check now's line, drawn in place at the top of the page: its live status while it runs, then what it found (#837). */
+    @Volatile private var checkLine: String? = null
+    @Volatile private var checkRunning = false
     private val scope = dev.droidtop.runtime.util.AppScopes.io
 
     /** Reads [section] in the background unless it is being read or was read within [FRESH_MS] ([force] reads it anyway). */
@@ -302,6 +306,17 @@ object UpdatesPage {
                 id = "updates_view_${kind?.name?.lowercase() ?: "all"}",
                 title = title,
                 items = buildList {
+                    if (kind == null) {
+                        checkLine?.let { line ->
+                            add(
+                                if (checkRunning) {
+                                    ActionItem(id = "updates_check_now", title = line, progress = -1f)
+                                } else {
+                                    TextBlockItem(id = "updates_check_now", text = line)
+                                },
+                            )
+                        }
+                    }
                     if (kind == null && updates.isEmpty() && checked != null && failure == null && unread.isEmpty()) {
                         add(TextBlockItem(id = "updates_none", text = "Everything is up to date."))
                     }
@@ -317,11 +332,31 @@ object UpdatesPage {
                 byline = listOfNotNull(lastLine ?: "Not checked yet", failure?.let { "The last check of droidtop failed: $it" }).joinToString(". "),
             ),
             buttons = listOf(
-                PageButton(id = "updates_check", label = "Check now", role = ButtonRole.PRIMARY) { ctx ->
+                // Its progress and its answer are a line at the top of the page, in place: the press was easy to miss when
+                // the answer was a flash, and it said nothing at all while the check it joined was stuck (#837).
+                PageButton(
+                    id = "updates_check",
+                    label = "Check now",
+                    role = ButtonRole.PRIMARY,
+                    enabled = !checkRunning,
+                    disabledReason = "Checking",
+                ) { ctx ->
+                    if (checkRunning) return@PageButton
+                    checkRunning = true
+                    checkLine = "Checking..."
+                    changes.value++
                     scope.launch {
-                        val said = UpdateChecks.checkAll(ctx) { }
+                        val said = try {
+                            UpdateChecks.checkAll(ctx) { line ->
+                                checkLine = line
+                                changes.value++
+                            }
+                        } finally {
+                            checkRunning = false
+                        }
                         Section.entries.forEach { refresh(ctx, it, force = true) }
-                        dev.droidtop.library.settings.Notices.flash(said.ifBlank { "Checked" }, context = ctx)
+                        checkLine = said.ifBlank { "Checked" }
+                        changes.value++
                     }
                 },
                 PageButton(

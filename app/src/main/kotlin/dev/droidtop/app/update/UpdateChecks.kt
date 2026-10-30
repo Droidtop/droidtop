@@ -100,7 +100,8 @@ object UpdateChecks {
      */
     suspend fun checkAll(context: Context, onStatus: (String) -> Unit): String {
         val jobs = dev.droidtop.pluginhost.PluginJobsCenter
-        val jobId = jobs.entries().value.firstOrNull { it.nativeKind == JOB_KIND && !it.done }?.jobId
+        // Only a check that is running now is followed: one that is not moving would be waited on for ever (#837).
+        val jobId = jobs.entries().value.firstOrNull { it.nativeKind == JOB_KIND && !it.done && !it.paused }?.jobId
             ?: jobs.startNative(null, JOB_KIND, JOB_TITLE, owner = "Updates", pausable = false)
             ?: return checkNow(context, onStatus)
         val end = jobs.follow(jobId, onStatus)
