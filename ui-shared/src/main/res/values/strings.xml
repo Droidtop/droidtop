@@ -5,4 +5,6 @@
 -->
 <resources>
     <string name="ui_shared_details">Details</string>
+    <string name="ui_shared_paste">Paste</string>
+    <string name="ui_shared_cancel">Cancel</string>
 </resources>

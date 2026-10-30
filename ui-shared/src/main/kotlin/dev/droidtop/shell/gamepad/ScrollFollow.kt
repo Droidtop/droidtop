@@ -37,7 +37,7 @@ import dev.droidtop.ui.shared.Motion
  * person moving up sees what is coming. Where the list cannot scroll further
  * the row simply sits nearer that end.
  */
-internal suspend fun LazyListState.keepInView(index: Int, animate: Boolean = true, under: Int? = null, keepRoom: Boolean = false) {
+suspend fun LazyListState.keepInView(index: Int, animate: Boolean = true, under: Int? = null, keepRoom: Boolean = false) {
     // Two passes: an item that is not laid out yet is reached by an
     // estimate, and the second pass makes the estimate exact.
     repeat(2) {
@@ -76,7 +76,7 @@ internal suspend fun LazyListState.keepInView(index: Int, animate: Boolean = tru
  * room shows its start, so moving inside it never scrolls (Droidtop/tracker#616: Home's first row, taller than the
  * screen, scrolled down to its end and back up to its start on every left or right). Pure, for the tests.
  */
-internal fun inViewDelta(itemStart: Int, itemSize: Int, roomStart: Int, roomEnd: Int): Float? {
+fun inViewDelta(itemStart: Int, itemSize: Int, roomStart: Int, roomEnd: Int): Float? {
     val delta = when {
         itemSize > roomEnd - roomStart -> itemStart - roomStart
         itemStart < roomStart -> itemStart - roomStart
@@ -87,7 +87,7 @@ internal fun inViewDelta(itemStart: Int, itemSize: Int, roomStart: Int, roomEnd:
 }
 
 /** [LazyListState.keepInView] for a grid: rows instead of items. */
-internal suspend fun LazyGridState.keepInView(index: Int, animate: Boolean = true) {
+suspend fun LazyGridState.keepInView(index: Int, animate: Boolean = true) {
     repeat(2) {
         val info = layoutInfo
         val visible = info.visibleItemsInfo
@@ -120,7 +120,7 @@ internal suspend fun LazyGridState.keepInView(index: Int, animate: Boolean = tru
  * its own centre minus the span's centre. Positive scrolls forward. Pure,
  * for the tests.
  */
-internal fun centreDelta(itemStart: Float, itemSize: Float, spanStart: Float, spanEnd: Float): Float =
+fun centreDelta(itemStart: Float, itemSize: Float, spanStart: Float, spanEnd: Float): Float =
     itemStart + itemSize / 2f - (spanStart + spanEnd) / 2f
 
 /**
@@ -132,7 +132,7 @@ internal fun centreDelta(itemStart: Float, itemSize: Float, spanStart: Float, sp
  * glides ([Motion.scroll]). Nothing here measures anything the lazy list
  * has not already measured.
  */
-internal suspend fun LazyListState.keepCentred(index: Int, chained: Boolean = false) {
+suspend fun LazyListState.keepCentred(index: Int, chained: Boolean = false) {
     repeat(2) {
         val info = layoutInfo
         val visible = info.visibleItemsInfo
@@ -159,7 +159,7 @@ internal suspend fun LazyListState.keepCentred(index: Int, chained: Boolean = fa
 }
 
 /** [LazyListState.keepCentred] for a grid: the selection's row, centred vertically. */
-internal suspend fun LazyGridState.keepCentred(index: Int, chained: Boolean = false) {
+suspend fun LazyGridState.keepCentred(index: Int, chained: Boolean = false) {
     repeat(2) {
         val info = layoutInfo
         val visible = info.visibleItemsInfo

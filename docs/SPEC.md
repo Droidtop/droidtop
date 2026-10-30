@@ -3642,7 +3642,7 @@ the `ContainerRuntime` interface that already exists (§3):
     (`ContainersCatalog.kt:394`, `:411`, `:465`, `:736`) — but both
     renderers call a `ToggleItem.onToggle` and a `FolderPickItem.onPicked`
     synchronously on the main thread (`CatalogPreferenceBuilder.kt:111`,
-    `:387`; `SettingsCatalogView.kt:238`, `:593`), and `runBlocking` parks
+    `:387`; `CatalogNavigator.kt:501`, `:434`), and `runBlocking` parks
     its caller whatever dispatcher the body runs on, so each of those
     rows holds the UI thread for a container-config write. That is the
     remaining violation of the settings catalog's own C4 rule ("an
@@ -3653,7 +3653,7 @@ the `ContainerRuntime` interface that already exists (§3):
     export/restore (`ContainersCatalog.kt:302`, `:317`) run inside a
     `DocumentPickItem.onPicked`, which both renderers already run under
     `withContext(Dispatchers.IO)` (`CatalogPreferenceBuilder.kt:128`;
-    `SettingsCatalogView.kt:228`), so the `runBlocking` parks an IO
+    `CatalogNavigator.kt:422`), so the `runBlocking` parks an IO
     thread for the archive, not the UI. The plugin broker's surface is
     synchronous by contract, so its `runBlocking`s park the calling
     binder thread while a grant sheet is answered or a provider call runs
@@ -18842,7 +18842,14 @@ a dialog's choices (`DialogChoices`), the one modal window (`ShellDialog`) and t
 (`PadFocusHolder`), the side panels (`SidePanelFrame`), the sheet of choices (`ActionSheet`), the tab rail (`TabRail`)
 with the glyphs it draws (`QuickGlyph`), a catalog row's glyph (`CatalogGlyph`), the sheen (`shine`),
 `requestFocusWhenAttached`, and the interface sounds the panels play (`theme/`: `EsDeNavigationSounds`, `UiSound`,
-the wav reader and normaliser). It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
+the wav reader and normaliser). The settings renderer followed (part 4): `CatalogNavigator`, with its category column
+(`SettingsCategories`), the pickers and text dialog it opens (`CatalogChoicePicker`, `TextEditDialog`), the one value
+step (`adjustCatalogItem`) and the stack and selection savers, plus what it draws through: keeping the selection in view
+(`ScrollFollow`), the shoulder strip a page claims (`ShoulderStrip`), the room the status cluster takes
+(`StatusClusterRoom`) and droidtop's keyboard for a field (`DroidtopKeyboard`, `OwnFieldKeyboard`, `opensFocused`).
+Gaming's own Settings section and places stay in `:shell-gamepad` (`SettingsCatalogView`, `PlaceCatalogView`,
+`gamingSettingsRoot`): they are the shell's entries into the renderer, with the shell's theme browser behind Browse
+themes. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
 `TypeRole` naming the job of each role with `DroidtopTypography` behind it, `MenuTokens` as the
 shell's palette and row measures, and `ChromeColors` as the colour source for chrome outside
 the shell. `DroidtopTheme` supplies the colour

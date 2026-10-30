@@ -20,7 +20,7 @@ import dev.droidtop.library.settings.NestedScreenItem
  * [sectionAbove] is the column label drawn above the entry (the title of the
  * group its links came from, on the first of them only).
  */
-internal data class SettingsCategory(
+data class SettingsCategory(
     val key: String,
     val label: String,
     val icon: CatalogIcon?,
@@ -48,7 +48,7 @@ internal const val MIN_SETTINGS_CATEGORIES = 3
  * fulfils natively ([nativeIds]) is not a screen, so its group stays a plain
  * category.
  */
-internal fun settingsCategories(
+fun settingsCategories(
     groups: List<CatalogGroup>,
     untitledLabel: String,
     nativeIds: Set<String> = emptySet(),
@@ -126,7 +126,7 @@ internal fun settingsCategories(
  * builds a screen's groups (`CatalogScreen.groups` with the caller's context).
  * Only one level: a merged screen's own links stay links.
  */
-internal suspend fun mergeShortScreens(
+suspend fun mergeShortScreens(
     groups: List<CatalogGroup>,
     load: suspend (CatalogScreen) -> List<CatalogGroup>,
 ): List<CatalogGroup> {
@@ -160,7 +160,7 @@ internal suspend fun mergeShortScreens(
  * held nothing else: in a mode with a left menu a place has one way in, the menu, not a second
  * row in Settings (docs/SPEC.md "Settings layout", Droidtop/tracker#273).
  */
-internal fun withoutPlaceLinks(groups: List<CatalogGroup>, placeScreenIds: Set<String>): List<CatalogGroup> {
+fun withoutPlaceLinks(groups: List<CatalogGroup>, placeScreenIds: Set<String>): List<CatalogGroup> {
     if (placeScreenIds.isEmpty()) return groups
     fun isPlaceLink(item: Any) = (item as? NestedScreenItem)?.registryId in placeScreenIds
     return groups.mapNotNull { group ->

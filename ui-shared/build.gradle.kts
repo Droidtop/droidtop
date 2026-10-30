@@ -48,6 +48,9 @@ dependencies {
     // window, and a catalog row's picture (CatalogGlyph) is drawn by the image loader, as it was in :shell-gamepad.
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.coil.compose)
+    // The settings renderer (Droidtop/tracker#827 F1b part 4): CatalogNavigator takes Back through the activity's back
+    // dispatcher and opens Android's folder and document pickers, as it did in :shell-gamepad.
+    implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)

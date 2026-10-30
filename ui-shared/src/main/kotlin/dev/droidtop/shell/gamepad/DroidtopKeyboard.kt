@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import android.view.View
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -22,6 +23,7 @@ import dev.droidtop.runtime.keyboard.AddonKeyboard
 import org.pocketworkstation.pckeyboard.KeyboardPanel
 import org.pocketworkstation.pckeyboard.KeyboardSink
 import org.pocketworkstation.pckeyboard.WindowKeySink
+import java.util.WeakHashMap
 
 /** The share of its screen's height the keyboard takes where it shares the screen with other content. */
 const val INLINE_KEYBOARD_HEIGHT_PERCENT = 35f
@@ -82,8 +84,8 @@ fun OwnFieldKeyboard(modifier: Modifier = Modifier, active: Boolean = true) {
     // This window's field has its keyboard beside it: the window-wide one stays away.
     DisposableEffect(view) {
         val root = view.rootView
-        InWindowKeyboard.ownFieldShown(root, true)
-        onDispose { InWindowKeyboard.ownFieldShown(root, false) }
+        OwnFieldWindows.shown(root, true)
+        onDispose { OwnFieldWindows.shown(root, false) }
     }
     val sink = remember(view) { WindowKeySink { view.rootView } }
     // Wherever "Keyboard displays on" puts it (SPEC 4c): drawn here only when that is this screen.
@@ -111,6 +113,22 @@ fun OwnFieldKeyboard(modifier: Modifier = Modifier, active: Boolean = true) {
 }
 
 private const val KEYBOARD_GUARD_MS = 150L
+
+/**
+ * Root views with an [OwnFieldKeyboard] composed in them, counted, so the window-wide keyboard
+ * (`InWindowKeyboard`, :shell-gamepad) draws no second one there. Weak: a gone window is forgotten. Main thread only.
+ */
+object OwnFieldWindows {
+    private val roots = WeakHashMap<View, Int>()
+
+    internal fun shown(root: View, shown: Boolean) {
+        val count = (roots[root] ?: 0) + if (shown) 1 else -1
+        if (count <= 0) roots.remove(root) else roots[root] = count
+    }
+
+    /** Whether [root] has a field drawing its own keyboard beside it. */
+    fun has(root: View): Boolean = (roots[root] ?: 0) > 0
+}
 
 /**
  * A dialog's one text field, holding the cursor from the moment the dialog opens (Droidtop/tracker#523): keys from any

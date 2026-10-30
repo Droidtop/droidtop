@@ -145,7 +145,7 @@ This project is distributed under the GNU General Public License v3.0 (see
   (`ui/FrontEndWidgets.kt`, the game page's gear), the Stop pill (`ui/SessionOverlay.kt`, the Quick Menu's
   Game section), the Resume row with its live dot and the attention dot (`ui/FrontEndRail.kt`, in
   `LeftMenu.kt`), and the store page's header chips and busy bar (`ui/StorePage.kt`, as catalog chips and
-  progress rows in `SettingsCatalogView.kt` and `MenuRow.kt`). Each ported file names
+  progress rows in `CatalogNavigator.kt` and `MenuRow.kt`). Each ported file names
   the DroidDeck file it came from. No DroidDeck artwork, logo or wordmark is used.
 
 ## Bundled themes

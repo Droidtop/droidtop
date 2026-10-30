@@ -17,10 +17,10 @@ import androidx.compose.runtime.setValue
  * One mechanism for the whole shell: the shell's root handler asks
  * [shoulderRoute] and nothing else keeps a shoulder list of its own.
  */
-internal class ShoulderStrip(val step: (Int) -> Unit)
+class ShoulderStrip(val step: (Int) -> Unit)
 
 /** The strip, if any, the page in front has claimed. Held by the shell. */
-internal class ShoulderStripRegistry {
+class ShoulderStripRegistry {
     var current: ShoulderStrip? by mutableStateOf(null)
         private set
 
@@ -38,7 +38,7 @@ internal class ShoulderStripRegistry {
     }
 }
 
-internal val LocalShoulderStrips = compositionLocalOf<ShoulderStripRegistry?> { null }
+val LocalShoulderStrips = compositionLocalOf<ShoulderStripRegistry?> { null }
 
 /**
  * Claims L1/R1 for this page's tab strip while it is composed. [step] is
@@ -48,7 +48,7 @@ internal val LocalShoulderStrips = compositionLocalOf<ShoulderStripRegistry?> { 
  * user).
  */
 @Composable
-internal fun OwnShoulders(step: (Int) -> Unit) {
+fun OwnShoulders(step: (Int) -> Unit) {
     val registry = LocalShoulderStrips.current
     val latest by rememberUpdatedState(step)
     DisposableEffect(registry) {
@@ -58,12 +58,12 @@ internal fun OwnShoulders(step: (Int) -> Unit) {
     }
 }
 
-internal enum class ShoulderRoute { STRIP, NONE }
+enum class ShoulderRoute { STRIP, NONE }
 
 /**
  * Where an L1/R1 press goes. Details and pages without strips leave it alone.
  */
-internal fun shoulderRoute(stripOwned: Boolean, detailOpen: Boolean): ShoulderRoute = when {
+fun shoulderRoute(stripOwned: Boolean, detailOpen: Boolean): ShoulderRoute = when {
     detailOpen -> ShoulderRoute.NONE
     stripOwned -> ShoulderRoute.STRIP
     else -> ShoulderRoute.NONE
@@ -74,4 +74,4 @@ internal fun shoulderRoute(stripOwned: Boolean, detailOpen: Boolean): ShoulderRo
  * attached the glyphs are noise, so neither the top bar nor a strip draws
  * them there.
  */
-internal fun ShellWindow.showsShoulderGlyphs(): Boolean = !touchFirst || padPresent
+fun ShellWindow.showsShoulderGlyphs(): Boolean = !touchFirst || padPresent
