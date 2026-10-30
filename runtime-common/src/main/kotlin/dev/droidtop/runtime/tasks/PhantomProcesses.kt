@@ -58,15 +58,39 @@ object PhantomProcesses {
      * droidtop's child processes now: every process of droidtop's own user that is not one of its app processes. The
      * kernel shows an app only its own processes, which is exactly what Android counts for it. Blocking: IO only.
      */
-    fun countOurs(uid: Int, packageName: String, procRoot: File = File("/proc")): Int =
-        procRoot.list().orEmpty().count { name ->
-            val pid = name.toIntOrNull() ?: return@count false
+    fun countOurs(uid: Int, packageName: String, procRoot: File = File("/proc")): Int = ours(uid, packageName, procRoot).size
+
+    /**
+     * The same processes by program, most first ("proot" to 6, "sway" to 1), so a rig can see what fills the count
+     * (Droidtop/tracker#816, "measure and cut"). Blocking: IO only.
+     */
+    fun breakdown(uid: Int, packageName: String, procRoot: File = File("/proc")): List<Pair<String, Int>> =
+        ours(uid, packageName, procRoot).groupingBy { it }.eachCount().entries
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .map { it.key to it.value }
+
+    /** [breakdown] in a line: the [top] biggest, then how many other programs. Pure. */
+    fun describe(breakdown: List<Pair<String, Int>>, top: Int = 4): String {
+        if (breakdown.isEmpty()) return "None"
+        val shown = breakdown.take(top).joinToString(", ") { (name, count) -> "$name $count" }
+        val rest = breakdown.drop(top).sumOf { it.second }
+        return if (rest == 0) shown else "$shown, $rest more"
+    }
+
+    /** A process's program: its command's last path part, or the kernel's name for it when the command is empty. Pure. */
+    internal fun programOf(cmdline: String, statusName: String?): String =
+        cmdline.substringAfterLast('/').ifEmpty { statusName.orEmpty() }.ifEmpty { "unknown" }
+
+    private fun ours(uid: Int, packageName: String, procRoot: File): List<String> =
+        procRoot.list().orEmpty().mapNotNull { name ->
+            val pid = name.toIntOrNull() ?: return@mapNotNull null
             val dir = File(procRoot, name)
-            val status = runCatching { File(dir, "status").readText() }.getOrNull() ?: return@count false
+            val status = runCatching { File(dir, "status").readText() }.getOrNull() ?: return@mapNotNull null
             val owner = status.lineSequence().firstOrNull { it.startsWith("Uid:") }?.split(Regex("\\s+"))?.getOrNull(1)?.toIntOrNull()
-            if (owner != uid || pid <= 0) return@count false
+            if (owner != uid || pid <= 0) return@mapNotNull null
             val cmdline = runCatching { File(dir, "cmdline").readText().substringBefore('\u0000') }.getOrDefault("")
-            !isAppProcess(cmdline, packageName)
+            if (isAppProcess(cmdline, packageName)) return@mapNotNull null
+            programOf(cmdline, status.lineSequence().firstOrNull { it.startsWith("Name:") }?.substringAfter(':')?.trim())
         }
 
     /** The commands that lift the limit on [sdk]. Pure. */

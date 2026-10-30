@@ -4351,8 +4351,12 @@ keeps the rules; they are pure and tested.
   program's page says "Android ended it: too many child processes across your apps", and the game's end screen
   is titled "Android ended the game", each naming the Child processes row that lifts the limit. Without the shell
   the log cannot be read, so on Android 12+ the line says what probably happened instead, never that it did not.
-- **The next slices of #816:** a measure of a Desktop session's and a Wine game's count and a cut in droidtop's
-  own helpers; the same line on the companion's droidtop page (#786).
+- **What they are** (measure and cut). Under the row, "What they are" lists droidtop's child processes by program,
+  most first ("libproot.so 6, sway 1, Xwayland 1, 2 more"): each process's command, its last path part
+  (`PhantomProcesses.breakdown`). The whole list goes to the log under `droidtop.ChildProcesses` each time the page
+  opens, so a rig reading of a Desktop session and of a Wine game names what to cut.
+- **The next slices of #816:** the cut in droidtop's own helpers, once a rig reading of a Desktop session and a Wine
+  game names the biggest; the same line on the companion's droidtop page (#786).
 - **It is a device-setup item** (below): the same lift and undo in onboarding, Settings > Device setup and this row.
 
 ### Device setup (Droidtop/tracker#816, owner 2026-10-30)

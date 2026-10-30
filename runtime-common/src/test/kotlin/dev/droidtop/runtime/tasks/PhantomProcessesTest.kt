@@ -29,6 +29,20 @@ class PhantomProcessesTest {
     }
 
     @Test
+    fun `the breakdown names each program, most first, and the line keeps the biggest`() {
+        process(100, 10174, "dev.droidtop.app")
+        process(200, 10174, "/data/app/x/lib/arm64/libproot.so")
+        process(201, 10174, "/data/app/x/lib/arm64/libproot.so")
+        process(202, 10174, "/usr/bin/sway")
+        process(203, 10174, "Xwayland")
+        process(204, 10174, "")
+        val breakdown = PhantomProcesses.breakdown(10174, "dev.droidtop.app", proc)
+        assertEquals(listOf("libproot.so" to 2, "Xwayland" to 1, "sway" to 1, "x" to 1), breakdown)
+        assertEquals("libproot.so 2, Xwayland 1, 2 more", PhantomProcesses.describe(breakdown, top = 2))
+        assertEquals("None", PhantomProcesses.describe(emptyList()))
+    }
+
+    @Test
     fun `the limit reads as Android's default when nothing set it, and is unknown without an answer`() {
         assertEquals(32, PhantomProcesses.parseLimit("null\n"))
         assertEquals(2147483647, PhantomProcesses.parseLimit("2147483647"))

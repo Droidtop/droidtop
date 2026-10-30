@@ -374,6 +374,7 @@ object DroidtopWideSettings {
                         // The rows above that apply "when the desktop next starts" can apply now (Droidtop/tracker#687).
                         // What Android allows droidtop's programs before it ends them (Droidtop/tracker#816).
                         PhantomProcessRow.item(context, "pref_desktop_child_processes"),
+                        PhantomBreakdownRow.item(context, "pref_desktop_child_processes_what"),
                         ActionItem(
                             id = "pref_desktop_restart",
                             title = "Restart the desktop",
