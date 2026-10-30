@@ -183,6 +183,37 @@ internal fun ControllerStep(
             )
         }
 
+        // Whether HOME + R2, L2 and Start work over games, and the one press that makes them (Droidtop/tracker#740).
+        StepSectionLabel("HOME button combos")
+        val scope = rememberCoroutineScope()
+        var chords by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+        var chordsTick by remember { mutableStateOf(0) }
+        // Read again when the step comes back to the front: the person may have turned it on in Android's list.
+        val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+        DisposableEffect(lifecycle) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) chordsTick++
+            }
+            lifecycle.addObserver(observer)
+            onDispose { lifecycle.removeObserver(observer) }
+        }
+        LaunchedEffect(chordsTick) {
+            chords = withContext(Dispatchers.IO) { dev.droidtop.runtime.keyboard.AccessibilityKeyboard.homeChords(context) }
+        }
+        chords?.let { (on, line) ->
+            SelectableRow(
+                title = if (on) "HOME button combos: on" else "HOME button combos: off",
+                supporting = line,
+                selected = false,
+                onClick = if (on) null else ({
+                    scope.launch {
+                        withContext(Dispatchers.IO) { dev.droidtop.runtime.keyboard.AccessibilityKeyboard.turnOn(context) }
+                        chordsTick++
+                    }
+                }),
+            )
+        }
+
         StepSectionLabel("Test your buttons")
         // A real key event, caught where it lands: the box takes focus and
         // reports the button by position. Nothing is remapped here; this

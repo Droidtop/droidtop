@@ -39,8 +39,8 @@
     <string name="widget_quick_launch_gone">This game left your library</string>
     <!-- TypingAccessibilityService (docs/SPEC.md 4c, "Typing on the add-on display"): its name and what it does,
          shown in Android's accessibility settings. -->
-    <string name="typing_accessibility_label">droidtop keyboard and pointer</string>
-    <string name="typing_accessibility_description">Shows droidtop\'s keyboard when you tap a text field in another app on a screen Android shows no keyboard on, and types what you press into that field. When you use the companion screen\'s trackpad on another app, it draws a pointer on the main screen and plays the taps, long presses, drags and swipes you make there. While droidtop is your home screen, it watches for Home held with R2, L2 or Start, to open droidtop\'s menus over the game you are playing; every other key goes on to the app untouched. It reads only the text of the field you are typing in, to edit it, and stores nothing.</string>
+    <string name="typing_accessibility_label">droidtop: HOME button combos, keyboard and pointer over other apps</string>
+    <string name="typing_accessibility_description">Lets HOME held with R2, L2 or Start open droidtop\'s menus over the game or app you are using, while droidtop is your home screen; every other key goes on to the app untouched. Also shows droidtop\'s keyboard when you tap a text field in another app on a screen Android shows no keyboard on, and types what you press into that field. When you use the companion screen\'s trackpad on another app, it draws a pointer on the main screen and plays the taps, long presses, drags and swipes you make there. It reads only the text of the field you are typing in, to edit it, and stores nothing.</string>
     <string name="companion_performance_collecting_readings">Collecting readings...</string>
     <string name="companion_game_playing">Playing · %1$s</string>
     <string name="companion_retro_arch_setup_save_and_load_from_here">Save and load from here</string>

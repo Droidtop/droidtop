@@ -226,6 +226,27 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             "droidtop.ReturnToGame",
             "arrival: homePress=$homePress running=${running?.gameId} quickMenu=$gamingQuickMenu token=$gamingDeepLinkToken",
         )
+        if (homePress) explainHomeChordsOnce()
+    }
+
+    /**
+     * A Home press reached droidtop while its accessibility service is off: the HOME button combos (HOME + R2, L2,
+     * Start) cannot work over games, and nothing else would say so (Droidtop/tracker#740). Said once, where the
+     * person already is, so they learn it before they are in a game; the row in Settings > Controls turns it on.
+     */
+    private fun explainHomeChordsOnce() {
+        val app = applicationContext
+        dev.droidtop.runtime.util.AppScopes.io.launch {
+            val prefs = app.getSharedPreferences(HOME_CHORDS_PREFS, MODE_PRIVATE)
+            if (prefs.getBoolean(HOME_CHORDS_EXPLAINED, false)) return@launch
+            if (dev.droidtop.runtime.keyboard.AccessibilityKeyboard.homeChords(app).first) return@launch
+            prefs.edit().putBoolean(HOME_CHORDS_EXPLAINED, true).apply()
+            dev.droidtop.library.settings.Notices.flash(
+                "HOME button combos are off: Android needs you to allow droidtop to see button presses over other " +
+                    "apps. Settings > Controls > HOME button combos turns them on",
+                context = app,
+            )
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -1011,6 +1032,10 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     private companion object {
         /** How long the keep-running offer waits for the mode switched to to be able to ask. */
         const val KEEP_RUNNING_HOST_WAIT_MS = 5_000L
+
+        /** Where the one-time HOME combos explanation is remembered (explainHomeChordsOnce). */
+        const val HOME_CHORDS_PREFS = "home_chords"
+        const val HOME_CHORDS_EXPLAINED = "explained"
 
         /** The shell instance created last; an older one still alive is the one a relocation left behind. */
         var live: java.lang.ref.WeakReference<MainActivity>? = null
