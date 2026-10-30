@@ -131,14 +131,32 @@ internal fun CompanionDisplayCards() {
 @Composable
 private fun MainBrightness() {
     val context = LocalContext.current
-    val current by produceState<Int?>(null) { value = withContext(Dispatchers.IO) { DisplayControls.brightness(context) } }
-    if (!DisplayControls.canWriteBrightness(context)) {
-        CompanionNote("Brightness needs Modify system settings: System > Brightness")
+    // The level and whether droidtop may change it, read off the main thread and again on a return from Android's page.
+    var resumed by remember { mutableIntStateOf(0) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { resumed++ }
+    val read by produceState<Pair<Int?, Boolean>?>(null, resumed) {
+        value = withContext(Dispatchers.IO) { DisplayControls.brightness(context) to DisplayControls.canWriteBrightness(context) }
+    }
+    val (current, allowed) = read ?: return
+    val level = current ?: return
+    val title = stringResource(R.string.companion_displays_brightness)
+    if (!allowed) {
+        // Kept in place, read-only, until droidtop may change it (Droidtop/tracker#786 rule 3).
+        CompanionReadOnlyRow(
+            title = title,
+            value = percentOf(level.toFloat(), 0f..255f),
+            fraction = level / 255f,
+            locked = dev.droidtop.library.settings.Locked(
+                allows = "Let droidtop change the screen's brightness. Android asks for this as Modify system settings.",
+                step = dev.droidtop.library.settings.LockedStep("Allow") { ctx ->
+                    dev.droidtop.runtime.systemstatus.SettingsLaunch.start(ctx, dev.droidtop.runtime.systemstatus.SystemControls.brightnessGrantIntent(ctx))
+                },
+            ),
+        )
         return
     }
-    val level = current ?: return
     CompanionSliderRow(
-        title = stringResource(R.string.companion_displays_brightness),
+        title = title,
         value = level.toFloat(),
         range = 0f..255f,
         step = 255f / 20f,

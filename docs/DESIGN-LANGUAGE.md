@@ -168,6 +168,8 @@ empty state (glyph, one sentence, one action), keyboard slab, hint bar (one 48 d
 focused thing). Used by droidtop, Enginehost and every plugin; a screen that needs something else adds it here first.
 In touch form (the companion) a slider row is a drawn track with a 48 dp step button at each end and its value
 beside its name, written off the main thread with only the newest value kept; there is one, `CompanionSliderRow`.
+A control droidtop may not change yet is never removed: it stays in place in the read-only look (muted, its level
+drawn without a thumb) and opens one sheet saying what would be allowed and the next step (`Locked`).
 
 ### Plugins inherit it
 A plugin supplies content (rows, groups, progress values, tiles, facets, short strings, a tone name, a glyph by name or

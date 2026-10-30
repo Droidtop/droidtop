@@ -5077,7 +5077,12 @@ droidtop 0.2.0-dev.1931).
   Android only for where it stops and nothing is written on the main thread. A screen reader hears one node: name,
   value, range, and Lower and Raise. Every catalog slider, every pinned slider (no longer only − and +), every stream
   volume and both brightnesses draw it; it replaced five separate sliders. A catalog slider says its number, or a
-  percentage on a 0 to 100 scale, as the shell's Settings does; a
+  percentage on a 0 to 100 scale, as the shell's Settings does. **A control droidtop may not change yet stays in
+  place** (rule 3 of the #786 plan): `CompanionReadOnlyRow` shows its name and state in the read-only look (muted,
+  a meter where it has a level, "Not allowed yet"), and a tap opens the one sheet, `CompanionLockedSheet`, from one
+  model (`Locked`: what droidtop would be allowed to change, one button for the next step, Android's page as a second
+  where there is one, and Not now). The main screen's brightness without Modify system settings is the first: it
+  used to be a note in its place; a
   choice lays its options out under the row; an action that asks first shows the safe answer first. The catalog
   is built off the main thread while the tab shows, again after each change and on a return from another screen
   (a grant), and not at all while the tab is not composed; `PerformanceMonitor.subscribers` counts the surfaces
