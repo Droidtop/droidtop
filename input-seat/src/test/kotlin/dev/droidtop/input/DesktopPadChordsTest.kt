@@ -31,12 +31,23 @@ class DesktopPadChordsTest {
     }
 
     @Test
-    fun `without L2 the face buttons and the D-pad stay droidtop's`() {
+    fun `without L2 the face buttons and the D-pad are the container's keys, and Start is not`() {
+        // KEY_ENTER = 28, KEY_ESC = 1, KEY_BACKSPACE = 14, KEY_TAB = 15, KEY_UP = 103.
         val bridge = FakeHostBridge()
         val router = router(bridge)
-        assertFalse(router.down(KeyEvent.KEYCODE_BUTTON_A, 0))
-        assertFalse(router.up(KeyEvent.KEYCODE_BUTTON_A, 10))
-        assertFalse(router.down(KeyEvent.KEYCODE_DPAD_UP, 20))
+        for ((code, key) in listOf(
+            KeyEvent.KEYCODE_BUTTON_A to 28,
+            KeyEvent.KEYCODE_BUTTON_B to 1,
+            KeyEvent.KEYCODE_BUTTON_X to 14,
+            KeyEvent.KEYCODE_BUTTON_Y to 15,
+            KeyEvent.KEYCODE_DPAD_UP to 103,
+        )) {
+            bridge.keys.clear()
+            assertTrue(router.down(code, 0))
+            assertTrue(router.up(code, 10))
+            assertEquals(listOf(key to true, key to false), bridge.keys)
+        }
+        bridge.keys.clear()
         assertFalse(router.down(KeyEvent.KEYCODE_BUTTON_START, 30))
         assertTrue(bridge.keys.isEmpty())
     }
@@ -76,8 +87,10 @@ class DesktopPadChordsTest {
         // A's release still reaches the engine, which lets go of what A pressed.
         assertTrue(router.up(KeyEvent.KEYCODE_BUTTON_A, 30))
         assertEquals(listOf(29 to true, 46 to true, 46 to false, 29 to false), bridge.keys)
-        // And with L2 up, A is droidtop's again.
-        assertFalse(router.down(KeyEvent.KEYCODE_BUTTON_A, 40))
+        // And with L2 up, A is Enter again.
+        bridge.keys.clear()
+        assertTrue(router.down(KeyEvent.KEYCODE_BUTTON_A, 40))
+        assertEquals(listOf(28 to true), bridge.keys)
     }
 
     @Test

@@ -135,7 +135,12 @@ class DesktopInputRouter {
         // A key let go while the surface does not have input goes elsewhere, and the container would hold it forever
         // (Ctrl stayed down in foot after a Ctrl combination, follow-up rig 2026-10-16): let go of all of it then.
         view.setOnFocusChangeListener { _, focused -> if (!focused) releaseHeldInput() }
-        view.viewTreeObserver.addOnWindowFocusChangeListener { focused -> if (!focused) releaseHeldInput() }
+        // Back from a sheet (the Start menu, the windows list), the keys are the desktop's again: Android hands the focus
+        // back to whatever last had it, and a bar button holding it took the pad's A as a click, so the Start menu came
+        // back and the next typing went to its search (Droidtop/tracker#350, rig 2638).
+        view.viewTreeObserver.addOnWindowFocusChangeListener { focused ->
+            if (!focused) releaseHeldInput() else if (!view.isFocused) view.requestFocus()
+        }
         view.requestFocus()
     }
 
@@ -351,9 +356,9 @@ class DesktopInputRouter {
     fun onKeyEvent(event: KeyEvent): Boolean {
         val seat = seat ?: return false
 
-        // Gamepad buttons arrive as key events too. Only the two stick
-        // clicks are claimed; everything else is left to the shell so
-        // D-pad/A navigation keeps working (see onJoystickMotion).
+        // Gamepad buttons arrive as key events too. The pad layout takes the face buttons and the D-pad as the
+        // container's keys (desktop_pad_chords.vdf); droidtop's sheets are windows of their own, so they never
+        // reach here. The two stick clicks are the mouse buttons; the rest is left to the shell.
         if (event.isFromSource(InputDevice.SOURCE_GAMEPAD) || event.isFromSource(InputDevice.SOURCE_JOYSTICK)) {
             if (onPadChord(event.keyCode, event.action, event.repeatCount, event.eventTime)) return true
             if (!gamepadPointerEnabled) return false

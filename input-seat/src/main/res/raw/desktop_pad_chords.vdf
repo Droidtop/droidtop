@@ -1,6 +1,6 @@
 // droidtop's Desktop pad chords (Droidtop/tracker#383), written for droidtop, CC BY 4.0.
-// Steam's controller layout format, so Steam loads it as it is. Held, L2 puts the face buttons and the D-pad on the
-// chord groups; released, they are droidtop's again.
+// Steam's controller layout format, so Steam loads it as it is. The face buttons and the D-pad are keys for the
+// container: A Enter, B Escape, X Backspace, Y Tab, the D-pad the arrow keys. Held, L2 puts them on the chord groups.
 "controller_mappings"
 {
 	"version"		"3"
@@ -22,7 +22,7 @@
 		"english"
 		{
 			"title"		"Desktop chords"
-			"description"		"Hold L2: A copies, B pastes, X cuts, Y undoes, the D-pad is the arrow keys."
+			"description"		"A is Enter, B Escape, X Backspace, Y Tab, the D-pad the arrow keys. Hold L2: A copies, B pastes, X cuts, Y undoes."
 			"set_default"		"Default"
 		}
 	}
@@ -172,6 +172,126 @@
 			}
 		}
 	}
+	"group"
+	{
+		"id"		"3"
+		"mode"		"four_buttons"
+		"inputs"
+		{
+			"button_a"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press RETURN, Enter, "
+						}
+					}
+				}
+			}
+			"button_b"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press ESCAPE, Escape, "
+						}
+					}
+				}
+			}
+			"button_x"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press BACKSPACE, Backspace, "
+						}
+					}
+				}
+			}
+			"button_y"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press TAB, Tab, "
+						}
+					}
+				}
+			}
+		}
+	}
+	"group"
+	{
+		"id"		"4"
+		"mode"		"dpad"
+		"inputs"
+		{
+			"dpad_north"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press UP_ARROW, Up, "
+						}
+					}
+				}
+			}
+			"dpad_south"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press DOWN_ARROW, Down, "
+						}
+					}
+				}
+			}
+			"dpad_west"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press LEFT_ARROW, Left, "
+						}
+					}
+				}
+			}
+			"dpad_east"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press RIGHT_ARROW, Right, "
+						}
+					}
+				}
+			}
+		}
+	}
 	"preset"
 	{
 		"id"		"0"
@@ -181,6 +301,8 @@
 			"0"		"left_trigger active"
 			"1"		"button_diamond active modeshift"
 			"2"		"dpad active modeshift"
+			"3"		"button_diamond active"
+			"4"		"dpad active"
 		}
 	}
 }

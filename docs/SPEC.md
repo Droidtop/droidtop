@@ -8273,12 +8273,14 @@ keyboard's map, and keys still held are re-read under it. A new connection
 starts with nothing held.
 
 **Gamepad.** The right stick drives the pointer and the two stick clicks are
-left/right button; the D-pad, face buttons, shoulders and left stick are left
-alone. The shell around the surface — taskbar, start menu, settings — is
-driven by the D-pad and A inside the sheets it opens, and claiming those would break
-navigation in exactly the case a gamepad pointer is for (no mouse attached). Start, R2, L1 and R1
-are droidtop's while Desktop shows and open those sheets (2b "Desktop chrome with a pad").
-The right stick and stick clicks are the controls that navigation does not use.
+left/right button. The face buttons and the D-pad are keys for the container, from the pad layout below:
+A is Enter, B Escape, X Backspace, Y Tab and the D-pad the arrow keys. Start, R2, L1 and R1
+are droidtop's while Desktop shows and open its sheets (2b "Desktop chrome with a pad"), and each sheet is a
+window of its own that the D-pad and A drive, so nothing the surface takes is ever needed there. Left to Android, the
+D-pad moved its focus from the surface onto the bar (the Plugins button lit up), and A then pressed whichever bar
+button held it: the Start button, which brought the Start menu back so the next typing went to its search
+(Droidtop/tracker#350, rig 2638). For the same reason the surface takes the focus back whenever its window gets it
+back from a sheet. The left stick, the other shoulders and Select are left alone.
 
 **Pad chords (lane default, 2026-10-29, Droidtop/tracker#383).** The owner, 2026-10-08: "we might wanna do key-combination mapping, extra controls"; the issue scopes it as one mapping mechanism, never a second one, Desktop first since the container gets raw keys. So the desktop's chords are a controller layout in Steam's format, played by the same `MappingEngine` that runs Windows games' layouts (5b "Controller layouts"). The bundled layout is `input-seat/src/main/res/raw/desktop_pad_chords.vdf`, our own, CC BY 4.0.
 
@@ -8286,7 +8288,7 @@ Held, L2 mode-shifts the face buttons and the D-pad onto chord groups:
 - A is Ctrl+C, B Ctrl+V, X Ctrl+X, Y Ctrl+Z;
 - the D-pad is the arrow keys.
 
-Released, they are droidtop's again: `DesktopInputRouter.onPadChord` takes a pad button only while the layout binds it, plus the release of any button it took. So the D-pad and A keep driving the shell's focus, and nothing is held after a chord.
+Released, they are the plain keys of the layout's base groups again (Enter, Escape, Backspace, Tab and the arrows, above): `DesktopInputRouter.onPadChord` takes a pad button the layout binds now, plus the release of any button it took, and a button's release lets go of what its press did, so nothing is held after a chord.
 
 The chord keys go to the container through the router's own key translation (Steam's key names to Android key codes, `SteamKeys`, then the one Android-to-evdev table).
 
