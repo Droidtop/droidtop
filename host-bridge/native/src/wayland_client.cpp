@@ -268,6 +268,8 @@ struct ToplevelState {
  */
 struct TextFieldState {
     zwp_input_method_v2* method = nullptr;
+    // False once the person gave the seat to a container's input method (setInputMethodTaken).
+    bool wanted = true;
     bool pending = false;
     bool active = false;
     TextFieldCallback callback = nullptr;
@@ -1473,7 +1475,9 @@ bool WaylandClient::connect(const char* socketPath) {
 
     // Text fields. Non-fatal when absent, like the two above.
     if (!textField_) textField_ = new TextFieldState();
-    if (globals_->input_method_manager) {
+    if (globals_->input_method_manager && !textField_->wanted) {
+        LOGI("the seat's input method is left to the container's own");
+    } else if (globals_->input_method_manager) {
         textField_->method = zwp_input_method_manager_v2_get_input_method(
             globals_->input_method_manager, globals_->seat);
         zwp_input_method_v2_add_listener(textField_->method, &kInputMethodListener, textField_);
@@ -1747,6 +1751,30 @@ void WaylandClient::setTextFieldListener(TextFieldCallback callback, void* userD
     if (!textField_) textField_ = new TextFieldState();
     textField_->callback = callback;
     textField_->userData = userData;
+}
+
+void WaylandClient::setInputMethodTaken(bool taken) {
+    if (!textField_) textField_ = new TextFieldState();
+    textField_->wanted = taken;
+    // Not connected yet: connect() reads `wanted`.
+    if (!display_ || !globals_ || !globals_->input_method_manager || !globals_->seat) return;
+    if (taken && !textField_->method) {
+        textField_->method = zwp_input_method_manager_v2_get_input_method(
+            globals_->input_method_manager, globals_->seat);
+        zwp_input_method_v2_add_listener(textField_->method, &kInputMethodListener, textField_);
+        LOGI("took the seat's input method again");
+    } else if (!taken && textField_->method) {
+        // Destroying it frees the seat: the compositor deactivates it, and a container's input method can register.
+        zwp_input_method_v2_destroy(textField_->method);
+        textField_->method = nullptr;
+        textField_->pending = false;
+        if (textField_->active) {
+            textField_->active = false;
+            if (textField_->callback) textField_->callback(textField_->userData, false);
+        }
+        LOGI("released the seat's input method for the container's own");
+    }
+    wl_display_flush(display_);
 }
 
 void WaylandClient::setToplevelsListener(ToplevelsChangedCallback callback, void* userData) {

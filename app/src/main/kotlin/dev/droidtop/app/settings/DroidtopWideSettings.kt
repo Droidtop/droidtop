@@ -325,6 +325,14 @@ object DroidtopWideSettings {
                         ),
                         desktopScaleChoice(context),
                         desktopResolutionChoice(context),
+                        // The seat's one input method, left to a container's fcitx5 or ibus (Droidtop/tracker#809).
+                        ToggleItem(
+                            id = DesktopPrefs.KEY_CONTAINER_INPUT_METHOD,
+                            title = "A container's own input method",
+                            subtitle = "Leave typing to fcitx5 or ibus in a container. Text fields then don't open the keyboard",
+                            current = DesktopPrefs.read(context).containerInputMethod,
+                            onToggle = { ctx, on -> DesktopPrefs.setContainerInputMethod(ctx, on) },
+                        ),
                         ToggleItem(
                             id = "pref_desktop_keep_running",
                             title = "Keep the desktop running",

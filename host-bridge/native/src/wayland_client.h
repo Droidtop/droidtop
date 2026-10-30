@@ -168,6 +168,11 @@ public:
     // connect().
     void setTextFieldListener(TextFieldCallback callback, void* userData);
 
+    // Whether droidtop holds the seat's one input method (Droidtop/tracker#809). Released, a container's own input
+    // method (fcitx5, ibus) can take the seat, and text fields no longer show the keyboard. Any thread; applies at
+    // once on a connection, else from the next connect().
+    void setInputMethodTaken(bool taken);
+
     // A copy of the current list, safe to call from any thread. Entries are
     // only ever mutated on the dispatch thread; reads take the same mutex
     // that guards those mutations (see ToplevelState in the .cpp).

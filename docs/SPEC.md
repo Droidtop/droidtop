@@ -8662,8 +8662,18 @@ typing still goes through the virtual keyboards as above, so nothing about keys 
 does not grab the keyboard or commit text. Decided: droidtop takes the seat's one input method. sway allows one per
 seat, so an input method run inside the container (fcitx5 or ibus, for CJK input) cannot register while droidtop
 holds it. Such a person types through droidtop's keyboard, or through the container's input method on a hardware
-keyboard after turning droidtop's off. Turning droidtop's off is not built yet. If the seat already has an input
-method when droidtop connects, the protocol says `unavailable`, and the keyboard is then shown from the bar only.
+keyboard after turning droidtop's off. If the seat already has an input method when droidtop connects, the protocol
+says `unavailable`, and the keyboard is then shown from the bar only.
+
+**Turning droidtop's off (Droidtop/tracker#809).** Desktop mode's settings have "A container's own input method", off
+by default (`DesktopPrefs.KEY_CONTAINER_INPUT_METHOD`).
+- **On:** host-bridge destroys its input method (`HostBridge.setInputMethodTaken`, `WaylandClient::setInputMethodTaken`).
+  That frees the seat, and a container's fcitx5 or ibus can register and take the keys typed on a hardware keyboard,
+  which reach the seat through droidtop's virtual keyboards as always. Text fields no longer bring up the on-screen
+  keyboard; the bar's Keyboard button still does.
+- **Off again:** droidtop asks for the seat's input method again. While a container's input method still holds it, the
+  answer is `unavailable`, as at connect, so the setting takes effect once that one exits.
+- **Applies at once.** The shell follows the setting, and every later connection starts with it.
 
 **When the desktop stops** (Droidtop/tracker#688, the coordinator's Desktop review: a dead compositor still showed
 "Connected", with the last frame frozen and input going nowhere). host-bridge's dispatch thread is the one reader of

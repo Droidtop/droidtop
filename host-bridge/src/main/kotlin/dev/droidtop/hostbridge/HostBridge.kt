@@ -62,6 +62,8 @@ class HostBridge : HostBridgeInput {
 
     fun connect(waylandSocketPath: String): Boolean {
         connected = nativeConnect(waylandSocketPath)
+        // The person's choice holds on every connection; the native side takes the seat by default.
+        if (connected && !inputMethodTaken) nativeSetInputMethodTaken(false)
         // A new connection's keyboards are new: nothing is held or locked there, and the layout one has the US
         // map again until the layout is set.
         synchronized(modifiers) {
@@ -218,6 +220,19 @@ class HostBridge : HostBridgeInput {
     @Volatile
     var textFieldListener: ((Boolean) -> Unit)? = null
 
+    @Volatile
+    private var inputMethodTaken = true
+
+    /**
+     * Whether droidtop holds the seat's one input method (Droidtop/tracker#809, docs/SPEC.md "The on-screen keyboard").
+     * sway allows one per seat, so with droidtop's released a container's own (fcitx5 or ibus, for CJK input) can take
+     * it, and text fields no longer bring up the on-screen keyboard. Applies at once, and on every later connection.
+     */
+    fun setInputMethodTaken(taken: Boolean) {
+        inputMethodTaken = taken
+        if (connected) nativeSetInputMethodTaken(taken)
+    }
+
     /** Called from JNI (hostbridge_jni.cpp's textFieldTrampoline). [Keep] for the same reason as [onToplevelsChanged]. */
     @Keep
     @Suppress("unused")
@@ -260,6 +275,7 @@ class HostBridge : HostBridgeInput {
     private external fun nativeConnect(waylandSocketPath: String): Boolean
     private external fun nativeDisconnect()
     private external fun nativeConnectionLost(): Boolean
+    private external fun nativeSetInputMethodTaken(taken: Boolean)
     private external fun nativePresentOutput(surface: Surface): Boolean
     private external fun nativeStopPresenting()
     private external fun nativeSetOutputSize(width: Int, height: Int, scale: Double): Boolean

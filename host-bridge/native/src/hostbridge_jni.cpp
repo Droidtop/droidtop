@@ -486,6 +486,12 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeSetKeymap(JNIEnv* env, jobject thi
     return JNI_FALSE;
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeSetInputMethodTaken(JNIEnv* env, jobject thiz, jboolean taken) {
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    if (auto* client = findClient(identityHash(env, thiz))) client->setInputMethodTaken(taken == JNI_TRUE);
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_dev_droidtop_hostbridge_HostBridge_nativeSetOutputSize(JNIEnv* env, jobject thiz, jint width, jint height, jdouble scale) {
     std::lock_guard<std::mutex> lock(g_clientsMutex);

@@ -292,6 +292,10 @@ fun DesktopShell(
         val prefs by remember(shellContext) { DesktopPrefs.changes(shellContext).flowOn(Dispatchers.IO) }
             .collectAsState(initial = DesktopPrefs.Values())
         val barAtTop = prefs.taskbarAtTop
+        // The seat's input method, held or left to a container's own as the setting says (Droidtop/tracker#809).
+        LaunchedEffect(hostBridge, prefs.containerInputMethod) {
+            withContext(Dispatchers.IO) { hostBridge?.setInputMethodTaken(!prefs.containerInputMethod) }
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()

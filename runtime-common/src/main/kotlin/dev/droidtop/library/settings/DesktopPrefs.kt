@@ -16,9 +16,18 @@ object DesktopPrefs {
     const val KEY_TASKBAR_TOP = "pref_desktop_taskbar_top"
     private const val KEY_PINS = "pref_desktop_taskbar_pins"
     private const val KEY_SCREEN_DPI = "pref_desktop_screen_dpi"
+    const val KEY_CONTAINER_INPUT_METHOD = "pref_desktop_container_input_method"
 
-    /** What the shell reads: where the bar sits, and the stored scale and resolution ([DesktopScale]; null for none). */
-    data class Values(val taskbarAtTop: Boolean = false, val scale: String? = null, val resolution: String? = null)
+    /**
+     * What the shell reads: where the bar sits, the stored scale and resolution ([DesktopScale]; null for none), and
+     * whether the seat's input method is left to a container's own (Droidtop/tracker#809).
+     */
+    data class Values(
+        val taskbarAtTop: Boolean = false,
+        val scale: String? = null,
+        val resolution: String? = null,
+        val containerInputMethod: Boolean = false,
+    )
 
     fun read(context: Context): Values {
         val prefs = prefs(context)
@@ -26,11 +35,16 @@ object DesktopPrefs {
             taskbarAtTop = prefs.getBoolean(KEY_TASKBAR_TOP, false),
             scale = prefs.getString(DesktopScale.KEY, null),
             resolution = prefs.getString(DesktopScale.RESOLUTION_KEY, null),
+            containerInputMethod = prefs.getBoolean(KEY_CONTAINER_INPUT_METHOD, false),
         )
     }
 
     fun setTaskbarAtTop(context: Context, atTop: Boolean) {
         prefs(context).edit().putBoolean(KEY_TASKBAR_TOP, atTop).apply()
+    }
+
+    fun setContainerInputMethod(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_CONTAINER_INPUT_METHOD, on).apply()
     }
 
     /** The taskbar's pins as stored ([dev.droidtop.library.TaskbarPins] encodes them); null for none. Disk: IO only. */
@@ -55,7 +69,7 @@ object DesktopPrefs {
     /** The values now and after every change to one of them; collect off the main thread (the first read opens the file). */
     fun changes(context: Context): Flow<Values> = callbackFlow {
         val prefs = prefs(context)
-        val keys = setOf(KEY_TASKBAR_TOP, DesktopScale.KEY, DesktopScale.RESOLUTION_KEY)
+        val keys = setOf(KEY_TASKBAR_TOP, DesktopScale.KEY, DesktopScale.RESOLUTION_KEY, KEY_CONTAINER_INPUT_METHOD)
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == null || key in keys) trySend(read(context))
         }
