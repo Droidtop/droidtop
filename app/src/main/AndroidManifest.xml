@@ -476,11 +476,20 @@
           reasoning: see that Activity's own doc comment) makes a repeat
           launch resolve through onNewIntent against the ONE existing
           instance instead of stacking another.
+
+          android:taskAffinity="" (Droidtop/tracker#785): a task of its own.
+          Sharing MainActivity's affinity, starting it on the built-in
+          display with FLAG_ACTIVITY_NEW_TASK found the shell's task and
+          brought that task, shell included, back to the built-in display
+          right after the shell was relocated to the other screen. The
+          shell then relocated again, a loop on every start with two
+          screens attached.
         -->
         <activity
             android:name="dev.droidtop.app.CompanionActivity"
             android:exported="false"
             android:launchMode="singleTask"
+            android:taskAffinity=""
             android:excludeFromRecents="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
 

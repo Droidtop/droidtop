@@ -95,7 +95,6 @@ class SecondScreenOrchestrator(
     /** Bumped to force a fresh orchestration pass (home-press reinit, explicit shell re-entry, a game launch). */
     private val roleRefresh = MutableStateFlow(0)
 
-    private var lastDisplayIds: Set<Int> = emptySet()
     private var lastArrangementSeq: Int = -1
     private var lastMainId: Int? = null
 
@@ -115,6 +114,19 @@ class SecondScreenOrchestrator(
 
         @Volatile
         private var relocationAttempts = 0
+
+        /**
+         * The displays the last pass saw, and the display the shell was last on. Process-wide like the attempts and
+         * the cooldown above: a relocation recreates or moves this Activity, and a fresh instance (or the
+         * configuration change a move delivers) must not read as a new topology. Reset there, they let a relocation
+         * that does not stick retry at once and for ever: the cold start with two screens attached that "constantly
+         * reinitializes both screens" (Droidtop/tracker#785).
+         */
+        @Volatile
+        private var lastDisplayIds: Set<Int> = emptySet()
+
+        @Volatile
+        private var lastShellDisplayId: Int? = null
     }
 
     fun refresh() {
@@ -151,9 +163,19 @@ class SecondScreenOrchestrator(
         CompanionCover.clear()
     }
 
+    /**
+     * The shell's configuration changed. A foldable changing the shape of the screen the shell is on gets a fresh,
+     * uncooled pass. A change that comes from the shell having moved to another display (a relocation) does not: it
+     * only re-runs the pass, so the cooldown and the attempt count keep bounding relocations (Droidtop/tracker#785).
+     */
     fun onConfigurationChanged() {
-        lastRelocationAttemptMs = 0L
-        relocationAttempts = 0
+        val here = host.currentDisplayId()
+        val moved = lastShellDisplayId != null && lastShellDisplayId != here
+        lastShellDisplayId = here
+        if (!moved) {
+            lastRelocationAttemptMs = 0L
+            relocationAttempts = 0
+        }
         roleRefresh.value++
     }
 
@@ -283,6 +305,7 @@ class SecondScreenOrchestrator(
                 }
 
                 val currentDisplay = host.currentDisplayId()
+                lastShellDisplayId = currentDisplay
                 val disconnectedShellDestination = DualScreenOrchestration
                     .disconnectedShellDestination(currentDisplay, displayIds)
                 if (disconnectedShellDestination != null) {

@@ -6134,7 +6134,18 @@ relocation give-up policy, which surface covers which display -- is now orchestr
 Activity code. The relocation cooldown counters stay process-wide (a companion object on the
 orchestrator class, same as `MainActivity`'s own former `DisplayRelocation` companion
 object), since a relocation recreates the Activity (and with it a fresh
-`SecondScreenOrchestrator` instance) mid-guard-window.
+`SecondScreenOrchestrator` instance) mid-guard-window. So do the displays the
+last pass saw and the display the shell was last on (Droidtop/tracker#785):
+kept per instance, a fresh instance read every relocation as a new topology and
+reset the cooldown and the attempts, and the configuration change a move
+delivers reset them too, so a relocation that did not stick retried at once and
+for ever. That was the owner's "constantly reinitializes both screens until it
+only has one" on a start with two screens attached. A configuration change now
+resets them only when the shell stayed on its display (a foldable's new
+shape). What made the relocation not stick: `CompanionActivity` shared
+`MainActivity`'s task affinity, so starting it on the built-in display found
+the shell's task and brought it back there. It has a task of its own
+(`taskAffinity=""`).
 
 Behavior is unchanged -- this is a move, not a redesign: explicit launch-display targeting,
 the Standard second screen (via `reassertSecondaryDisplays`, untouched), the Alternative
