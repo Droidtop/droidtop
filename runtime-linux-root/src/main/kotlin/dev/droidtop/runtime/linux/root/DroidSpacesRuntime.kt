@@ -11,6 +11,7 @@ import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.ContainerLook
 import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerUser
 import dev.droidtop.runtime.EnvironmentMounts
@@ -202,7 +203,7 @@ class DroidSpacesRuntime(
         // exists (vendor/droidspaces src/environment.c, src/android/
         // pulseaudio.c) -- ContainerLayout's PULSE_SERVER is proot's
         // HostAudioServer path, which droidspaces does not use.
-        envFile.writeText(ContainerLayout.clientEnvironment(null, audioShared = false).entries.joinToString("") { (key, value) -> "$key=$value\n" })
+        envFile.writeText(ContainerLayout.clientEnvironment(null, audioShared = false, look = readLook(name)).entries.joinToString("") { (key, value) -> "$key=$value\n" })
 
         val sockets = readSockets(name)
         val config = DroidSpacesContainerConfig(
@@ -390,7 +391,7 @@ class DroidSpacesRuntime(
         val swaySocketName = if (waylandShared) ContainerLayout.findSwayIpcSocket(socketsDir)?.name else null
         // Same reasoning as writeConfig: PULSE_SERVER is droidspaces' own
         // to set, not ContainerLayout's.
-        val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName, audioShared = false, swaySocketName = swaySocketName) + env +
+        val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName, audioShared = false, swaySocketName = swaySocketName, look = readLook(container.id)) + env +
             (switchTo?.let { mapOf(ContainerUser.SWITCH_ENV to it) } ?: emptyMap())
         val envPrefix = fullEnv.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
         val commandLine = command.joinToString(" ") { shellQuote(it) }
@@ -461,7 +462,7 @@ class DroidSpacesRuntime(
             RootArchive.copy(source.container.rootfsPath, rootfs)
             if (container.role == ContainerRole.PRIMARY) writeInit(rootfs, null)
             withContext(Dispatchers.IO) {
-                for (file in listOf(::imageRecordFile, ::runConfigFile, ::mountsFile, ::socketsFile, ::devicesFile)) {
+                for (file in listOf(::imageRecordFile, ::runConfigFile, ::mountsFile, ::socketsFile, ::devicesFile, ::lookFile)) {
                     file(container.id).takeIf { it.isFile }?.copyTo(file(id), overwrite = true)
                 }
                 writeConfig(id, rootfs)
@@ -470,7 +471,7 @@ class DroidSpacesRuntime(
         } catch (e: Throwable) {
             withContext(kotlinx.coroutines.NonCancellable) {
                 RootfsDelete.delete(rootfs)
-                for (file in listOf(::imageRecordFile, ::runConfigFile, ::mountsFile, ::socketsFile, ::devicesFile)) file(id).delete()
+                for (file in listOf(::imageRecordFile, ::runConfigFile, ::mountsFile, ::socketsFile, ::devicesFile, ::lookFile)) file(id).delete()
                 File(configsDir, "$id.config").delete()
                 File(configsDir, "$id.env").delete()
                 names.remove(id)
@@ -490,6 +491,7 @@ class DroidSpacesRuntime(
         imageRecordFile(container.id).delete()
         provisioningFile(container.id).delete()
         socketsFile(container.id).delete()
+        lookFile(container.id).delete()
         mountsFile(container.id).delete()
         runConfigFile(container.id).delete()
         names.remove(container.id)
@@ -557,6 +559,20 @@ class DroidSpacesRuntime(
     override suspend fun setSockets(container: Container, sockets: ContainerSockets) = withContext(Dispatchers.IO) {
         socketsFile(container.id).apply { parentFile?.mkdirs() }
             .writeText("wayland=${sockets.waylandShared}\naudio=${sockets.audioShared}\n")
+        Unit
+    }
+
+    // ---- scale and theme (docs/SPEC.md 3d "Scale and theme") ----
+
+    private fun lookFile(name: String) = File(configsDir, "$name.look")
+
+    private fun readLook(name: String): ContainerLook =
+        ContainerLook.decode(lookFile(name).takeIf { it.isFile }?.readText().orEmpty())
+
+    override suspend fun look(container: Container): ContainerLook = withContext(Dispatchers.IO) { readLook(container.id) }
+
+    override suspend fun setLook(container: Container, look: ContainerLook) = withContext(Dispatchers.IO) {
+        lookFile(container.id).apply { parentFile?.mkdirs() }.writeText(look.encode())
         Unit
     }
 

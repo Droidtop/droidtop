@@ -41,6 +41,7 @@ import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
+import dev.droidtop.runtime.ContainerLook
 import dev.droidtop.runtime.ContainerReach
 import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerUsage
@@ -68,6 +69,7 @@ import dev.droidtop.runtime.KnownImageRepository
 import dev.droidtop.runtime.RootfsImage
 import dev.droidtop.shell.standard.BackButtonMenu
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import android.util.Log
@@ -410,6 +412,7 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "vpn", title = "VPN", items = vpnItems(context, runtime, info))
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
+        groups += CatalogGroup(id = "look", title = "Scale and theme", items = lookItems(runtime, info))
         runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
             ?.let { image -> withContext(Dispatchers.IO) { ContainerProgram.effectiveConfig(context.filesDir, info.container.id, image) } }
             ?.takeIf { it.program().isNotEmpty() }
@@ -628,6 +631,43 @@ object ContainersCatalog {
             }
         }
     }
+
+    /**
+     * How the container's programs look (docs/SPEC.md 3d "Scale and theme", Droidtop/tracker#787 slice 5): their size
+     * against the desktop's scale, and whether GTK follows droidtop's Light or dark. Both apply to programs started
+     * after the change.
+     */
+    private suspend fun lookItems(runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
+        val container = info.container
+        val look = runCatching { runtime.look(container) }.getOrDefault(ContainerLook())
+        fun save(next: ContainerLook) {
+            dev.droidtop.runtime.util.AppScopes.io.launch { runCatching { runtime.setLook(container, next) } }
+        }
+        return listOf(
+            ChoiceItem(
+                id = "container_look_scale",
+                title = "Scale",
+                subtitle = "Its programs' size against the desktop's own scale. Qt programs and GTK's text follow it. " +
+                    "Applies to programs started after the change",
+                options = ContainerLook.SCALES.map { ChoiceOption(it.toString(), scaleLabel(it)) },
+                current = look.scale.toString(),
+                onSelect = { _, value -> value.toFloatOrNull()?.let { save(look.copy(scale = it)) } },
+            ),
+            ToggleItem(
+                id = "container_look_theme",
+                title = "Light or dark as droidtop",
+                subtitle = "Its GTK programs follow droidtop's Light or dark. Off, they keep the image's own look. " +
+                    "Applies to programs started after the change",
+                current = look.followTheme,
+                onToggle = { _, on ->
+                    withContext(Dispatchers.IO) { runCatching { runtime.setLook(container, look.copy(followTheme = on)) } }
+                },
+            ),
+        )
+    }
+
+    /** "As the desktop" for 1, else the percentage: "75%", "150%". Pure. */
+    internal fun scaleLabel(scale: Float): String = if (scale == 1f) "As the desktop" else "${(scale * 100).toInt()}%"
 
     /**
      * The device microphone as a source on the audio bridge (Droidtop/tracker#80).

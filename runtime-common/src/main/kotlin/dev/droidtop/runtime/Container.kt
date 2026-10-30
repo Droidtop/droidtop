@@ -88,6 +88,32 @@ data class ExtraMount(val hostPath: String, val name: String) {
  */
 data class ContainerSockets(val waylandShared: Boolean = true, val audioShared: Boolean = true)
 
+/**
+ * How a container's programs look (docs/SPEC.md 3d "Scale and theme", Droidtop/tracker#787 slice 5): [scale] is their
+ * size against the desktop's own scale (1 is the same; the desktop's scale is the compositor's and applies to every
+ * window already), and [followTheme] whether GTK takes droidtop's Light or dark ([DesktopAppearance]) or the image's own
+ * look. Read when a program starts, so a change applies to the programs started after it.
+ */
+data class ContainerLook(val scale: Float = 1f, val followTheme: Boolean = true) {
+    /** The line form the backends keep it in, beside the container's other settings. */
+    fun encode(): String = "scale=$scale\ntheme=$followTheme\n"
+
+    companion object {
+        /** The scales offered, against the desktop's: smaller, the same, larger. */
+        val SCALES = listOf(0.75f, 1f, 1.25f, 1.5f, 2f)
+
+        fun decode(text: String): ContainerLook {
+            val lines = text.lineSequence().mapNotNull { line ->
+                line.split("=", limit = 2).takeIf { it.size == 2 }?.let { it[0].trim() to it[1].trim() }
+            }.toMap()
+            return ContainerLook(
+                scale = lines["scale"]?.toFloatOrNull()?.takeIf { it in SCALES } ?: 1f,
+                followTheme = lines["theme"]?.toBooleanStrictOrNull() ?: true,
+            )
+        }
+    }
+}
+
 /** Common lifecycle surface both container backends implement. */
 interface ContainerRuntime {
     val backend: ContainerBackend
@@ -201,6 +227,12 @@ interface ContainerRuntime {
 
     /** Records which sockets to share with [container] from its next start/exec. */
     suspend fun setSockets(container: Container, sockets: ContainerSockets)
+
+    /** How [container]'s programs look ([ContainerLook]); the default for a backend that keeps none. */
+    suspend fun look(container: Container): ContainerLook = ContainerLook()
+
+    /** Records how [container]'s programs look, for the programs started after it. */
+    suspend fun setLook(container: Container, look: ContainerLook): Unit = error("This backend keeps no look for its containers")
 
     /**
      * Why this backend cannot bridge host audio into a container; null
