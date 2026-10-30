@@ -39,4 +39,12 @@ class WhatsNewTest {
         val since = WhatsNew.since(WhatsNew.parse(json), lastSeen = 2300, current = 2301)
         assertEquals(listOf(2301L), since.map { it.versionCode })
     }
+
+    @Test
+    fun `over the shell it waits for the placement to settle, over other screens it does not`() {
+        assertEquals(false, WhatsNew.mayOpen(screenAlive = true, isShell = true, settled = false))
+        assertEquals(true, WhatsNew.mayOpen(screenAlive = true, isShell = true, settled = true))
+        assertEquals(true, WhatsNew.mayOpen(screenAlive = true, isShell = false, settled = false))
+        assertEquals(false, WhatsNew.mayOpen(screenAlive = false, isShell = true, settled = true))
+    }
 }

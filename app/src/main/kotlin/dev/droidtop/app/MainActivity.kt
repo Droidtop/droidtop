@@ -689,6 +689,11 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         val shellDisplay = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) display?.displayId else android.view.Display.DEFAULT_DISPLAY
         dev.droidtop.runtime.HomeDisplays.shellShown(shellDisplay)
         dev.droidtop.runtime.HomeDisplays.used(shellDisplay)
+        // Kept for the next process's Home press, which starts the shell here rather than moving it (Droidtop/tracker#824).
+        if (shellDisplay != null) {
+            val app = applicationContext
+            dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.runtime.ShellPlacement.remember(app, shellDisplay) }
+        }
     }
 
     override fun onPause() {

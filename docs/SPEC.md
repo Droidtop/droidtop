@@ -9749,6 +9749,16 @@ displays it."
   `last_seen_version_code`). A person updating from a build before What's new sees the installed build's entry. It
   never opens over onboarding or a game, nor before onboarding finished. Settings > About droidtop > What's new
   opens it with every build's entry, any time.
+  **It opens once the shell is placed, and nothing covers it** (Droidtop/tracker#824; the owner on the console after
+  an update: "I don't have a "what's new" splash"). It opened over the first `MainActivity` of a fresh process, and
+  0.4 s later the screen placement started the shell a second time on the second screen, over it. Two changes, no
+  timer: the shell starts where it belongs, once, and What's new waits for the placement's word. A Home press starts
+  the shell on the display it was last in front on (`ShellPlacement.remember`, kept across processes;
+  `ShellPlacement.launchDisplay`: where it is now, else where it last was, when that display is connected), so the
+  placement finds it placed and starts nothing; a display that refuses it leaves the move to the placement, as before.
+  The placement reports after every pass whether it moves the shell (`ShellPlacement.settled`), and What's new opens
+  over the screen in front only when that screen is not the shell or the placement said it stays (`WhatsNew.mayOpen`).
+  The version counts as seen only when it is closed; left any other way, it shows again at the next start.
 - **Feature steps, one registry.** A feature that needs explaining declares a `FeatureStep` in code
   (`FeatureSteps.register`, at droidtop's start in `WhatsNew.registerSteps`): an id; the changelog fragment it
   arrived with (the version, named the way the history names it); its place, the catalog screen where the feature

@@ -172,6 +172,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 AudioHandOff.mark("${javaClass.simpleName} $what (display ${window?.decorView?.display?.displayId})")
             override fun onActivityPaused(activity: Activity) {
                 activity.note("paused")
+                WhatsNew.onScreenPaused(activity)
                 if (!activity.isParkedSurface()) AudioHandOff.releaseNow("${activity.javaClass.simpleName} paused")
             }
             override fun onActivityResumed(activity: Activity) {
