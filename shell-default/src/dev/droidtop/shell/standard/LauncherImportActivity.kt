@@ -61,14 +61,14 @@ class LauncherImportActivity : DocumentPickActivity() {
         fun heading(text: String) = list.addView(TextView(this).apply {
             this.text = text
             textSize = 16f
-            setTextColor(TITLE_COLOR)
+            setTextColor(getColor(R.color.droidtop_dialog_text))
             setPadding(0, dp(12), 0, dp(4))
             DialogAccessibility.heading(this)
         })
         fun line(text: String) = list.addView(TextView(this).apply {
             this.text = text
             textSize = 14f
-            setTextColor(ROW_COLOR)
+            setTextColor(getColor(R.color.droidtop_dialog_text_secondary))
             setPadding(dp(8), dp(6), dp(8), dp(6))
             isFocusable = true
             background = getDrawable(R.drawable.droidtop_list_selector)
@@ -134,7 +134,5 @@ class LauncherImportActivity : DocumentPickActivity() {
 
     companion object {
         private const val TAG = "droidtop.LauncherImport"
-        private const val TITLE_COLOR = 0xFFEDEDED.toInt()
-        private const val ROW_COLOR = 0xFFD0D0D0.toInt()
     }
 }

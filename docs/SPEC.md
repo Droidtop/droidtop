@@ -1486,6 +1486,22 @@ alphabetical list (same shape as the work-profile items already prepended
 there), matched against apps already in `mApps` so a hidden, filtered, or
 since-uninstalled component is silently excluded.
 
+Standard's own values kept as a string in its preferences (the widget
+stacks, the drawer tabs, the recent apps and their launch counts, the icon
+swipes) all use one store, `CachedPref` in `:runtime-common`, over
+`LauncherPrefsFile` (decided 2026-10-30, Droidtop/tracker#771). Each is read
+once and then held in memory; every change goes through the store's one
+lock, so a change on the model thread and one on the main thread never
+undo each other; an unchanged value is not written. A stored value that
+does not parse is logged and kept beside it as `<key>_unreadable`, as it
+was, before anything is saved over it: before, each store fell back to
+empty and the next save erased the person's tabs or swipes without a
+trace. A launch is recorded on the module's executor, not the tap's
+thread. Standard's background work runs on Launcher3's
+`Executors.THREAD_POOL_EXECUTOR`; the one exception is Clear all apps,
+whose task-manager calls suspend and so run in droidtop's process scope
+(`AppScopes`).
+
 A first version only recorded launches but never re-derived the row on
 reopen -- `AlphabeticalAppsList`'s cached adapter items only rebuild from
 a real `LauncherModel` change (install/uninstall), which closing and

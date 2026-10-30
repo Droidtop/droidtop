@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import com.android.launcher3.R
 import dev.droidtop.runtime.tasks.RunningApp
 import dev.droidtop.runtime.util.AppScopes
 import dev.droidtop.runtime.tasks.TaskManager
@@ -45,13 +46,13 @@ class ClearAllAppsActivity : Activity() {
     private fun decide(targets: List<RunningApp>) {
         if (isFinishing || isDestroyed) return
         when {
-            targets.isEmpty() -> say("Nothing to close.")
+            targets.isEmpty() -> say(getString(R.string.clear_all_nothing))
             TaskPolicy.needsClearAllConfirm(targets.size) ->
-                AlertDialog.Builder(this, com.android.launcher3.R.style.DroidtopDialog)
-                    .setTitle("Close ${targets.size} apps?")
-                    .setMessage("Unsaved progress in them is lost. droidtop, Enginehost and the apps you protected stay open.")
-                    .setPositiveButton("Close all") { _, _ -> closeAll(targets) }
-                    .setNegativeButton("Cancel", null)
+                AlertDialog.Builder(this, R.style.DroidtopDialog)
+                    .setTitle(resources.getQuantityString(R.plurals.clear_all_confirm_title, targets.size, targets.size))
+                    .setMessage(R.string.clear_all_confirm_body)
+                    .setPositiveButton(R.string.clear_all_confirm) { _, _ -> closeAll(targets) }
+                    .setNegativeButton(android.R.string.cancel, null)
                     .setOnDismissListener { finish() }
                     .show()
             else -> closeAll(targets)

@@ -11,7 +11,7 @@ import android.os.Bundle
 import android.os.Process
 import com.android.launcher3.Launcher
 import com.android.launcher3.R
-import java.util.concurrent.Executors
+import com.android.launcher3.util.Executors
 
 /**
  * droidtop (Droidtop/tracker#564): "Stack a widget here", from a widget's resize frame. Lists the widgets
@@ -38,7 +38,7 @@ class WidgetStackActivity : Activity() {
         }
         // Labels load the providers' resources: off the main thread.
         val app = applicationContext
-        IO.execute {
+        Executors.THREAD_POOL_EXECUTOR.execute {
             val providers = AppWidgetManager.getInstance(app).getInstalledProvidersForProfile(Process.myUserHandle())
             val labelled = providers.map { it to label(app, it) }.sortedBy { it.second.lowercase() }
             runOnUiThread { choose(labelled) }
@@ -131,7 +131,6 @@ class WidgetStackActivity : Activity() {
         private const val STATE_ALLOCATED = "allocated"
         private const val REQUEST_BIND = 1
         private const val REQUEST_CONFIGURE = 2
-        private val IO = Executors.newSingleThreadExecutor()
 
         /** Opens the picker to stack a widget on the widget [shown] (its app widget id). */
         @JvmStatic

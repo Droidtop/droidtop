@@ -51,10 +51,9 @@ class WidgetStackTableTest {
     }
 
     @Test
-    fun `the table survives a round trip, and a damaged one reads as none`() {
+    fun `the table survives a round trip, and a damaged one is refused`() {
         val stacks = listOf(WidgetStack(listOf(clock, weather)), WidgetStack(listOf(notes, StackMember(14, "a/.B"))))
         assertEquals(stacks, WidgetStackTable.decode(WidgetStackTable.encode(stacks)))
-        assertTrue(WidgetStackTable.decode("not json").isEmpty())
-        assertTrue(WidgetStackTable.decode(null).isEmpty())
+        assertTrue(runCatching { WidgetStackTable.decode("not json") }.isFailure)
     }
 }

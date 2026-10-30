@@ -662,13 +662,13 @@
          stock AlertDialog look was visually unrelated to every other
          droidtop surface. -->
     <style name="DroidtopDialog" parent="@android:style/Theme.DeviceDefault.Dialog.Alert">
-        <item name="android:colorBackground">#FF1A1A1A</item>
-        <item name="android:textColorPrimary">#FFEDEDED</item>
-        <item name="android:textColor">#FFEDEDED</item>
-        <item name="android:colorAccent">#FF8AB4FF</item>
+        <item name="android:colorBackground">@color/droidtop_dialog_background</item>
+        <item name="android:textColorPrimary">@color/droidtop_dialog_text</item>
+        <item name="android:textColor">@color/droidtop_dialog_text</item>
+        <item name="android:colorAccent">@color/droidtop_dialog_accent</item>
         <item name="android:windowTitleStyle">@style/DroidtopDialogTitle</item>
     </style>
     <style name="DroidtopDialogTitle" parent="@android:style/TextAppearance.DeviceDefault.DialogWindowTitle">
-        <item name="android:textColor">#FFEDEDED</item>
+        <item name="android:textColor">@color/droidtop_dialog_text</item>
     </style>
 </resources>

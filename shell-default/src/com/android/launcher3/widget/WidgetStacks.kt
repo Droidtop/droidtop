@@ -3,12 +3,13 @@ package com.android.launcher3.widget
 import android.content.ComponentName
 import android.content.Context
 import com.android.launcher3.Launcher
-import com.android.launcher3.LauncherFiles
 import com.android.launcher3.model.data.LauncherAppWidgetInfo
 import com.android.launcher3.widget.util.WidgetSizes
+import dev.droidtop.runtime.CachedPref
 import dev.droidtop.runtime.StackMember
 import dev.droidtop.runtime.WidgetStack
 import dev.droidtop.runtime.WidgetStackTable
+import dev.droidtop.shell.standard.LauncherPrefsFile
 
 /**
  * droidtop (Droidtop/tracker#564): Standard's widget stacks. Several widgets share one place on the home
@@ -20,26 +21,15 @@ import dev.droidtop.runtime.WidgetStackTable
  * stacks and forgets the stacks that left the grid.
  */
 object WidgetStacks {
-    private const val KEY = "widget_stacks"
+    private val stored = CachedPref("widget_stacks", emptyList(), WidgetStackTable::decode, WidgetStackTable::encode)
 
-    @Volatile
-    private var cache: List<WidgetStack>? = null
-
-    private fun prefs(context: Context) =
-        context.getSharedPreferences(LauncherFiles.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
-
-    // One lock for the table: the ghost-widget cleanup rewrites it on the model thread while a stack can be added on
-    // the main thread, and each change reads the table and saves it whole (Droidtop/tracker#771).
     @JvmStatic
-    @Synchronized
-    fun table(context: Context): List<WidgetStack> =
-        cache ?: WidgetStackTable.decode(prefs(context).getString(KEY, null)).also { cache = it }
+    fun table(context: Context): List<WidgetStack> = stored.get(LauncherPrefsFile(context))
 
-    @Synchronized
-    private fun save(context: Context, stacks: List<WidgetStack>) {
-        cache = stacks
-        prefs(context).edit().putString(KEY, WidgetStackTable.encode(stacks)).apply()
-    }
+    // Every change goes through the store's one lock: the ghost-widget cleanup rewrites the table on the model thread
+    // while a stack can be added on the main thread (Droidtop/tracker#771).
+    private fun change(context: Context, change: (List<WidgetStack>) -> List<WidgetStack>) =
+        stored.update(LauncherPrefsFile(context), change)
 
     /** The stack whose member the widget [appWidgetId] is, or null. */
     @JvmStatic
@@ -50,13 +40,8 @@ object WidgetStacks {
      * no member left on the grid are forgotten here, so their widgets are freed.
      */
     @JvmStatic
-    @Synchronized
-    fun sparedFromCleanup(context: Context, inDatabase: Set<Int>): Set<Int> {
-        val stacks = table(context)
-        val live = WidgetStackTable.live(stacks, inDatabase)
-        if (live != stacks) save(context, live)
-        return WidgetStackTable.spared(live, inDatabase)
-    }
+    fun sparedFromCleanup(context: Context, inDatabase: Set<Int>): Set<Int> =
+        WidgetStackTable.spared(change(context) { WidgetStackTable.live(it, inDatabase) }, inDatabase)
 
     /** Adds the widget [added] to the stack of the widget [shown] (starting one), and shows it. Main thread. */
     @JvmStatic
@@ -64,9 +49,7 @@ object WidgetStacks {
         val view = launcher.workspace.getWidgetForAppWidgetId(shown) ?: return
         val info = view.tag as? LauncherAppWidgetInfo ?: return
         val member = StackMember(added, provider.flattenToString())
-        synchronized(this) {
-            save(launcher, WidgetStackTable.add(table(launcher), StackMember(shown, info.providerName.flattenToString()), member))
-        }
+        change(launcher) { WidgetStackTable.add(it, StackMember(shown, info.providerName.flattenToString()), member) }
         show(launcher, view, info, member)
     }
 

@@ -265,4 +265,12 @@
     <!-- droidtop: widget stacks (Droidtop/tracker#564). -->
     <string name="widget_stack_here">Stack a widget here</string>
     <string name="widget_stack_none">This device has no widgets to stack</string>
+    <!-- droidtop: Clear all apps (Droidtop/tracker#252, #771). -->
+    <string name="clear_all_nothing">Nothing to close.</string>
+    <plurals name="clear_all_confirm_title">
+        <item quantity="one">Close %d app?</item>
+        <item quantity="other">Close %d apps?</item>
+    </plurals>
+    <string name="clear_all_confirm_body">Unsaved progress in them is lost. droidtop, Enginehost and the apps you protected stay open.</string>
+    <string name="clear_all_confirm">Close all</string>
 </resources>

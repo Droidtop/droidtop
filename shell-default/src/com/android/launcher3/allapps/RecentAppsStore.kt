@@ -2,7 +2,9 @@ package com.android.launcher3.allapps
 
 import android.content.ComponentName
 import android.content.Context
-import com.android.launcher3.LauncherFiles
+import com.android.launcher3.util.Executors
+import dev.droidtop.runtime.CachedPref
+import dev.droidtop.shell.standard.LauncherPrefsFile
 
 /**
  * droidtop patch (not upstream Launcher3): backs the app drawer's own
@@ -31,21 +33,39 @@ object RecentAppsStore {
     // more than a drawer row will ever display (see RECENT_ROW_LIMIT).
     private const val MAX_TRACKED = 30
 
-    /** Records [component] as just launched: most-recent-first, deduplicated. */
+    private val recent = CachedPref<List<ComponentName>>(
+        KEY_RECENT_COMPONENTS, emptyList(),
+        { raw -> raw.split(SEPARATOR).filter { it.isNotBlank() }.mapNotNull { ComponentName.unflattenFromString(it) } },
+        { list -> list.joinToString(SEPARATOR) { it.flattenToString() } },
+    )
+
+    private val counts = CachedPref<Map<String, Int>>(
+        KEY_LAUNCH_COUNTS, emptyMap(),
+        { raw ->
+            raw.split(SEPARATOR).mapNotNull { entry ->
+                val name = entry.substringBeforeLast('=', "")
+                val count = entry.substringAfterLast('=', "").toIntOrNull()
+                if (name.isEmpty() || count == null) null else name to count
+            }.toMap()
+        },
+        { map -> map.entries.joinToString(SEPARATOR) { "${it.key}=${it.value}" } },
+    )
+
+    /**
+     * Records [component] as just launched: most-recent-first, deduplicated. Called on an icon tap, so the lists are
+     * changed and written on the module's executor, not the main thread (Droidtop/tracker#771).
+     */
     @JvmStatic
     fun recordLaunch(context: Context, component: ComponentName) {
-        val existing = current(context).toMutableList()
-        existing.remove(component)
-        existing.add(0, component)
-        while (existing.size > MAX_TRACKED) existing.removeAt(existing.size - 1)
-        val counts = launchCounts(context).toMutableMap()
-        counts[component.flattenToString()] = (counts[component.flattenToString()] ?: 0) + 1
-        val kept = counts.entries.sortedByDescending { it.value }.take(MAX_COUNTED)
-        context.getSharedPreferences(LauncherFiles.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_RECENT_COMPONENTS, existing.joinToString(SEPARATOR) { it.flattenToString() })
-            .putString(KEY_LAUNCH_COUNTS, kept.joinToString(SEPARATOR) { "${it.key}=${it.value}" })
-            .apply()
+        val prefs = LauncherPrefsFile(context)
+        Executors.THREAD_POOL_EXECUTOR.execute {
+            recent.update(prefs) { list -> (listOf(component) + (list - component)).take(MAX_TRACKED) }
+            counts.update(prefs) { map ->
+                val name = component.flattenToString()
+                val next = map + (name to (map[name] ?: 0) + 1)
+                if (next.size <= MAX_COUNTED) next else next.entries.sortedByDescending { it.value }.take(MAX_COUNTED).associate { it.toPair() }
+            }
+        }
     }
 
     /**
@@ -54,15 +74,7 @@ object RecentAppsStore {
      * app never launched since is absent.
      */
     @JvmStatic
-    fun launchCounts(context: Context): Map<String, Int> {
-        val raw = context.getSharedPreferences(LauncherFiles.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
-            .getString(KEY_LAUNCH_COUNTS, null) ?: return emptyMap()
-        return raw.split(SEPARATOR).mapNotNull { entry ->
-            val name = entry.substringBeforeLast('=', "")
-            val count = entry.substringAfterLast('=', "").toIntOrNull()
-            if (name.isEmpty() || count == null) null else name to count
-        }.toMap()
-    }
+    fun launchCounts(context: Context): Map<String, Int> = counts.get(LauncherPrefsFile(context))
 
     /** Whether a preferences change is to this list, for a surface that follows it (the companion's Recent apps). */
     @JvmStatic
@@ -70,11 +82,5 @@ object RecentAppsStore {
 
     /** Every tracked component, most-recent-first. */
     @JvmStatic
-    fun current(context: Context): List<ComponentName> {
-        val raw = context.getSharedPreferences(LauncherFiles.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
-            .getString(KEY_RECENT_COMPONENTS, null) ?: return emptyList()
-        return raw.split(SEPARATOR)
-            .filter { it.isNotBlank() }
-            .mapNotNull { ComponentName.unflattenFromString(it) }
-    }
+    fun current(context: Context): List<ComponentName> = recent.get(LauncherPrefsFile(context))
 }

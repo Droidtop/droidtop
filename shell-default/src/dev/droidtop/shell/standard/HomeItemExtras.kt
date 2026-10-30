@@ -7,12 +7,12 @@ import android.util.Log
 import androidx.annotation.WorkerThread
 import app.lawnchair.icons.getCustomInstanceLabelForId
 import app.lawnchair.icons.setCustomInstanceLabelForId
-import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.FastBitmapDrawable
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.ItemInfoWithIcon
+import dev.droidtop.runtime.CachedPref
 import dev.droidtop.runtime.HomeAction
 import java.io.File
 import java.io.FileOutputStream
@@ -32,8 +32,9 @@ import org.json.JSONObject
  * Drawn by `BubbleTextView` and `FolderIcon` at the moment they apply an item, so an icon refresh never loses them.
  * Removed with the item ([forget], from `ModelWriter`'s deletes).
  *
- * The pictures and the swipes change from the model thread, the customize menu's executor and a restore: every
- * change is made under one lock ([lock]), so one never overwrites another that began first.
+ * The pictures and the swipes change from the model thread, the customize menu's executor and a restore: the pictures
+ * change under one lock ([lock]) and the swipes through their store ([CachedPref]), so one change never overwrites
+ * another that began first.
  */
 object HomeItemExtras {
     private const val TAG = "droidtop.HomeItemExtras"
@@ -41,9 +42,8 @@ object HomeItemExtras {
     /** A picture is kept at most this many pixels a side: larger than any icon is drawn. */
     const val MAX_SIDE = 384
 
-    private val SWIPES = LauncherPrefs.backedUpItem("home_item_swipes", "")
-    // A stored swipe table that does not parse is kept here, as it was, before anything is saved over it.
-    private val SWIPES_UNREADABLE = LauncherPrefs.backedUpItem("home_item_swipes_unreadable", "")
+    /** Item id to side ("up", "down") to its encoded [HomeAction]; one JSON object in the launcher's preferences. */
+    private val swipes = CachedPref("home_item_swipes", emptyMap(), ::decodeSwipes, ::encodeSwipes)
 
     private val lock = Any()
 
@@ -51,7 +51,6 @@ object HomeItemExtras {
     private class Picture(val modified: Long, val bitmap: Bitmap)
 
     @Volatile private var pictures: Map<Int, Picture> = emptyMap()
-    @Volatile private var swipes: JSONObject? = null
 
     private fun dir(context: Context) = File(context.filesDir, DIR)
 
@@ -148,28 +147,27 @@ object HomeItemExtras {
 
     fun setTitle(id: Int, title: String?) = setCustomInstanceLabelForId(id, title?.trim()?.takeIf { it.isNotEmpty() })
 
-    private fun swipeTable(context: Context): JSONObject = swipes ?: synchronized(lock) {
-        swipes ?: run {
-            val stored = SWIPES.get(context)
-            try {
-                JSONObject(stored.ifEmpty { "{}" })
-            } catch (e: org.json.JSONException) {
-                // Kept as it was before an empty table is saved over it, and said, so it can be recovered.
-                Log.w(TAG, "the stored icon swipes do not parse; kept as home_item_swipes_unreadable", e)
-                LauncherPrefs.get(context).put(SWIPES_UNREADABLE, stored)
-                JSONObject()
-            }
-        }.also { swipes = it }
+    private fun swipeTable(context: Context): Map<String, Map<String, String>> = swipes.get(LauncherPrefsFile(context))
+
+    private fun decodeSwipes(raw: String): Map<String, Map<String, String>> {
+        val table = JSONObject(raw)
+        return table.keys().asSequence().associateWith { key ->
+            val entry = table.getJSONObject(key)
+            entry.keys().asSequence().associateWith { side -> entry.getString(side) }
+        }
     }
+
+    private fun encodeSwipes(table: Map<String, Map<String, String>>): String =
+        JSONObject().apply { table.forEach { (key, entry) -> put(key, JSONObject(entry)) } }.toString()
 
     /** What a swipe up ([up]) or down on item [id] does; null when nothing. */
     fun swipe(context: Context, id: Int, up: Boolean): HomeAction? {
         if (id < 0) return null
-        val entry = swipeTable(context).optJSONObject(id.toString()) ?: return null
-        return HomeAction.decode(entry.optString(if (up) "up" else "down"))
+        val entry = swipeTable(context)[id.toString()] ?: return null
+        return HomeAction.decode(entry[if (up) "up" else "down"])
     }
 
-    fun hasSwipe(context: Context, id: Int): Boolean = id >= 0 && swipeTable(context).has(id.toString())
+    fun hasSwipe(context: Context, id: Int): Boolean = id >= 0 && swipeTable(context).containsKey(id.toString())
 
     fun setSwipe(context: Context, id: Int, up: Boolean, action: HomeAction?) = setSwipes(context, listOf(SwipeChange(id, up, action)))
 
@@ -177,22 +175,18 @@ object HomeItemExtras {
     class SwipeChange(val id: Int, val up: Boolean, val action: HomeAction?)
 
     /** Applies [changes] to the table and saves it once (an import sets up to two per icon). */
-    fun setSwipes(context: Context, changes: List<SwipeChange>) = synchronized(lock) {
-        val table = JSONObject(swipeTable(context).toString())
-        for (change in changes) {
-            if (change.id < 0) continue
-            val key = change.id.toString()
-            val entry = table.optJSONObject(key) ?: JSONObject()
-            val side = if (change.up) "up" else "down"
-            if (change.action == null) entry.remove(side) else entry.put(side, change.action.encoded)
-            if (entry.length() == 0) table.remove(key) else table.put(key, entry)
+    fun setSwipes(context: Context, changes: List<SwipeChange>) {
+        swipes.update(LauncherPrefsFile(context)) { before ->
+            val table = before.toMutableMap()
+            for (change in changes) {
+                if (change.id < 0) continue
+                val key = change.id.toString()
+                val side = if (change.up) "up" else "down"
+                val entry = table[key].orEmpty().let { if (change.action == null) it - side else it + (side to change.action.encoded) }
+                if (entry.isEmpty()) table.remove(key) else table[key] = entry
+            }
+            table
         }
-        save(context, table)
-    }
-
-    private fun save(context: Context, table: JSONObject) {
-        swipes = table
-        LauncherPrefs.get(context).put(SWIPES, table.toString())
     }
 
     /** Standard's own backup (`BackupHelper`) carries each picture as one flat entry, `home_item_picture_<id>.png`. */
@@ -227,15 +221,15 @@ object HomeItemExtras {
 
     /** Items [ids] left the home screen (an import replacing the layout): the swipe table is saved once. */
     @WorkerThread
-    fun forget(context: Context, ids: Collection<Int>) = synchronized(lock) {
+    fun forget(context: Context, ids: Collection<Int>) {
         val gone = ids.filter { it >= 0 }
-        for (id in gone) {
-            if (id in pictures || File(dir(context), "$id.png").exists()) setPicture(context, id, null)
-            if (getCustomInstanceLabelForId(id) != null) setCustomInstanceLabelForId(id, null)
+        synchronized(lock) {
+            for (id in gone) {
+                if (id in pictures || File(dir(context), "$id.png").exists()) setPicture(context, id, null)
+                if (getCustomInstanceLabelForId(id) != null) setCustomInstanceLabelForId(id, null)
+            }
         }
-        val table = swipeTable(context)
-        if (gone.any { table.has(it.toString()) }) {
-            save(context, JSONObject(table.toString()).apply { gone.forEach { remove(it.toString()) } })
-        }
+        val keys = gone.map { it.toString() }.toSet()
+        swipes.update(LauncherPrefsFile(context)) { table -> table - keys }
     }
 }
