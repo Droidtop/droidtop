@@ -13882,6 +13882,37 @@ it over the screen it is on and never navigates away to reach it:
   `GameInPlace`, `JobOpener`).
 - **A Get new games result** opens the one search on its title in place, as it already did.
 
+**droidtop picks the download (2026-10-30, Droidtop/tracker#838).** The owner: "Downloads still don't auto-pick links".
+`DownloadPick.candidates` orders a record's downloads as the mirrors to try:
+- only the game itself, a `build` that is official (patches, extras and unofficial ports are offered, never taken);
+- the system droidtop runs it with first;
+- the build of the installed copy (a Steam copy takes the "Steam" build);
+- then a link droidtop serves without a page (debrid, a host's API), then the person's host order (`HostOrder`, by
+  default hosts that serve a file straight away before those that show a page), then the source's order.
+
+**Get the update** leads the record page's Downloads tab and the Updates record screen (two presses, as a download):
+- it tries the mirrors in that order, saying "Trying GOFILE", then "GOFILE started nothing. Trying MEGA";
+- a mirror that starts nothing gives way to the next, without opening the source's page; anything else (a download
+  that started, a check not passed, a sign-in declined) is the answer;
+- only when no mirror started anything does the source's page open, saying so ("No mirror started a download
+  (3 tried)").
+
+The rows below it stay pickable by hand, and a source result's page (a new game) lists its links as before.
+
+**One row per build and platform (2026-10-30, Droidtop/tracker#838).** The rows below Get the update are one per
+heading the source gave ("Win/Linux", "Steam Build · Win/Linux"), not one per link. Each row:
+- lists its hosts under it ("GOFILE, MEGA, MIXDROP, PIXELDRAIN, UPLOADHAVEN"); a screen that draws chips draws one per host;
+- on A (two presses), tries those hosts in turn, served first, then the person's host order (`RecordAction.Group`).
+
+A heading with one link is that link's row, as before.
+
+Most games have one build, and their rows are just its platforms. When a thread has several builds, the copy's build
+comes first, marked "Your copy". A Steam copy's build is the "Steam" one; any other copy's is the build without it.
+The other builds follow under "Other builds". A page with no copy (a new game) keeps the thread's order and marks none.
+Patches and extras stay apart, under "Patches" and "Extras", link by link. They are offered, never part of a build's row.
+
+**Host order** is under Download rules: a press moves a host to the top, and Use the default order puts it back.
+
 **Getting an update: the source's record page (2026-10-17).** The owner, from
 the console: "we need actual update management. the f95 plugin surfaces
 updates, but tapping on them doesn't give the link list to actually download

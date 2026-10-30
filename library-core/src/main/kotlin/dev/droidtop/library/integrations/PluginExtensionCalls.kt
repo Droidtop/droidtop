@@ -627,7 +627,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         }
         if (captured.isEmpty()) {
             Log.w(TAG, "update $source/$externalId: the web view started no download from ${dev.droidtop.pluginhost.NetScope.hostOf(url)}")
-            return "Nothing was downloaded from that page"
+            return dev.droidtop.library.DownloadPick.NOTHING_STARTED
         }
         val descriptors = UpdateLinks.descriptorsFor(captured)
         val title = "Download $name"
@@ -816,6 +816,8 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
                         url = url,
                         // Its systems, as a contract 3 entry names them, else from its heading ("Win/Linux").
                         systems = dev.droidtop.pluginhost.DownloadSystems.of(dev.droidtop.pluginhost.DownloadSystems.read(d.optJSONArray("systems")), section),
+                        role = d.optString("role", "build").takeIf { it == "patch" || it == "extra" } ?: "build",
+                        official = d.optBoolean("official", true),
                     )
                 }
             }.orEmpty().let(ItemPageFacets::distinctDownloads)

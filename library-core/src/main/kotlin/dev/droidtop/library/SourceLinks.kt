@@ -85,6 +85,10 @@ interface UpdateSources {
         val systems: List<String> = emptyList(),
         /** A split release's pieces (docs/plugin-api.md 1.10, `download` `parts`): one row, fetched as one job. */
         val parts: List<Part> = emptyList(),
+        /** `build`, `patch` or `extra` (Droidtop/tracker#838): droidtop's own pick takes only a build. */
+        val role: String = "build",
+        /** False for an item the source marks unofficial. */
+        val official: Boolean = true,
     ) {
         /** One piece: its page ([url]) or the source's token ([link]), and its size when the source knows it. */
         data class Part(val label: String, val url: String?, val link: String?, val size: Long?)

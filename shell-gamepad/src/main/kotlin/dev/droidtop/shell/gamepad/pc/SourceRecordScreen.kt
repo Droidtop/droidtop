@@ -127,7 +127,7 @@ object SourceRecordScreen {
             null
         }
         // The record page's Downloads rows, less its System row: here the system is the choice above.
-        val downloads = downloadRows(record, picked).filterNot { it.action == RecordAction.PickSystem }
+        val downloads = downloadRows(record, picked, dev.droidtop.library.DownloadPick.isSteamCopy(facet.entry)).filterNot { it.action == RecordAction.PickSystem }
         return listOf(
             versions,
             CatalogGroup(
@@ -164,6 +164,21 @@ object SourceRecordScreen {
                 subtitle = row.subtitle,
                 confirmTitle = "Download this version? It lands beside your other versions",
                 run = { _, onStatus -> getDownload(library, facet.source, record, action.download, facet.gameName, facet.entry, onStatus) },
+            )
+            RecordAction.GetBest -> AsyncActionItem(
+                id = id,
+                title = row.title,
+                subtitle = row.subtitle,
+                confirmTitle = "Get the update? droidtop picks the build and the host, and it lands beside your other versions",
+                run = { ctx, onStatus -> getBest(library, facet.source, record, facet.gameName, facet.entry, dev.droidtop.library.HostOrder.get(ctx), onStatus) },
+            )
+            is RecordAction.Group -> AsyncActionItem(
+                id = id,
+                title = row.title,
+                subtitle = row.subtitle,
+                value = row.value,
+                confirmTitle = "Download this build? Its mirrors are tried in turn",
+                run = { ctx, onStatus -> getGroup(library, facet.source, record, action.downloads, facet.gameName, facet.entry, dev.droidtop.library.HostOrder.get(ctx), onStatus) },
             )
             RecordAction.SignIn -> AsyncActionItem(
                 id = id,

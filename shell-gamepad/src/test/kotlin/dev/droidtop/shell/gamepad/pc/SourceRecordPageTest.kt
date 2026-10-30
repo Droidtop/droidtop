@@ -40,10 +40,15 @@ class SourceRecordPageTest {
     fun downloadsKeepTheSourcesSectionsAndGroupByHostWithinOne() {
         val order = groupedDownloads(record.downloads).map { "${it.section}|${it.host}|${it.label}" }
         assertEquals(listOf("Win/Linux|MEGA|MEGA", "Win/Linux|mega|Mirror", "Win/Linux|PIXELDRAIN|Part 1", "Mac|MEGA|MEGA"), order)
-        val rows = recordRows(record, RecordTab.DOWNLOADS) { "" }
-        assertEquals("MEGA", rows.first().title)
-        assertEquals("PIXELDRAIN · Part 1", rows[2].title)
-        assertTrue(rows.all { it.action is RecordAction.Download })
+        val all = recordRows(record, RecordTab.DOWNLOADS) { "" }
+        // droidtop's own pick leads (Droidtop/tracker#838); the links follow for picking by hand.
+        assertEquals(RecordAction.GetBest, all.first().action)
+        // One row per heading (Droidtop/tracker#838): Win/Linux's three links tried in turn, Mac's one link as itself.
+        val rows = all.drop(1)
+        assertEquals(listOf("Win/Linux", "MEGA"), rows.map { it.title })
+        assertEquals("MEGA, PIXELDRAIN", rows.first().subtitle)
+        assertEquals(3, (rows.first().action as RecordAction.Group).downloads.size)
+        assertTrue(rows[1].action is RecordAction.Download)
     }
 
     @Test
@@ -57,14 +62,14 @@ class SourceRecordPageTest {
         )
         assertEquals(listOf("windows", "linux", "mac", "android"), downloadSystems(tagged))
         // Windows first; the links for it and the ones for any system.
-        val first = recordRows(tagged, RecordTab.DOWNLOADS) { "" }
+        val first = recordRows(tagged, RecordTab.DOWNLOADS) { "" }.also { assertEquals(RecordAction.GetBest, it.first().action) }.drop(1)
         assertEquals(RecordRow("System", "Windows", "Left and Right show another system's links", RecordAction.PickSystem), first.first())
         // The links for any system follow under their own headings, each with its description.
         assertEquals(listOf("MEGA", "Extras", "WALKTHROUGH", "Other", "MIXDROP"), first.drop(1).map { it.title })
         assertEquals("Walkthrough", first.first { it.title == "WALKTHROUGH" }.subtitle)
         assertNull(first.first { it.title == "Extras" }.action)
         // Android: droidtop's word first, then only Android's link.
-        val android = recordRows(tagged, RecordTab.DOWNLOADS, "android") { "" }
+        val android = recordRows(tagged, RecordTab.DOWNLOADS, "android") { "" }.drop(1)
         assertEquals("This will not be trackable by us. Windows or Linux is recommended.", android[1].title)
         assertNull(android[1].action)
         assertEquals(listOf("GOFILE", "Extras", "WALKTHROUGH", "Other", "MIXDROP"), android.drop(2).map { it.title })
@@ -72,7 +77,7 @@ class SourceRecordPageTest {
         assertEquals("android", nextSystem(downloadSystems(tagged), null, -1))
         // Links that are all for one system: no picker, but Android still says so.
         val onlyAndroid = record.copy(downloads = listOf(s("Android", "GOFILE", "android")))
-        val rows = recordRows(onlyAndroid, RecordTab.DOWNLOADS) { "" }
+        val rows = recordRows(onlyAndroid, RecordTab.DOWNLOADS) { "" }.drop(1)
         assertEquals(listOf("This will not be trackable by us. Windows or Linux is recommended.", "GOFILE"), rows.map { it.title })
     }
 
@@ -152,7 +157,7 @@ class SourceRecordPageTest {
         // Without every part's size, only the count: a total would be wrong.
         assertEquals("2 parts", partsLine(split.copy(parts = listOf(parts[0], parts[1].copy(size = null)))))
         assertNull(partsLine(d("Win", "MEGA")))
-        val rows = recordRows(record.copy(downloads = listOf(split)), RecordTab.DOWNLOADS) { "" }
+        val rows = recordRows(record.copy(downloads = listOf(split)), RecordTab.DOWNLOADS) { "" }.drop(1)
         assertEquals(1, rows.size)
         assertEquals("4 parts, 12.0 GB", rows.single().value)
         assertEquals(RecordAction.Download(split), rows.single().action)

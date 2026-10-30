@@ -1,6 +1,8 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
+import dev.droidtop.library.DownloadPick
+import dev.droidtop.library.HostOrder
 import dev.droidtop.library.RECORD_PREFS
 import dev.droidtop.library.RecordMirrors
 import dev.droidtop.library.RecordAction
@@ -119,7 +121,8 @@ object SourceItemPage {
         } else {
             null
         }
-        val rows = downloadRows(found, picked).filterNot { it.action == RecordAction.PickSystem }.mapIndexed { index, row ->
+        // Get the update is an update's (Droidtop/tracker#838); a source result's page lists its links as they are.
+        val rows = downloadRows(found, picked).filterNot { it.action == RecordAction.PickSystem || it.action == RecordAction.GetBest }.mapIndexed { index, row ->
             val id = "item_download_$index"
             when (val action = row.action) {
                 is RecordAction.Download -> AsyncActionItem(
@@ -129,6 +132,23 @@ object SourceItemPage {
                     value = row.value,
                     confirmTitle = "Download this?",
                     run = { ctx, onStatus -> get.download(ctx, action.download, onStatus) },
+                )
+                // One build's mirrors (Droidtop/tracker#838): the next is tried when one starts nothing.
+                is RecordAction.Group -> AsyncActionItem(
+                    id = id,
+                    title = row.title,
+                    subtitle = row.subtitle,
+                    value = row.value,
+                    confirmTitle = "Download this?",
+                    run = { ctx, onStatus ->
+                        val ordered = DownloadPick.hostOrdered(action.downloads, HostOrder.get(ctx)) { false }
+                        var outcome = DownloadPick.NOTHING_STARTED
+                        for (d in ordered) {
+                            outcome = get.download(ctx, d, onStatus)
+                            if (outcome != DownloadPick.NOTHING_STARTED) break
+                        }
+                        outcome
+                    },
                 )
                 else -> ActionItem(id = id, title = row.title, subtitle = row.subtitle, value = row.value)
             }
@@ -185,7 +205,7 @@ object SourceItemPage {
                 }
             }
             val captured = PluginWebAccount.openForDownloads(context, record, url, DownloadJobs.MAX_FILES, refresh)
-            if (captured.isEmpty()) return "Nothing was downloaded from that page"
+            if (captured.isEmpty()) return dev.droidtop.library.DownloadPick.NOTHING_STARTED
             return said(AcquireDownload.run(context, record, title, hostContext, emptyMap(), UpdateLinks.descriptorsFor(captured), onStatus))
         }
 

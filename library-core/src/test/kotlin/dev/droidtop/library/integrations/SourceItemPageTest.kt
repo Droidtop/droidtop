@@ -79,12 +79,24 @@ class SourceItemPageTest {
 
     @Test
     fun `a release in parts is one download row, its parts counted`() {
+        // Two mirrors under one heading are one row that tries them in turn (Droidtop/tracker#838).
         val downloads = page()!!.groups[1].items
-        assertEquals(2, downloads.size)
-        assertTrue(downloads.all { it is AsyncActionItem })
-        val parts = downloads.single { it.title.startsWith("FuckingFast") }
+        val repack = downloads.single() as AsyncActionItem
+        assertEquals("Repack", repack.title)
+        assertEquals("Magnet, FuckingFast", repack.subtitle)
+        // On its own, the release in parts is its own row, its parts counted.
+        val onlyParts = JSONObject(reply.toString()).apply {
+            val dl = getJSONArray("facets").getJSONObject(facetIndex("dl"))
+            dl.getJSONArray("entries").remove(0)
+        }
+        val parts = page(onlyParts)!!.groups[1].items.single()
+        assertTrue(parts.title.startsWith("FuckingFast"))
         assertEquals("2 parts, 5 MB", parts.value)
-        assertEquals("Magnet", downloads.first().title)
+    }
+
+    private fun facetIndex(id: String): Int {
+        val facets = reply.getJSONArray("facets")
+        return (0 until facets.length()).first { facets.getJSONObject(it).optString("id") == id }
     }
 
     @Test

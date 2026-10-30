@@ -12,6 +12,15 @@ import dev.droidtop.pluginhost.DownloadSystems
 /** What A on a record row does. */
 sealed interface RecordAction {
     data class Download(val download: UpdateSources.Download) : RecordAction
+
+    /** droidtop's own pick (Droidtop/tracker#838): the build, the system and the host chosen, the mirrors tried in turn. */
+    data object GetBest : RecordAction
+
+    /**
+     * One build for one platform (Droidtop/tracker#838): its mirrors, in the source's order, tried in turn in the person's
+     * host order. The hosts are the row's to show (a chip each, where the screen draws chips).
+     */
+    data class Group(val downloads: List<UpdateSources.Download>) : RecordAction
     data class Open(val url: String) : RecordAction
     data object Relink : RecordAction
 
@@ -97,17 +106,55 @@ fun partsLine(d: UpdateSources.Download): String? {
     return listOfNotNull(count, total).joinToString(", ")
 }
 
+/** The build a download's heading names ("Steam Build · Win/Linux": "Steam Build"); null for the thread's default build. */
+fun buildOf(section: String): String? = section.substringBefore(" · ", "").trim().ifEmpty { null }
+
+/**
+ * A build's links as rows (Droidtop/tracker#838): one row per build and platform, its hosts listed under it, A trying
+ * them in turn; a heading with one link is that link's row. Most games have one build and get just that. When a thread
+ * has several ("Steam Build" beside the default one), the copy's build comes first, marked "Your copy" when droidtop
+ * knows the copy ([steamCopy]; null on a page with no copy), and the others follow under "Other builds". Pure.
+ */
+fun buildRows(downloads: List<UpdateSources.Download>, steamCopy: Boolean?): List<RecordRow> {
+    val groups = downloads.groupBy { it.section }
+    fun row(section: String, mine: Boolean): RecordRow {
+        val list = groups.getValue(section)
+        val base = if (list.size == 1) {
+            linkRow(list.single())
+        } else {
+            RecordRow(section, subtitle = list.map { it.host }.distinctBy { it.lowercase() }.joinToString(", "), action = RecordAction.Group(list))
+        }
+        return if (mine) base.copy(value = "Your copy") else base
+    }
+    val builds = groups.keys.map(::buildOf).distinct()
+    if (builds.size < 2) return groups.keys.map { row(it, mine = false) }
+    val yours = steamCopy?.let { steam -> builds.firstOrNull { (it?.contains("steam", ignoreCase = true) == true) == steam } } ?: builds.first()
+    val (first, rest) = groups.keys.partition { buildOf(it) == yours }
+    return first.map { row(it, mine = steamCopy != null) } +
+        RecordRow("Other builds", subtitle = rest.map { buildOf(it) ?: "The default build" }.distinct().joinToString(", ")) +
+        rest.map { row(it, mine = false) }
+}
+
 /**
  * The Downloads tab's rows: when the links differ by system, a System row first, droidtop's word on the picked system
- * if it has one (Android: not trackable), then only the picked system's links. The links for any system follow
- * whichever system is picked, under their own heading (the owner, 2026-10-23, Droidtop/tracker#617): "Extras" for a
- * walkthrough, a patch or a save file, "Other" for the rest, each with its own heading under it as its description.
+ * if it has one (Android: not trackable), then only the picked system's builds ([buildRows]). The links for any system
+ * follow whichever system is picked, under their own heading (the owner, 2026-10-23, Droidtop/tracker#617): "Patches"
+ * and "Extras" (a walkthrough, a mod, a save file) apart from the game, "Other" for the rest, each with its own heading
+ * under it as its description. [steamCopy] is whether the copy being updated is a Steam copy, null with no copy.
  */
-fun downloadRows(record: UpdateSources.Record, picked: String?): List<RecordRow> {
+fun downloadRows(record: UpdateSources.Record, picked: String?, steamCopy: Boolean? = null): List<RecordRow> {
     if (record.downloads.isEmpty()) return listOf(RecordRow("No downloads listed", subtitle = "The source lists no links for this version"))
     val offered = downloadSystems(record)
+    // droidtop's own pick first (Droidtop/tracker#838): one press, no link to choose; the rows below stay for picking by hand.
+    val get = listOfNotNull(
+        RecordRow("Get the update", subtitle = "droidtop picks the build and the host, and tries the next if one fails", action = RecordAction.GetBest)
+            .takeIf { DownloadPick.offers(record.downloads) },
+    )
     // Links that do not differ by system: the source's own list, as it gives it.
-    if (offered.isEmpty()) return groupedDownloads(record.downloads).map(::linkRow)
+    if (offered.isEmpty()) {
+        val (builds, rest) = record.downloads.partition { it.role == "build" && !DownloadSystems.isExtra(it.section) }
+        return get + buildRows(builds, steamCopy) + apart(rest, subtitle = null)
+    }
     val system = picked?.takeIf { it in offered } ?: DownloadSystems.first(offered)
     val head = listOfNotNull(
         if (offered.size >= 2) {
@@ -118,12 +165,18 @@ fun downloadRows(record: UpdateSources.Record, picked: String?): List<RecordRow>
         system?.let { DownloadSystems.notice(it) }?.let { RecordRow(it) },
     )
     val label = DownloadSystems.LABELS[system] ?: system
-    val links = groupedDownloads(record.downloads.filter { it.systems.isNotEmpty() && system in it.systems }).map(::linkRow)
+    val links = buildRows(record.downloads.filter { it.systems.isNotEmpty() && system in it.systems }, steamCopy)
     val anySystem = record.downloads.filter { it.systems.isEmpty() }
-    val (extras, other) = anySystem.partition { DownloadSystems.isExtra(it.section) || DownloadSystems.isExtra(it.label) }
+    return get + head + links.ifEmpty { listOf(RecordRow("No links for $label")) } + apart(anySystem, subtitle = "For any system")
+}
+
+/** Patches, extras and the rest, each under its own heading, link by link: offered, never part of a build's row. */
+private fun apart(downloads: List<UpdateSources.Download>, subtitle: String?): List<RecordRow> {
+    val patches = downloads.filter { it.role == "patch" }
+    val (extras, other) = (downloads - patches.toSet()).partition { it.role == "extra" || DownloadSystems.isExtra(it.section) || DownloadSystems.isExtra(it.label) }
     fun group(title: String, list: List<UpdateSources.Download>): List<RecordRow> =
-        if (list.isEmpty()) emptyList() else listOf(RecordRow(title, subtitle = "For any system")) + groupedDownloads(list).map(::linkRow)
-    return head + links.ifEmpty { listOf(RecordRow("No links for $label")) } + group("Extras", extras) + group("Other", other)
+        if (list.isEmpty()) emptyList() else listOf(RecordRow(title, subtitle = subtitle)) + groupedDownloads(list).map(::linkRow)
+    return group("Patches", patches) + group("Extras", extras) + group("Other", other)
 }
 
 /** Where a record's Downloads keep the system last picked per source. */
