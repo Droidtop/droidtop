@@ -26,8 +26,13 @@ import org.json.JSONObject
  * still shows after [SETTLE_MS] is the person's to pass, as before. Blocking: never on the main thread.
  */
 object WebFetch {
-    /** How long a check page may take to pass by itself before it is the person's. */
-    private const val SETTLE_MS = 12_000L
+    /**
+     * How long a check page may take to pass by itself before it is the person's. It was 12 s; on the console
+     * (Droidtop/tracker#783) the hidden view gave up at 12.7 s and the visible view then passed the same check unaided,
+     * so the hidden one gets as long as a person would wait. [WebViewProbe] logs how long each view takes to pass. The
+     * plugin's own request timeout still bounds it.
+     */
+    const val SETTLE_MS = 25_000L
     private const val TAG = "droidtop.WebFetch"
 
     /** The document's type, its markup, and its text, as one JSON string. */
@@ -59,7 +64,10 @@ object WebFetch {
         cookies?.split(';')?.map { it.trim() }?.filter { it.contains('=') }?.forEach { pair ->
             jar.setCookie("https://$host", "$pair; Path=/; Secure")
         }
-        val view = WebView(context)
+        // Made with droidtop's screen in front and put behind it, out of sight: a page in no window never finishes a check
+        // (Droidtop/tracker#783). With no droidtop screen in front it runs in no window, as before.
+        val view = HiddenWebViews.open() ?: WebView(context)
+        val shown = view.isAttachedToWindow
         WebSessionActivity.webViewSetup?.invoke(view)
         view.settings.javaScriptEnabled = true
         view.settings.domStorageEnabled = true
@@ -67,8 +75,7 @@ object WebFetch {
         view.settings.allowContentAccess = false
         view.settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         jar.setAcceptThirdPartyCookies(view, true)
-        // In droidtop's window, out of sight: a page in no window never finishes a check (Droidtop/tracker#783).
-        val shown = HiddenWebViews.attach(view)
+        view.webChromeClient = HiddenWebViews.chromeClient(TAG, host)
         Log.i(TAG, "$host: fetching in ${if (shown) "droidtop's window, out of sight" else "no window: no droidtop screen is in front"}")
         val handler = Handler(Looper.getMainLooper())
         val startedAt = System.currentTimeMillis()
@@ -95,10 +102,12 @@ object WebFetch {
             override fun onPageFinished(view: WebView, finished: String?) {
                 if (done.isCompleted) return
                 val at = finished ?: url
-                if (SiteCheck.isCheckTitle(view.title)) {
+                val checking = SiteCheck.isCheckTitle(view.title)
+                WebViewProbe.report("hidden fetch", host, view, startedAt, if (checking) "check page" else "page")
+                if (checking) {
                     // A check that passes by itself loads the site's page next; one that does not is the person's.
                     if (System.currentTimeMillis() - startedAt > SETTLE_MS) {
-                        Log.i(TAG, "$host: the check did not pass by itself")
+                        Log.i(TAG, "$host: the check did not pass by itself in ${SETTLE_MS / 1000} s")
                         finish(Result(null, challenged = true, cookies = jar.getCookie("https://$host")))
                     } else {
                         handler.postDelayed({

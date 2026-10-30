@@ -337,7 +337,7 @@ to do the same." A plugin no longer has to recognise a check:
   the document's own `content-type`, and as `body` an HTML page's markup or the
   text of anything else (a JSON reply as JSON, not the page the view wraps it
   in). A check the
-  view passes by itself within about 12 seconds is waited for; one it does not
+  view passes by itself within about 25 seconds is waited for; one it does not
   pass is `BROWSER_CHECK_REQUIRED` as before. Other methods still go through
   droidtop's client. A page the site shows signed out (a guest page with no
   download links) is still the site's page. A plugin that needs the account

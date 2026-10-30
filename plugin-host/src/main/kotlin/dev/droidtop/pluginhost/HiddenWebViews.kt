@@ -17,15 +17,37 @@ object HiddenWebViews {
     @Volatile
     var window: (() -> ViewGroup?)? = null
 
-    /** Puts [view] behind the screen in front's content; whether there was one. Call on the main thread. */
-    fun attach(view: WebView): Boolean {
-        val content = runCatching { window?.invoke() }.getOrNull() ?: return false
+    /**
+     * A web view made with the context of droidtop's screen in front and put behind its content, as the visible view is
+     * made with its own screen's (Droidtop/tracker#783); null when no droidtop screen is in front. Call on the main thread.
+     */
+    fun open(): WebView? {
+        val content = runCatching { window?.invoke() }.getOrNull() ?: return null
+        val view = WebView(content.context)
+        if (attach(view, content)) return view
+        view.destroy()
+        return null
+    }
+
+    /** Puts [view] behind [content]; whether it could. Call on the main thread. */
+    private fun attach(view: WebView, content: ViewGroup): Boolean {
         view.isFocusable = false
         view.isFocusableInTouchMode = false
         view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         return runCatching {
             content.addView(view, 0, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }.isSuccess
+    }
+
+    /**
+     * The visible view's page log, for a hidden one: the page's console messages go to droidtop's log under [tag], as the
+     * visible view's do, and the view has a chrome client as that one has.
+     */
+    fun chromeClient(tag: String, host: String): android.webkit.WebChromeClient = object : android.webkit.WebChromeClient() {
+        override fun onConsoleMessage(message: android.webkit.ConsoleMessage): Boolean {
+            android.util.Log.i(tag, "$host out of sight: console ${message.messageLevel()}: ${message.message()}")
+            return true
+        }
     }
 
     /** Takes [view] out of the window it was put in, if any. Call on the main thread, before destroying it. */

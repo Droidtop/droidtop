@@ -517,9 +517,9 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         val onFacets = providers().firstOrNull { (_, entry) -> entry.id == source }?.first?.let { PluginFacets.declares(it, PluginFacets.ITEM_PAGE) } == true
         val reply = if (onFacets) {
             val subject = JSONObject().put("type", "item").put("source", source).put("id", externalId)
-            call(source, PluginFacets.OP_GET, PluginFacets.getArgs(PluginFacets.ITEM_PAGE, subject), QUICK_BUDGET_MS, userInitiated = true, point = PluginFacets.POINT)
+            call(source, PluginFacets.OP_GET, PluginFacets.getArgs(PluginFacets.ITEM_PAGE, subject), RECORD_BUDGET_MS, userInitiated = true, point = PluginFacets.POINT)
         } else {
-            call(source, "record", JSONObject().put("id", externalId), QUICK_BUDGET_MS, userInitiated = true)
+            call(source, "record", JSONObject().put("id", externalId), RECORD_BUDGET_MS, userInitiated = true)
         }
         if (reply == null || !reply.ok) {
             val failure = reply?.message ?: if (reply == null) "The source $source is not installed or not running" else "The source did not answer"
@@ -723,6 +723,14 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
 
         /** `resolve` and `match` answer a person waiting on a sheet. */
         const val QUICK_BUDGET_MS = 15_000L
+
+        /**
+         * A record's page, asked for by the person (the record page, a Download's current link): long enough for a site's
+         * browser check to pass by itself in droidtop's hidden view ([dev.droidtop.pluginhost.WebFetch.SETTLE_MS]) after
+         * the plugin has loaded, which [QUICK_BUDGET_MS] was not: on the console the check had about 13 s
+         * (Droidtop/tracker#783). The page says "Asking <source>..." meanwhile.
+         */
+        const val RECORD_BUDGET_MS = 45_000L
 
         const val MAX_CANDIDATES = 20
 

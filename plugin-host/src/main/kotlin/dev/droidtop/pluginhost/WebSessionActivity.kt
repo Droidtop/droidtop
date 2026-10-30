@@ -62,6 +62,9 @@ class WebSessionActivity : Activity() {
     private var handoff: String? = null
     private var takenLine: TextView? = null
 
+    /** When the view started loading its first page, for [WebViewProbe]'s times. */
+    private var startedAt = 0L
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         // droidtop's colours for a screen it draws with plain views (docs/SPEC.md 7k "Light and dark",
@@ -211,6 +214,10 @@ class WebSessionActivity : Activity() {
 
                 override fun onPageFinished(view: WebView, url: String?) {
                     location?.text = url?.let { NetScope.hostOf(it) }.orEmpty()
+                    // The same probe as the hidden views', so the two can be compared in a device's log (Droidtop/tracker#783).
+                    url?.let { NetScope.hostOf(it) }?.let {
+                        WebViewProbe.report("visible ${asked.mode.name.lowercase()}", it, view, startedAt, if (SiteCheck.isCheckTitle(view.title)) "check page" else "page")
+                    }
                     if (url != null && browse) asked.onPage?.invoke(url)
                     // A browser check is passed once the view shows the site's own page with a pass cookie for it, and the
                     // view closes by itself (Droidtop/tracker#600). Not on a timer or the first page: a challenge's own
@@ -267,6 +274,7 @@ class WebSessionActivity : Activity() {
         root.addView(view, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
         view.requestFocus(View.FOCUS_DOWN)
+        startedAt = System.currentTimeMillis()
         view.loadUrl(asked.url)
     }
 

@@ -28,7 +28,7 @@ object HiddenWebSession {
     private const val TAG = "droidtop.WebSession"
 
     /** How long a check page may take to pass by itself, as for [WebFetch]. */
-    private const val SETTLE_MS = 12_000L
+    private const val SETTLE_MS = WebFetch.SETTLE_MS
 
     /** How long a finished page with nothing to act on is given to move on by itself (a page that redirects in script). */
     private const val STILL_MS = 3_000L
@@ -84,9 +84,7 @@ object HiddenWebSession {
         done: CompletableDeferred<Outcome?>,
     ): () -> Unit {
         val cookies = CookieManager.getInstance()
-        val view = WebView(app)
-        if (!HiddenWebViews.attach(view)) {
-            view.destroy()
+        val view = HiddenWebViews.open() ?: run {
             done.complete(null)
             return {}
         }
@@ -98,9 +96,10 @@ object HiddenWebSession {
         view.settings.allowContentAccess = false
         view.settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         cookies.setAcceptThirdPartyCookies(view, true)
+        val host = NetScope.hostOf(request.url).orEmpty()
+        view.webChromeClient = HiddenWebViews.chromeClient(TAG, host)
         val handler = Handler(Looper.getMainLooper())
         val startedAt = System.currentTimeMillis()
-        val host = NetScope.hostOf(request.url).orEmpty()
         // Each page the view finishes; a wait for an earlier one is dropped when the view has moved on.
         var shown = 0
 
@@ -133,7 +132,9 @@ object HiddenWebSession {
             override fun onPageFinished(view: WebView, url: String?) {
                 if (done.isCompleted) return
                 val page = ++shown
-                if (SiteCheck.isCheckTitle(view.title)) {
+                val checking = SiteCheck.isCheckTitle(view.title)
+                url?.let { NetScope.hostOf(it) }?.let { WebViewProbe.report("hidden open", it, view, startedAt, if (checking) "check page" else "page") }
+                if (checking) {
                     // A check that passes by itself loads the site's page next; one that does not is the person's.
                     if (System.currentTimeMillis() - startedAt > SETTLE_MS) {
                         finish(End.PERSON)

@@ -18972,7 +18972,7 @@ A condition the person should know about (an unofficial plugin, a feature that i
     off-screen web view (`WebFetch`) with the cookies the request would have carried, never by droidtop's HTTP
     client. The plugin gets an ordinary answer: an HTML page's markup, or the text of anything else with its own
     content type (a JSON reply stays JSON, not the page the view wraps it in). The cookies the view ends with are
-    kept as the plugin's clearance. A check that passes by itself within about 12 seconds is waited for; otherwise
+    kept as the plugin's clearance. A check that passes by itself within about 25 seconds (2026-10-30, Droidtop/tracker#783; a record the person asks for gets 45 s for it) is waited for; otherwise
     `BROWSER_CHECK_REQUIRED` as before. Other methods still use the client. A guest page is still the site's page:
     the plugin answers `SIGN_IN_REQUIRED` for it, not "could not read" (docs/plugin-api.md 1.3), and that change is
     the F95 plugin's.
@@ -18988,6 +18988,14 @@ A condition the person should know about (an unofficial plugin, a feature that i
       screen in front, at its size, unfocusable and out of the accessibility tree (`HiddenWebViews`), and taken out
       before it is destroyed. Not behind the companion or a cover parked on the other screen, nor a running game. With
       no droidtop screen in front a fetch runs in no window as before, and a download link opens in the visible view.
+    - **Like the visible view in every way it is made (2026-10-30).** On the console the hidden view in droidtop's
+      window still gave up after 12.7 s, and the visible view passed the same check unaided right after. So a hidden
+      view is made with the context of the screen it runs behind, as the visible one is made with its own, has a chrome
+      client as the visible one has, and waits about 25 seconds for a check. A record the person asks for gets 45 s,
+      where it had 15 s for the plugin's start and the check together. Both views log the same probe
+      (`droidtop.WebProbe`): view size, shown and focused, the page's `visibilityState`, `hasFocus()`, viewport and
+      user agent, the cookie names (never their values), and the time since loading began, so a device's log shows
+      what still differs.
     - **The same session as the visible view.** The plugin's session and droidtop's download-site sign-ins are put into
       the cookie store and taken out again exactly as for the visible view (`WebSessionCookies`).
     - **A download link opens out of sight first** (`PluginWebAccount.openForDownloads`, and a plugin's own
@@ -19000,7 +19008,7 @@ A condition the person should know about (an unofficial plugin, a feature that i
         for the record again, finds the same mirror in it by section, host and label, and opens that link out of sight
         the same way, once. A plugin's own `open_in_session` answers `{captured: false, expired: true}` instead, for
         the plugin to ask its site again.
-      - **The person's.** A check that did not pass by itself in about 12 seconds, a page that neither moves on nor
+      - **The person's.** A check that did not pass by itself in about 25 seconds, a page that neither moves on nor
         starts anything within 3 seconds of finishing, or 40 seconds in all: the visible view opens on the same link,
         and what the hidden one cleared on the way is kept first.
     - **The record's links are kept.** A masked link works for a few hours, so the address droidtop saved with the
