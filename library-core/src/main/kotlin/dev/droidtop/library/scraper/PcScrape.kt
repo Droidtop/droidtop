@@ -857,10 +857,14 @@ object PcScraper {
         if (sources.isNotEmpty()) dao.upsertGameMetadata(filled.copy(fieldSources = FieldSources.merge(row.fieldSources, sources)))
     }
 
-    /** A metadata plugin's candidate for the picker: which source offered it, and its ids to fetch it by. */
+    /**
+     * A metadata plugin's candidate for the picker: which source offered it, and its ids to fetch it by. [current]: the
+     * record the game is linked to now under that source, listed first and marked (docs/plugin-api.md 1.11).
+     */
     data class PluginPick(
         val source: dev.droidtop.library.integrations.PluginMetadataSources.Source,
         val candidate: PluginMetadataProtocol.Candidate,
+        val current: Boolean = false,
     ) {
         /**
          * The candidate's title, or, when the source gave none, its record said plainly as one with no name
@@ -874,11 +878,34 @@ object PcScraper {
     suspend fun pluginCandidates(context: Context, entry: LibraryEntry): List<PluginPick> = withContext(Dispatchers.IO) {
         val session = dev.droidtop.library.integrations.PluginMetadataSources.open(context) ?: return@withContext emptyList()
         try {
-            session.candidates(pluginFacts(context, entry)).map { (source, candidate) -> PluginPick(source, candidate) }
+            // One rematch path, droidtop's (docs/plugin-api.md 1.11, Droidtop/tracker#784; the owner: "We need to be able
+            // to rematch it on f95 if it's matched incorrectly"). A source the game is linked to is asked by the link, as
+            // the automatic scrape asks it: that is the current record, listed first and marked. Every source is then
+            // asked as for a game it has never seen, with no link and `asked: "person"`, so it searches; its candidates
+            // follow, without the current one again. Picking another replaces the link ([applyPlugin]).
+            val facts = pluginFacts(context, entry)
+            val links = facts.optJSONObject("sourceLinks")
+            val current = if (links == null) {
+                emptyList()
+            } else {
+                session.candidates(facts, only = { source -> source.ownLinkKeys.any(links::has) })
+                    .map { (source, candidate) -> PluginPick(source, candidate, current = true) }
+            }
+            val search = org.json.JSONObject(facts.toString()).apply {
+                remove("sourceLinks")
+                put("asked", "person")
+            }
+            val found = session.candidates(search).map { (source, candidate) -> PluginPick(source, candidate) }
+                .filterNot { pick -> current.any { it.source.record.manifest.id == pick.source.record.manifest.id && sameIds(it.candidate.ids, pick.candidate.ids) } }
+            current + found
         } finally {
             session.close()
         }
     }
+
+    /** Whether two candidates' ids name the same record: the same keys with the same values. */
+    private fun sameIds(a: org.json.JSONObject, b: org.json.JSONObject): Boolean =
+        a.keys().asSequence().toSet() == b.keys().asSequence().toSet() && a.keys().asSequence().all { a.opt(it)?.toString() == b.opt(it)?.toString() }
 
     /**
      * Writes a plugin candidate the person picked: the game is linked to that record (replacing a link under the same

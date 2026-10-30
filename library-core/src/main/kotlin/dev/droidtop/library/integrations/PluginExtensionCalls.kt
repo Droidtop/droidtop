@@ -279,7 +279,10 @@ object PluginMetadataSources {
          * no name, or only its id for one ("Thread 214581"), is named by the source's `fetch` (docs/plugin-api.md 1.11,
          * Droidtop/tracker#784), at most [MAX_NAMED] per source; one still unnamed stays untitled, and the picker says so.
          */
-        suspend fun candidates(facts: JSONObject): List<Pair<Source, PluginMetadataProtocol.Candidate>> = sources.flatMap { source ->
+        suspend fun candidates(
+            facts: JSONObject,
+            only: (Source) -> Boolean = { true },
+        ): List<Pair<Source, PluginMetadataProtocol.Candidate>> = sources.filter(only).flatMap { source ->
             try {
                 val match = policy.handle(source.record, newCall(POINT, "match", "pick", facts, 15_000L))
                 if (!match.ok) return@flatMap emptyList()

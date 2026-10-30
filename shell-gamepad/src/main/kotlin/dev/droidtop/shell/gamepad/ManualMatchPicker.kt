@@ -80,7 +80,9 @@ internal fun ManualMatchPicker(
                     status = found.message.takeIf { fromPlugins.isEmpty() }
                     candidates = fromPlugins
                 }
-                is PcScraper.Candidates.Found -> candidates = found.matches.map { MatchCandidate.Pc(it) } + fromPlugins
+                // The game's current link comes first, marked, then the PC source's candidates, then the plugins' others.
+                is PcScraper.Candidates.Found -> candidates = fromPlugins.filter { it.pick.current } +
+                    found.matches.map { MatchCandidate.Pc(it) } + fromPlugins.filterNot { it.pick.current }
             }
             return@LaunchedEffect
         }
@@ -205,7 +207,7 @@ internal sealed interface MatchCandidate {
     /** A metadata plugin's record (docs/SPEC.md 7h, "A source's own match"): picking it links the game to that record. */
     data class Plugin(val pick: PcScraper.PluginPick) : MatchCandidate {
         override val name: String get() = pick.name
-        override val subtitle: String get() = "from ${pick.source.label}"
+        override val subtitle: String get() = if (pick.current) "Current link, from ${pick.source.label}" else "from ${pick.source.label}"
     }
 
     data class Pc(val match: PcMatch) : MatchCandidate {
