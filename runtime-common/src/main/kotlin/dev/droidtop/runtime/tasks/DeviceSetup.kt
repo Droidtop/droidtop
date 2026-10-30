@@ -125,8 +125,41 @@ object DeviceSetup {
         undo = { context, shell -> turnOffButtonPresses(context, shell) },
     )
 
+    // ---- Auto power (Droidtop/tracker#841, owner Q3: off until chosen, offered in onboarding, recommended on) ----
+
+    val autoPower = DeviceSetupItem(
+        id = "auto_power",
+        title = R.string.device_setup_power_title,
+        ask = R.string.device_setup_power_ask,
+        undoAsk = R.string.device_setup_power_undo_ask,
+        line = { state ->
+            when (state) {
+                SetupState.NOT_NEEDED -> R.string.device_setup_power_not_needed
+                SetupState.TO_DO -> R.string.device_setup_power_to_do
+                SetupState.DONE, SetupState.DONE_BY_DROIDTOP -> R.string.device_setup_power_on
+            }
+        },
+        state = { context, _ ->
+            when {
+                Build.VERSION.SDK_INT < PhantomProcesses.FIRST_SDK -> SetupState.NOT_NEEDED
+                dev.droidtop.runtime.power.PowerPrefs.auto(context) -> SetupState.DONE_BY_DROIDTOP
+                else -> SetupState.TO_DO
+            }
+        },
+        apply = { context, _ ->
+            dev.droidtop.runtime.power.PowerPrefs.setAuto(context, true)
+            true
+        },
+        undo = { context, shell ->
+            dev.droidtop.runtime.power.PowerPrefs.setAuto(context, false)
+            // Every game droidtop changed goes back; one that cannot yet stays journaled for droidtop's next start.
+            dev.droidtop.runtime.power.StandardPowerLayer.restoreAll(context, shell)
+            true
+        },
+    )
+
     /** The items, in the order they are shown. */
-    val items: List<DeviceSetupItem> get() = listOf(childProcesses, buttonPresses)
+    val items: List<DeviceSetupItem> get() = listOf(childProcesses, buttonPresses, autoPower)
 
     private fun ownService(context: Context) = ComponentName(context.packageName, AccessibilityKeyboard.SERVICE_CLASS).flattenToString()
 

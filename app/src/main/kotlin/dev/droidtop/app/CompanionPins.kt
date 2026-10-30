@@ -383,10 +383,17 @@ internal fun CompanionLowBatteryLine(reading: dev.droidtop.runtime.systemstatus.
                     when {
                         game == null -> "No game in front"
                         !provider -> "Needs More controls"
-                        dev.droidtop.runtime.systemstatus.GameModeControl.set(
-                            TaskManager.shell, dev.droidtop.runtime.systemstatus.GameMode.BATTERY, game,
-                        ) -> "Game on battery mode"
-                        else -> "Android refused"
+                        // Through the power policy's layer, so the change is journaled and goes back when the game is left.
+                        else -> when (
+                            dev.droidtop.runtime.power.StandardPowerLayer.apply(
+                                context, TaskManager.shell, dev.droidtop.runtime.power.PowerLevel.SAVER, game,
+                            )
+                        ) {
+                            dev.droidtop.runtime.power.StandardPowerLayer.Outcome.SET,
+                            dev.droidtop.runtime.power.StandardPowerLayer.Outcome.ALREADY -> "Game on battery mode"
+                            dev.droidtop.runtime.power.StandardPowerLayer.Outcome.IGNORED -> "Android ignores this app"
+                            else -> "Android refused"
+                        }
                     }
                 }
             }

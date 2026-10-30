@@ -1131,28 +1131,65 @@ object GamingSettingsCatalog {
     }
 
     /**
-     * Performance mode for the game in front (Android's GameManager profile, [GameModeControl]): one catalog item,
-     * drawn by the Quick Menu's Performance section, the companion's System > Power card and its Game tab
-     * (docs/SPEC.md "The companion's tabs"). Each press steps Standard, Performance, Battery saver. Null without a
-     * running `priv.shell` provider or without a game droidtop launched: there is nothing it could set. Asks the
-     * plugin registry, so built off the main thread like the rest of the catalog.
+     * Power for the game in front (docs/SPEC.md "Power policy", Droidtop/tracker#841): one catalog item, drawn by the
+     * Quick Menu's Performance section, the companion's System > Power card and its Game tab. Each press steps Auto,
+     * Saver, Standard, Performance; a level is this game's pick and holds on its next launches, Auto leaves it to the
+     * policy (Auto power on) or to Android (off). The value says what is in force and why. Null without a running
+     * `priv.shell` provider or without a game droidtop launched. Built off the main thread.
      */
     fun performanceModeItem(): AsyncActionItem? {
         val shell = dev.droidtop.runtime.tasks.TaskManager.shell
         if (!runCatching { shell.capabilities().shellCommand }.getOrDefault(false)) return null
+        val context = dev.droidtop.runtime.power.PowerController.context ?: return null
         val game = dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName ?: return null
-        val current = dev.droidtop.runtime.systemstatus.GameModeControl.lastSet(game)
+        val pick = dev.droidtop.runtime.power.PowerPrefs.gamePick(context, game)
+        val auto = dev.droidtop.runtime.power.PowerPrefs.auto(context)
+        val decision = dev.droidtop.runtime.power.PowerController.decide(context, game)
         return AsyncActionItem(
             id = ID_PERFORMANCE_MODE,
-            title = "Performance mode",
-            subtitle = "How Android runs the game in front: Standard, Performance, or Battery saver",
-            value = current?.label ?: "Unchanged",
-            run = { _, onStatus ->
-                val next = (current ?: dev.droidtop.runtime.systemstatus.GameMode.STANDARD).next()
+            title = "Power",
+            subtitle = "How hard the game in front runs: Auto, Saver, Standard or Performance",
+            value = powerValue(pick, auto, decision),
+            run = { ctx, onStatus ->
                 onStatus("Setting...")
-                if (dev.droidtop.runtime.systemstatus.GameModeControl.set(shell, next, game)) next.label else "Android refused"
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val next = nextPowerPick(pick)
+                    dev.droidtop.runtime.power.PowerPrefs.setGamePick(ctx, game, next)
+                    val outcome = dev.droidtop.runtime.power.PowerController.applyFor(ctx, game)
+                    val now = dev.droidtop.runtime.power.PowerController.decide(ctx, game)
+                    when (outcome) {
+                        dev.droidtop.runtime.power.StandardPowerLayer.Outcome.IGNORED -> "Android ignores this app"
+                        dev.droidtop.runtime.power.StandardPowerLayer.Outcome.FAILED -> "Android refused"
+                        null -> {
+                            // Back to Auto with Auto power off: Android's own mode for it again.
+                            dev.droidtop.runtime.power.StandardPowerLayer.restore(ctx, shell, game)
+                            powerValue(next, false, now)
+                        }
+                        else -> powerValue(next, dev.droidtop.runtime.power.PowerPrefs.auto(ctx), now)
+                    }
+                }
             },
         )
+    }
+
+    /** The order a press steps through: Auto, Saver, Standard, Performance, Auto. Pure. */
+    internal fun nextPowerPick(pick: dev.droidtop.runtime.power.PowerChoice): dev.droidtop.runtime.power.PowerChoice {
+        val levels = listOf(dev.droidtop.runtime.power.PowerLevel.SAVER, dev.droidtop.runtime.power.PowerLevel.STANDARD, dev.droidtop.runtime.power.PowerLevel.PERFORMANCE)
+        val at = (pick as? dev.droidtop.runtime.power.PowerChoice.Fixed)?.let { levels.indexOf(it.level) } ?: -1
+        return if (at + 1 < levels.size) dev.droidtop.runtime.power.PowerChoice.Fixed(levels[at + 1]) else dev.droidtop.runtime.power.PowerChoice.Auto
+    }
+
+    /** What the row says: the level in force, and why when heat or the battery holds it lower. Pure. */
+    internal fun powerValue(pick: dev.droidtop.runtime.power.PowerChoice, auto: Boolean, decision: dev.droidtop.runtime.power.PowerDecision): String {
+        fun word(level: dev.droidtop.runtime.power.PowerLevel) = level.name.lowercase().replaceFirstChar { it.uppercase() }
+        val capped = decision.effective < decision.requested
+        return when {
+            pick is dev.droidtop.runtime.power.PowerChoice.Fixed && capped -> "${word(decision.effective)}: ${decision.why}"
+            pick is dev.droidtop.runtime.power.PowerChoice.Fixed -> word(pick.level)
+            !auto -> "Auto (off)"
+            capped -> "Auto: ${word(decision.effective)}, ${decision.why}"
+            else -> "Auto: ${word(decision.effective)}"
+        }
     }
 
     /**

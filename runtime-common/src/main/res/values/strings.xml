@@ -69,4 +69,10 @@
     <string name="device_setup_buttons_on">On: HOME button combos work over games</string>
     <string name="device_setup_buttons_to_do">Off: HOME button combos need it. Press to turn it on</string>
     <string name="device_setup_buttons_by_droidtop">Turned on by droidtop. Press to turn it off again</string>
+    <string name="device_setup_power_title">Set game power automatically</string>
+    <string name="device_setup_power_ask">Let droidtop set each game\'s power by your rules, the heat and the battery? Recommended. Android\'s per-game power setting changes for the games droidtop starts and goes back when you leave them. You can undo it here</string>
+    <string name="device_setup_power_undo_ask">Stop setting game power? Every game droidtop changed goes back to Android\'s own setting</string>
+    <string name="device_setup_power_not_needed">Android has no per-game power setting here</string>
+    <string name="device_setup_power_to_do">Off. Recommended: droidtop sets each game\'s power. Press to turn it on</string>
+    <string name="device_setup_power_on">On: droidtop sets each game\'s power. Press to turn it off</string>
 </resources>

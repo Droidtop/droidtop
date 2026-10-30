@@ -20,10 +20,18 @@ object LaunchLedger {
     var last: Launched? = null
         private set
 
+    /**
+     * Told each launch, after it is noted; set once by the app (the power policy applies a game's level from here,
+     * docs/SPEC.md "Power policy"). Called on the launching thread, so it must hand any work off.
+     */
+    @Volatile
+    var launched: ((String) -> Unit)? = null
+
     fun note(packageName: String, displayId: Int, nowMs: Long = System.currentTimeMillis()) {
         val launched = Launched(packageName, displayId, nowMs)
         byPackage[packageName] = launched
         last = launched
+        this.launched?.let { runCatching { it(packageName) } }
     }
 
     /** Forget [packageName] after it was closed. */

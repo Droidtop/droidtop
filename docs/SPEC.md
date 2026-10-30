@@ -3990,8 +3990,8 @@ the `ContainerRuntime` interface that already exists (§3):
   GPU reads `--` until its counter is added. Games running inside droidtop's own process (the Wine view)
   have no separate layer to find and read `--` for FPS.
   **The one control the console allows without root: a per-game performance mode.** With a running
-  `priv.shell` provider and a game in front, a second row, **Performance mode**, cycles Mobile,
-  Performance and Battery saver through Android's GameManager: `cmd game set --mode <mode> --user 0 <package>`
+  `priv.shell` provider and a game in front, a second row, **Power** (the power policy's row since #841, below; it
+  was Performance mode), sets Android's GameManager profile: `cmd game set --mode <mode> --user 0 <package>`
   (Android 14) with `cmd game mode --user 0 <mode> <package>` (Android 12 and 13) as the fallback
   (`GameModeControl`). The row reports "Set for this game" or "Android refused"; Android keeps the mode, so
   it applies on later launches, and droidtop cannot read it back, so the row shows what droidtop set this
@@ -4043,6 +4043,19 @@ the `ContainerRuntime` interface that already exists (§3):
       droidtop's first change is written to droidtop's own preferences before the change. The game's close puts it
       back (slice 3b), and so does droidtop's next start when it stopped first: off the main thread, after the
       elevated shell has had five seconds to connect. A put-back that fails stays journaled for the next try.
+  - **Putting it into effect** (slice 3b, `PowerController`, `PowerPrefs`).
+    - **The Power row** for the game in front steps Auto, Saver, Standard, Performance. A level is that game's pick,
+      kept for its next launches; Auto leaves it to the policy. The value says what is in force and why, e.g.
+      "Standard: Getting hot".
+    - **Launch.** A game droidtop launches gets the decided level (`LaunchLedger.launched`, off the main thread), when
+      Auto power is on or the game has a pick.
+    - **Leaving.** droidtop's own Home screen coming back counts as the game being left: every changed game goes back
+      to what it had. The Quick Menu over a game is not leaving it.
+    - **Auto power** is off until chosen (owner Q3). It is the third Device setup item, "Set game power
+      automatically", so onboarding's "Android settings" step offers it with the recommendation to turn it on, and
+      Settings > Device setup can undo it. Undo puts every changed game back.
+    - Each game's pick is a rule of the game scope. Rules for cores, emulators and platforms, the suggested list, and
+      the person's own heat limit get their rows in Settings > Power with the device layer (slice 5).
 - **In-game overlays: HOME chords (decided 2026-10-29, Droidtop/tracker#740).** The owner: "As for the keyboard
   shortcut: we only care about it working when droidtop is the home, so can we use home + something else?" and
   "Home + r2 gets the quick menu, and home +l2 gives the local contextual menu/companion-style overlay. This gives us
@@ -5166,9 +5179,9 @@ droidtop 0.2.0-dev.1931).
   is built off the main thread while the tab shows, again after each change and on a return from another screen
   (a grant), and not at all while the tab is not composed; `PerformanceMonitor.subscribers` counts the surfaces
   sampling, and drops to 0 when the Performance tab or section is switched away.
-  **Performance mode** is one catalog item (`GamingSettingsCatalog.performanceModeItem`, Android's GameManager
-  profile through the `priv.shell` provider, only while a game droidtop launched is in front): the Quick Menu's
-  Performance section, System > Power and the Game tab draw that item.
+  **Power** is one catalog item (`GamingSettingsCatalog.performanceModeItem`, the power policy's row for the game in
+  front; see "Power policy"), only while a game droidtop launched is in front and the `priv.shell` provider runs:
+  the Quick Menu's Performance section, System > Power and the Game tab draw that item.
 - **Picture-in-picture video moves to the companion (owner, 2026-10-09, Droidtop/tracker#430).** While a
   companion host is started, `PipMover` moves a task that goes into picture-in-picture on the main screen (the
   display the shell is drawn on, else Android's default) to the companion's display through the helper app's shell

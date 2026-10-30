@@ -92,9 +92,15 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         dev.droidtop.runtime.systemstatus.VolumeControl.watchKidCap(this)
         // Kid's play-time limits: counts play while a game runs and closes it at the limit (SPEC 7f, tracker#421).
         PlayTimeLimiter.install(this)
+        // The power policy (docs/SPEC.md "Power policy", Droidtop/tracker#841): a game droidtop launches gets its level, off
+        // the main thread; droidtop's own screen coming back puts every changed game back (onActivityResumed below).
+        val powerApp = this
+        dev.droidtop.runtime.power.PowerController.install(this)
+        dev.droidtop.runtime.tasks.LaunchLedger.launched = { pkg ->
+            dev.droidtop.runtime.util.AppScopes.io.launch { runCatching { dev.droidtop.runtime.power.PowerController.applyFor(powerApp, pkg) } }
+        }
         // Game modes droidtop changed and did not put back before it stopped (docs/SPEC.md "Power policy", the journal,
         // Droidtop/tracker#841): put back first, once the elevated shell has had its moment to connect.
-        val powerApp = this
         dev.droidtop.runtime.util.AppScopes.io.launch {
             if (dev.droidtop.runtime.power.PowerJournal.entries(powerApp).isEmpty()) return@launch
             val shell = dev.droidtop.runtime.tasks.TaskManager.shell
@@ -207,6 +213,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 // Not over the storage-full screen, which only says that storage is full (Droidtop/tracker#849).
                 if ((activity is MainActivity && !activity.storageFull) || activity is com.android.launcher3.Launcher || activity is CatalogScreenActivity) {
                     WhatsNew.onShellResumed(activity)
+                    // Back at droidtop's own screen: the game was left, so its power goes back (SPEC "Power policy").
+                    val app = activity.applicationContext
+                    dev.droidtop.runtime.util.AppScopes.io.launch { runCatching { dev.droidtop.runtime.power.PowerController.atRest(app) } }
                 }
                 // Another of droidtop's screens over the shell is not a game: coming back from it is not a return (ShellReturn).
                 if (!activity.isParkedSurface() && activity !is MainActivity && activity !is dev.droidtop.runtime.windows.WineGameActivity) {
