@@ -1008,11 +1008,14 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         return super.onKeyLongPress(keyCode, event)
     }
 
-    private companion object {
+    companion object {
         /** How long the keep-running offer waits for the mode switched to to be able to ask. */
-        const val KEEP_RUNNING_HOST_WAIT_MS = 5_000L
+        private const val KEEP_RUNNING_HOST_WAIT_MS = 5_000L
 
         /** The shell instance created last; an older one still alive is the one a relocation left behind. */
-        var live: java.lang.ref.WeakReference<MainActivity>? = null
+        private var live: java.lang.ref.WeakReference<MainActivity>? = null
+
+        /** Whether a shell instance is alive, neither finishing nor destroyed: a companion with none starts one (Droidtop/tracker#788). */
+        fun alive(): Boolean = live?.get()?.let { !it.isFinishing && !it.isDestroyed } == true
     }
 }

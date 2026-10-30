@@ -112,8 +112,7 @@ class CompanionActivity : AppCompatActivity() {
      * start is not started in a loop.
      */
     private fun bringBackShellIfGone() {
-        val shell = MainActivity.live?.get()
-        if (shell != null && !shell.isFinishing && !shell.isDestroyed) return
+        if (MainActivity.alive()) return
         val mode = dev.droidtop.library.settings.Mode.byId(dev.droidtop.library.settings.Modes.lastMode(this))
         if (mode != dev.droidtop.library.settings.Mode.GAMING && mode != dev.droidtop.library.settings.Mode.DESKTOP) return
         if (!GamesRootPrefs.isOnboardingComplete(this)) return
