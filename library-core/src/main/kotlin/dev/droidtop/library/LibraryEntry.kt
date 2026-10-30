@@ -191,6 +191,13 @@ data class LibraryEntry(
      */
     val gameName: String? = null,
     /**
+     * The store row this folder is the same game as, or [GameLinks.NOT_THE_SAME] ([GameLinks.sameAs],
+     * Droidtop/tracker#745). A library fact, like [gameName]: no walk writes it.
+     */
+    val sameAs: String? = null,
+    /** The store ids a scrape learned for this game, as store keys ([GameLinks.storeIds]). A library fact, like [gameName]. */
+    val storeIds: List<String> = emptyList(),
+    /**
      * The newest version a source the user linked this game to last
      * reported, as it wrote it (docs/SPEC.md 7g, "Where an update comes
      * from"); null until one has been asked. A library fact, like [gameName].
@@ -2029,6 +2036,48 @@ class Library(
         true
     }
 
+    /**
+     * [folders] (a game that is folders on this device) is the same game as the store row [store]
+     * (docs/SPEC.md 7m, "A store's copy and a local copy", Droidtop/tracker#745): one card from now on, with both
+     * copies, each keeping its own install, version and update source. Undone by [unlinkFromStore]. What belongs to
+     * the game follows the link as [mergeGames] carries it: play history and the favourite move to the entry the
+     * card draws, and scraped metadata is copied into an empty place. Each copy keeps its own save rule.
+     */
+    suspend fun linkToStore(folders: LibraryGameGroup, store: LibraryGameGroup): Boolean = withContext(Dispatchers.IO) {
+        val ids = folders.entriesByPath.keys
+        val storeKey = store.entriesByPath.values.firstNotNullOfOrNull { it.ownership() }?.let { "${it.store}:${it.id}" }
+        if (ids.isEmpty() || storeKey == null || ids.any { it in store.entriesByPath }) return@withContext false
+        if (!folders.entriesByPath.values.all { it.groupingPath() != null }) return@withContext false
+        links.setSameAs(ids, storeKey)
+        val linked = LibraryGrouping.group(folders.entriesByPath.values.map { it.copy(sameAs = storeKey) } + store.entriesByPath.values)
+            .singleOrNull()
+        val target = (linked ?: store).displayEntry.id
+        for (source in setOf(folders.displayEntry.id, store.displayEntry.id) - target) {
+            playHistory.moveTo(source, target)
+            favorites.moveTo(source, target)
+            providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(source, target, keepSource = true) }
+        }
+        changedFactIds += ids + store.entriesByPath.keys
+        republish()
+        ScanLog.write("index: ${ids.size} folder(s) of ${folders.game.name} are now a copy of $storeKey")
+        true
+    }
+
+    /**
+     * The folders of [game] are not the store's game ([GameLinks.NOT_THE_SAME]): the card splits back into the
+     * store's and the folders', and no scraped store id links them again. The facts [linkToStore] moved stay where
+     * they are.
+     */
+    suspend fun unlinkFromStore(game: LibraryGameGroup): Boolean = withContext(Dispatchers.IO) {
+        val ids = game.entriesByPath.values.filter { it.groupingPath() != null && it.pcInfo?.marker == null }.map { it.id }
+        if (ids.isEmpty()) return@withContext false
+        links.setSameAs(ids, GameLinks.NOT_THE_SAME)
+        changedFactIds += ids
+        republish()
+        ScanLog.write("index: ${ids.size} folder(s) of ${game.game.name} are not its store's copy")
+        true
+    }
+
     private suspend fun scanProviderSafely(provider: LibraryProvider): List<LibraryEntry> =
         guarded("droidtop.Library", "Provider ${provider::class.simpleName} scan", emptyList()) {
             // Failures are isolated per provider; slowness is bounded per
@@ -2355,10 +2404,14 @@ class Library(
         // record or the index carrying an old answer does not keep it.
         val name = said?.gameName
         val latest = said?.latestKnown
-        return if (withFavourite.gameName == name && withFavourite.latestKnown == latest) {
+        val sameAs = said?.sameAs
+        val storeIds = said?.storeIds.orEmpty()
+        return if (withFavourite.gameName == name && withFavourite.latestKnown == latest &&
+            withFavourite.sameAs == sameAs && withFavourite.storeIds == storeIds
+        ) {
             withFavourite
         } else {
-            withFavourite.copy(gameName = name, latestKnown = latest)
+            withFavourite.copy(gameName = name, latestKnown = latest, sameAs = sameAs, storeIds = storeIds)
         }
     }
 

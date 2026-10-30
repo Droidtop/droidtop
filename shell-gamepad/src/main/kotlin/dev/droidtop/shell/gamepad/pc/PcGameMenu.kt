@@ -35,6 +35,7 @@ import dev.droidtop.library.GameLinks
 import dev.droidtop.library.UpdateSources
 import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
+import dev.droidtop.library.storeLabel
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.GameLaunchStrategy
@@ -162,6 +163,8 @@ internal fun PcGameMenu(
     var editingCollections by remember(entry) { mutableStateOf(false) }
     var pickingReplacement by remember(entry) { mutableStateOf(false) }
     var pickingSameGame by remember(entry) { mutableStateOf(false) }
+    // "Not the same game as <store>": the first press arms it, the second unlinks (Droidtop/tracker#745).
+    var unlinkArmed by remember(entry) { mutableStateOf(false) }
     var renaming by remember(entry) { mutableStateOf(false) }
     var progressToken by remember(entry) { mutableStateOf(0) }
     var editingSource by remember(entry) { mutableStateOf<UpdateSources.Source?>(null) }
@@ -505,12 +508,25 @@ internal fun PcGameMenu(
             question = "Which game is the same game as $here?",
             choices = candidates.map { SameGameChoice(GameNaming.displayName(it.group.game.name), it.line()) },
             confirmLine = { choice ->
-                "Press again: ${choice.title} becomes part of $here. Both folders stay; the history, favourite and collections move to one card"
+                val store = candidates.firstOrNull { GameNaming.displayName(it.group.game.name) == choice.title }?.store
+                if (store != null) {
+                    "Press again: this folder becomes the local copy of ${choice.title} on ${storeLabel(store.substringBefore(':'))}. Both copies stay, each with its own version; the history and favourite move to one card"
+                } else {
+                    "Press again: ${choice.title} becomes part of $here. Both folders stay; the history, favourite and collections move to one card"
+                }
             },
             workingLine = "Making them one game...",
             onPick = { index ->
-                val other = candidates[index].group
-                if (library.mergeGames(sameGame, other)) {
+                val candidate = candidates[index]
+                val other = candidate.group
+                val store = candidate.store
+                if (store != null) {
+                    if (library.linkToStore(sameGame, other)) {
+                        "$here is now a copy of ${GameNaming.displayName(other.game.name)} on ${storeLabel(store.substringBefore(':'))}."
+                    } else {
+                        "$here could not be linked to ${GameNaming.displayName(other.game.name)}."
+                    }
+                } else if (library.mergeGames(sameGame, other)) {
                     "${GameNaming.displayName(other.game.name)} is now part of $here."
                 } else {
                     "${GameNaming.displayName(other.game.name)} could not be made part of $here."
@@ -765,12 +781,30 @@ internal fun PcGameMenu(
         onOpenOther = onOpenOther,
         replacements = replacements.size,
         onReplace = { pickingReplacement = true },
-        sameGameRow = names.similar.size.takeIf { it > 0 }?.let { count ->
+        sameGameRow = if (grouping != null && SimilarGames.linkedToStore(grouping)) {
+            val stores = grouping.entriesByPath.values.mapNotNull { it.ownership() }.ownershipLabel().removePrefix("Owned on ")
             ActionRow(
-                "The same game as...",
-                "$count with a similar name",
-                onSelect = { pickingSameGame = true },
+                "Not the same game as the $stores copy",
+                if (unlinkArmed) "Press again: the local copy and the $stores copy become two games" else "Splits the local copy from the $stores copy",
+                onSelect = {
+                    if (!unlinkArmed) {
+                        unlinkArmed = true
+                    } else {
+                        unlinkArmed = false
+                        scope.launch {
+                            status = if (library.unlinkFromStore(grouping)) "The local copy and the $stores copy are two games again." else "Could not split them."
+                        }
+                    }
+                },
             )
+        } else {
+            names.similar.size.takeIf { it > 0 }?.let { count ->
+                ActionRow(
+                    "The same game as...",
+                    "$count with a similar name",
+                    onSelect = { pickingSameGame = true },
+                )
+            }
         },
         updateRows = if (!isFolder) {
             emptyList()
@@ -1635,8 +1669,10 @@ private fun MissingGames.Candidate.line(): String {
     return listOfNotNull(why, where).joinToString(" - ")
 }
 
-/** The same for a game that might be this one: why, and where its folders are. */
+/** The same for a game that might be this one: why, and where its folders are, or the store it is owned on. */
 private fun SimilarGames.Candidate.line(): String {
+    val store = store
+    if (store != null) return (if (score >= 1.0) "The same name" else "A similar name") + " - owned on ${storeLabel(store.substringBefore(':'))}"
     val folders = group.entriesByPath.values.mapNotNull { it.groupingPath() }.sorted()
     val where = folders.first() + if (folders.size > 1) " and ${folders.size - 1} more" else ""
     return "A similar name - $where"

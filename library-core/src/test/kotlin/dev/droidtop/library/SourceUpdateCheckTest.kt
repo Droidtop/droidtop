@@ -37,6 +37,7 @@ class SourceUpdateCheckTest {
         override suspend fun setSourceLink(ids: Collection<String>, source: String, externalId: String?) {
             ids.forEach { if (externalId == null) linkOf.remove(it) else linkOf[it] = SourceKey(source, externalId) }
         }
+        override suspend fun setSameAs(ids: Collection<String>, storeKey: String?) {}
         override suspend fun moveTo(fromId: String, toId: String) {}
         override suspend fun linkedSources(): Map<SourceKey, SourceAnswer?> = linkOf.values.toSet().associateWith { answers[it] }
         override suspend fun idsLinkedTo(key: SourceKey): List<String> = linkOf.filterValues { it == key }.keys.toList()

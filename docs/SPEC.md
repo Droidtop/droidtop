@@ -20107,7 +20107,10 @@ and are three different games; `Lust Academy` and `Lust Theory` score
 droidtop does not keep a library-wide list of "these two look alike"
 pairs either: comparing every game with every other grows with the square
 of the library and no screen asks for it. Similarity is used only where a
-person is already choosing, which is the question below.
+person is already choosing, which is the question below. A folder and a
+store's row of the same game join on evidence, never on a name alone: a
+store marker, the person's link, or a scraped store id together with an
+equal name ("A store's copy and a local copy", below, Droidtop/tracker#745).
 
 The same naming answers a second question, added 2026-09-17: which
 detected game replaces a missing one (7g). `MissingGames.candidates`
@@ -20132,8 +20135,9 @@ all-pairs scan: a game that is here has "The same game as..." on its own
 detail, offered only when some other game's name is at least 0.6 alike
 (`SimilarGames.candidates`, `GameNaming.similarity`, most alike first),
 computed for THAT game against each other game once, from that screen,
-and nowhere else. Only games that are folders on this device are offered
-on either side (a store row's name is the store's), and not a game that is
+and nowhere else. The game asked from is folders on this device; offered
+are other such games, and (since 2026-10-30, below) games that are only a
+store's rows, an equal name counting as fully alike; never a game that is
 only missing (that is the fold's question).
 
 Picking one (`Library.mergeGames`, one-way, confirmed with a second press)
@@ -20149,6 +20153,53 @@ entry the merged card draws (its newest version). A scraped metadata row is
 COPIED into an empty place and not taken, because its folder is still here
 (`EntryFactsOwner.moveEntryFacts(keepSource = true)`). There is no unmerge
 yet.
+
+### A store's copy and a local copy (decided 2026-10-29, Droidtop/tracker#745)
+
+The owner, 2026-10-29: "I purchased Bare Witness on steam. I don't know if
+we updated my library, but it doesn't seem to have linked to the Bare
+Witness entry from my manual library", and: "And linking games across
+sources? I own bare witness on steam, and also have a non-steam copy. We
+should be able to link the copies, transfer saves, and etc". The rule
+above (a store row's name is the store's, so a store row is never merged
+with a folder) left the commonest case with no answer: the same game owned
+on a store and kept as a folder.
+
+A folder game and a store's row of the same game are ONE card with both
+copies, by the join "Store markers" already makes (`LibraryGrouping`
+`withMarkedCopies`): the folder's versions first, the store's copy after
+them, under the store's name. Each copy stays its own entry, so each keeps
+its own install, version and update source (Steam updates the Steam copy, a
+linked source such as F95zone the folder). A folder joins a store's row by,
+in order:
+
+1. **A store marker** in the folder (7g, "Store markers"): the store's own
+   file, which nothing below outranks.
+2. **The person's link** (`GameLinks.sameAs`, the `same_as` column of
+   `game_links`): "The same game as..." on the folder game's menu now also
+   offers games that are only a store's rows, an equal name (`nameKey`) as
+   fully alike and the rest at 0.6 or more, each saying "owned on <store>".
+   Picking one (`Library.linkToStore`, confirmed with a second press) links
+   every folder of the game to that row.
+3. **A scraped store id AND an equal name**: a scrape that learned the
+   folder's Steam or GOG id (`game_ids`, 7o "Saves") links it when the row's
+   name and the folder game's are equal by `nameKey`. Neither alone is
+   enough: a store id could come from a wrong match, and a name alone is the
+   look-alike this section's rule guards against.
+
+A linked card's menu has "Not the same game as the <store> copy" in place
+of "The same game as..." (`Library.unlinkFromStore`, two presses): it
+records `GameLinks.NOT_THE_SAME` for the folders, the card splits, and no
+scraped id links them again; a marker's join is the store's and is not
+offered for undoing. Like "The same game", what belongs to the game
+follows the link: play history and the favourite move to the entry the
+card draws (the local copy, which is what is here) and scraped metadata is
+copied into an empty place; an undo leaves them where they are. Each copy
+keeps its own save rule. Play is the card's, as for any card with several
+copies (`CopyChoices`): an installed copy, the one the person chose with
+"Use this copy for this game" first, so the choice is remembered. Store
+ids and links are read with the rest of the library's facts, one batch
+query per publish, never while a list is drawn.
 
 ### The UI this needs, and no more
 

@@ -277,6 +277,52 @@ class LibraryTest {
         assertFalse(library.mergeGames(groups.first { folder.id in it.entriesByPath }, groups.first { store.id in it.entriesByPath }))
     }
 
+    @Test
+    fun `a folder linked to a store's row is one card with both copies, and the link can be undone`() = runBlocking {
+        val local = LibraryEntry(id = "/games/renpy/BW build", title = "BW build", kind = LibraryEntryKind.RENPY)
+        val steam = LibraryEntry(id = "steam:1", title = "Bare Witness", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(storeId = "steam:1", installed = false))
+        val folders = FoldingProvider(LibraryEntryKind.RENPY, listOf(local))
+        val stores = FoldingProvider(LibraryEntryKind.WINE_PROFILE, listOf(steam))
+        val playHistory = FakePlayHistoryStore()
+        val favorites = FakeFavoritesStore()
+        val links = FakeGameLinksStore()
+        val library = Library(listOf(folders, stores), playHistory, favorites, links = links)
+        playHistory.recordPlay(steam.id, 2_000L)
+        favorites.setFavorite(steam.id, true)
+        val groups = LibraryGrouping.group(listOf(local, steam))
+        assertEquals(2, groups.size)
+
+        assertTrue(library.linkToStore(groups.first { local.id in it.entriesByPath }, groups.first { steam.id in it.entriesByPath }))
+
+        assertEquals("steam:1", links.sameAs[local.id])
+        library.rescanNow(LibraryEntryKind.entries.toSet())
+        val scanned = library.backgroundScanState(LibraryEntryKind.entries.toSet()).value ?: emptyList()
+        val linked = LibraryGrouping.group(scanned).single()
+        assertEquals("Bare Witness", linked.game.name)
+        assertEquals(setOf(local.id, steam.id), linked.entriesByPath.keys)
+        // The local copy is what the card draws, so the Steam row's history and favourite are on it now.
+        assertEquals(local.id, linked.displayEntry.id)
+        assertEquals(1, playHistory.getAll(listOf(local.id))[local.id]?.playCount)
+        assertEquals(setOf(local.id), favorites.ids)
+
+        assertTrue(library.unlinkFromStore(linked))
+        assertEquals(GameLinks.NOT_THE_SAME, links.sameAs[local.id])
+        library.rescanNow(LibraryEntryKind.entries.toSet())
+        assertEquals(2, LibraryGrouping.group(library.backgroundScanState(LibraryEntryKind.entries.toSet()).value ?: emptyList()).size)
+    }
+
+    @Test
+    fun `a folder is never linked to a folder, or a store row to a store row`() = runBlocking {
+        val a = LibraryEntry(id = "/games/renpy/A", title = "A", kind = LibraryEntryKind.RENPY)
+        val b = LibraryEntry(id = "/games/renpy/B", title = "B", kind = LibraryEntryKind.RENPY)
+        val steam = LibraryEntry(id = "steam:1", title = "A", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(storeId = "steam:1", installed = false))
+        val library = Library(listOf(FoldingProvider(LibraryEntryKind.RENPY, listOf(a, b))), links = FakeGameLinksStore())
+        val groups = LibraryGrouping.group(listOf(a, b, steam))
+
+        assertFalse(library.linkToStore(groups.first { a.id in it.entriesByPath }, groups.first { b.id in it.entriesByPath }))
+        assertFalse(library.linkToStore(groups.first { steam.id in it.entriesByPath }, groups.first { steam.id in it.entriesByPath }))
+    }
+
     private val renpyGame = LibraryEntry(id = "/games/renpy/Known", title = "Known", kind = LibraryEntryKind.RENPY)
 
     @Test
@@ -460,12 +506,16 @@ private class FoldingProvider(
 /** The library's own links (merged names, source links), in memory. */
 private class FakeGameLinksStore : GameLinksStore {
     val names = mutableMapOf<String, String>()
+    val sameAs = mutableMapOf<String, String>()
     override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> =
-        ids.mapNotNull { id -> names[id]?.let { id to GameLinks(gameName = it) } }.toMap()
+        ids.filter { it in names || it in sameAs }.associateWith { id -> GameLinks(gameName = names[id], sameAs = sameAs[id]) }
     override suspend fun setGameName(ids: Collection<String>, name: String?) {
         ids.forEach { if (name == null) names.remove(it) else names[it] = name }
     }
     override suspend fun setSourceLink(ids: Collection<String>, source: String, externalId: String?) {}
+    override suspend fun setSameAs(ids: Collection<String>, storeKey: String?) {
+        ids.forEach { if (storeKey == null) sameAs.remove(it) else sameAs[it] = storeKey }
+    }
     override suspend fun moveTo(fromId: String, toId: String) {
         names.remove(fromId)?.let { names.putIfAbsent(toId, it) }
     }

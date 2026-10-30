@@ -196,8 +196,17 @@ object LibraryGrouping {
      * account's. The card keeps the folder's versions first (what is here is
      * what Play starts) and the store's copy after them, under the store's
      * name; every folder carrying that marker joins the same card. A marker
-     * with no account row (signed out) leaves the folder its own card. One
-     * map lookup per folder game.
+     * with no account row (signed out) leaves the folder its own card.
+     *
+     * A folder with no marker joins a store's row the same way when the
+     * person linked it to that row ([LibraryEntry.sameAs], "The same game
+     * as...", Droidtop/tracker#745), or when a scrape learned the row's store
+     * id for it ([LibraryEntry.storeIds]) AND the two names are equal by
+     * [GameNaming.nameKey]: a store id alone could come from a wrong match,
+     * and a name alone is the look-alike the store rule guards against
+     * (docs/SPEC.md 7m). The person's "not the same game"
+     * ([GameLinks.NOT_THE_SAME]) stops both; only a marker, the store's own
+     * file in the folder, outranks it. A few map lookups per folder game.
      */
     private fun withMarkedCopies(
         folders: List<LibraryGameGroup>,
@@ -211,7 +220,7 @@ object LibraryGrouping {
         val byStore = LinkedHashMap<Int, MutableList<LibraryGameGroup>>()
         val plain = ArrayList<LibraryGameGroup>(folders.size)
         for (folder in folders) {
-            val index = folder.entriesByPath.values.firstNotNullOfOrNull { it.pcInfo?.marker?.key }?.let(storeByKey::get)
+            val index = storeIndexOf(folder, storeByKey, stores)
             if (index == null) plain += folder else byStore.getOrPut(index) { mutableListOf() } += folder
         }
         val joined = byStore.map { (index, members) ->
@@ -228,5 +237,16 @@ object LibraryGrouping {
             )
         }
         return (plain + joined) to stores.filterIndexed { index, _ -> index !in byStore }
+    }
+
+    /** The store row [folder] is a copy of, by [withMarkedCopies]' order of evidence, or null. */
+    private fun storeIndexOf(folder: LibraryGameGroup, storeByKey: Map<String, Int>, stores: List<LibraryGameGroup>): Int? {
+        val entries = folder.entriesByPath.values
+        entries.firstNotNullOfOrNull { it.pcInfo?.marker?.key }?.let(storeByKey::get)?.let { return it }
+        if (entries.any { it.sameAs == GameLinks.NOT_THE_SAME }) return null
+        entries.firstNotNullOfOrNull { it.sameAs }?.let(storeByKey::get)?.let { return it }
+        val name = GameNaming.nameKey(folder.game.name)
+        return entries.asSequence().flatMap { it.storeIds }.mapNotNull(storeByKey::get).distinct()
+            .firstOrNull { GameNaming.nameKey(stores[it].game.name) == name }
     }
 }

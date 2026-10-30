@@ -139,11 +139,12 @@ interface FavoritesDao {
     }
 }
 
-/** One row per entry the user has named as part of another game; see [GameLinks]. */
+/** One row per entry the user has named as part of another game, or linked to a store's row of it; see [GameLinks]. */
 @Entity(tableName = "game_links")
 data class GameLinkEntity(
     @PrimaryKey val id: String,
     @ColumnInfo(name = "game_name") val gameName: String? = null,
+    @ColumnInfo(name = "same_as") val sameAs: String? = null,
 )
 
 /** One entry's link to one source's record of its game; see [SourceLink]. */
@@ -175,6 +176,10 @@ interface GameLinksDao {
 
     @Query("SELECT * FROM source_links WHERE id IN (:ids)")
     suspend fun getSourceLinks(ids: Collection<String>): List<SourceLinkEntity>
+
+    /** The store ids a scrape kept for [ids] (`game_ids`, docs/SPEC.md 7o "Saves"): the ones a store's row is keyed by. */
+    @Query("SELECT * FROM game_ids WHERE game_id IN (:ids) AND kind IN ('steam', 'gog')")
+    suspend fun getStoreIds(ids: Collection<String>): List<dev.droidtop.library.saves.GameIdEntity>
 
     @Query("SELECT * FROM source_answers WHERE source = :source AND external_id IN (:externalIds)")
     suspend fun getAnswers(source: String, externalIds: Collection<String>): List<SourceAnswerEntity>
@@ -215,7 +220,19 @@ interface GameLinksDao {
 
     @Transaction
     suspend fun setGameName(ids: Collection<String>, name: String?) {
-        for (id in ids) if (name == null) deleteLink(id) else putLink(GameLinkEntity(id, name))
+        val rows = getLinks(ids).associateBy { it.id }
+        for (id in ids) putOrDelete((rows[id] ?: GameLinkEntity(id)).copy(gameName = name))
+    }
+
+    @Transaction
+    suspend fun setSameAs(ids: Collection<String>, storeKey: String?) {
+        val rows = getLinks(ids).associateBy { it.id }
+        for (id in ids) putOrDelete((rows[id] ?: GameLinkEntity(id)).copy(sameAs = storeKey))
+    }
+
+    /** A row that says nothing is not kept. */
+    suspend fun putOrDelete(row: GameLinkEntity) {
+        if (row.gameName == null && row.sameAs == null) deleteLink(row.id) else putLink(row)
     }
 
     @Transaction
@@ -229,7 +246,7 @@ interface GameLinksDao {
     suspend fun moveTo(fromId: String, toId: String) {
         val rows = getLinks(listOf(fromId, toId)).associateBy { it.id }
         val from = rows[fromId]
-        if (from != null && rows[toId] == null) putLink(GameLinkEntity(toId, from.gameName))
+        if (from != null && rows[toId] == null) putLink(from.copy(id = toId))
         deleteLink(fromId)
         val links = getSourceLinks(listOf(fromId, toId)).groupBy { it.id }
         val taken = links[toId].orEmpty().map { it.source }.toSet()
@@ -249,7 +266,7 @@ data class LinkedKey(
         PlayHistoryEntity::class, PlayStartEntity::class, FavoriteEntity::class, GameLinkEntity::class, SourceLinkEntity::class, SourceAnswerEntity::class,
         dev.droidtop.library.saves.GameIdEntity::class, dev.droidtop.library.saves.SaveRuleEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class PlayHistoryDatabase : RoomDatabase() {
@@ -348,13 +365,21 @@ abstract class PlayHistoryDatabase : RoomDatabase() {
             }
         }
 
+        // A folder linked to a store's row of its game (Droidtop/tracker#745): one nullable column, nothing existing
+        // touched, for the same reason as MIGRATION_1_2.
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `game_links` ADD COLUMN `same_as` TEXT")
+            }
+        }
+
         fun get(context: Context): PlayHistoryDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     PlayHistoryDatabase::class.java,
                     "droidtop-play-history.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build().also { instance = it }
             }
     }
 }
@@ -364,16 +389,20 @@ class RoomGameLinksStore(context: Context) : GameLinksStore {
 
     override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> {
         if (ids.isEmpty()) return emptyMap()
-        val names = ids.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getLinks(it) }.associate { it.id to it.gameName }
+        val rows = ids.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getLinks(it) }.associateBy { it.id }
         val links = ids.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getSourceLinks(it) }
-        if (names.isEmpty() && links.isEmpty()) return emptyMap()
+        val storeIds = ids.chunked(MAX_IDS_PER_QUERY).flatMap { dao.getStoreIds(it) }
+            .groupBy({ it.gameId }, { "${it.kind}:${it.value}" })
+        if (rows.isEmpty() && links.isEmpty() && storeIds.isEmpty()) return emptyMap()
         val answers = links.groupBy { it.source }.flatMap { (source, rows) ->
             rows.map { it.externalId }.distinct().chunked(MAX_IDS_PER_QUERY).flatMap { dao.getAnswers(source, it) }
         }.associateBy { it.key }
         val byId = links.groupBy { it.id }
-        return (names.keys + byId.keys).associateWith { id ->
+        return (rows.keys + byId.keys + storeIds.keys).associateWith { id ->
             GameLinks(
-                gameName = names[id],
+                gameName = rows[id]?.gameName,
+                sameAs = rows[id]?.sameAs,
+                storeIds = storeIds[id].orEmpty(),
                 sources = byId[id].orEmpty().map { row ->
                     SourceLink(row.source, row.externalId, answers[SourceKey(row.source, row.externalId)]?.toAnswer())
                 },
@@ -385,6 +414,8 @@ class RoomGameLinksStore(context: Context) : GameLinksStore {
 
     override suspend fun setSourceLink(ids: Collection<String>, source: String, externalId: String?) =
         dao.setSourceLink(ids, source, externalId)
+
+    override suspend fun setSameAs(ids: Collection<String>, storeKey: String?) = dao.setSameAs(ids, storeKey)
 
     override suspend fun moveTo(fromId: String, toId: String) = dao.moveTo(fromId, toId)
 

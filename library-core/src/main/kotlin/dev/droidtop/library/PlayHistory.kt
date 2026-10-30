@@ -96,7 +96,20 @@ data class GameLinks(
     val gameName: String? = null,
     /** The sources' records the user linked this game to, one per source, by source key. */
     val sources: List<SourceLink> = emptyList(),
+    /**
+     * The store row this folder is the same game as (docs/SPEC.md 7m, "A store's copy and a local copy",
+     * Droidtop/tracker#745): a store key ("steam:440") the person linked it to, or [NOT_THE_SAME] when the person
+     * said it is not the store's game, which also stops [storeIds] from linking it. Null: nobody said.
+     */
+    val sameAs: String? = null,
+    /** The store ids a scrape learned for this game (`game_ids`, as store keys: "steam:440", "gog:1207658691"). */
+    val storeIds: List<String> = emptyList(),
 ) {
+    companion object {
+        /** [sameAs] when the person unlinked the folder from a store's row: no store id links it again. */
+        const val NOT_THE_SAME = "none"
+    }
+
     /** The link to [source], when there is one. */
     fun link(source: String): SourceLink? = sources.firstOrNull { it.source == source }
 
@@ -143,6 +156,12 @@ interface GameLinksStore {
     suspend fun setSourceLink(ids: Collection<String>, source: String, externalId: String?)
 
     /**
+     * [ids] are the same game as the store row [storeKey] ([GameLinks.sameAs]), [GameLinks.NOT_THE_SAME] when the
+     * person said they are not, or nobody said when null.
+     */
+    suspend fun setSameAs(ids: Collection<String>, storeKey: String?)
+
+    /**
      * Carries [fromId]'s links to [toId] when a missing game is folded
      * into the game that replaced it ([Library.replaceMissing]). Only into
      * an empty place: a game that already has its own name, or its own
@@ -163,6 +182,7 @@ object NoOpGameLinksStore : GameLinksStore {
     override suspend fun getAll(ids: Collection<String>): Map<String, GameLinks> = emptyMap()
     override suspend fun setGameName(ids: Collection<String>, name: String?) {}
     override suspend fun setSourceLink(ids: Collection<String>, source: String, externalId: String?) {}
+    override suspend fun setSameAs(ids: Collection<String>, storeKey: String?) {}
     override suspend fun moveTo(fromId: String, toId: String) {}
     override suspend fun linkedSources(): Map<SourceKey, SourceAnswer?> = emptyMap()
     override suspend fun idsLinkedTo(key: SourceKey): List<String> = emptyList()
