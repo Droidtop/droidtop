@@ -28,7 +28,7 @@ internal class EmojiBrowser(
     private val onBack: () -> Unit,
 ) : LinearLayout(context) {
     // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, Droidtop/tracker#562).
-    private val colors = KeyboardAppearance.palette(context)
+    private val colors = KeyboardAppearance.colors(context)
     private val adapter = EmojiAdapter(context, colors.text)
     private val grid = GridView(context)
     private val groupRow = LinearLayout(context)
@@ -50,8 +50,8 @@ internal class EmojiBrowser(
             },
             LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f),
         )
-        header.addView(button("Search") { onSearch() })
-        header.addView(button("Back") { onBack() })
+        header.addView(button(context.getString(R.string.emoji_search)) { onSearch() })
+        header.addView(button(context.getString(R.string.tool_back)) { onBack() })
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         grid.apply {
             numColumns = GridView.AUTO_FIT
@@ -63,7 +63,7 @@ internal class EmojiBrowser(
             onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ -> onPick(this@EmojiBrowser.adapter.items[position]) }
         }
         addView(grid, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-        adapter.show(listOf("Loading emoji..."), loading = true)
+        adapter.show(listOf(context.getString(R.string.emoji_loading)), loading = true)
         EmojiAssets.load(context) { loaded ->
             catalog = loaded
             buildGroups()
@@ -71,33 +71,18 @@ internal class EmojiBrowser(
         }
     }
 
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
-
-    private fun button(label: String, onClick: () -> Unit): Button = Button(context).apply {
-        text = label
-        setAllCaps(false)
-        textSize = 13f
-        setTextColor(colors.text)
-        setBackgroundColor(Color.TRANSPARENT)
-        minHeight = 0
-        minimumHeight = 0
-        minWidth = 0
-        minimumWidth = 0
-        setPadding(dp(10), dp(6), dp(10), dp(6))
-        isFocusable = false
-        setOnClickListener { onClick() }
-    }
+    private fun button(label: String, onClick: () -> Unit): Button = flatButton(context, colors, label, paddingDp = 10, onClick = onClick)
 
     private fun buildGroups() {
         groupRow.removeAllViews()
-        groupRow.addView(button("Recent") { select(RECENT) })
-        catalog?.groups?.forEach { group -> groupRow.addView(button(groupLabel(group.id)) { select(group.id) }) }
+        groupRow.addView(button(context.getString(R.string.emoji_recent)) { select(RECENT) })
+        catalog?.groups?.forEach { group -> groupRow.addView(button(groupLabel(context, group.id)) { select(group.id) }) }
     }
 
     private fun select(id: String) {
         selected = id
         val items = if (id == RECENT) recent() else catalog?.groups?.firstOrNull { it.id == id }?.entries?.map { it.emoji } ?: emptyList()
-        adapter.show(if (items.isEmpty() && id == RECENT) listOf("Nothing used yet") else items, loading = items.isEmpty())
+        adapter.show(if (items.isEmpty() && id == RECENT) listOf(context.getString(R.string.emoji_recent_empty)) else items, loading = items.isEmpty())
     }
 
     private class EmojiAdapter(private val context: Context, private val textColor: Int) : BaseAdapter() {
@@ -138,17 +123,20 @@ internal class EmojiBrowser(
         private const val RECENT = "recent"
 
         /** The button text for a group id of the emoji data. */
-        fun groupLabel(id: String): String = when (id) {
-            "smileys_emotion" -> "Smileys"
-            "people_body" -> "People"
-            "animals_nature" -> "Nature"
-            "food_drink" -> "Food"
-            "travel_places" -> "Travel"
-            "activities" -> "Activities"
-            "objects" -> "Objects"
-            "symbols" -> "Symbols"
-            "flags" -> "Flags"
-            else -> id.replace('_', ' ')
+        fun groupLabel(context: Context, id: String): String {
+            val name = when (id) {
+                "smileys_emotion" -> R.string.emoji_group_smileys
+                "people_body" -> R.string.emoji_group_people
+                "animals_nature" -> R.string.emoji_group_nature
+                "food_drink" -> R.string.emoji_group_food
+                "travel_places" -> R.string.emoji_group_travel
+                "activities" -> R.string.emoji_group_activities
+                "objects" -> R.string.emoji_group_objects
+                "symbols" -> R.string.emoji_group_symbols
+                "flags" -> R.string.emoji_group_flags
+                else -> return id.replace('_', ' ')
+            }
+            return context.getString(name)
         }
     }
 }
@@ -163,10 +151,11 @@ internal class EmojiSearchBar(
     private val onPick: (String) -> Unit,
     private val onDone: () -> Unit,
 ) : LinearLayout(context), KeyboardCapture.Target {
-    private val colors = KeyboardAppearance.palette(context)
+    private val colors = KeyboardAppearance.colors(context)
     private val query = StringBuilder()
     private val label = TextView(context)
     private val results = LinearLayout(context)
+    private val cells = ArrayList<TextView>()
     private var catalog: EmojiCatalog? = EmojiAssets.current()
 
     init {
@@ -179,17 +168,7 @@ internal class EmojiSearchBar(
             setPadding(dp(12), dp(6), dp(8), dp(6))
         }
         top.addView(label, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-        top.addView(
-            Button(context).apply {
-                text = "Done"
-                setAllCaps(false)
-                textSize = 13f
-                setTextColor(colors.text)
-                setBackgroundColor(Color.TRANSPARENT)
-                isFocusable = false
-                setOnClickListener { onDone() }
-            },
-        )
+        top.addView(flatButton(context, colors, context.getString(R.string.label_done_key), onClick = onDone))
         addView(top)
         addView(
             HorizontalScrollView(context).apply {
@@ -202,8 +181,6 @@ internal class EmojiSearchBar(
         refresh()
     }
 
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
-
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         KeyboardCapture.set(this)
@@ -215,12 +192,12 @@ internal class EmojiSearchBar(
     }
 
     override fun key(code: Int): Boolean = when {
-        code == -5 || code == 8 -> {
+        code == Keyboard.KEYCODE_DELETE || code == '\b'.code -> {
             if (query.isNotEmpty()) query.setLength(query.length - 1)
             refresh()
             true
         }
-        code == 10 -> {
+        code == '\n'.code -> {
             onDone()
             true
         }
@@ -239,19 +216,21 @@ internal class EmojiSearchBar(
     }
 
     private fun refresh() {
-        label.text = if (query.isEmpty()) "Search emoji: type on the keyboard" else "Search emoji: $query"
-        results.removeAllViews()
+        label.text = if (query.isEmpty()) context.getString(R.string.emoji_search_prompt) else context.getString(R.string.emoji_search_query, query)
         val found = catalog?.search(query.toString()).orEmpty()
-        for (entry in found) {
-            results.addView(
-                TextView(context).apply {
-                    text = entry.emoji
-                    textSize = 26f
-                    setTextColor(colors.text)
-                    setPadding(dp(8), dp(2), dp(8), dp(2))
-                    setOnClickListener { onPick(entry.emoji) }
-                },
-            )
+        // The result cells are made once and reused, so a key typed into the search changes text, not views.
+        found.forEachIndexed { i, entry ->
+            val cell = cells.getOrNull(i) ?: TextView(context).apply {
+                textSize = 26f
+                setTextColor(colors.text)
+                setPadding(dp(8), dp(2), dp(8), dp(2))
+                cells += this
+                results.addView(this)
+            }
+            cell.text = entry.emoji
+            cell.visibility = View.VISIBLE
+            cell.setOnClickListener { onPick(entry.emoji) }
         }
+        for (i in found.size until cells.size) cells[i].visibility = View.GONE
     }
 }

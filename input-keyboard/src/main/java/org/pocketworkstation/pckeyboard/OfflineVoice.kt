@@ -8,7 +8,6 @@ import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
-import java.util.concurrent.Executors
 import java.util.zip.ZipInputStream
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
@@ -69,7 +68,7 @@ internal object OfflineVoice {
     /** Whether both parts are in place, as last checked ([refresh]); cheap, so the voice key can ask on every press. */
     val ready: Boolean get() = readyCache
 
-    private val worker by lazy { Executors.newSingleThreadExecutor { r -> Thread(r, "keyboard-offline-voice").apply { isDaemon = true } } }
+    private val worker by lazy { KeyboardThreads.single("keyboard-offline-voice") }
 
     /** Re-reads [ready] off the main thread, then runs [then] (on the worker) if given. */
     @JvmStatic
@@ -85,6 +84,26 @@ internal object OfflineVoice {
     private fun checkInstalled(context: Context): Boolean = complete(engineDir(context)) && complete(modelDir(context))
 
     /** What a download says while it runs and when it ends. */
+    /**
+     * Why a download was not put in place, turned into the person's language only when shown ([text]), so the
+     * download and its checks stay free of Android resources (and JVM tested).
+     */
+    sealed interface Failure {
+        data object NoAbi : Failure
+        data class Server(val code: Int, val host: String) : Failure
+        data object Checksum : Failure
+        data class Files(val kept: Int, val expected: Int) : Failure
+        data object NotPlaced : Failure
+
+        fun text(context: Context): String = when (this) {
+            NoAbi -> context.getString(R.string.offline_voice_failed_abi)
+            is Server -> context.getString(R.string.offline_voice_failed_server, code, host)
+            Checksum -> context.getString(R.string.offline_voice_failed_checksum)
+            is Files -> context.getString(R.string.offline_voice_failed_files, kept, expected)
+            NotPlaced -> context.getString(R.string.offline_voice_failed_not_placed)
+        }
+    }
+
     interface Progress {
         fun step(line: String)
         fun done(error: String?)
@@ -94,22 +113,23 @@ internal object OfflineVoice {
     fun install(context: Context, progress: Progress) {
         val app = context.applicationContext
         worker.execute {
-            val error = runCatching { installNow(app, progress) }.getOrElse { "The download failed: ${it.message ?: it}" }
+            val error = logged("offline voice download failed") { installNow(app, progress)?.text(app) }
+                .getOrElse { app.getString(R.string.offline_voice_failed_download, it.message ?: it.toString()) }
             readyCache = checkInstalled(app)
             progress.done(error)
         }
     }
 
-    private fun installNow(context: Context, progress: Progress): String? {
-        val abi = abi() ?: return "This device has no 64-bit ABI the engine is built for"
+    private fun installNow(context: Context, progress: Progress): Failure? {
+        val abi = abi() ?: return Failure.NoAbi
         if (!complete(engineDir(context))) {
-            val error = fetch(ENGINE_URL, ENGINE_SHA256, engineDir(context), ENGINE_LIBS.size, { progress.step("Downloading the engine: $it of $ENGINE_DOWNLOAD_MB MB") }) { stream, out ->
+            val error = fetch(ENGINE_URL, ENGINE_SHA256, engineDir(context), ENGINE_LIBS.size, { progress.step(context.getString(R.string.offline_voice_downloading_engine, it, ENGINE_DOWNLOAD_MB)) }) { stream, out ->
                 unpackEngine(stream, out, abi)
             }
             if (error != null) return error
         }
         if (!complete(modelDir(context))) {
-            val error = fetch(MODEL_URL, MODEL_SHA256, modelDir(context), MODEL_FILES.size, { progress.step("Downloading the English model: $it of $MODEL_DOWNLOAD_MB MB") }) { stream, out ->
+            val error = fetch(MODEL_URL, MODEL_SHA256, modelDir(context), MODEL_FILES.size, { progress.step(context.getString(R.string.offline_voice_downloading_model, it, MODEL_DOWNLOAD_MB)) }) { stream, out ->
                 unpackModel(stream, out)
             }
             if (error != null) return error
@@ -125,12 +145,12 @@ internal object OfflineVoice {
         expected: Int,
         megabytes: (Long) -> Unit,
         unpack: (InputStream, File) -> Int,
-    ): String? {
+    ): Failure? {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 30_000
         connection.readTimeout = 60_000
         try {
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) return "The server answered ${connection.responseCode} for ${URL(url).host}"
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) return Failure.Server(connection.responseCode, URL(url).host)
             return unpackChecked(connection.inputStream, sha256, dest, expected, megabytes, unpack)
         } finally {
             connection.disconnect()
@@ -150,7 +170,7 @@ internal object OfflineVoice {
         expected: Int,
         megabytes: (Long) -> Unit,
         unpack: (InputStream, File) -> Int,
-    ): String? {
+    ): Failure? {
         val staging = File(dest.parentFile, dest.name + ".part")
         clear(staging)
         staging.mkdirs()
@@ -166,17 +186,17 @@ internal object OfflineVoice {
         val got = digest.digest().joinToString("") { "%02x".format(it) }
         if (got != sha256) {
             clear(staging)
-            return "The download did not match its checksum, so it was not kept"
+            return Failure.Checksum
         }
         if (kept != expected) {
             clear(staging)
-            return "The download did not hold the files expected ($kept of $expected)"
+            return Failure.Files(kept, expected)
         }
         File(staging, DONE).writeText(sha256)
         clear(dest)
         if (!staging.renameTo(dest)) {
             clear(staging)
-            return "The download could not be put in place"
+            return Failure.NotPlaced
         }
         return null
     }

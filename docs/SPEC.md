@@ -4773,7 +4773,8 @@ droidtop 0.2.0-dev.1931).
   hidden and have fixed heights, so a fact changing never moves the keys. A key that is a key press goes down on touch
   and up on release with what is latched held under it (`Slab.held`), so a PC game sees an arrow or a letter held for
   as long as the finger is on it; Ctrl, Alt and Super latch for the next key, Shift once or (twice) Caps; a held
-  character, space, Backspace or arrow repeats (400 ms, then 50 ms) for a destination that sees one key-down per press
+  character, space, Backspace or arrow repeats (`KeyRepeat`: 400 ms, then 50 ms; the touch keyboard uses the same)
+  for a destination that sees one key-down per press
   (an input connection, a window, a draft, the accessibility field), and not where the far side repeats itself
   (`KeyboardSink.repeatsAtSource` false: Desktop's seat, the compositor's own repeat; the elevated `input` route, which
   starts a process per key). The trackpad's settings (Companion group > Trackpad,
@@ -5531,7 +5532,8 @@ rig check in the commit message.
   button (`RoutedKeyboardSink`), the Social draft
   (the draft itself; its own keyboard composable is gone), droidtop's own fields and windows
   (`WindowKeySink`) and the keyboard over another app (`ImeConnectionSink`, or the accessibility
-  service's `AccessibilityTyping.FieldSink`). `KeyMeta` is the one meta-state rule.
+  service's `AccessibilityTyping.FieldSink`). `MetaTracker` (KeyboardSinks.kt) is the one meta-state rule, one
+  tracker per sink.
 - **No full-screen input method over droidtop's fields (rig on the console, 2026-10-16, Droidtop/tracker#485 comment
   6224857113).** On a landscape screen Gboard replaced the whole window with its own editor, covering the search's
   results, and its Search and Enter did not close it. Every droidtop Compose field asks for no full screen and no
@@ -5586,9 +5588,10 @@ rig check in the commit message.
   - the pad: A presses the focused key, X Backspace, Y Space, L1 Shift (one capital; a second press within 400 ms
     holds Caps; another lets go), R1 the symbols layer and back, R2 Enter labelled by purpose (Search, Save, Done,
     Next, Go), B Done on a Field and Cancel on a Prompt, Select the clipboard; each such key shows its pad button.
-  The face-button map and the double press for Caps are the design's own and are to compare with a Deck: Valve
-  documents none for the Deck's keyboard (coordinator, 2026-10-16, from the public reference on #485, comment
-  6224222271). There is no emoji page (the Deck's emoji menu is a difference noted there, not adopted); the email
+  The face-button map and the double press for Caps are the design's own, and they are the settled default:
+  Valve documents none for the Deck's keyboard (coordinator, 2026-10-16, from the public reference on #485, comment
+  6224222271), so there is nothing to match, and the open "compare with a Deck" note is closed rather than kept
+  as a pending change (Droidtop/tracker#772, 2026-10-29). A rig report that a Deck differs is a new issue. There is no emoji page (the Deck's emoji menu is a difference noted there, not adopted); the email
   layer follows the Deck API's email mode.
   - Drawn by `SlabView` (`:input-keyboard`): rows of 38 dp (Large keys 48 dp) with 6 dp gaps, so 226 dp (222 dp
     Large); keys on the theme's card colour over its overlay surface; the focused key scaled 1.06 on the focused fill
@@ -7814,7 +7817,7 @@ Removing the download (the same row) frees the 75 MB, and the voice key falls ba
 
 **One source for both (lane plan, 2026-10-28, Droidtop/tracker#336).** droidtop's `:input-keyboard` stays the one source; Droidtop/hacker-keyboard-reborn holds the standalone app around a mirror of the module, never edited there. The module depends on nothing of droidtop's, so anything droidtop-specific reaches it through a small hook `:app` sets, with a plain default for the standalone app.
 
-**The keyboard follows Light or dark (Droidtop/tracker#562, with #337's "droidtop theme").** #562: "A default keyboard theme that follows droidtop's Light or dark: Material light or Material dark, re-chosen when the setting changes. The person's explicit theme choice still wins." The theme list gains "Follow light or dark" (id 8, after every existing id, as `strings.xml` asks), now the default for anyone who never chose a theme; a stored choice, the old default "0" included, is kept as it is. It draws Material light or Material dark by `KeyboardAppearance`: droidtop's `DroidtopApplication` sets the host answer to its Appearance setting (7k, `AppearancePrefs.light`); the standalone app has no host and follows the system's night mode. `KeyboardSwitcher` keeps the stored choice apart from the theme drawn and re-checks as each editor starts (`refreshAppearance` in `onStartInputView`), so a change made while the keyboard was away shows on its next use. The tools strip, clipboard and macro panels, emoji browser and search, and the inline autofill chips take one palette (`KeyboardAppearance.palette`): light beside the light keyboard, dark beside every other theme, in place of their own dark literals.
+**The keyboard follows Light or dark (Droidtop/tracker#562, with #337's "droidtop theme").** #562: "A default keyboard theme that follows droidtop's Light or dark: Material light or Material dark, re-chosen when the setting changes. The person's explicit theme choice still wins." The theme list gains "Follow light or dark" (id 8, after every existing id, as `strings.xml` asks), now the default for anyone who never chose a theme; a stored choice, the old default "0" included, is kept as it is. It draws Material light or Material dark by `KeyboardAppearance`: droidtop's `DroidtopApplication` sets the host answer to its Appearance setting (7k, `AppearancePrefs.light`); the standalone app has no host and follows the system's night mode. `KeyboardSwitcher` keeps the stored choice apart from the theme drawn and re-checks as each editor starts (`refreshAppearance` in `onStartInputView`), so a change made while the keyboard was away shows on its next use. The tools strip, clipboard and macro panels, emoji browser and search, the inline autofill chips and the glide trail take one set of colours (`KeyboardAppearance.colors`, a `KeyboardColors`): light beside the light keyboard, dark beside every other theme. They are the host's colours when it gives them: droidtop gives the palette it draws now (its theme's, when one is held and it is the same light or dark), else its own default palette for that light or dark; the standalone app has none and keeps Material light and Material dark. The glide trail is that accent at 80%, where it was a fixed azure. The slab takes the same `KeyboardColors` type, filled by each surface from its own theme (Droidtop/tracker#772, decided 2026-10-29).
 
 **A pad on the keyboard (Droidtop/tracker#338).** #338: "D-pad moves a focus ring over keys, A presses"; the slab (4c) had since given a pad its typing buttons, so the input method's own keyboard takes the same ones, one pad vocabulary for typing: while it shows, Android hands key events to the input method first, and `PadKeys` takes a pad's (source gamepad or joystick, or a gamepad button): the D-pad moves a focus ring over the keys (`KeyFocus`, pure: rows share a top edge, Left and Right wrap, Up and Down go to the nearest key across and stop at the top and bottom rows), A presses the key under it as a tap would, X is Backspace (held, it repeats), Y Space, L1 Shift, R1 the symbols, R2 or Start Enter, and B closes the keyboard; the face buttons go through `FaceKeys`, so a Nintendo-layout swap holds. The first A or D-pad press shows the ring in the middle of the keyboard; it is drawn only while the pad drives (DESIGN-LANGUAGE) and a touch removes it. The ring's place is a point, not a key, so it survives a layer switch by landing on the nearest key. A physical keyboard is not taken (lane default, 2026-10-28): it types, and its arrows move the app's caret, as before; its Ctrl, Alt and Fn keys already reach the app. The companion's and the second screen's keyboards are the slab, which a pad already drives.
 
@@ -7915,7 +7918,7 @@ proposal) is not built; these helpers are in the one settings tree that already 
   does for the arrow keys. The hardware-key listener (`SecondScreenKeyboardListener`) presses and releases the
   arrows; Shift latched on that keyboard is held at the far side, so it selects there too. A hardware key types
   the moment it goes down, so with the helper on that listener sends the space bar down and up together when it
-  is let go; a space bar held for 250 ms is pressed at the far side then (`HoldTimer`), so it repeats there, and a
+  is let go; a space bar held for 250 ms is pressed at the far side then (`KeyTimer`), so it repeats there, and a
   drag after that lets it go once; with the helper off nothing changes.
 - **Macro keys.** One macro per line of the `Macros` setting, `name = steps` (`MacroParser`, JVM tested): `C-b`
   style chords with Ctrl, Alt, Shift or Meta, key names, letters, and `"quoted text"` with `\n` as Enter. A

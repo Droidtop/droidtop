@@ -111,19 +111,19 @@ object SecondScreenKeyboard {
     /** LatinIME.onStartInputView: an editor asked for the keyboard. */
     @JvmStatic
     fun onShowRequested(editorPackage: String?) {
-        runCatching { showRequests?.requested(editorPackage) }
+        logged("show request not handled") { showRequests?.requested(editorPackage) }
     }
 
     /** LatinIME.onShowInputRequested: the app asked for the keyboard again (a tap on the focused field). */
     @JvmStatic
     fun onShowReasked() {
-        runCatching { showRequests?.reasked() }
+        logged("show re-request not handled") { showRequests?.reasked() }
     }
 
     /** LatinIME.onFinishInputView and onFinishInput: the keyboard is no longer wanted. */
     @JvmStatic
     fun onShowEnded() {
-        runCatching { showRequests?.ended() }
+        logged("show end not handled") { showRequests?.ended() }
     }
 
     /**
@@ -160,7 +160,7 @@ object SecondScreenKeyboard {
         if (before == (attachCount > 0)) return
         // The IME re-evaluates only when asked; without this the change
         // takes effect at the next focus event rather than immediately.
-        LatinIME.sInstance?.let { ime -> runCatching { ime.updateInputViewShown() } }
+        LatinIME.sInstance?.let { ime -> logged("input view not updated") { ime.updateInputViewShown() } }
     }
 
     /**
@@ -247,23 +247,6 @@ object SecondScreenKeyboard {
     const val DEFAULT_HEIGHT_PERCENT = 45f
 }
 
-/** A one-shot delay on the main thread, for [SecondScreenKeyboardListener]'s held space bar. */
-interface HoldTimer {
-    fun start(delayMs: Long, action: () -> Unit)
-
-    fun cancel()
-}
-
-/**
- * Repeats a held key for a destination that does not (see [KeyboardSink.repeatsAtSource]): [action] runs after
- * [delayMs], then every [intervalMs] until [cancel].
- */
-interface RepeatTimer {
-    fun start(delayMs: Long, intervalMs: Long, action: () -> Unit)
-
-    fun cancel()
-}
-
 /**
  * Turns Hacker's Keyboard key events into hardware-style key press and
  * release pairs.
@@ -298,19 +281,25 @@ class SecondScreenKeyboardListener(
      */
     private val deferSpace: Boolean = false,
     /** With [deferSpace]: presses a held space bar after [SPACE_HOLD_MS], so it repeats at the far side. */
-    private val holdTimer: HoldTimer? = null,
+    private val holdTimer: KeyTimer? = null,
     /**
      * Repeats Backspace, Delete, the arrows and Page Up and Down while one is held, for a destination whose far side
      * sees only the one key-down; null where the far side repeats by itself (a compositor).
      */
-    private val repeatTimer: RepeatTimer? = null,
+    private val repeatTimer: KeyTimer? = null,
 ) : LatinKeyboardBaseView.OnKeyboardActionListener {
 
     private val latchedModifiers = LinkedHashSet<Int>()
     private var repeatingKey: Int? = null
-    private var spacePending = false
-    private var spaceCancelled = false
-    private var spaceDown = false
+
+    /**
+     * The space bar under [deferSpace] (Droidtop/tracker#772: one state where three booleans allowed combinations that
+     * cannot happen): [UP] untouched; [PENDING] pressed, nothing sent yet; [DOWN] held long enough to be pressed at the
+     * far side; [DRAGGED] turned into a cursor drag, so its release types nothing.
+     */
+    private enum class SpaceState { UP, PENDING, DOWN, DRAGGED }
+
+    private var space = SpaceState.UP
     private val heldKeys = HashMap<Int, KeyStroke>()
     private var transientShift = false
 
@@ -323,10 +312,8 @@ class SecondScreenKeyboardListener(
         if (KeyboardCapture.offerKey(primaryCode)) return
 
         if (deferSpace && primaryCode == SPACE) {
-            spacePending = true
-            spaceCancelled = false
-            spaceDown = false
-            holdTimer?.start(SPACE_HOLD_MS) { pressHeldSpace() }
+            space = SpaceState.PENDING
+            holdTimer?.start(SPACE_HOLD_MS, 0) { pressHeldSpace() }
             return
         }
 
@@ -360,26 +347,27 @@ class SecondScreenKeyboardListener(
         val timer = repeatTimer
         if (timer != null && stroke.androidKeyCode in REPEATABLE) {
             repeatingKey = stroke.androidKeyCode
-            timer.start(REPEAT_DELAY_MS, REPEAT_INTERVAL_MS) { send(stroke.androidKeyCode, true) }
+            timer.start(KeyRepeat.AFTER_MS, KeyRepeat.EVERY_MS) { send(stroke.androidKeyCode, true) }
         }
     }
 
     override fun onRelease(primaryCode: Int) {
-        if (spacePending && primaryCode == SPACE) {
+        if (space != SpaceState.UP && primaryCode == SPACE) {
             holdTimer?.cancel()
-            spacePending = false
             val stroke = strokeFor(SPACE)
-            if (spaceDown) {
-                spaceDown = false
-                stroke?.let { send(it.androidKeyCode, false) }
-                releaseLatched()
-            } else if (!spaceCancelled) {
-                stroke?.let {
+            when (space) {
+                SpaceState.DOWN -> {
+                    stroke?.let { send(it.androidKeyCode, false) }
+                    releaseLatched()
+                }
+                SpaceState.PENDING -> stroke?.let {
                     send(it.androidKeyCode, true)
                     send(it.androidKeyCode, false)
                     releaseLatched()
                 }
+                SpaceState.DRAGGED, SpaceState.UP -> Unit
             }
+            space = SpaceState.UP
             return
         }
         val stroke = heldKeys.remove(primaryCode) ?: return
@@ -410,12 +398,13 @@ class SecondScreenKeyboardListener(
             commit(text)
             return
         }
+        // As onPress does: Shift is pressed for a character that needs it only when it is not latched already, so a
+        // latched Shift is neither pressed twice nor let go under the person (Droidtop/tracker#772).
+        val keys = KeySequencer(send)
         for (character in text) {
             val stroke = resolver.resolve(character) ?: continue
-            if (stroke.shift) send(KeyEvent.KEYCODE_SHIFT_LEFT, true)
-            send(stroke.androidKeyCode, true)
-            send(stroke.androidKeyCode, false)
-            if (stroke.shift) send(KeyEvent.KEYCODE_SHIFT_LEFT, false)
+            val shift = stroke.shift && KeyEvent.KEYCODE_SHIFT_LEFT !in latchedModifiers
+            keys.chord(stroke.androidKeyCode, if (shift) listOf(KeyEvent.KEYCODE_SHIFT_LEFT) else emptyList())
         }
     }
 
@@ -424,12 +413,9 @@ class SecondScreenKeyboardListener(
      * the far side, so the arrow selects, as it does on a hardware keyboard.
      */
     override fun onCursorDrag(steps: Int) {
-        spaceCancelled = true
         holdTimer?.cancel()
-        if (spaceDown) {
-            spaceDown = false
-            strokeFor(SPACE)?.let { send(it.androidKeyCode, false) }
-        }
+        if (space == SpaceState.DOWN) strokeFor(SPACE)?.let { send(it.androidKeyCode, false) }
+        if (space != SpaceState.UP) space = SpaceState.DRAGGED
         val key = if (steps < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
         repeat(kotlin.math.abs(steps)) {
             send(key, true)
@@ -445,15 +431,13 @@ class SecondScreenKeyboardListener(
     override fun swipeUp(): Boolean = false
 
     /**
-     * Lets go of everything the far side thinks is held. Called when the
-     * surface goes away: a modifier whose release never arrives leaves the
-     * container behaving as though Ctrl were permanently down, which is
-     * the failure `DesktopInputRouter.releaseHeldInput` also exists for.
+     * The space bar has been held for [SPACE_HOLD_MS] without a drag: it goes down at the far side now, so it repeats
+     * there as a held key does, and its release lets it go.
      */
     private fun pressHeldSpace() {
-        if (!spacePending || spaceCancelled || spaceDown) return
+        if (space != SpaceState.PENDING) return
         strokeFor(SPACE)?.let {
-            spaceDown = true
+            space = SpaceState.DOWN
             send(it.androidKeyCode, true)
         }
     }
@@ -463,14 +447,17 @@ class SecondScreenKeyboardListener(
         repeatingKey = null
     }
 
+    /**
+     * Lets go of everything the far side thinks is held. Called when the
+     * surface goes away: a modifier whose release never arrives leaves the
+     * container behaving as though Ctrl were permanently down, which is
+     * the failure `DesktopInputRouter.releaseHeldInput` also exists for.
+     */
     fun releaseEverything() {
         stopRepeat()
         holdTimer?.cancel()
-        if (spaceDown) {
-            spaceDown = false
-            strokeFor(SPACE)?.let { send(it.androidKeyCode, false) }
-        }
-        spacePending = false
+        if (space == SpaceState.DOWN) strokeFor(SPACE)?.let { send(it.androidKeyCode, false) }
+        space = SpaceState.UP
         heldKeys.values.forEach { send(it.androidKeyCode, false) }
         heldKeys.clear()
         if (transientShift) {
@@ -494,17 +481,10 @@ class SecondScreenKeyboardListener(
         }
 
     private companion object {
-        /**
-         * `Keyboard.KEYCODE_MODE_CHANGE` and `LatinKeyboardView.KEYCODE_FN`,
-         * by value because both are package-private Java constants.
-         */
-        val LAYOUT_KEYS = setOf(-2, -119)
+        /** The keys that change this keyboard's layout (the symbols and the Fn layer), not the text. */
+        val LAYOUT_KEYS = setOf(Keyboard.KEYCODE_MODE_CHANGE, LatinKeyboardView.KEYCODE_FN)
 
-        const val SPACE = 32
-
-        /** Hold-to-repeat, as a hardware keyboard's defaults: a pause, then about twenty a second. */
-        const val REPEAT_DELAY_MS = 400L
-        const val REPEAT_INTERVAL_MS = 50L
+        val SPACE = ' '.code
 
         /** The keys that repeat when held. Letters do not: a long press on one is its popup. */
         val REPEATABLE = setOf(

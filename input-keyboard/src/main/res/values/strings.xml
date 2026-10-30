@@ -680,10 +680,22 @@
     <string name="seek_pref_max">100%</string>
     <string name="title_editing_helpers">Editing helpers</string>
     <string name="title_dictionaries">Dictionaries</string>
+    <!-- The pad-driven keyboard slab's named keys (Droidtop/tracker#485, #772). -->
+    <string name="slab_description">Keyboard</string>
+    <string name="slab_backspace">Backspace</string>
+    <string name="slab_space">Space</string>
+    <string name="slab_shift">Shift</string>
+    <string name="slab_caps">Caps</string>
+    <string name="slab_clipboard">Clipboard</string>
+    <string name="slab_system_keyboard">System keyboard</string>
+    <string name="slab_search">Search</string>
+    <string name="slab_save">Save</string>
+    <string name="slab_enter">Enter</string>
     <string name="summary_dictionaries">Words for suggestions and corrections, one per language, added from a wordlist file (.combined, or .gz)</string>
     <string name="dictionary_add_from_file">Add from a file…</string>
     <string name="dictionary_converting">Converting the wordlist; this takes a moment</string>
     <string name="dictionary_remove">Remove %1$s</string>
+    <string name="dictionary_remove_damaged">Remove %1$s (damaged, so not in use)</string>
     <string name="dictionary_removed">Removed the %1$s dictionary</string>
     <string name="dictionary_not_removed">The %1$s dictionary could not be removed</string>
     <string name="dictionary_added">Added %1$s: %2$d words, used from the next text field</string>
@@ -731,4 +743,51 @@
     <string name="offline_voice_removing">Removing</string>
     <string name="offline_voice_listening">Listening… tap here or the voice key to stop</string>
     <string name="offline_voice_failed">Offline voice typing stopped: %1$s</string>
+    <string name="offline_voice_failed_download">The download failed: %1$s</string>
+    <string name="offline_voice_failed_abi">This device has no 64-bit ABI the engine is built for</string>
+    <string name="offline_voice_failed_server">The server answered %1$d for %2$s</string>
+    <string name="offline_voice_failed_checksum">The download did not match its checksum, so it was not kept</string>
+    <string name="offline_voice_failed_files">The download did not hold the files expected (%1$d of %2$d)</string>
+    <string name="offline_voice_failed_not_placed">The download could not be put in place</string>
+    <string name="offline_voice_downloading_engine">Downloading the engine: %1$d of %2$d MB</string>
+    <string name="offline_voice_downloading_model">Downloading the English model: %1$d of %2$d MB</string>
+    <!-- The tool strip and its panels (Droidtop/tracker#340, #772). -->
+    <string name="tool_clipboard">Clipboard</string>
+    <string name="tool_emoji">Emoji</string>
+    <string name="tool_layout">Layout: %1$s</string>
+    <string name="tool_copied_for_terminal">Copied. Paste it in the terminal.</string>
+    <string name="tool_incognito">Incognito</string>
+    <string name="tool_incognito_on">Incognito: on</string>
+    <string name="tool_incognito_recording_nothing">Incognito: nothing new is recorded.</string>
+    <string name="tool_back">Back</string>
+    <string name="tool_clear">Clear</string>
+    <string name="tool_clipboard_empty">Nothing copied yet.</string>
+    <string name="tool_pin">Pin</string>
+    <string name="tool_unpin">Unpin</string>
+    <string name="tool_delete">Delete</string>
+    <string name="tool_macro_problems_more">" (and %1$d more)"</string>
+    <string name="tool_macros_empty">None yet. In the keyboard settings, Editing helpers, write one per line: name = C-b c</string>
+    <!-- The emoji panel (Droidtop/tracker#342, #772). -->
+    <string name="emoji_search">Search</string>
+    <string name="emoji_loading">Loading emoji…</string>
+    <string name="emoji_recent">Recent</string>
+    <string name="emoji_recent_empty">Nothing used yet</string>
+    <string name="emoji_search_prompt">Search emoji: type on the keyboard</string>
+    <string name="emoji_search_query">Search emoji: %1$s</string>
+    <string name="emoji_group_smileys">Smileys</string>
+    <string name="emoji_group_people">People</string>
+    <string name="emoji_group_nature">Nature</string>
+    <string name="emoji_group_food">Food</string>
+    <string name="emoji_group_travel">Travel</string>
+    <string name="emoji_group_activities">Activities</string>
+    <string name="emoji_group_objects">Objects</string>
+    <string name="emoji_group_symbols">Symbols</string>
+    <string name="emoji_group_flags">Flags</string>
+    <!-- Why a wordlist was not added (Droidtop/tracker#339, #772). -->
+    <string name="dictionary_refused_no_language">The wordlist does not say its language (no locale= in its first line)</string>
+    <string name="dictionary_refused_no_words">The wordlist has no words</string>
+    <string name="dictionary_refused_engine">This language\'s dictionary does not fit the keyboard\'s engine: %1$s</string>
+    <string name="dictionary_refused_not_saved">The dictionary could not be saved</string>
+    <string name="dictionary_refused_not_opened">The file could not be opened</string>
+    <string name="dictionary_refused_not_read">The file could not be read: %1$s</string>
 </resources>

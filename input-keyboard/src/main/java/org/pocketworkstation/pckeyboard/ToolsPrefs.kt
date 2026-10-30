@@ -53,6 +53,16 @@ object ToolsPrefs {
 
     fun spaceDrag(context: Context): Boolean = prefs(context).getBoolean(SPACE_DRAG, true)
 
+    /**
+     * Loads what a panel's key grid reads from the shared [GlobalKeyboardSettings] (the form and space-bar drag). The
+     * input method loads its own through `initPrefs`; a panel drawn without it (KeyboardPanel) calls this instead,
+     * once, before building its grid, rather than setting fields one by one (Droidtop/tracker#772).
+     */
+    fun loadInto(settings: GlobalKeyboardSettings, context: Context) {
+        settings.form = form(context)
+        settings.spaceDrag = spaceDrag(context)
+    }
+
     fun macroSource(context: Context): String = prefs(context).getString(MACROS, "") ?: ""
 
     fun macros(context: Context): List<Macro> = MacroParser.parse(macroSource(context))

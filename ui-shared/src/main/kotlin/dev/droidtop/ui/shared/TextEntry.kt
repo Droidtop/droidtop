@@ -30,6 +30,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.pocketworkstation.pckeyboard.Slab
+import org.pocketworkstation.pckeyboard.KeyboardColors
 import org.pocketworkstation.pckeyboard.SlabView
 
 /**
@@ -65,7 +67,7 @@ data class TextEntryColors(
     val accent: Color,
     val scrim: Color = Color.Black.copy(alpha = 0.6f),
 ) {
-    internal fun slab() = SlabView.Colors(ground.toArgb(), plate.toArgb(), plateFocused.toArgb(), text.toArgb(), muted.toArgb(), accent.toArgb())
+    internal fun slab() = KeyboardColors(ground.toArgb(), plate.toArgb(), plateFocused.toArgb(), text.toArgb(), muted.toArgb(), accent.toArgb())
 }
 
 /** What a slab press does to the field's value. Pure, for tests: typing replaces the selection, Backspace removes it or one character before the caret. */
@@ -148,7 +150,7 @@ private fun SlabKeys(
     form: Slab.Form,
     enter: Slab.EnterPurpose,
     colors: TextEntryColors,
-    capLabel: (Slab.Cap) -> String,
+    capLabel: (Slab.PadButton) -> String,
     onOutput: (Slab.Output) -> Unit,
     holder: (SlabView) -> Unit,
 ) {
@@ -169,7 +171,7 @@ fun TextEntryField(
     onValueChange: (TextFieldValue) -> Unit,
     placeholder: String,
     colors: TextEntryColors,
-    capLabel: (Slab.Cap) -> String,
+    capLabel: (Slab.PadButton) -> String,
     onSubmit: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
@@ -206,7 +208,7 @@ fun TextEntryPrompt(
     title: String,
     initial: String,
     colors: TextEntryColors,
-    capLabel: (Slab.Cap) -> String,
+    capLabel: (Slab.PadButton) -> String,
     onSave: (String) -> Unit,
     onCancel: () -> Unit,
     placeholder: String = "",
@@ -249,7 +251,7 @@ fun TextEntryPrompt(
             Plate(value, { value = it }, placeholder, colors, focus, system.cue ?: elsewhereCue.takeIf { !slabHere }, search = false, modifier = Modifier.padding(top = 12.dp))
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                 SmallButton("Cancel", colors, onCancel)
-                SmallButton(enter.label, colors) { onSave(value.text) }
+                SmallButton(SlabView.word(LocalContext.current, enter.word), colors) { onSave(value.text) }
             }
         }
         if (slabHere && !system.active) SlabKeys(kind, Slab.Form.PROMPT, enter, colors, capLabel, ::deliver) { slab = it }

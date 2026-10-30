@@ -895,7 +895,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
 
     // droidtop: glide typing (Droidtop/tracker#341). Null while it is off; the IME sets it.
     private GlideTyping mGlide;
-    private final Paint mGlideTrailPaint = GlideTyping.trailPaint(6 * getResources().getDisplayMetrics().density);
+    private final Paint mGlideTrailPaint = GlideTyping.trailPaint(getContext(), 6 * getResources().getDisplayMetrics().density);
 
     public void setGlide(GlideTyping glide) {
         if (mGlide == glide) return;

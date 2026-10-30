@@ -12,8 +12,6 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Display
 import android.view.Gravity
-import android.view.KeyCharacterMap
-import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -36,7 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.pocketworkstation.pckeyboard.ImeConnectionSink
-import org.pocketworkstation.pckeyboard.KeyMeta
+import org.pocketworkstation.pckeyboard.MetaTracker
 import org.pocketworkstation.pckeyboard.KeyboardPanel
 import org.pocketworkstation.pckeyboard.KeyboardSink
 import org.pocketworkstation.pckeyboard.SecondScreenKeyboard
@@ -204,14 +202,12 @@ object AddonKeyboardHost {
  * focused one as long as that display holds the system's focus (`config_perDisplayFocusEnabled` is off on handhelds).
  */
 class ElevatedInputSink(private val displayId: () -> Int?) : KeyboardSink {
-    private var metaState = 0
+    private val meta = MetaTracker()
 
     override fun key(androidKeyCode: Int, down: Boolean) {
-        metaState = KeyMeta.updated(metaState, androidKeyCode, down)
-        if (!down || KeyMeta.updated(0, androidKeyCode, true) != 0) return
+        if (meta.track(androidKeyCode, down) || !down) return
         val display = displayId() ?: return
-        val unicode = runCatching { VIRTUAL.get(androidKeyCode, metaState and KeyEvent.META_SHIFT_ON) }.getOrDefault(0)
-        val char = unicode.takeIf { it != 0 && unicode and KeyCharacterMap.COMBINING_ACCENT == 0 }?.toChar()
+        val char = meta.charOf(androidKeyCode)
         val argv = char?.let { AddonKeyboardRules.inputTextArgv(display, it.toString()) }
             ?: AddonKeyboardRules.inputKeyArgv(display, androidKeyCode)
         run(argv)
@@ -228,7 +224,6 @@ class ElevatedInputSink(private val displayId: () -> Int?) : KeyboardSink {
 
     private companion object {
         val RUNNER = Executors.newSingleThreadExecutor { r -> Thread(r, "droidtop-elevated-input").apply { isDaemon = true } }
-        val VIRTUAL: KeyCharacterMap by lazy { KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD) }
     }
 }
 

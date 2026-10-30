@@ -3,9 +3,14 @@ package org.pocketworkstation.pckeyboard
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import java.util.concurrent.Executors
 
-data class EmojiEntry(val emoji: String, val name: String, val keywords: List<String>)
+data class EmojiEntry(val emoji: String, val name: String, val keywords: List<String>) {
+    // What search compares, lower-cased and split once when the entry is made (on the loader thread), not on every
+    // key typed into the search (Droidtop/tracker#772).
+    internal val lowerName: String = name.lowercase()
+    internal val nameWords: List<String> = lowerName.split(' ', '-', ':')
+    internal val lowerKeywords: List<String> = keywords.map { it.lowercase() }
+}
 
 data class EmojiGroup(val id: String, val entries: List<EmojiEntry>)
 
@@ -29,13 +34,12 @@ class EmojiCatalog(val groups: List<EmojiGroup>) {
         if (tokens.isEmpty()) return emptyList()
         val scored = ArrayList<Pair<Int, EmojiEntry>>()
         for (entry in all) {
-            val name = entry.name.lowercase()
-            val nameWords = name.split(' ', '-', ':')
+            val nameWords = entry.nameWords
             val score = when {
-                name == q -> 0
-                name.startsWith(q) -> 1
+                entry.lowerName == q -> 0
+                entry.lowerName.startsWith(q) -> 1
                 tokens.all { token -> nameWords.any { it.startsWith(token) } } -> 2
-                tokens.all { token -> nameWords.any { it.startsWith(token) } || entry.keywords.any { it.lowercase().startsWith(token) } } -> 3
+                tokens.all { token -> nameWords.any { it.startsWith(token) } || entry.lowerKeywords.any { it.startsWith(token) } } -> 3
                 else -> -1
             }
             if (score >= 0) scored += score to entry
@@ -87,7 +91,7 @@ object EmojiRecents {
  * the main thread (at once when it is already loaded). No file work on the main thread.
  */
 object EmojiAssets {
-    private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "hk-emoji-load").apply { isDaemon = true } }
+    private val io = KeyboardThreads.single("hk-emoji-load")
     private val main = Handler(Looper.getMainLooper())
 
     @Volatile

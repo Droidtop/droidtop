@@ -35,9 +35,9 @@ object InlineAutofill {
     /** The request: chips in the keyboard's colours, light or dark ([KeyboardAppearance]), up to six of them. */
     @JvmStatic
     fun request(context: Context): InlineSuggestionsRequest {
-        val colors = KeyboardAppearance.palette(context)
+        val colors = KeyboardAppearance.colors(context)
         val chip = Icon.createWithResource(context, androidx.autofill.R.drawable.autofill_inline_suggestion_chip_background)
-            .setTint(colors.chip)
+            .setTint(colors.key)
         val style = InlineSuggestionUi.newStyleBuilder()
             .setSingleIconChipStyle(ViewStyle.Builder().setBackground(chip).setPadding(0, 0, 0, 0).build())
             .setChipStyle(ViewStyle.Builder().setBackground(chip).build())

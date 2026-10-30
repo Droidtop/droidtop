@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.pocketworkstation.pckeyboard.Slab.Action
-import org.pocketworkstation.pckeyboard.Slab.Button
+import org.pocketworkstation.pckeyboard.Slab.PadButton
 import org.pocketworkstation.pckeyboard.Slab.Form
 import org.pocketworkstation.pckeyboard.Slab.Kind
 import org.pocketworkstation.pckeyboard.Slab.Layer
@@ -65,38 +65,38 @@ class SlabTest {
     @Test
     fun `shift types one capital, a double press holds Caps, a third press lets go`() {
         var state = Slab.State()
-        state = Slab.button(state, Button.L1, now = 0).first
+        state = Slab.button(state, PadButton.L1, now = 0).first
         assertEquals(ShiftState.ONCE, state.shift)
         val (after, out) = Slab.press(state, Action.Char('a'), now = 1000)
         assertEquals(typed("A"), out)
         assertEquals(ShiftState.OFF, after.shift)
 
-        state = Slab.button(Slab.State(), Button.L1, now = 0).first
-        state = Slab.button(state, Button.L1, now = 200).first
+        state = Slab.button(Slab.State(), PadButton.L1, now = 0).first
+        state = Slab.button(state, PadButton.L1, now = 200).first
         assertEquals(ShiftState.CAPS, state.shift)
         val (stillCaps, _) = Slab.press(state, Action.Char('b'), now = 300)
         assertEquals(ShiftState.CAPS, stillCaps.shift)
-        assertEquals(ShiftState.OFF, Slab.button(stillCaps, Button.L1, now = 2000).first.shift)
+        assertEquals(ShiftState.OFF, Slab.button(stillCaps, PadButton.L1, now = 2000).first.shift)
     }
 
     @Test
     fun `two slow shift presses turn it off again instead of setting caps`() {
-        var state = Slab.button(Slab.State(), Button.L1, now = 0).first
-        state = Slab.button(state, Button.L1, now = 1000).first
+        var state = Slab.button(Slab.State(), PadButton.L1, now = 0).first
+        state = Slab.button(state, PadButton.L1, now = 1000).first
         assertEquals(ShiftState.OFF, state.shift)
     }
 
     @Test
     fun `the pad buttons do their keycap's job`() {
         val state = Slab.State()
-        assertEquals(Output.Press(KeyEvent.KEYCODE_DEL), Slab.button(state, Button.X, 0).second)
-        assertEquals(typed(" "), Slab.button(state, Button.Y, 0).second)
-        assertEquals(Output.Press(KeyEvent.KEYCODE_ENTER), Slab.button(state, Button.R2, 0).second)
-        assertEquals(Output.Close, Slab.button(state, Button.B, 0).second)
-        assertEquals(Output.OpenClipboard, Slab.button(state, Button.SELECT, 0).second)
-        val symbols = Slab.button(state, Button.R1, 0).first
+        assertEquals(Output.Press(KeyEvent.KEYCODE_DEL), Slab.button(state, PadButton.X, 0).second)
+        assertEquals(typed(" "), Slab.button(state, PadButton.Y, 0).second)
+        assertEquals(Output.Press(KeyEvent.KEYCODE_ENTER), Slab.button(state, PadButton.R2, 0).second)
+        assertEquals(Output.Close, Slab.button(state, PadButton.B, 0).second)
+        assertEquals(Output.OpenClipboard, Slab.button(state, PadButton.SELECT, 0).second)
+        val symbols = Slab.button(state, PadButton.R1, 0).first
         assertEquals(Layer.SYMBOLS, symbols.layer)
-        assertEquals(Layer.LETTERS, Slab.button(symbols, Button.R1, 0).first.layer)
+        assertEquals(Layer.LETTERS, Slab.button(symbols, PadButton.R1, 0).first.layer)
     }
 
     @Test
@@ -105,10 +105,11 @@ class SlabTest {
         val enter = field.keys.flatten().first { it.action == Action.Enter }
         val done = field.keys.flatten().first { it.action == Action.Done }
         val q = field.keys.flatten().first { (it.action as? Action.Char)?.lower == 'q' }
-        assertEquals("Search", field.label(enter, Slab.EnterPurpose.SEARCH))
-        assertEquals("Done", field.label(done, Slab.EnterPurpose.SAVE))
-        assertEquals("Cancel", field.copy(form = Form.PROMPT).label(done, Slab.EnterPurpose.SAVE))
-        assertEquals("Q", field.copy(shift = ShiftState.ONCE).label(q, Slab.EnterPurpose.DONE))
+        val word: (Slab.Word) -> String = { it.name }
+        assertEquals("SEARCH", field.label(enter, Slab.EnterPurpose.SEARCH, word))
+        assertEquals("DONE", field.label(done, Slab.EnterPurpose.SAVE, word))
+        assertEquals("CANCEL", field.copy(form = Form.PROMPT).label(done, Slab.EnterPurpose.SAVE, word))
+        assertEquals("Q", field.copy(shift = ShiftState.ONCE).label(q, Slab.EnterPurpose.DONE, word))
     }
 
     @Test
@@ -183,5 +184,16 @@ class SlabTest {
         assertEquals(ShiftState.OFF, after.shift)
         assertEquals(ShiftState.CAPS, Slab.released(Slab.State(shift = ShiftState.CAPS)).shift)
         assertTrue(Slab.repeats(Action.Backspace) && Slab.repeats(Action.ArrowDown) && !Slab.repeats(Action.Enter))
+    }
+
+    @Test
+    fun `a pad key is read as the same button by the slab and the keyboard`() {
+        assertEquals(PadButton.X, PadButton.of(KeyEvent.KEYCODE_BUTTON_X))
+        assertEquals(PadButton.Y, PadButton.of(KeyEvent.KEYCODE_BUTTON_Y))
+        assertEquals(PadButton.B, PadButton.of(KeyEvent.KEYCODE_BUTTON_B))
+        assertEquals(PadButton.R2, PadButton.of(KeyEvent.KEYCODE_BUTTON_START))
+        assertEquals(PadButton.SELECT, PadButton.of(KeyEvent.KEYCODE_BUTTON_SELECT))
+        assertEquals(null, PadButton.of(KeyEvent.KEYCODE_BUTTON_A))
+        assertEquals(null, PadButton.of(KeyEvent.KEYCODE_DPAD_UP))
     }
 }

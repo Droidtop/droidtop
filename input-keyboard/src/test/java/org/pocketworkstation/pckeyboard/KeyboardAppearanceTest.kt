@@ -1,7 +1,8 @@
 package org.pocketworkstation.pckeyboard
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertSame
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -33,7 +34,7 @@ class KeyboardAppearanceTest {
 
     @Test
     fun panelsAreLightOnlyBesideTheLightKeyboard() {
-        assertSame(KeyboardAppearance.LIGHT, KeyboardAppearance.paletteFor(KeyboardAppearance.MATERIAL_LIGHT))
-        for (theme in listOf(0, 1, 2, 3, 4, 6, 7)) assertSame(KeyboardAppearance.DARK, KeyboardAppearance.paletteFor(theme))
+        assertTrue(KeyboardAppearance.lightPanels(KeyboardAppearance.MATERIAL_LIGHT))
+        for (theme in listOf(0, 1, 2, 3, 4, 6, 7)) assertFalse(KeyboardAppearance.lightPanels(theme))
     }
 }

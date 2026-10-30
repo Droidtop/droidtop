@@ -9,13 +9,13 @@ import org.pocketworkstation.pckeyboard.Slab
  * pad's Backspace keycap reads Y; the shoulders and Select by their names.
  */
 object SlabCaps {
-    fun label(cap: Slab.Cap): String = when (cap) {
-        Slab.Cap.X -> ControllerLayouts.layout.glyph(FaceRole.X)
-        Slab.Cap.Y -> ControllerLayouts.layout.glyph(FaceRole.Y)
-        Slab.Cap.B -> ControllerLayouts.layout.glyph(FaceRole.CANCEL)
-        Slab.Cap.L1 -> "L1"
-        Slab.Cap.R1 -> "R1"
-        Slab.Cap.R2 -> "R2"
-        Slab.Cap.SELECT -> "Select"
+    fun label(cap: Slab.PadButton): String = when (cap) {
+        Slab.PadButton.X -> ControllerLayouts.layout.glyph(FaceRole.X)
+        Slab.PadButton.Y -> ControllerLayouts.layout.glyph(FaceRole.Y)
+        Slab.PadButton.B -> ControllerLayouts.layout.glyph(FaceRole.CANCEL)
+        Slab.PadButton.L1 -> "L1"
+        Slab.PadButton.R1 -> "R1"
+        Slab.PadButton.R2 -> "R2"
+        Slab.PadButton.SELECT -> "Select"
     }
 }

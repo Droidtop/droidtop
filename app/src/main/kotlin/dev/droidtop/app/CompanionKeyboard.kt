@@ -15,6 +15,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.shell.gamepad.KeyboardTargets
 import dev.droidtop.shell.gamepad.input.SlabCaps
 import org.pocketworkstation.pckeyboard.Slab
+import org.pocketworkstation.pckeyboard.KeyboardColors
 import org.pocketworkstation.pckeyboard.SlabSink
 import org.pocketworkstation.pckeyboard.SlabView
 
@@ -27,7 +28,7 @@ import org.pocketworkstation.pckeyboard.SlabView
 @Composable
 internal fun CompanionDockedSlab(request: KeyboardTargets.Request) {
     val scheme = MaterialTheme.colorScheme
-    val colors = SlabView.Colors(
+    val colors = KeyboardColors(
         ground = scheme.surface.toArgb(),
         key = scheme.surfaceVariant.toArgb(),
         keyFocused = scheme.secondaryContainer.toArgb(),

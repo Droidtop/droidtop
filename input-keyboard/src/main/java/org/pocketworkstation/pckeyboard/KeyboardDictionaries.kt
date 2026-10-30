@@ -3,13 +3,13 @@ package org.pocketworkstation.pckeyboard
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.InputStream
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
 import java.util.Locale
-import java.util.concurrent.Executors
 import java.util.zip.GZIPInputStream
 
 /**
@@ -20,8 +20,11 @@ import java.util.zip.GZIPInputStream
  * only swaps the loaded dictionary in.
  */
 object KeyboardDictionaries {
-    private val worker by lazy { Executors.newSingleThreadExecutor { r -> Thread(r, "keyboard-dictionaries").apply { isDaemon = true } } }
+    private val worker by lazy { KeyboardThreads.single("keyboard-dictionaries") }
     private val main by lazy { Handler(Looper.getMainLooper()) }
+
+    /** Languages whose dictionary file failed to load in this process: corrupt, or not a dictionary. */
+    val damaged: MutableSet<String> = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap())
 
     fun dir(context: Context): File = File(context.filesDir, "keyboard-dictionaries")
 
@@ -76,12 +79,12 @@ object KeyboardDictionaries {
      */
     fun add(context: Context, input: InputStream): Added {
         val parsed = maybeGunzip(input).bufferedReader(Charsets.UTF_8).use { CombinedWordlist.parse(it.lineSequence()) }
-        val language = languageOf(parsed.header) ?: return Added.Refused("The wordlist does not say its language (no locale= in its first line)")
-        if (parsed.words.isEmpty()) return Added.Refused("The wordlist has no words")
+        val language = languageOf(parsed.header) ?: return Added.Refused(context.getString(R.string.dictionary_refused_no_language))
+        if (parsed.words.isEmpty()) return Added.Refused(context.getString(R.string.dictionary_refused_no_words))
         val bytes = try {
             DictionaryWriter.writeFitting(parsed.words, parsed.bigrams)
         } catch (e: DictionaryWriter.Unsupported) {
-            return Added.Refused("This language's dictionary does not fit the keyboard's engine: ${e.message}")
+            return Added.Refused(context.getString(R.string.dictionary_refused_engine, e.message))
         }
         val target = fileFor(context, language)
         target.parentFile?.mkdirs()
@@ -89,7 +92,7 @@ object KeyboardDictionaries {
         temp.writeBytes(bytes)
         if (!temp.renameTo(target)) {
             temp.delete()
-            return Added.Refused("The dictionary could not be saved")
+            return Added.Refused(context.getString(R.string.dictionary_refused_not_saved))
         }
         writeGlideWords(fileFor(context, language).parentFile!!, glideFileFor(context, language), parsed.words)
         generation++
@@ -104,7 +107,10 @@ object KeyboardDictionaries {
     private fun writeGlideWords(dir: File, target: File, words: Map<String, Int>) {
         val temp = File(dir, target.name + ".part")
         temp.writeText(glideLines(words).joinToString("\n"), Charsets.UTF_8)
-        if (!temp.renameTo(target)) temp.delete()
+        if (!temp.renameTo(target)) {
+            Log.w(KEYBOARD_TAG, "glide words not saved: rename to ${target.name} failed")
+            temp.delete()
+        }
     }
 
     /** [language]'s glide words and their frequencies, or null when it has none. Disk: off the main thread. */
@@ -126,7 +132,12 @@ object KeyboardDictionaries {
     /** Forgets [language]'s dictionary. Disk: off the main thread. */
     fun remove(context: Context, language: String): Boolean {
         glideFileFor(context, language).delete()
-        return fileFor(context, language).delete().also { if (it) generation++ }
+        return fileFor(context, language).delete().also {
+            if (it) {
+                generation++
+                damaged -= language
+            }
+        }
     }
 
     /**
@@ -140,12 +151,18 @@ object KeyboardDictionaries {
         worker.execute {
             val file = fileFor(app, language)
             if (!file.isFile) return@execute
-            val dictionary = runCatching {
+            val dictionary = logged("dictionary $language not loaded") {
                 RandomAccessFile(file, "r").use { raf ->
                     val mapped = raf.channel.map(FileChannel.MapMode.READ_ONLY, 0, raf.length())
                     BinaryDictionary(app, mapped, Suggest.DIC_MAIN)
                 }
-            }.getOrNull() ?: return@execute
+            }.getOrNull()
+            if (dictionary == null) {
+                // The Dictionaries row names it as damaged, so the person can remove it and add it again.
+                damaged += language
+                return@execute
+            }
+            damaged -= language
             main.post {
                 if (isCurrent() && !suggest.hasMainDictionary()) {
                     suggest.setMainDictionary(dictionary)
@@ -168,7 +185,7 @@ internal object DictionaryRow {
     const val KEY = "pref_dictionaries"
     const val PICK_REQUEST = 3390
 
-    private val worker by lazy { Executors.newSingleThreadExecutor { r -> Thread(r, "keyboard-dictionary-row").apply { isDaemon = true } } }
+    private val worker by lazy { KeyboardThreads.single("keyboard-dictionary-row") }
 
     @JvmStatic
     fun open(activity: android.app.Activity, row: android.preference.Preference) {
@@ -182,7 +199,10 @@ internal object DictionaryRow {
 
     private fun show(activity: android.app.Activity, row: android.preference.Preference, languages: List<String>) {
         if (activity.isFinishing) return
-        val labels = languages.map { activity.getString(R.string.dictionary_remove, name(it)) } + activity.getString(R.string.dictionary_add_from_file)
+        val labels = languages.map {
+            val label = if (it in KeyboardDictionaries.damaged) R.string.dictionary_remove_damaged else R.string.dictionary_remove
+            activity.getString(label, name(it))
+        } + activity.getString(R.string.dictionary_add_from_file)
         android.app.AlertDialog.Builder(activity)
             .setTitle(R.string.title_dictionaries)
             .setItems(labels.toTypedArray()) { _, which ->
@@ -213,10 +233,10 @@ internal object DictionaryRow {
         row?.summary = activity.getString(R.string.dictionary_converting)
         val app = activity.applicationContext
         worker.execute {
-            val result = runCatching {
+            val result = logged("wordlist not added") {
                 app.contentResolver.openInputStream(uri)?.use { KeyboardDictionaries.add(app, it) }
-                    ?: KeyboardDictionaries.Added.Refused("The file could not be opened")
-            }.getOrElse { KeyboardDictionaries.Added.Refused("The file could not be read: ${it.message ?: it}") }
+                    ?: KeyboardDictionaries.Added.Refused(app.getString(R.string.dictionary_refused_not_opened))
+            }.getOrElse { KeyboardDictionaries.Added.Refused(app.getString(R.string.dictionary_refused_not_read, it.message ?: it.toString())) }
             activity.runOnUiThread {
                 when (result) {
                     is KeyboardDictionaries.Added.Done ->

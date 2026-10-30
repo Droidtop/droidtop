@@ -92,9 +92,9 @@ class SecondScreenKeyboardTest {
     @Test
     fun `codes that address the keyboard itself reach no container`() {
         // Mode change, cancel, done, alt-sym, options, voice, language
-        // cycling, compose: all meaningful to the keyboard, meaningless to
+        // cycling, compose, the Fn layer: all meaningful to the keyboard, meaningless to
         // a compositor.
-        for (code in listOf(-2, -3, -4, -6, -100, -101, -102, -103, -104, -105, -10024)) {
+        for (code in listOf(-2, -3, -4, -6, -100, -101, -102, -103, -104, -105, -10024, -119)) {
             assertNull("code $code should not reach the container", HackersKeyCodes.specialStroke(code))
         }
     }
@@ -168,6 +168,26 @@ class SecondScreenKeyboardTest {
 
         listener.onPress('!'.code)
         listener.onRelease('!'.code)
+
+        assertEquals(
+            listOf(
+                KeyEvent.KEYCODE_SHIFT_LEFT to true,
+                KeyEvent.KEYCODE_1 to true,
+                KeyEvent.KEYCODE_1 to false,
+                KeyEvent.KEYCODE_SHIFT_LEFT to false,
+            ),
+            sink.sent,
+        )
+    }
+
+    @Test
+    fun `a popup character under a latched Shift neither presses nor releases Shift again`() {
+        val sink = Sink()
+        val listener = SecondScreenKeyboardListener(sink.send, fakeResolver)
+
+        listener.onPress(-1) // Keyboard.KEYCODE_SHIFT: latches Shift
+        listener.onText("!")
+        listener.onPress(-1) // and lets it go
 
         assertEquals(
             listOf(
@@ -282,7 +302,7 @@ class SecondScreenKeyboardTest {
         )
     }
 
-    private class FakeRepeat : RepeatTimer {
+    private class FakeRepeat : KeyTimer {
         var action: (() -> Unit)? = null
         var delayMs = 0L
         var intervalMs = 0L
@@ -307,8 +327,8 @@ class SecondScreenKeyboardTest {
         val listener = SecondScreenKeyboardListener(sink.send, fakeResolver, repeatTimer = repeat)
 
         listener.onPress(-19) // up
-        assertEquals(400L, repeat.delayMs)
-        assertEquals(50L, repeat.intervalMs)
+        assertEquals(KeyRepeat.AFTER_MS, repeat.delayMs)
+        assertEquals(KeyRepeat.EVERY_MS, repeat.intervalMs)
         repeat.action!!.invoke()
         repeat.action!!.invoke()
         listener.onRelease(-19)
@@ -376,5 +396,78 @@ class SecondScreenKeyboardTest {
         listener.releaseEverything()
         assertNull(repeat.action)
         assertEquals(listOf(KeyEvent.KEYCODE_DPAD_RIGHT to true, KeyEvent.KEYCODE_DPAD_RIGHT to false), sink.sent)
+    }
+
+    private class FakeHold : KeyTimer {
+        var action: (() -> Unit)? = null
+
+        override fun start(delayMs: Long, intervalMs: Long, action: () -> Unit) {
+            this.action = action
+        }
+
+        override fun cancel() {
+            action = null
+        }
+    }
+
+    private fun spaceBar(sink: Sink, hold: FakeHold) = SecondScreenKeyboardListener(
+        sink.send,
+        CharKeyResolver { KeyTable.stroke(it) },
+        deferSpace = true,
+        holdTimer = hold,
+    )
+
+    private val space = ' '.code
+
+    @Test
+    fun `a tapped space bar types one space when it is let go`() {
+        val sink = Sink()
+        val listener = spaceBar(sink, FakeHold())
+        listener.onPress(space)
+        assertEquals(emptyList<Pair<Int, Boolean>>(), sink.sent)
+        listener.onRelease(space)
+        assertEquals(listOf(KeyEvent.KEYCODE_SPACE to true, KeyEvent.KEYCODE_SPACE to false), sink.sent)
+    }
+
+    @Test
+    fun `a held space bar goes down when the hold fires and up on release`() {
+        val sink = Sink()
+        val hold = FakeHold()
+        val listener = spaceBar(sink, hold)
+        listener.onPress(space)
+        hold.action!!.invoke()
+        assertEquals(listOf(KeyEvent.KEYCODE_SPACE to true), sink.sent)
+        listener.onRelease(space)
+        assertEquals(listOf(KeyEvent.KEYCODE_SPACE to true, KeyEvent.KEYCODE_SPACE to false), sink.sent)
+    }
+
+    @Test
+    fun `a dragged space bar moves the cursor and types no space`() {
+        val sink = Sink()
+        val listener = spaceBar(sink, FakeHold())
+        listener.onPress(space)
+        listener.onCursorDrag(-2)
+        listener.onRelease(space)
+        assertEquals(
+            listOf(
+                KeyEvent.KEYCODE_DPAD_LEFT to true,
+                KeyEvent.KEYCODE_DPAD_LEFT to false,
+                KeyEvent.KEYCODE_DPAD_LEFT to true,
+                KeyEvent.KEYCODE_DPAD_LEFT to false,
+            ),
+            sink.sent,
+        )
+    }
+
+    @Test
+    fun `letting go of everything releases a held space bar once`() {
+        val sink = Sink()
+        val hold = FakeHold()
+        val listener = spaceBar(sink, hold)
+        listener.onPress(space)
+        hold.action!!.invoke()
+        listener.releaseEverything()
+        listener.onRelease(space)
+        assertEquals(listOf(KeyEvent.KEYCODE_SPACE to true, KeyEvent.KEYCODE_SPACE to false), sink.sent)
     }
 }

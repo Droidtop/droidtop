@@ -41,7 +41,7 @@ class SlabSinkTest {
         var closed = false
         SlabSink.deliver(Slab.Output.Close, Recorder(true), onClose = { closed = true })
         assertTrue(closed)
-        val missing = (32..126).map { it.toChar() }.filter { SlabSink.UsKeys.of(it) == null }
+        val missing = (32..126).map { it.toChar() }.filter { KeyTable.stroke(it) == null }
         assertTrue("no key for $missing", missing.isEmpty())
     }
 

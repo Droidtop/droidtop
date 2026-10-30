@@ -12,7 +12,6 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Display
-import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -26,8 +25,8 @@ import dev.droidtop.runtime.keyboard.FieldText
 import dev.droidtop.runtime.keyboard.OverlayOwner
 import dev.droidtop.runtime.keyboard.TextEdit
 import dev.droidtop.runtime.keyboard.TextSplice
-import org.pocketworkstation.pckeyboard.KeyMeta
 import org.pocketworkstation.pckeyboard.KeyboardSink
+import org.pocketworkstation.pckeyboard.MetaTracker
 import org.pocketworkstation.pckeyboard.SecondScreenKeyboard
 import java.util.concurrent.Executors
 
@@ -239,15 +238,12 @@ internal object AccessibilityTyping {
 
     /** droidtop's keyboard typing into the focused field through its accessibility actions. */
     class FieldSink : KeyboardSink {
-        private var metaState = 0
+        private val meta = MetaTracker()
 
         override fun key(androidKeyCode: Int, down: Boolean) {
-            metaState = KeyMeta.updated(metaState, androidKeyCode, down)
-            if (!down || KeyMeta.updated(0, androidKeyCode, true) != 0) return
+            if (meta.track(androidKeyCode, down) || !down) return
             val node = field ?: return
-            val unicode = runCatching { VIRTUAL.get(androidKeyCode, metaState and KeyEvent.META_SHIFT_ON) }.getOrDefault(0)
-            val char = unicode.takeIf { it != 0 && it and KeyCharacterMap.COMBINING_ACCENT == 0 }?.toChar()
-            val key = FieldKeys.map(androidKeyCode, metaState, char, node.isMultiLine) ?: return
+            val key = FieldKeys.map(androidKeyCode, meta.state, meta.charOf(androidKeyCode), node.isMultiLine) ?: return
             worker.execute { runCatching { perform(node, key) } }
         }
 
@@ -314,6 +310,4 @@ internal object AccessibilityTyping {
         }
         node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, args)
     }
-
-    private val VIRTUAL: KeyCharacterMap by lazy { KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD) }
 }

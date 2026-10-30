@@ -17,7 +17,9 @@ import kotlin.math.sqrt
  *   penalty when the gesture starts or ends off the word's first or last key;
  * - only words whose first key is within [startKeyProximity] of the start are scored, and a word is dropped as soon as
  *   its running score passes the worst kept candidate.
- * Pure: no Android types, no threads. [load] is the slow part (a path per word); run it off the main thread.
+ * Pure: no Android types, no threads. [load] and [candidates] are the slow parts (a path per word; a walk per word
+ * near the start); run both off the main thread. The finger's points ([addPoint], [path]) are the main thread's:
+ * [path] hands a copy of the corners to score, so the next touch never changes a path being scored.
  */
 class GlideClassifier(
     private val keys: List<Key>,
@@ -47,6 +49,8 @@ class GlideClassifier(
     private var words: List<String> = emptyList()
     private var frequencies: IntArray = IntArray(0)
     private var corners: Array<ShortArray> = emptyArray()
+    /** Each word's last key, worked out at [load] rather than for every word on every glide. */
+    private var lastKeys: Array<Key?> = emptyArray()
     private val wordsByStartKey = HashMap<Key, IntArrayList>()
 
     @Volatile
@@ -67,6 +71,7 @@ class GlideClassifier(
         loaded = false
         wordsByStartKey.clear()
         val paths = arrayOfNulls<ShortArray>(words.size)
+        val ends = arrayOfNulls<Key>(words.size)
         val xs = IntArray(MAX_GESTURE_LENGTH)
         val ys = IntArray(MAX_GESTURE_LENGTH)
         for ((index, word) in words.withIndex()) {
@@ -86,9 +91,11 @@ class GlideClassifier(
             paths[index] = corners(xs, ys, n)
             val start = word.firstOrNull()?.let { keyByLetter[it.lowercaseChar()] ?: keyByLetter[base(it.lowercaseChar())] }
             if (start != null) wordsByStartKey.getOrPut(start) { IntArrayList() }.add(index)
+            ends[index] = word.lastOrNull()?.let { keyByLetter[base(it.lowercaseChar())] ?: keyByLetter[it.lowercaseChar()] }
         }
         this.words = words
         this.frequencies = frequencies
+        lastKeys = ends
         corners = Array(paths.size) { paths[it] ?: ShortArray(0) }
         loaded = true
     }
@@ -110,10 +117,15 @@ class GlideClassifier(
         gestureSize = 0
     }
 
+    /** The corners of the path so far, a copy to hand to [candidates]; null with no path. Cheap. */
+    fun path(): ShortArray? = if (gestureSize == 0) null else corners(gestureXs, gestureYs, gestureSize)
+
     /** The best words for the path so far, best first; empty before [load] or with no path. */
-    fun candidates(): List<String> {
-        if (!loaded || gestureSize == 0) return emptyList()
-        val path = corners(gestureXs, gestureYs, gestureSize)
+    fun candidates(): List<String> = path()?.let(::candidates).orEmpty()
+
+    /** The best words for [path] (from [path]), best first; empty before [load]. Slow: off the main thread. */
+    fun candidates(path: ShortArray): List<String> {
+        if (!loaded || path.size < 2) return emptyList()
         val startX = path[0].toInt()
         val startY = path[1].toInt()
         val endX = path[path.size - 2].toInt()
@@ -132,7 +144,7 @@ class GlideClassifier(
                 val index = list[i]
                 val word = words[index]
                 var endPenalty = 0.0
-                val last = word.lastOrNull()?.let { keyByLetter[base(it.lowercaseChar())] ?: keyByLetter[it.lowercaseChar()] }
+                val last = lastKeys[index]
                 if (last != null) {
                     val d = last.squaredDistanceFrom(endX, endY)
                     if (d > startProximitySquared * END_DIST_THRESHOLD_MULTIPLIER) continue
@@ -188,22 +200,19 @@ class GlideClassifier(
 
         /** The path's corners as x, y pairs: its ends and every point turning more sharply than 170 degrees. */
         fun corners(xs: IntArray, ys: IntArray, n: Int): ShortArray {
-            val out = ArrayList<Int>()
-            if (n > 0) {
-                out += xs[0]
-                out += ys[0]
+            // At most every point is a corner: x, y pairs straight into a short array, nothing boxed.
+            val out = ShortArray(2 * n)
+            var size = 0
+            fun put(i: Int) {
+                out[size++] = xs[i].toShort()
+                out[size++] = ys[i].toShort()
             }
+            if (n > 0) put(0)
             for (i in 1 until n - 1) {
-                if (angle(xs[i - 1], ys[i - 1], xs[i], ys[i], xs[i + 1], ys[i + 1]) <= CURVATURE_THRESHOLD) {
-                    out += xs[i]
-                    out += ys[i]
-                }
+                if (angle(xs[i - 1], ys[i - 1], xs[i], ys[i], xs[i + 1], ys[i + 1]) <= CURVATURE_THRESHOLD) put(i)
             }
-            if (n > 1) {
-                out += xs[n - 1]
-                out += ys[n - 1]
-            }
-            return ShortArray(out.size) { out[it].toShort() }
+            if (n > 1) put(n - 1)
+            return if (size == out.size) out else out.copyOf(size)
         }
 
         private fun angle(sx: Int, sy: Int, mx: Int, my: Int, ex: Int, ey: Int): Double {

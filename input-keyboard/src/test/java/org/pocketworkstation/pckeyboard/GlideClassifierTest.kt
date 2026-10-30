@@ -65,6 +65,18 @@ class GlideClassifierTest {
     }
 
     @Test
+    fun `a path handed off is scored as the stroke it was, whatever the next touch does`() {
+        val c = classifier()
+        val live = glide(c, "world")
+        val path = c.path()!!
+        c.clear()
+        c.addPoint(10, 10)
+        assertEquals(live, c.candidates(path))
+        c.clear()
+        assertEquals(null, c.path())
+    }
+
+    @Test
     fun `a gesture's corners are its ends and its sharp turns`() {
         val straight = GlideClassifier.corners(intArrayOf(0, 50, 100), intArrayOf(0, 0, 0), 3)
         assertEquals(listOf<Short>(0, 0, 100, 0), straight.toList())

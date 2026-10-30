@@ -33,7 +33,7 @@ class ToolsDeck private constructor(
     private val relayout: Runnable?,
 ) : LinearLayout(context) {
     // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, Droidtop/tracker#562).
-    private val colors = KeyboardAppearance.palette(context)
+    private val colors = KeyboardAppearance.colors(context)
     private val stack = FrameLayout(context)
     private var overlay: View? = null
     private var overlayId: String? = null
@@ -48,7 +48,7 @@ class ToolsDeck private constructor(
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(colors.background)
+        setBackgroundColor(colors.ground)
         isFocusable = false
         addView(buildStrip(), LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         inlineScroll.apply {
@@ -73,16 +73,14 @@ class ToolsDeck private constructor(
     /** A grid narrower than the screen sits at the edge the form names. */
     private fun formGravity(): Int = if (ToolsPrefs.form(context).atEnd) Gravity.END else Gravity.START
 
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
-
     private fun buildStrip(): View {
         val row = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        if (ToolsPrefs.clipboardHistory(context)) row.addView(tool("Clipboard") { toggle("clipboard") { clipboardPanel() } })
-        if (ToolsPrefs.emoji(context)) row.addView(tool("Emoji") { toggle("emoji") { emojiPanel() } })
-        row.addView(tool("Macros") { toggle("macros") { macroPanel() } })
+        if (ToolsPrefs.clipboardHistory(context)) row.addView(tool(context.getString(R.string.tool_clipboard)) { toggle("clipboard") { clipboardPanel() } })
+        if (ToolsPrefs.emoji(context)) row.addView(tool(context.getString(R.string.tool_emoji)) { toggle("emoji") { emojiPanel() } })
+        row.addView(tool(context.getString(R.string.title_macros)) { toggle("macros") { macroPanel() } })
         row.addView(formButton())
         incognitoButton = tool("") { toggleIncognito() }
         row.addView(incognitoButton)
@@ -94,25 +92,12 @@ class ToolsDeck private constructor(
         }
     }
 
-    private fun tool(label: String, onClick: () -> Unit): Button = Button(context).apply {
-        text = label
-        setAllCaps(false)
-        textSize = 13f
-        setTextColor(colors.text)
-        setBackgroundColor(Color.TRANSPARENT)
-        minHeight = 0
-        minimumHeight = 0
-        minWidth = 0
-        minimumWidth = 0
-        setPadding(dp(12), dp(6), dp(12), dp(6))
-        isFocusable = false
-        setOnClickListener { onClick() }
-    }
+    private fun tool(label: String, onClick: () -> Unit): Button = flatButton(context, colors, label, onClick = onClick)
 
     /** Cycles the key grid between full width, split, and one-handed left and right. */
     private fun formButton(): Button {
         lateinit var button: Button
-        fun label() = "Layout: " + ToolsPrefs.form(context).id
+        fun label() = context.getString(R.string.tool_layout, ToolsPrefs.form(context).id)
         button = tool(label()) {
             val form = KeyboardForm.next(ToolsPrefs.form(context))
             ToolsPrefs.prefs(context).edit().putString(KeyboardForm.PREF, form.id).apply()
@@ -182,7 +167,7 @@ class ToolsDeck private constructor(
             return true
         }
         context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("", text))
-        showNotice("Copied. Paste it in the terminal.")
+        showNotice(context.getString(R.string.tool_copied_for_terminal))
         return false
     }
 
@@ -239,7 +224,7 @@ class ToolsDeck private constructor(
     }
 
     private fun updateIncognito(on: Boolean = ToolsPrefs.incognito(context)) {
-        incognitoButton.text = if (on) "Incognito: on" else "Incognito"
+        incognitoButton.text = context.getString(if (on) R.string.tool_incognito_on else R.string.tool_incognito)
         incognitoButton.setBackgroundColor(if (on) colors.accent else Color.TRANSPARENT)
     }
 
@@ -262,7 +247,7 @@ class ToolsDeck private constructor(
         }
         header.addView(label(title, 15f), LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         actions.forEach { header.addView(it) }
-        header.addView(tool("Back") { hidePanel() })
+        header.addView(tool(context.getString(R.string.tool_back)) { hidePanel() })
         root.addView(header)
         status.setPadding(dp(12), 0, dp(12), dp(4))
         status.setTextColor(colors.muted)
@@ -274,7 +259,7 @@ class ToolsDeck private constructor(
     private fun clipboardPanel(): View {
         val status = TextView(context)
         val rows = LinearLayout(context).apply { orientation = VERTICAL }
-        val root = panelFrame("Clipboard history", status, tool("Clear") { ClipboardHistoryStore.clear() })
+        val root = panelFrame(context.getString(R.string.title_clipboard_history), status, tool(context.getString(R.string.tool_clear)) { ClipboardHistoryStore.clear() })
         root.addView(
             ScrollView(context).apply {
                 isFocusable = false
@@ -287,8 +272,8 @@ class ToolsDeck private constructor(
             val incognito = ToolsPrefs.incognito(context)
             // Incognito keeps what was copied before out of sight; pinned entries are the user's own notes.
             val entries = ClipboardHistoryStore.snapshot().filter { !incognito || it.pinned }
-            status.text = if (incognito) "Incognito: nothing new is recorded." else ""
-            if (entries.isEmpty()) rows.addView(label("Nothing copied yet.").apply { setPadding(dp(12), dp(8), dp(12), dp(8)) })
+            status.text = if (incognito) context.getString(R.string.tool_incognito_recording_nothing) else ""
+            if (entries.isEmpty()) rows.addView(label(context.getString(R.string.tool_clipboard_empty)).apply { setPadding(dp(12), dp(8), dp(12), dp(8)) })
             entries.forEach { rows.addView(clipboardRow(it)) }
         }
         val listener: () -> Unit = { root.post { refresh() } }
@@ -325,20 +310,20 @@ class ToolsDeck private constructor(
             },
             LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f),
         )
-        row.addView(tool(if (entry.pinned) "Unpin" else "Pin") { ClipboardHistoryStore.setPinned(entry.text, !entry.pinned) })
-        row.addView(tool("Delete") { ClipboardHistoryStore.delete(entry.text) })
+        row.addView(tool(context.getString(if (entry.pinned) R.string.tool_unpin else R.string.tool_pin)) { ClipboardHistoryStore.setPinned(entry.text, !entry.pinned) })
+        row.addView(tool(context.getString(R.string.tool_delete)) { ClipboardHistoryStore.delete(entry.text) })
         return row
     }
 
     private fun macroPanel(): View {
         val status = TextView(context)
-        val root = panelFrame("Macros", status)
+        val root = panelFrame(context.getString(R.string.title_macros), status)
         val macros = ToolsPrefs.macros(context)
         val rows = LinearLayout(context).apply { orientation = VERTICAL }
         val problems = MacroParser.problems(ToolsPrefs.macroSource(context))
         status.text = when {
-            problems.isNotEmpty() -> problems.first() + if (problems.size > 1) " (and ${problems.size - 1} more)" else ""
-            macros.isEmpty() -> "None yet. In the keyboard settings, Editing helpers, write one per line: name = C-b c"
+            problems.isNotEmpty() -> problems.first() + if (problems.size > 1) context.getString(R.string.tool_macro_problems_more, problems.size - 1) else ""
+            macros.isEmpty() -> context.getString(R.string.tool_macros_empty)
             else -> ""
         }
         val player = MacroPlayer(sink::key, typeText)

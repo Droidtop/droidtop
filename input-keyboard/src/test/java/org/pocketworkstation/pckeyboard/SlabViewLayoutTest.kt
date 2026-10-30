@@ -23,7 +23,7 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [34])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SlabViewLayoutTest {
-    private val colors = SlabView.Colors(0, 1, 2, 3, 4, 5)
+    private val colors = KeyboardColors(0, 1, 2, 3, 4, 5)
 
     private fun slab(width: Int, height: Int): SlabView {
         val view = SlabView(

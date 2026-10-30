@@ -110,6 +110,16 @@ class EditingHelpersTest {
         assertEquals(listOf("good"), h.entries.map { it.text })
     }
 
+    @Test fun keyTableNamesKeysAndShiftsTheSymbolsThatNeedIt() {
+        assertEquals(KeyStroke(KeyEvent.KEYCODE_1, shift = true), KeyTable.stroke('!'))
+        assertEquals(KeyStroke(KeyEvent.KEYCODE_SLASH), KeyTable.stroke('/'))
+        assertEquals(KeyStroke(KeyEvent.KEYCODE_Q, shift = true), KeyTable.stroke('Q'))
+        assertNull(KeyTable.stroke('é'))
+        assertEquals(KeyEvent.KEYCODE_PAGE_UP, KeyTable.named("PgUp"))
+        assertEquals(KeyEvent.KEYCODE_F12, KeyTable.named("f12"))
+        assertNull(KeyTable.named("nonsense"))
+    }
+
     // --- inline autofill ---
 
     @Test fun inlineAutofillNeedsAndroid11AndThePreference() {
@@ -168,9 +178,9 @@ class EditingHelpersTest {
 
     @Test fun aHeldSpaceRepeatsAtTheFarSideAndADragStillCancelsATap() {
         val sent = ArrayList<Pair<Int, Boolean>>()
-        val timer = object : HoldTimer {
+        val timer = object : KeyTimer {
             var action: (() -> Unit)? = null
-            override fun start(delayMs: Long, action: () -> Unit) { this.action = action }
+            override fun start(delayMs: Long, intervalMs: Long, action: () -> Unit) { this.action = action }
             override fun cancel() { action = null }
         }
         val resolver = CharKeyResolver { if (it == ' ') KeyStroke(KeyEvent.KEYCODE_SPACE) else null }

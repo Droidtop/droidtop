@@ -20,7 +20,7 @@ import kotlin.math.min
  * keeps focus and its caret); a tap on a key presses it the same way. Every press gives the same 80 ms flash and a
  * haptic tick. [onOutput] receives what a press produces for the host to deliver.
  *
- * Colours come from the host's theme ([Colors]), and the pad buttons' printed names from its controller layout
+ * Colours come from the host's theme ([KeyboardColors]), and the pad buttons' printed names from its controller layout
  * ([capLabel]: on a Nintendo-layout pad the Backspace keycap reads Y), so the slab draws what is on the plastic.
  *
  * It lays out from its container's real size (Droidtop/tracker#567: the companion's keyboard "moves things around,
@@ -35,8 +35,8 @@ class SlabView(
     kind: Slab.Kind,
     form: Slab.Form,
     private val enter: Slab.EnterPurpose,
-    private val colors: Colors,
-    private val capLabel: (Slab.Cap) -> String,
+    private val colors: KeyboardColors,
+    private val capLabel: (Slab.PadButton) -> String,
     private val onOutput: (Slab.Output) -> Unit,
     /** Up from the top row: the host moves its cursor into the plate's controls. */
     private val onLeaveTop: () -> Unit = {},
@@ -46,10 +46,9 @@ class SlabView(
     private val repeatHeld: () -> Boolean = { false },
 ) : View(context) {
 
-    /** The slab's colours, from the host's theme tokens (overlaySurface, card, cardFocused, onSurface, accent). */
-    data class Colors(val ground: Int, val key: Int, val keyFocused: Int, val text: Int, val muted: Int, val accent: Int)
-
     private val density = resources.displayMetrics.density
+    /** The slab's words in the person's language, read once. */
+    private val words: Map<Slab.Word, String> = Slab.Word.entries.associateWith { word(context, it) }
     private val scaledDensity = density * resources.configuration.fontScale
     private val largeByFont = resources.configuration.fontScale >= Slab.LARGE_KEYS_FONT_SCALE
 
@@ -71,7 +70,7 @@ class SlabView(
     init {
         isFocusable = false
         setBackgroundColor(colors.ground)
-        contentDescription = "Keyboard"
+        contentDescription = context.getString(R.string.slab_description)
     }
 
     /** The height the slab asks for with nothing else to go by: its design rows (38 dp, 48 dp with Large keys). */
@@ -108,13 +107,13 @@ class SlabView(
         if (height <= 0) return
         rowHeight = min(fit(height, tallest(state.large)), MAX_ROW_DP * density)
         gap = (rowHeight / 6f).coerceIn(min(3 * density, rowHeight / 6f), GAP_DP * density)
-        val rows = state.keys.size
-        state = state.copy(row = state.row.coerceIn(0, rows - 1), col = state.col.coerceIn(0, state.keys[state.row.coerceIn(0, rows - 1)].lastIndex))
+        val row = state.row.coerceIn(0, state.keys.lastIndex)
+        state = state.copy(row = row, col = state.col.coerceIn(0, state.keys[row].lastIndex))
         invalidate()
     }
 
-    /** The most rows any layer has in this form. */
-    private fun tallest(large: Boolean): Int = Slab.Layer.entries.maxOf { Slab.rows(it, large, state.form, state.extras).size }
+    /** The most rows any layer has at [large] with this state's extras setting. */
+    private fun tallest(large: Boolean): Int = Slab.Layer.entries.maxOf { Slab.rows(it, large, state.extras).size }
 
     /** The row height that shares [height] out over [rows] rows and their gaps (a gap is a sixth of a row). */
     private fun fit(height: Int, rows: Int): Float = height / (rows + (rows + 1) / 6f)
@@ -138,11 +137,12 @@ class SlabView(
 
     private inline fun forEachKey(action: (row: Int, col: Int, key: Slab.Key, rect: RectF) -> Unit) {
         val usable = width - 2 * gap
+        val top = firstRowTop()
         state.keys.forEachIndexed { r, row ->
             val units = row.sumOf { it.width.toDouble() }.toFloat()
             val unit = (usable - gap * (row.size - 1)) / units
             var x = gap
-            val rowTop = firstRowTop() + r * (rowHeight + gap)
+            val rowTop = top + r * (rowHeight + gap)
             row.forEachIndexed { c, key ->
                 val w = unit * key.width
                 keyRect.set(x, rowTop, x + w, rowTop + rowHeight)
@@ -172,7 +172,7 @@ class SlabView(
             }
             // The label: 18 sp for a character, 15 sp for a named key, scaled down with the key it sits on (60% of
             // the row, 70% of a letter key's width) and never under MIN_LABEL_SP, then ellipsised if it is still wide.
-            val text = state.label(key, enter)
+            val text = state.label(key, enter, words::getValue)
             val sp = if (key.action is Slab.Action.Char) 18f else 15f
             label.textSize = labelSize(rect.height(), rect.width() / key.width, sp)
             label.color = colors.text
@@ -226,30 +226,29 @@ class SlabView(
         val face = if (event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ||
             event.keyCode == KeyEvent.KEYCODE_ESCAPE
         ) null else FaceKeys.roleOf(event.keyCode)
-        val button = when {
-            event.keyCode == KeyEvent.KEYCODE_DPAD_UP -> return move(Slab.Move.UP, event)
-            event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN -> return move(Slab.Move.DOWN, event)
-            event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> return move(Slab.Move.LEFT, event)
-            event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> return move(Slab.Move.RIGHT, event)
-            face == FaceKeys.Role.CONFIRM -> {
-                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                    state.focused?.let { key -> apply(Slab.press(state, key.action, event.eventTime), key) }
-                }
-                return true
-            }
-            face == FaceKeys.Role.X -> Slab.Button.X
-            face == FaceKeys.Role.Y -> Slab.Button.Y
-            face == FaceKeys.Role.CANCEL || event.keyCode == KeyEvent.KEYCODE_BACK -> Slab.Button.B
-            event.keyCode == KeyEvent.KEYCODE_BUTTON_L1 -> Slab.Button.L1
-            event.keyCode == KeyEvent.KEYCODE_BUTTON_R1 -> Slab.Button.R1
-            event.keyCode == KeyEvent.KEYCODE_BUTTON_R2 || event.keyCode == KeyEvent.KEYCODE_BUTTON_START -> Slab.Button.R2
-            event.keyCode == KeyEvent.KEYCODE_BUTTON_SELECT -> Slab.Button.SELECT
-            else -> return false
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> return move(Slab.Move.UP, event)
+            KeyEvent.KEYCODE_DPAD_DOWN -> return move(Slab.Move.DOWN, event)
+            KeyEvent.KEYCODE_DPAD_LEFT -> return move(Slab.Move.LEFT, event)
+            KeyEvent.KEYCODE_DPAD_RIGHT -> return move(Slab.Move.RIGHT, event)
         }
+        if (face == FaceKeys.Role.CONFIRM) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                state.focused?.let { key -> apply(Slab.press(state, key.action, event.eventTime), key) }
+            }
+            return true
+        }
+        val button = when {
+            // A host window's own Back key is B here as well.
+            event.keyCode == KeyEvent.KEYCODE_BACK -> Slab.PadButton.B
+            // A hardware keyboard's Enter and Escape type, as above; they are not pad buttons here.
+            face == null && FaceKeys.roleOf(event.keyCode) != null -> null
+            else -> Slab.PadButton.of(event.keyCode)
+        } ?: return false
         if (event.action != KeyEvent.ACTION_DOWN) return true
         // Only Backspace repeats while held; every other button acts once per press.
-        if (event.repeatCount > 0 && button != Slab.Button.X) return true
-        val key = state.keys.flatten().firstOrNull { it.cap == Slab.Cap.valueOf(button.name) }
+        if (event.repeatCount > 0 && button != Slab.PadButton.X) return true
+        val key = state.keys.flatten().firstOrNull { it.cap == button }
         apply(Slab.button(state, button, event.eventTime), key)
         return true
     }
@@ -264,13 +263,7 @@ class SlabView(
     /** The key held under a finger on a whole keyboard, and what it sent down. */
     private var holding: Slab.Output.Hold? = null
 
-    private val repeat = object : Runnable {
-        override fun run() {
-            val held = holding ?: return
-            onOutput(Slab.Output.Down(held, repeat = true))
-            postDelayed(this, REPEAT_EVERY_MS)
-        }
-    }
+    private val repeat = HandlerKeyTimer()
 
     /**
      * A tap presses on release. On a whole keyboard ([Slab.State.extras]) a key that is a key press goes down on touch
@@ -289,7 +282,9 @@ class SlabView(
                 holding = held
                 flash(key)
                 onOutput(Slab.Output.Down(held))
-                if (repeatHeld() && Slab.repeats(key.action)) postDelayed(repeat, REPEAT_AFTER_MS)
+                if (repeatHeld() && Slab.repeats(key.action)) {
+                    repeat.start(KeyRepeat.AFTER_MS, KeyRepeat.EVERY_MS) { onOutput(Slab.Output.Down(held, repeat = true)) }
+                }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 val held = holding
@@ -308,7 +303,7 @@ class SlabView(
     }
 
     private fun letGo(held: Slab.Output.Hold) {
-        removeCallbacks(repeat)
+        repeat.cancel()
         holding = null
         onOutput(Slab.Output.Up(held))
         state = Slab.released(state)
@@ -328,12 +323,31 @@ class SlabView(
     }
 
     companion object {
+        /** [word] in the person's language, from the keyboard's strings. */
+        fun word(context: Context, word: Slab.Word): String = context.getString(
+            when (word) {
+                Slab.Word.BACKSPACE -> R.string.slab_backspace
+                Slab.Word.SPACE -> R.string.slab_space
+                Slab.Word.SHIFT -> R.string.slab_shift
+                Slab.Word.CAPS -> R.string.slab_caps
+                Slab.Word.DONE -> R.string.label_done_key
+                Slab.Word.CANCEL -> R.string.cancel
+                Slab.Word.CLIPBOARD -> R.string.slab_clipboard
+                Slab.Word.SYSTEM_KEYBOARD -> R.string.slab_system_keyboard
+                Slab.Word.SEARCH -> R.string.slab_search
+                Slab.Word.SAVE -> R.string.slab_save
+                Slab.Word.NEXT -> R.string.label_next_key
+                Slab.Word.GO -> R.string.label_go_key
+                Slab.Word.ENTER -> R.string.slab_enter
+            },
+        )
+
         /**
          * The height that gives every row of every layer at least [MIN_ROW_DP], in pixels: what a host reserves before
          * sharing the rest out (the companion's Input tab gives its trackpad only what is left over).
          */
-        fun minimumHeight(density: Float, form: Slab.Form = Slab.Form.FIELD, extras: Boolean = false): Int {
-            val rows = Slab.Layer.entries.maxOf { layer -> listOf(true, false).maxOf { Slab.rows(layer, it, form, extras).size } }
+        fun minimumHeight(density: Float, extras: Boolean = false): Int {
+            val rows = Slab.Layer.entries.maxOf { layer -> listOf(true, false).maxOf { Slab.rows(layer, it, extras).size } }
             return kotlin.math.ceil(MIN_ROW_DP * density * (rows + (rows + 1) / 6f)).toInt()
         }
 
@@ -346,7 +360,5 @@ class SlabView(
         const val CORNER_DP = 6f
         const val FOCUS_SCALE = 1.06f
         const val FLASH_MS = 80L
-        const val REPEAT_AFTER_MS = 400L
-        const val REPEAT_EVERY_MS = 50L
     }
 }

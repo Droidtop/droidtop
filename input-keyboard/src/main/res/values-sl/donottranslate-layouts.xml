@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The QWERTZ letters Czech, Croatian, Slovak and Slovenian share (Droidtop/tracker#772): one file in xml/, named here, instead of a copy per language. -->
+<resources>
+    <item name="kbd_qwerty" type="xml">@xml/kbd_qwerty_central_european_qwertz</item>
+</resources>

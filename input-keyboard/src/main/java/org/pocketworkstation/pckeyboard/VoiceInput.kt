@@ -13,7 +13,10 @@ import android.view.inputmethod.InputMethodSubtype
  * microphone is allowed, else [SystemVoiceKeyboard].
  */
 interface VoiceProvider {
-    /** Whether this provider can dictate now. Cheap: asked on every press of the voice key. */
+    /**
+     * Whether this provider can dictate now; asked on every press of the voice key, so it must not do a lookup each
+     * time (the system keyboard's answer is kept for the field, see [VoiceInput.fieldStarted]).
+     */
     fun available(service: InputMethodService): Boolean
 
     /** Starts dictation for the field [service] is typing into. */
@@ -26,6 +29,13 @@ object VoiceInput {
     /** The provider the voice key uses now, or null when none can dictate (the key then does nothing). */
     @JvmStatic
     fun provider(service: InputMethodService): VoiceProvider? = providers.firstOrNull { it.available(service) }
+
+    /**
+     * A new field started: answers kept for the last one are dropped (another keyboard may have been enabled or
+     * disabled since), so the next press asks again. Main thread, from the input method's `onStartInputView`.
+     */
+    @JvmStatic
+    fun fieldStarted() = SystemVoiceKeyboard.forget()
 
     /** The voice key: dictation from the first provider that can, if any. Returns whether one started. */
     @JvmStatic
@@ -58,10 +68,27 @@ object SystemVoiceKeyboard : VoiceProvider {
         return null
     }
 
-    override fun available(service: InputMethodService): Boolean = find(service, service.packageName) != null
+    // What find answered for this field (two IPC calls per enabled input method), until VoiceInput.fieldStarted.
+    private var looked = false
+    private var found: Pair<InputMethodInfo, InputMethodSubtype>? = null
+
+    internal fun forget() {
+        looked = false
+        found = null
+    }
+
+    private fun voiceKeyboard(service: InputMethodService): Pair<InputMethodInfo, InputMethodSubtype>? {
+        if (!looked) {
+            found = find(service, service.packageName)
+            looked = true
+        }
+        return found
+    }
+
+    override fun available(service: InputMethodService): Boolean = voiceKeyboard(service) != null
 
     override fun start(service: InputMethodService) {
-        val (info, subtype) = find(service, service.packageName) ?: return
+        val (info, subtype) = voiceKeyboard(service) ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             service.switchInputMethod(info.id, subtype)
         } else {

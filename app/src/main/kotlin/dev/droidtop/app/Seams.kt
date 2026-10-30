@@ -34,9 +34,27 @@ internal object Seams {
         dev.droidtop.pluginhost.PluginGrantPrompts.setSurface { PluginGrantSheetActivity.open(app) }
         // A plugin's secret facet, shown on droidtop's own sheet when the person presses Show (docs/plugin-api.md 1.10).
         dev.droidtop.pluginhost.PluginSecrets.setSurface { PluginSecretSheetActivity.open(app) }
-        // The keyboard's "Follow light or dark" follows droidtop's Light or dark (docs/SPEC.md 7k, Droidtop/tracker#562).
-        org.pocketworkstation.pckeyboard.KeyboardAppearance.host =
-            org.pocketworkstation.pckeyboard.KeyboardAppearance.Host { context -> dev.droidtop.library.settings.AppearancePrefs.light(context) }
+        // The keyboard's "Follow light or dark" follows droidtop's Light or dark (docs/SPEC.md 7k, Droidtop/tracker#562),
+        // and its panels and glide trail take droidtop's palette for that light or dark (Droidtop/tracker#772).
+        org.pocketworkstation.pckeyboard.KeyboardAppearance.host = object : org.pocketworkstation.pckeyboard.KeyboardAppearance.Host {
+            override fun light(context: android.content.Context) = dev.droidtop.library.settings.AppearancePrefs.light(context)
+
+            override fun colors(context: android.content.Context, light: Boolean): org.pocketworkstation.pckeyboard.KeyboardColors {
+                // The palette droidtop draws now (its theme's, when one is held) when it is the same light or dark,
+                // else droidtop's own palette for the keyboard's light or dark.
+                val live = dev.droidtop.shell.gamepad.GamingTheme.palette.colors
+                val c = if (live.isLight == light) live else dev.droidtop.shell.gamepad.GamingPalette.defaultFor(light).colors
+                return org.pocketworkstation.pckeyboard.KeyboardColors(
+                    ground = c.ground,
+                    panel = c.overlaySurface,
+                    key = c.card,
+                    keyFocused = c.cardFocused,
+                    text = c.onSurface,
+                    muted = c.onSurfaceMuted,
+                    accent = c.accent,
+                )
+            }
+        }
         // `library.read` `systems` (docs/plugin-api.md 3 A1): the broker runs on a binder thread, which may block here;
         // the answer comes from the library's in-memory index, never a folder walk.
         dev.droidtop.pluginhost.PluginBrokers.librarySystemsProvider = {

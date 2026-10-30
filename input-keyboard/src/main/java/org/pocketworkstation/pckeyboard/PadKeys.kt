@@ -48,24 +48,28 @@ internal class PadKeys(private val ime: LatinIME) {
             held += keyCode
             return true
         }
-        val role = FaceKeys.roleOf(keyCode)
-        when {
-            role == FaceKeys.Role.CONFIRM -> if (first) {
+        if (FaceKeys.roleOf(keyCode) == FaceKeys.Role.CONFIRM) {
+            if (first) {
                 val at = point?.let { KeyFocus.nearest(boxes, it.first, it.second) }
                 // The first A shows the ring; the next presses the key under it.
                 if (at == null) focus(view, keys, boxes, KeyFocus.start(boxes)) else press(view, keys[at])
             }
-            role == FaceKeys.Role.X -> type(Keyboard.KEYCODE_DELETE)
-            role == FaceKeys.Role.Y -> if (first) type(' '.code)
-            role == FaceKeys.Role.CANCEL -> if (first) {
-                clear()
-                ime.requestHideSelf(0)
-                return true
+        } else {
+            // The same buttons, read the same way, as on the slab ([Slab.PadButton]); here they become the keyboard's
+            // own keys. Select has no job on this keyboard and stays the app's.
+            when (Slab.PadButton.of(keyCode)) {
+                Slab.PadButton.X -> type(Keyboard.KEYCODE_DELETE)
+                Slab.PadButton.Y -> if (first) type(' '.code)
+                Slab.PadButton.B -> if (first) {
+                    clear()
+                    ime.requestHideSelf(0)
+                    return true
+                }
+                Slab.PadButton.L1 -> if (first) type(Keyboard.KEYCODE_SHIFT)
+                Slab.PadButton.R1 -> if (first) type(Keyboard.KEYCODE_MODE_CHANGE)
+                Slab.PadButton.R2 -> if (first) type('\n'.code)
+                Slab.PadButton.SELECT, null -> return false
             }
-            keyCode == KeyEvent.KEYCODE_BUTTON_L1 -> if (first) type(Keyboard.KEYCODE_SHIFT)
-            keyCode == KeyEvent.KEYCODE_BUTTON_R1 -> if (first) type(Keyboard.KEYCODE_MODE_CHANGE)
-            keyCode == KeyEvent.KEYCODE_BUTTON_R2 || keyCode == KeyEvent.KEYCODE_BUTTON_START -> if (first) type('\n'.code)
-            else -> return false
         }
         held += keyCode
         refreshLater(view)

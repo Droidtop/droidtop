@@ -32,6 +32,7 @@ import dev.droidtop.input.TrackpadView
 import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
 import dev.droidtop.shell.gamepad.KeyboardTargets
 import org.pocketworkstation.pckeyboard.Slab
+import org.pocketworkstation.pckeyboard.KeyboardColors
 import org.pocketworkstation.pckeyboard.SlabSink
 import org.pocketworkstation.pckeyboard.SlabView
 import org.pocketworkstation.pckeyboard.KeyboardSink
@@ -251,7 +252,7 @@ class SecondScreenInputView(
         // never runs past its edge. Only the destination is this surface's own.
         val slabSink = requestAwareSink(keyboardSink())
         val tokens = dev.droidtop.shell.gamepad.MenuTokens
-        val colors = SlabView.Colors(
+        val colors = KeyboardColors(
             ground = tokens.Ground.toArgb(),
             key = tokens.Card.toArgb(),
             keyFocused = tokens.CardFocused.toArgb(),
@@ -290,7 +291,7 @@ class SecondScreenInputView(
         addView(trackpad, LayoutParams(LayoutParams.MATCH_PARENT, 0, TRACKPAD_WEIGHT))
     }
 
-    private fun slab(colors: SlabView.Colors, sink: KeyboardSink): SlabView = SlabView(
+    private fun slab(colors: KeyboardColors, sink: KeyboardSink): SlabView = SlabView(
         context, Slab.Kind.PLAIN, Slab.Form.FIELD, Slab.EnterPurpose.ENTER, colors,
         dev.droidtop.shell.gamepad.input.SlabCaps::label,
         // Nothing on this tab closes: the keys stay until the person leaves the tab.

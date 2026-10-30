@@ -7,7 +7,10 @@ package org.pocketworkstation.pckeyboard
  * the keyboard, not the text, so it never reaches a container (HackersKeyCodes drops it).
  */
 object SwitchKeyboard {
-    /** The key code, beside the fork's other keyboard codes (LatinKeyboardView.KEYCODE_OPTIONS and on, -100 to -105). */
+    /**
+     * The key code, beside the fork's other keyboard codes (LatinKeyboardView.KEYCODE_OPTIONS and on, -100 to -105); the
+     * one definition, which LatinIME and LatinKeyboardView read.
+     */
     const val CODE = -106
 
     /** The code a long press on the key whose primary code is [primaryCode] sends, or null for the key's own. */

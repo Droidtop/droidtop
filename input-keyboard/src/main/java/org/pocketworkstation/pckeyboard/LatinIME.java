@@ -796,6 +796,8 @@ public class LatinIME extends InputMethodService implements
         // policy, docs/SPEC.md 4c), so droidtop is told and can draw the
         // same keyboard on the editor's own screen itself.
         SecondScreenKeyboard.onShowRequested(attribute.packageName);
+        // droidtop: the voice key asks again which keyboard dictates for this field (Droidtop/tracker#772).
+        VoiceInput.fieldStarted();
         // droidtop: a dictionary added or removed since the last field is loaded now (Droidtop/tracker#339).
         if (mDictionaryGeneration != KeyboardDictionaries.getGeneration() && mLanguageSwitcher != null) {
             initSuggest(mLanguageSwitcher.getInputLanguage());
@@ -2860,9 +2862,6 @@ public class LatinIME extends InputMethodService implements
         }
     }
 
-    private void rememberReplacedWord(CharSequence suggestion) {
-    }
-
     /**
      * droidtop: a glide's words (Droidtop/tracker#341), best first. The best is typed, after a space when it follows a
      * word, with the shift state's capitals; the strip offers the rest, and picking one replaces it.
@@ -2889,10 +2888,13 @@ public class LatinIME extends InputMethodService implements
 
     /** A glided word in the shift state's case: all capitals when locked, a capital first letter when shifted. */
     private String glideCase(String word) {
+        // The keyboard's language decides the capitals, not the device's: a Turkish layout's "i" capitalises to
+        // the dotted capital, an English one's to "I" even on a Turkish device (Droidtop/tracker#772).
+        Locale locale = sKeyboardSettings.inputLocale;
         int shift = getShiftState();
-        if (shift == Keyboard.SHIFT_LOCKED || shift == Keyboard.SHIFT_CAPS_LOCKED) return word.toUpperCase();
+        if (shift == Keyboard.SHIFT_LOCKED || shift == Keyboard.SHIFT_CAPS_LOCKED) return word.toUpperCase(locale);
         if (shift == Keyboard.SHIFT_ON || shift == Keyboard.SHIFT_CAPS) {
-            return word.isEmpty() ? word : word.substring(0, 1).toUpperCase() + word.substring(1);
+            return word.isEmpty() ? word : word.substring(0, 1).toUpperCase(locale) + word.substring(1);
         }
         return word;
     }
@@ -2934,7 +2936,6 @@ public class LatinIME extends InputMethodService implements
         }
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) {
-            rememberReplacedWord(suggestion);
             ic.commitText(suggestion, 1);
         }
         saveWordInHistory(suggestion);

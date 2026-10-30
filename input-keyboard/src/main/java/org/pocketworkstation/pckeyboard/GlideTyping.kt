@@ -1,11 +1,11 @@
 package org.pocketworkstation.pckeyboard
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
-import java.util.concurrent.Executors
 import kotlin.math.max
 
 /**
@@ -16,7 +16,9 @@ import kotlin.math.max
  *
  * The guesser ([GlideClassifier]) is built for each keyboard's letter keys and the language's glide words
  * ([KeyboardDictionaries.glideWords]) on a background thread; until it is ready, or with no words for the language,
- * nothing becomes a glide and the keys type as before. Main thread, except the build.
+ * nothing becomes a glide and the keys type as before. Main thread, except the build and the scoring at release,
+ * which run on the glide's own thread; a guess that comes back after the keyboard changed or after a newer glide
+ * ended is dropped.
  */
 class GlideTyping(private val onWords: (List<String>) -> Unit) {
     private val main = Handler(Looper.getMainLooper())
@@ -24,6 +26,8 @@ class GlideTyping(private val onWords: (List<String>) -> Unit) {
     @Volatile
     private var classifier: GlideClassifier? = null
     private var generation = 0
+    /** Counts finished glides, so only the newest one's words are typed. */
+    private var glides = 0
     private var keyboard: Keyboard? = null
     private var words: (() -> Pair<List<String>, IntArray>?)? = null
 
@@ -56,7 +60,7 @@ class GlideTyping(private val onWords: (List<String>) -> Unit) {
         keyWidth = max(1, keys.map { it.width }.sorted()[keys.size / 2])
         val source = words ?: return
         worker.execute {
-            val loaded = runCatching { source() }.getOrNull() ?: return@execute
+            val loaded = logged("glide words not read") { source() }.getOrNull() ?: return@execute
             val built = GlideClassifier(keys, minPointDistance = max(4, keyWidth / 6), startKeyProximity = keyWidth * 3 / 2)
             built.load(loaded.first, loaded.second)
             main.post { if (gen == generation) classifier = built }
@@ -98,8 +102,15 @@ class GlideTyping(private val onWords: (List<String>) -> Unit) {
         val c = classifier
         if (c != null) {
             add(c, x, y)
-            val found = c.candidates()
-            if (found.isNotEmpty()) onWords(found)
+            val path = c.path()
+            if (path != null) {
+                val gen = generation
+                val glide = ++glides
+                worker.execute {
+                    val found = c.candidates(path)
+                    if (found.isNotEmpty()) main.post { if (gen == generation && glide == glides) onWords(found) }
+                }
+            }
         }
         cancel()
         return true
@@ -141,12 +152,12 @@ class GlideTyping(private val onWords: (List<String>) -> Unit) {
         const val GLIDE_START_KEYS = 1.0
         private const val MIN_LETTER_KEYS = 10
 
-        private val worker by lazy { Executors.newSingleThreadExecutor { r -> Thread(r, "keyboard-glide").apply { isDaemon = true } } }
+        private val worker by lazy { KeyboardThreads.single("keyboard-glide") }
 
-        /** The trail's paint: droidtop's focus azure, rounded, [widthPx] wide. */
+        /** The trail's paint: the keyboard's accent ([KeyboardAppearance.colors]) at 80%, rounded, [widthPx] wide. */
         @JvmStatic
-        fun trailPaint(widthPx: Float): Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xCC3BB5FF.toInt()
+        fun trailPaint(context: Context, widthPx: Float): Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = (KeyboardAppearance.colors(context).accent and 0x00FFFFFF) or (0xCC shl 24)
             style = Paint.Style.STROKE
             strokeWidth = widthPx
             strokeCap = Paint.Cap.ROUND

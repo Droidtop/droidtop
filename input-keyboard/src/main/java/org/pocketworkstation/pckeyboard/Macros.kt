@@ -134,55 +134,10 @@ object MacroParser {
             }
             rest = rest.substring(2)
         }
-        NAMED[rest.lowercase()]?.let { return MacroStep.Chord(it, ctrl, alt, shift, meta) }
+        KeyTable.named(rest)?.let { return MacroStep.Chord(it, ctrl, alt, shift, meta) }
         if (rest.length != 1) throw MacroError("unknown key '$token'")
-        val ch = rest[0]
-        val code = charKey(ch.lowercaseChar()) ?: throw MacroError("unknown key '$token'")
-        return MacroStep.Chord(code, ctrl, alt, shift || ch.isUpperCase(), meta)
-    }
-
-    /** The Android key that types an unshifted [c], or null. Key codes, not a layout: the far side owns the layout. */
-    private fun charKey(c: Char): Int? = when (c) {
-        in 'a'..'z' -> KeyEvent.KEYCODE_A + (c - 'a')
-        in '0'..'9' -> KeyEvent.KEYCODE_0 + (c - '0')
-        '-' -> KeyEvent.KEYCODE_MINUS
-        '=' -> KeyEvent.KEYCODE_EQUALS
-        '[' -> KeyEvent.KEYCODE_LEFT_BRACKET
-        ']' -> KeyEvent.KEYCODE_RIGHT_BRACKET
-        ';' -> KeyEvent.KEYCODE_SEMICOLON
-        '\'' -> KeyEvent.KEYCODE_APOSTROPHE
-        ',' -> KeyEvent.KEYCODE_COMMA
-        '.' -> KeyEvent.KEYCODE_PERIOD
-        '/' -> KeyEvent.KEYCODE_SLASH
-        '\\' -> KeyEvent.KEYCODE_BACKSLASH
-        '`' -> KeyEvent.KEYCODE_GRAVE
-        else -> null
-    }
-
-    private val NAMED: Map<String, Int> = buildMap {
-        put("esc", KeyEvent.KEYCODE_ESCAPE)
-        put("escape", KeyEvent.KEYCODE_ESCAPE)
-        put("enter", KeyEvent.KEYCODE_ENTER)
-        put("return", KeyEvent.KEYCODE_ENTER)
-        put("tab", KeyEvent.KEYCODE_TAB)
-        put("space", KeyEvent.KEYCODE_SPACE)
-        put("bs", KeyEvent.KEYCODE_DEL)
-        put("backspace", KeyEvent.KEYCODE_DEL)
-        put("del", KeyEvent.KEYCODE_FORWARD_DEL)
-        put("delete", KeyEvent.KEYCODE_FORWARD_DEL)
-        put("ins", KeyEvent.KEYCODE_INSERT)
-        put("insert", KeyEvent.KEYCODE_INSERT)
-        put("home", KeyEvent.KEYCODE_MOVE_HOME)
-        put("end", KeyEvent.KEYCODE_MOVE_END)
-        put("pgup", KeyEvent.KEYCODE_PAGE_UP)
-        put("pageup", KeyEvent.KEYCODE_PAGE_UP)
-        put("pgdn", KeyEvent.KEYCODE_PAGE_DOWN)
-        put("pagedown", KeyEvent.KEYCODE_PAGE_DOWN)
-        put("up", KeyEvent.KEYCODE_DPAD_UP)
-        put("down", KeyEvent.KEYCODE_DPAD_DOWN)
-        put("left", KeyEvent.KEYCODE_DPAD_LEFT)
-        put("right", KeyEvent.KEYCODE_DPAD_RIGHT)
-        for (n in 1..12) put("f$n", KeyEvent.KEYCODE_F1 + (n - 1))
+        val stroke = KeyTable.stroke(rest[0]) ?: throw MacroError("unknown key '$token'")
+        return MacroStep.Chord(stroke.androidKeyCode, ctrl, alt, shift || stroke.shift, meta)
     }
 }
 
@@ -208,10 +163,7 @@ class MacroPlayer(private val key: (androidKeyCode: Int, down: Boolean) -> Unit,
             if (step.shift) add(KeyEvent.KEYCODE_SHIFT_LEFT)
             if (step.meta) add(KeyEvent.KEYCODE_META_LEFT)
         }
-        held.forEach { key(it, true) }
-        key(step.keyCode, true)
-        key(step.keyCode, false)
-        held.asReversed().forEach { key(it, false) }
+        KeySequencer(key).chord(step.keyCode, held)
     }
 
     /** Text goes through [type]; a newline or tab inside it is the Enter or Tab key. */

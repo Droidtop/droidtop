@@ -6,7 +6,6 @@ import android.content.SharedPreferences
 import android.util.Log
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.Executors
 
 /**
  * The process's clipboard history (docs/SPEC.md 6a, "Editing helpers", Droidtop/tracker#340): the model
@@ -31,7 +30,7 @@ object ClipboardHistoryStore {
     private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
 
     private val history = ClipboardHistory()
-    private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "hk-clipboard-history").apply { isDaemon = true } }
+    private val io = KeyboardThreads.single("hk-clipboard-history")
     private val listeners = CopyOnWriteArrayList<() -> Unit>()
     private var started = false
     private lateinit var appContext: Context

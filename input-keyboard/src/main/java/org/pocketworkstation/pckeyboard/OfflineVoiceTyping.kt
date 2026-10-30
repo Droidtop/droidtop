@@ -90,7 +90,7 @@ internal object OfflineVoiceTyping : VoiceProvider {
         }
 
         private fun run() {
-            val error = runCatching { listen() }.exceptionOrNull()
+            val error = logged("dictation stopped") { listen() }.exceptionOrNull()
             main.post { finish(error) }
         }
 
