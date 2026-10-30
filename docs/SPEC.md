@@ -11611,10 +11611,13 @@ Two checks, both required:
    droidtop's preferences on a background thread at start and answer from memory; **until they have loaded the
    answer is no**.
 2. **The confirmation, every use.** A row that would use a class is a confirm row (`confirmTitle`): the Gaming
-   surface arms it and shows the sentence in place of the hint, with "press A again to confirm" ("tap again"
-   under touch, where the sentence shows too: it used not to, so a tapped trust row never showed the key it
-   trusted, Droidtop/tracker#270); its info glyph is a target of its own that opens Info and disarms the row,
-   never a second press; the Preference surface asks in a dialog. A trust question names the key's fingerprint
+   surface asks in the shell's one confirmation (`ConfirmDialog`): the sentence over Cancel, first and under the
+   cursor, and the action in the danger tone; A on Cancel, B or Back cancel, only A on the action runs it (owner,
+   2026-10-30, Droidtop/tracker#835: "if I hit something like "quit", I can't back out of it, all I can do is
+   confirm it"). It replaced "press A again to confirm", which armed the row and could only be confirmed or left
+   with the whole page. Quit, Restart and Kill in the Quick Menu's Game section and the in-game L2 menus ask the
+   same way; the companion's question card already put "Keep playing" first. The Preference surface asks in a
+   dialog with Cancel. A trust question names the key's fingerprint
    first, so it survives the two lines a row's title gets. The sentence (`RiskyPrompts`) names the app and the exact thing: the package and the
    appop or permission name, or the file path (for "Add a BIOS file", the folder, since the file is picked after),
    or the core files and RetroArch's folder, and says how to undo it. Wherever a row is shown without its class,

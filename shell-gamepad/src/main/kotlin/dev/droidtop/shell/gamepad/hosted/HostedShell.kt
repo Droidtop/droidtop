@@ -438,7 +438,8 @@ fun GameOptionsStandalone(
     var optionsOpen by remember(entry.id) { mutableStateOf(false) }
     var pageOpen by remember(entry.id) { mutableStateOf(false) }
     var detailOpen by remember(entry.id) { mutableStateOf(false) }
-    var armed by remember(entry.id) { mutableStateOf<String?>(null) }
+    // Quit and Kill ask in the one confirmation, Cancel first (Droidtop/tracker#835).
+    var pending by remember(entry.id) { mutableStateOf<dev.droidtop.shell.gamepad.PendingConfirm?>(null) }
     var said by remember(entry.id) { mutableStateOf<Pair<String, String>?>(null) }
     var guidesOpen by remember(entry.id) { mutableStateOf(false) }
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
@@ -460,15 +461,15 @@ fun GameOptionsStandalone(
             title = title,
             detail = when {
                 said?.first == key -> said?.second
-                armed == key -> dev.droidtop.shell.gamepad.input.PressWords.againSentence
                 else -> idle
             },
             danger = key == "kill",
             onSelect = {
-                if (armed != key) {
-                    armed = key
-                } else {
-                    armed = null
+                val row = if (key == "kill") dev.droidtop.library.settings.GameRow.KILL else dev.droidtop.library.settings.GameRow.QUIT
+                pending = dev.droidtop.shell.gamepad.PendingConfirm(
+                    dev.droidtop.library.settings.GameControls.question(row, dev.droidtop.library.settings.GameRunner.LOCAL, entry.title),
+                    title,
+                ) {
                     scope.launch {
                         val outcome = end()
                         said = key to outcome.message
@@ -507,6 +508,9 @@ fun GameOptionsStandalone(
             rows = rows,
             onDismiss = onDismiss,
         )
+        pending?.let { ask ->
+            dev.droidtop.shell.gamepad.ConfirmDialog(ask.question, ask.action, onConfirm = { pending = null; ask.run() }, onCancel = { pending = null })
+        }
     }
 }
 
@@ -601,7 +605,7 @@ fun AppInFrontStandalone(
             }.getOrDefault(packageName)
         }
     }
-    var armed by remember(packageName) { mutableStateOf(false) }
+    var asking by remember(packageName) { mutableStateOf(false) }
     var said by remember(packageName) { mutableStateOf<String?>(null) }
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         dev.droidtop.shell.gamepad.ActionSheet(
@@ -610,23 +614,27 @@ fun AppInFrontStandalone(
                 dev.droidtop.shell.gamepad.ActionRow("Resume", "Back to the app; it never stopped") { onResume() },
                 dev.droidtop.shell.gamepad.ActionRow(
                     title = "Close the app",
-                    detail = said ?: if (armed) dev.droidtop.shell.gamepad.input.PressWords.againSentence else "Ends it the way the task manager does",
+                    detail = said ?: "Ends it the way the task manager does",
                     danger = true,
-                ) {
-                    if (!armed) {
-                        armed = true
-                    } else {
-                        armed = false
-                        scope.launch {
-                            val outcome = dev.droidtop.runtime.tasks.TaskManager.close(context, packageName)
-                            said = outcome.text
-                            if (outcome == dev.droidtop.runtime.tasks.CloseOutcome.Closed) onDismiss()
-                        }
-                    }
-                },
+                ) { asking = true },
                 dev.droidtop.shell.gamepad.ActionRow("App info", "Android's page for the app") { onAppInfo() },
             ),
             onDismiss = onDismiss,
         )
+        if (asking) {
+            dev.droidtop.shell.gamepad.ConfirmDialog(
+                question = "Close $label?",
+                action = "Close the app",
+                onConfirm = {
+                    asking = false
+                    scope.launch {
+                        val outcome = dev.droidtop.runtime.tasks.TaskManager.close(context, packageName)
+                        said = outcome.text
+                        if (outcome == dev.droidtop.runtime.tasks.CloseOutcome.Closed) onDismiss()
+                    }
+                },
+                onCancel = { asking = false },
+            )
+        }
     }
 }

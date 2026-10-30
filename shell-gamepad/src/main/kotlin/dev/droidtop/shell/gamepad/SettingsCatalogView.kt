@@ -229,6 +229,9 @@ fun CatalogNavigator(
     var confirmArmedId by remember { mutableStateOf<String?>(null) }
     var editingText by remember { mutableStateOf<TextInputItem?>(null) }
     var pickingChoice by remember { mutableStateOf<ChoiceItem?>(null) }
+    // A row that asks first (its confirmTitle), waiting in the one confirmation, Cancel first (Droidtop/tracker#835): it
+    // replaced the second A on the row, where only pressing again or leaving the page ended the question.
+    var confirming by remember { mutableStateOf<CatalogItem?>(null) }
     // Y's Info sheet: the selected row's whole text. Rows show their
     // name and value; this is where the rest of it is.
     var infoRow by remember { mutableStateOf<CatalogItem?>(null) }
@@ -592,7 +595,7 @@ fun CatalogNavigator(
             }
             is DocumentPickItem -> {
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
-                    confirmArmedId = item.id
+                    confirming = item
                     return
                 }
                 confirmArmedId = null
@@ -621,7 +624,7 @@ fun CatalogNavigator(
                 // A fact or a state: A promises nothing on it, and does nothing (Droidtop/tracker#587).
                 if (item.inert) return
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
-                    confirmArmedId = item.id
+                    confirming = item
                     return
                 }
                 confirmArmedId = null
@@ -635,7 +638,7 @@ fun CatalogNavigator(
                     return
                 }
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
-                    confirmArmedId = item.id
+                    confirming = item
                     return
                 }
                 confirmArmedId = null
@@ -789,6 +792,19 @@ fun CatalogNavigator(
         return
     }
 
+    confirming?.let { item ->
+        ConfirmDialog(
+            question = item.confirmText ?: item.title,
+            action = item.title,
+            onConfirm = {
+                confirming = null
+                // Marked as the yes, then pressed: the row's own path runs it as it always did.
+                confirmArmedId = item.id
+                activate(item)
+            },
+            onCancel = { confirming = null },
+        )
+    }
     infoRow?.let { item ->
         CatalogInfoSheet(item = item, status = statusById[item.id], onDismiss = { infoRow = null })
     }

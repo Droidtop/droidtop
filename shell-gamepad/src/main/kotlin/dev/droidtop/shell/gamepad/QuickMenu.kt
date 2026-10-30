@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.ui.res.stringResource
-import dev.droidtop.shell.gamepad.input.PressWords
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -963,10 +962,16 @@ private fun GameTab(
     }
     val companionSettings by dev.droidtop.library.settings.CompanionPrefs.settings.collectAsState()
     val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
-    fun secondPress(row: dev.droidtop.library.settings.GameRow, isArmed: Boolean) =
-        dev.droidtop.library.settings.GameControls.needsSecondPress(row, isArmed, uiMode, companionSettings.ask)
-    // The row waiting for its second press (Restart or Quit), and the one whose outcome the subtitle reports.
-    var armed by remember(entry.id) { mutableStateOf<GameEnding?>(null) }
+    // Quit, Restart and Kill ask in the one confirmation, Cancel first (Droidtop/tracker#835), when they ask at all.
+    var pending by remember(entry.id) { mutableStateOf<PendingConfirm?>(null) }
+    fun confirmed(row: dev.droidtop.library.settings.GameRow, action: String, run: () -> Unit) {
+        if (dev.droidtop.library.settings.GameControls.asks(row, uiMode, companionSettings.ask)) {
+            pending = PendingConfirm(dev.droidtop.library.settings.GameControls.question(row, dev.droidtop.library.settings.GameRunner.LOCAL, entry.title), action, run)
+        } else {
+            run()
+        }
+    }
+    // The row whose outcome the subtitle reports.
     var lastEnding by remember(entry.id) { mutableStateOf<GameEnding?>(null) }
     // The per-game emulator (Droidtop/tracker#248): the installed candidates for a console game's
     // system, loaded off the main thread, and the game's own stored choice (null follows the system).
@@ -983,20 +988,16 @@ private fun GameTab(
     var reportLine by remember(entry.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(entry.id) { emulatorChoice = library.getMetadataForEditing(entry)?.altEmulator }
 
-    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse, controls, reportLine) {
+    val tiles = remember(entry.id, quitOutcome, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse, controls, reportLine) {
         fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = ActionRow(
             title = title,
             detail = when {
-                armed == kind -> PressWords.againSentence
                 lastEnding == kind && quitOutcome != null -> quitOutcome.message
                 else -> idle
             },
             danger = true,
             onSelect = {
-                if (secondPress(if (restart) dev.droidtop.library.settings.GameRow.RESTART else dev.droidtop.library.settings.GameRow.QUIT, armed == kind)) {
-                    armed = kind
-                } else {
-                    armed = null
+                confirmed(if (restart) dev.droidtop.library.settings.GameRow.RESTART else dev.droidtop.library.settings.GameRow.QUIT, title) {
                     lastEnding = kind
                     onQuit(entry, restart)
                 }
@@ -1082,17 +1083,17 @@ private fun GameTab(
     // A restored cursor (one saved per section) stays on a tile that still exists.
     LaunchedEffect(tiles.size) { if (focusIndex != STOP_PILL && focusIndex >= tiles.size) focusIndex = (tiles.size - 1).coerceAtLeast(0) }
     // The Stop pill in the header (DroidDeck's red Stop, Steam's destructive red): ending the game
-    // without restarting it, with the same second press as the rows.
+    // without restarting it, asking as the rows do.
     // Kill force-stops at once, not the gentler Quit (Droidtop/tracker#571 row 16; the owner: "kill should
-    // immediately force-stop it"); its second press asks Kill's own question.
+    // immediately force-stop it"); it asks Kill's own question.
     val stop = ActionRow(title = "Kill", danger = true) {
-        if (secondPress(dev.droidtop.library.settings.GameRow.KILL, armed == GameEnding.KILL)) {
-            armed = GameEnding.KILL
-        } else {
-            armed = null
+        confirmed(dev.droidtop.library.settings.GameRow.KILL, "Kill") {
             lastEnding = GameEnding.KILL
             onKill(entry)
         }
+    }
+    pending?.let { ask ->
+        ConfirmDialog(ask.question, ask.action, onConfirm = { pending = null; ask.run() }, onCancel = { pending = null })
     }
 
     // Asked each frame until the window is attached: one early request was lost in the Quick Menu over a game,
@@ -1108,11 +1109,9 @@ private fun GameTab(
                 when (press.action) {
                     // The pill sits above the rows: Up from the first row reaches it, Down leaves it.
                     GamepadAction.UP -> {
-                        armed = null
                         focusIndex = if (focusIndex <= 0) STOP_PILL else menuStep(focusIndex, tiles.size, -1)
                     }
                     GamepadAction.DOWN -> {
-                        armed = null
                         focusIndex = if (focusIndex == STOP_PILL) 0 else menuStep(focusIndex, tiles.size, 1)
                     }
                     GamepadAction.B -> onDismiss()
@@ -1132,10 +1131,9 @@ private fun GameTab(
                 modifier = Modifier.weight(1f),
             )
             StopPill(
-                label = if (armed == GameEnding.KILL) PressWords.againSentence else stop.title,
+                label = stop.title,
                 selected = focusIndex == STOP_PILL,
                 onClick = {
-                    if (focusIndex != STOP_PILL) armed = null
                     focusIndex = STOP_PILL
                     press(GamepadAction.A)
                 },
