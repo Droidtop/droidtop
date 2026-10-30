@@ -41,6 +41,7 @@ import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
+import dev.droidtop.runtime.ContainerReach
 import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerUsage
 import dev.droidtop.runtime.PackageUpgrade
@@ -401,7 +402,9 @@ object ContainersCatalog {
             )
         }
 
+        val mounts = runCatching { runtime.mounts(info.container) }.getOrDefault(EnvironmentMounts())
         val groups = mutableListOf(CatalogGroup(id = "container", title = imageLine(info), items = main))
+        groups += CatalogGroup(id = "reach", title = "What it can reach", items = reachItems(context, runtime, info, mounts))
         if (primary) groups += CatalogGroup(id = "printing", title = "Printing", items = printingItems(context, runtime, desktopUp))
         if (primary) groups += CatalogGroup(id = "fonts", title = "Languages", items = fontItems(context))
         groups += CatalogGroup(id = "vpn", title = "VPN", items = vpnItems(context, runtime, info))
@@ -411,7 +414,6 @@ object ContainersCatalog {
             ?.let { image -> withContext(Dispatchers.IO) { ContainerProgram.effectiveConfig(context.filesDir, info.container.id, image) } }
             ?.takeIf { it.program().isNotEmpty() }
             ?.let { groups += CatalogGroup(id = "program", title = "Its own program", items = programItems(context, runtime, info, it)) }
-        val mounts = runCatching { runtime.mounts(info.container) }.getOrDefault(EnvironmentMounts())
         groups += CatalogGroup(id = "home", title = "Home", items = homeItems(runtime, info, mounts))
         groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info, mounts))
         if (info.container.role == ContainerRole.SIBLING) {
@@ -529,6 +531,25 @@ object ContainersCatalog {
         title = "Storage used",
         value = bytes?.let { dev.droidtop.library.format.ValueFormat.size(it) } ?: "Unknown",
     )
+
+    /**
+     * What the container can reach of the device, a line a kind (docs/SPEC.md 3d, "What it can reach";
+     * Droidtop/tracker#787 slice 1), read from the settings the rows below write ([ContainerReach]).
+     */
+    private suspend fun reachItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo, mounts: EnvironmentMounts): List<CatalogItem> {
+        val container = info.container
+        val sockets = runCatching { runtime.sockets(container) }.getOrDefault(ContainerSockets())
+        val microphone = runtime.microphoneUnavailableReason == null &&
+            withContext(Dispatchers.IO) { DesktopSetupPrefs.microphone(context) } &&
+            context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val devices = if (runtime.deviceSharingUnavailableReason != null) 0 else runCatching { runtime.sharedDevices(container).size }.getOrDefault(0)
+        val servesVpn = withContext(Dispatchers.IO) { VpnPrefs.read(context) }.containerId == container.id &&
+            DroidtopVpnService.state.value != VpnState.Off
+        val settings = ContainerReach.Settings(mounts, sockets, microphone, devices, servesVpn)
+        return ContainerReach.lines(settings).map { line ->
+            ActionItem(id = "container_reach_${line.kind.lowercase().replace(' ', '_')}", title = line.kind, subtitle = line.what)
+        }
+    }
 
     /** A reading of [container]'s use, or why there is none: the backend's reason, or what went wrong. */
     private suspend fun readUsage(runtime: ContainerRuntime, container: Container, sampleMs: Long): Result<ContainerUsage?> {

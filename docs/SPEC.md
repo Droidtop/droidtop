@@ -3399,6 +3399,17 @@ the `ContainerRuntime` interface that already exists (§3):
     devices); a copy of the desktop's own gets a sibling's init, and its
     provisioning plan stays with the original. A failed copy is deleted
     whole, through the same guarded root delete as Delete (`RootfsDelete`).
+  **What it can reach (Droidtop/tracker#787 slice 1, #750 part 2).** A
+  container's page opens with "What it can reach", one line a kind, in
+  plain words: Files (its home: its own, the shared home folder or the
+  folder chosen; the device's shared storage, which every container
+  sees; each extra folder by name), Screen (its windows on the desktop or
+  none), Sound (sound, and the microphone when it is shared), USB devices
+  (how many), Network (the device's own, as any app has, and whether it
+  carries droidtop's VPN). `ContainerReach` builds them from the same
+  settings the rows below write, so the summary cannot say what the rows
+  do not; each later slice of #787 (clipboard, network, GPU, scale and
+  theme, keyboard and pad) adds its line here.
   **Resource usage (Droidtop/tracker#757 slice 3).** A running
   container's page has "Memory and processor" under Storage used: the
   memory its processes hold (their resident sets, summed) and their share
