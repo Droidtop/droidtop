@@ -23,21 +23,45 @@ import kotlinx.coroutines.withContext
 object PerformanceOverlay {
     private const val PREFS = "performance_overlay"
     private const val KEY_LEVEL = "level"
+    private const val KEY_CORNER = "corner"
+    private const val KEY_SIZE = "size"
     private const val TICK_MS = 1_000L
     private const val LIST_EVERY = 5
 
     private val levelFlow = MutableStateFlow(OverlayLevel.OFF)
+    private val cornerFlow = MutableStateFlow(OverlayCorner.TOP_START)
+    private val sizeFlow = MutableStateFlow(OverlaySize.MEDIUM)
     private val readingsFlow = MutableStateFlow(OverlayReadings())
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val level: StateFlow<OverlayLevel> = levelFlow
+
+    /** Where the overlay sits and how big its text is (Droidtop/tracker#812). */
+    val corner: StateFlow<OverlayCorner> = cornerFlow
+    val size: StateFlow<OverlaySize> = sizeFlow
 
     /** The newest figures; the window redraws when they change. */
     val readings: StateFlow<OverlayReadings> = readingsFlow
 
     /** Reads the stored level. Touches the preferences file: not for the main thread. */
     fun load(context: Context) {
-        levelFlow.value = OverlayLevel.fromKey(prefs(context).getString(KEY_LEVEL, null))
+        val prefs = prefs(context)
+        levelFlow.value = OverlayLevel.fromKey(prefs.getString(KEY_LEVEL, null))
+        cornerFlow.value = OverlayCorner.fromKey(prefs.getString(KEY_CORNER, null))
+        sizeFlow.value = OverlaySize.fromKey(prefs.getString(KEY_SIZE, null))
+    }
+
+    /** Takes effect at the overlay's next refresh; the write happens off the calling thread. */
+    fun setCorner(context: Context, corner: OverlayCorner) {
+        cornerFlow.value = corner
+        val app = context.applicationContext
+        io.launch { prefs(app).edit().putString(KEY_CORNER, corner.key).apply() }
+    }
+
+    fun setSize(context: Context, size: OverlaySize) {
+        sizeFlow.value = size
+        val app = context.applicationContext
+        io.launch { prefs(app).edit().putString(KEY_SIZE, size.key).apply() }
     }
 
     /** Takes effect at once; the write happens off the calling thread. */

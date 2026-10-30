@@ -11,7 +11,9 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.TextView
+import dev.droidtop.runtime.systemstatus.OverlayCorner
 import dev.droidtop.runtime.systemstatus.OverlayLevel
+import dev.droidtop.runtime.systemstatus.OverlaySize
 import dev.droidtop.runtime.systemstatus.PerformanceOverlay
 import dev.droidtop.runtime.systemstatus.PerformanceOverlayModel
 import dev.droidtop.runtime.tasks.LaunchLedger
@@ -62,7 +64,13 @@ object PerformanceOverlayHost {
             if (game == null) {
                 window.hide()
             } else {
-                window.show(app, game.displayId, PerformanceOverlayModel.lines(level, readings).joinToString("\n"))
+                window.show(
+                    app,
+                    game.displayId,
+                    PerformanceOverlayModel.lines(level, readings).joinToString("\n"),
+                    PerformanceOverlay.corner.value,
+                    PerformanceOverlay.size.value,
+                )
             }
         }
     }
@@ -73,10 +81,12 @@ private class OverlayWindow {
     private var view: TextView? = null
     private var windowManager: WindowManager? = null
     private var shownOn: Int? = null
+    private var shownAt: Pair<OverlayCorner, OverlaySize>? = null
 
-    fun show(app: Context, displayId: Int, text: String) {
+    fun show(app: Context, displayId: Int, text: String, corner: OverlayCorner, size: OverlaySize) {
         val existing = view
-        if (existing != null && shownOn == displayId) {
+        // A new corner or size is a new window; the next refresh (a second at most) brings it.
+        if (existing != null && shownOn == displayId && shownAt == (corner to size)) {
             if (existing.text.toString() != text) existing.text = text
             return
         }
@@ -86,7 +96,7 @@ private class OverlayWindow {
         val label = TextView(context).apply {
             this.text = text
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, size.sp)
             typeface = Typeface.MONOSPACE
             setBackgroundColor(Color.argb(150, 0, 0, 0))
             val pad = (6 * resources.displayMetrics.density).toInt()
@@ -101,12 +111,20 @@ private class OverlayWindow {
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
-        ).apply { gravity = Gravity.TOP or Gravity.START }
+        ).apply {
+            gravity = when (corner) {
+                OverlayCorner.TOP_START -> Gravity.TOP or Gravity.START
+                OverlayCorner.TOP_END -> Gravity.TOP or Gravity.END
+                OverlayCorner.BOTTOM_START -> Gravity.BOTTOM or Gravity.START
+                OverlayCorner.BOTTOM_END -> Gravity.BOTTOM or Gravity.END
+            }
+        }
         runCatching { wm.addView(label, params) }
             .onSuccess {
                 view = label
                 windowManager = wm
                 shownOn = displayId
+                shownAt = corner to size
                 Log.i("droidtop.perfoverlay", "overlay on display $displayId")
             }
             .onFailure { Log.w("droidtop.perfoverlay", "overlay on display $displayId refused", it) }
@@ -118,5 +136,6 @@ private class OverlayWindow {
         view = null
         windowManager = null
         shownOn = null
+        shownAt = null
     }
 }

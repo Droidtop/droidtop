@@ -355,6 +355,9 @@ private fun QuickRail(
     )
 }
 
+/** The Performance section's rows, in order (Droidtop/tracker#812). */
+private enum class PerfRow { OVERLAY, CORNER, SIZE, MODE }
+
 /**
  * The Performance section: the overlay's level and the game's performance mode, then what a non-root app can read
  * about how the device is doing, as readouts (docs/SPEC.md, "Performance overlay").
@@ -378,6 +381,8 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
     val touch = rememberGamepadTouch()
 
     val overlayLevel by PerformanceOverlay.level.collectAsState()
+    val overlayCorner by PerformanceOverlay.corner.collectAsState()
+    val overlaySize by PerformanceOverlay.size.collectAsState()
     val canDraw = remember { PerformanceOverlay.canDraw(context) }
     val hasShell = remember { PerformanceOverlay.hasShell() }
     // Performance mode is the one catalog item the companion's System > Power card and Game tab draw too
@@ -389,7 +394,16 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
         }
     }
     var modeNote by remember { mutableStateOf<String?>(null) }
-    val rowCount = if (modeItem != null) 2 else 1
+    // The section's rows in order: where the overlay sits and how big it is only while it shows (Droidtop/tracker#812).
+    val rows = buildList {
+        add(PerfRow.OVERLAY)
+        if (canDraw && overlayLevel != OverlayLevel.OFF) {
+            add(PerfRow.CORNER)
+            add(PerfRow.SIZE)
+        }
+        if (modeItem != null) add(PerfRow.MODE)
+    }
+    val rowCount = rows.size
     var focusIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
     // A restored cursor (one saved per section) stays on a row that still exists.
     LaunchedEffect(rowCount) { if (focusIndex >= rowCount) focusIndex = rowCount - 1 }
@@ -436,9 +450,20 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
                     GamepadAction.DOWN ->
                         if (focusIndex < rowCount - 1) focusIndex = menuStep(focusIndex, rowCount, 1)
                         else scope.launch { scroll.animateScrollTo(scroll.value + 240) }
-                    GamepadAction.A, GamepadAction.RIGHT -> if (focusIndex == 0) cycleOverlay() else cycleMode()
-                    GamepadAction.LEFT -> if (focusIndex == 0 && canDraw) {
-                        PerformanceOverlay.setLevel(context, OverlayLevel.values()[(overlayLevel.ordinal + OverlayLevel.values().size - 1) % OverlayLevel.values().size])
+                    GamepadAction.A, GamepadAction.RIGHT -> when (rows.getOrNull(focusIndex)) {
+                        PerfRow.OVERLAY -> cycleOverlay()
+                        PerfRow.CORNER -> PerformanceOverlay.setCorner(context, overlayCorner.step(1))
+                        PerfRow.SIZE -> PerformanceOverlay.setSize(context, overlaySize.step(1))
+                        PerfRow.MODE -> cycleMode()
+                        null -> Unit
+                    }
+                    GamepadAction.LEFT -> when (rows.getOrNull(focusIndex)) {
+                        PerfRow.OVERLAY -> if (canDraw) {
+                            PerformanceOverlay.setLevel(context, OverlayLevel.values()[(overlayLevel.ordinal + OverlayLevel.values().size - 1) % OverlayLevel.values().size])
+                        }
+                        PerfRow.CORNER -> PerformanceOverlay.setCorner(context, overlayCorner.step(-1))
+                        PerfRow.SIZE -> PerformanceOverlay.setSize(context, overlaySize.step(-1))
+                        else -> Unit
                     }
                     GamepadAction.B -> onDismiss()
                     else -> Unit
@@ -455,21 +480,43 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
                 value = if (canDraw) overlayLevel.label else "Needs display over apps",
                 subtitle = if (overlayLevel != OverlayLevel.OFF && !hasShell) "FPS, CPU and GPU need More controls" else null,
                 adjustable = canDraw,
-                selected = focusIndex == 0,
+                selected = rows.getOrNull(focusIndex) == PerfRow.OVERLAY,
                 onClick = {
-                    focusIndex = 0
+                    focusIndex = rows.indexOf(PerfRow.OVERLAY)
                     touch(GamepadAction.A)
                 },
             )
+            if (PerfRow.CORNER in rows) {
+                MenuRow(
+                    title = "Overlay corner",
+                    value = overlayCorner.label,
+                    adjustable = true,
+                    selected = rows.getOrNull(focusIndex) == PerfRow.CORNER,
+                    onClick = {
+                        focusIndex = rows.indexOf(PerfRow.CORNER)
+                        touch(GamepadAction.A)
+                    },
+                )
+                MenuRow(
+                    title = "Overlay size",
+                    value = overlaySize.label,
+                    adjustable = true,
+                    selected = rows.getOrNull(focusIndex) == PerfRow.SIZE,
+                    onClick = {
+                        focusIndex = rows.indexOf(PerfRow.SIZE)
+                        touch(GamepadAction.A)
+                    },
+                )
+            }
             modeItem?.let { item ->
                 MenuRow(
                     title = item.title,
                     value = item.value,
                     subtitle = modeNote,
                     adjustable = true,
-                    selected = focusIndex == 1,
+                    selected = rows.getOrNull(focusIndex) == PerfRow.MODE,
                     onClick = {
-                        focusIndex = 1
+                        focusIndex = rows.indexOf(PerfRow.MODE)
                         touch(GamepadAction.A)
                     },
                 )

@@ -3978,9 +3978,13 @@ the `ContainerRuntime` interface that already exists (§3):
   it applies on later launches, and droidtop cannot read it back, so the row shows what droidtop set this
   session ("Unchanged" before). Android applies a mode only to a package it counts as a game. A fixed
   performance power mode, CPU governors and clock caps stay not built: they need root or a vendor API,
-  and root is never the standard path (the Battery tile paragraph in "What Gaming offers beyond the theme" stands). Not built: an overlay
-  position or size setting, a frame-time graph, and plugin-supplied readings (`perf.source` is declared and
-  has no consumer yet).
+  and root is never the standard path (the Battery tile paragraph in "What Gaming offers beyond the theme" stands). **Where it sits and
+  how big it is** (2026-10-30, Droidtop/tracker#812; DroidDeck's HUD settings, #363): while the overlay is on, the
+  Performance section has Overlay corner (top left, top right, bottom left, bottom right) and Overlay size (Small,
+  Medium, Large: 10, 12 and 16 sp), stepped with left and right and remembered (`OverlayCorner`, `OverlaySize`,
+  tested). The overlay is never touchable, so it is placed from here rather than dragged; a change shows at the
+  overlay's next refresh, within a second. Not built: a frame-time graph and plugin-supplied readings
+  (`perf.source` is declared and has no consumer yet).
 - **In-game overlays: HOME chords (decided 2026-10-29, Droidtop/tracker#740).** The owner: "As for the keyboard
   shortcut: we only care about it working when droidtop is the home, so can we use home + something else?" and
   "Home + r2 gets the quick menu, and home +l2 gives the local contextual menu/companion-style overlay. This gives us

@@ -174,4 +174,15 @@ class PerformanceOverlayModelTest {
         assertTrue(GameModeControl.refused("Unknown command: set"))
         assertFalse(GameModeControl.refused(""))
     }
+
+    @Test
+    fun `the overlay's corner and size step both ways, wrap, and read back from their keys`() {
+        // Droidtop/tracker#812: placed and sized from the Quick Menu, since the overlay is never touchable.
+        assertEquals(dev.droidtop.runtime.systemstatus.OverlayCorner.TOP_END, dev.droidtop.runtime.systemstatus.OverlayCorner.TOP_START.step(1))
+        assertEquals(dev.droidtop.runtime.systemstatus.OverlayCorner.BOTTOM_END, dev.droidtop.runtime.systemstatus.OverlayCorner.TOP_START.step(-1))
+        assertEquals(dev.droidtop.runtime.systemstatus.OverlaySize.SMALL, dev.droidtop.runtime.systemstatus.OverlaySize.LARGE.step(1))
+        assertEquals(dev.droidtop.runtime.systemstatus.OverlayCorner.BOTTOM_START, dev.droidtop.runtime.systemstatus.OverlayCorner.fromKey("bottom_start"))
+        assertEquals(dev.droidtop.runtime.systemstatus.OverlayCorner.TOP_START, dev.droidtop.runtime.systemstatus.OverlayCorner.fromKey(null))
+        assertEquals(dev.droidtop.runtime.systemstatus.OverlaySize.MEDIUM, dev.droidtop.runtime.systemstatus.OverlaySize.fromKey("nonsense"))
+    }
 }

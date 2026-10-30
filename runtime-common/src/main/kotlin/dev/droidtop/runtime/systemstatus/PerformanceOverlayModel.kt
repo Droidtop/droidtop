@@ -18,6 +18,38 @@ enum class OverlayLevel(val key: String, val label: String) {
     }
 }
 
+/**
+ * The corner of the game's screen the overlay sits in (Droidtop/tracker#812, DroidDeck's HUD settings, #363). It is
+ * never touchable, so it is placed from the Quick Menu rather than dragged.
+ */
+enum class OverlayCorner(val key: String, val label: String) {
+    TOP_START("top_start", "Top left"),
+    TOP_END("top_end", "Top right"),
+    BOTTOM_START("bottom_start", "Bottom left"),
+    BOTTOM_END("bottom_end", "Bottom right");
+
+    /** The corner a press steps to, by [by] (+1 or -1), wrapping. */
+    fun step(by: Int): OverlayCorner = values()[((ordinal + by) % values().size + values().size) % values().size]
+
+    companion object {
+        fun fromKey(key: String?): OverlayCorner = values().firstOrNull { it.key == key } ?: TOP_START
+    }
+}
+
+/** How big the overlay's text is, in sp (Droidtop/tracker#812). */
+enum class OverlaySize(val key: String, val label: String, val sp: Float) {
+    SMALL("small", "Small", 10f),
+    MEDIUM("medium", "Medium", 12f),
+    LARGE("large", "Large", 16f);
+
+    /** The size a press steps to, by [by] (+1 or -1), wrapping. */
+    fun step(by: Int): OverlaySize = values()[((ordinal + by) % values().size + values().size) % values().size]
+
+    companion object {
+        fun fromKey(key: String?): OverlaySize = values().firstOrNull { it.key == key } ?: MEDIUM
+    }
+}
+
 /** Frames presented by a game's surface over the last second. */
 data class FrameRate(val fps: Int, val avgFrameMs: Double, val worstFrameMs: Double)
 
