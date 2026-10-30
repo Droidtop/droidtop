@@ -131,6 +131,31 @@ object WhatsNew {
                 applies = { context -> !dev.droidtop.runtime.keyboard.AccessibilityKeyboard.homeChords(context).first },
             ),
         )
+        // Android's child-process limit (Droidtop/tracker#816): the device-setup item, asked once after the update when
+        // droidtop can lift it. The card is the question; Settings > Accounts and sources > Device setup undoes it.
+        FeatureSteps.register(
+            FeatureStep(
+                id = "child_processes",
+                arrived = "816-device-setup",
+                place = null,
+                title = "Android's child-process limit",
+                body = dev.droidtop.library.settings.words(dev.droidtop.runtime.tasks.DeviceSetup.childProcesses.ask),
+                actionLabel = "Lift it",
+                action = { context ->
+                    val item = dev.droidtop.runtime.tasks.DeviceSetup.childProcesses
+                    val done = item.apply(context, dev.droidtop.runtime.tasks.TaskManager.shell)
+                    dev.droidtop.library.settings.Notices.flash(
+                        if (done) "Lifted. Undo it in Settings > Accounts and sources > Device setup" else "Couldn't lift it",
+                        context = context,
+                    )
+                },
+                applies = { context ->
+                    val shell = dev.droidtop.runtime.tasks.TaskManager.shell
+                    dev.droidtop.runtime.tasks.DeviceSetup.canRun(shell) &&
+                        dev.droidtop.runtime.tasks.DeviceSetup.childProcesses.state(context, shell) == dev.droidtop.runtime.tasks.SetupState.TO_DO
+                },
+            ),
+        )
         // Download sites and the TorBox hand-off (docs/SPEC.md 12a "Download sites"): shown where they are set up.
         FeatureSteps.register(
             FeatureStep(

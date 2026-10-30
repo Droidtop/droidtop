@@ -56,6 +56,13 @@ class OnboardingPlanTest {
     }
 
     @Test
+    fun `device setup is asked only when something is left to change, right before the summary`() {
+        val with = plannedSteps(Mode.GAMING, alsoOther = true, controllerAsks = true, deviceSetup = true)
+        assertEquals(listOf(OnboardingStep.CONTROLLER, OnboardingStep.DEVICE_SETUP, OnboardingStep.DONE), with.takeLast(3))
+        assertTrue(OnboardingStep.DEVICE_SETUP !in plannedSteps(Mode.DESKTOP, alsoOther = false, deviceSetup = false))
+    }
+
+    @Test
     fun `every plan starts with the two questions and ends with the summary`() {
         listOf(
             plannedSteps(Mode.GAMING, alsoOther = false),

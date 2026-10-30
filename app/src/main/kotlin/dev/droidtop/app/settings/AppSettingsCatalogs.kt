@@ -1107,7 +1107,7 @@ object AppSettingsCatalogs {
             }
         }
 
-        listOf(
+        listOfNotNull(
             CatalogGroup(
                 id = "accounts_stores",
                 title = "Accounts",
@@ -1207,6 +1207,8 @@ object AppSettingsCatalogs {
                     ),
                 ),
             ),
+            // What droidtop can set on Android itself, through the elevated access above (Droidtop/tracker#816).
+            DeviceSetupRows.group(context),
         )
     }
 

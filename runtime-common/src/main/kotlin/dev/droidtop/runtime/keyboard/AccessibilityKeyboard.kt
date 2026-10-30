@@ -65,28 +65,18 @@ object AccessibilityKeyboard {
     }
 
     /**
-     * Turns the service on for the person who pressed to (Droidtop/tracker#740). With elevated access (Shizuku or
-     * Sui) droidtop allows its restricted settings and adds itself to Android's enabled list, keeping every service
-     * already on it (a vendor's, such as Retroid's Game Assistant, stays). Without it, App info opens when Android's
-     * restricted settings block the service, else Android's accessibility page. Either way it can be turned off in
-     * Android's settings again. Returns the line to say. Off the main thread: it may run a shell command.
+     * Turns the service on for the person who pressed to (Droidtop/tracker#740). With the privileged shell (Shizuku,
+     * Sui or wireless debugging; docs/SPEC.md "Device setup") droidtop allows its restricted settings and adds itself
+     * to Android's enabled list, keeping every service already on it (a vendor's, such as Retroid's Game Assistant,
+     * stays). Without it, App info opens when Android's restricted settings block the service, else Android's
+     * accessibility page. Either way it can be turned off in Android's settings again, and what the shell changed is
+     * undone from Settings > Accounts and sources > Device setup. Returns the line to say. Off the main thread: it
+     * may run a shell command.
      */
     fun turnOn(context: Context): String {
         if (isActive(context)) return "On"
-        val shell = dev.droidtop.runtime.tasks.TaskManager.shell
-        if (shell.capabilities().shellCommand) {
-            if (android.os.Build.VERSION.SDK_INT >= 33) {
-                shell.exec(listOf("appops", "set", context.packageName, "ACCESS_RESTRICTED_SETTINGS", "allow"))
-            }
-            val now = runCatching {
-                Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-            }.getOrNull().orEmpty()
-            val own = ComponentName(context.packageName, SERVICE_CLASS).flattenToString()
-            val next = (now.split(':').filter { it.isNotBlank() } + own).distinct().joinToString(":")
-            val listed = shell.exec(listOf("settings", "put", "secure", Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, next))?.exit == 0
-            val enabled = listed && shell.exec(listOf("settings", "put", "secure", Settings.Secure.ACCESSIBILITY_ENABLED, "1"))?.exit == 0
-            if (enabled) return "On"
-        }
+        // The device-setup item's own way, so what it changed is kept and Device setup can undo it.
+        if (dev.droidtop.runtime.tasks.DeviceSetup.turnOnButtonPresses(context, dev.droidtop.runtime.tasks.TaskManager.shell)) return "On"
         if (RestrictedSettings.stepNeeded(context, RestrictedGrant.ACCESSIBILITY, granted = false)) {
             // Some Androids have no "Allow restricted settings" item at all (the Retroid Pocket 5, Droidtop/tracker#740),
             // so the way that always works is said too, and copied, ready to paste on the computer.

@@ -461,7 +461,7 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
  * up" and "what to open into" are one step that doubles as the welcome.
  */
 internal enum class OnboardingStep {
-    MODE, HOME, SCREENS, GAMES, APPEARANCE, DESKTOP_SETUP, KEYBOARD, CONTROLLER, DONE;
+    MODE, HOME, SCREENS, GAMES, APPEARANCE, DESKTOP_SETUP, KEYBOARD, CONTROLLER, DEVICE_SETUP, DONE;
 
     companion object {
         /**
@@ -498,6 +498,8 @@ internal fun plannedSteps(
     controllerAsks: Boolean = true,
     // Two screens connected when the run started: then which one the menus go on is asked (Droidtop/tracker#598).
     twoScreens: Boolean = false,
+    // Android settings droidtop can change itself are left to change, and a shell can do it (Droidtop/tracker#816).
+    deviceSetup: Boolean = false,
 ): List<OnboardingStep> = buildList {
     val gaming = opensInto == Mode.GAMING || alsoOther
     val desktop = opensInto == Mode.DESKTOP || alsoOther
@@ -522,6 +524,8 @@ internal fun plannedSteps(
     // there is a question: with none attached there is nothing to map, and a pad droidtop already
     // identified is a fact the last screen states (2026-10-03).
     if (controllerAsks) add(OnboardingStep.CONTROLLER)
+    // Both modes': the HOME combos are Gaming's, the child-process limit Desktop's and Windows games' (SPEC "Device setup").
+    if (deviceSetup) add(OnboardingStep.DEVICE_SETUP)
     add(OnboardingStep.DONE)
 }
 
@@ -686,7 +690,10 @@ internal fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: ()
     val twoScreens = remember {
         (context.getSystemService(android.hardware.display.DisplayManager::class.java)?.displays?.size ?: 1) > 1
     }
-    val plan = plannedSteps(opensInto, alsoOther, run.controllerAsks, twoScreens)
+    // Read once per run, off the main thread: it asks the shell. Known well before the first step is answered.
+    var deviceSetup by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { deviceSetup = withContext(Dispatchers.IO) { runCatching { deviceSetupAsks(context) }.getOrDefault(false) } }
+    val plan = plannedSteps(opensInto, alsoOther, run.controllerAsks, twoScreens, deviceSetup)
     val padReady = ControllerLayouts.ready
     val padKnown = ControllerLayouts.layout.known
     LaunchedEffect(padReady, padKnown) { if (padReady) run.settleController(padKnown) }
@@ -913,6 +920,12 @@ internal fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: ()
             progress, back,
             isReEntry = isReEntry,
             onContinue = { advanceFrom(OnboardingStep.CONTROLLER) },
+        )
+
+        OnboardingStep.DEVICE_SETUP -> DeviceSetupStep(
+            progress, back,
+            isReEntry = isReEntry,
+            onContinue = { advanceFrom(OnboardingStep.DEVICE_SETUP) },
         )
 
         OnboardingStep.APPEARANCE -> AppearanceStep(

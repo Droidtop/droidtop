@@ -4353,6 +4353,37 @@ keeps the rules; they are pure and tested.
   the log cannot be read, so on Android 12+ the line says what probably happened instead, never that it did not.
 - **The next slices of #816:** a measure of a Desktop session's and a Wine game's count and a cut in droidtop's
   own helpers; the same line on the companion's droidtop page (#786).
+- **It is a device-setup item** (below): the same lift and undo in onboarding, Settings > Device setup and this row.
+
+### Device setup (Droidtop/tracker#816, owner 2026-10-30)
+
+The owner: "Add it to the things droidtop can do for setup, when shizuku is running, or through wireless debugging's
+autosetup". Some Android settings droidtop can change itself with a shell command. `DeviceSetup` (runtime-common)
+keeps them as items, and every item runs on the one privileged shell (`TaskManager.shell`). That covers the Shizuku
+app, the Shizuku plugin and wireless debugging alike: one mechanism, whichever is there.
+
+- **The items, in order.**
+  1. Lift Android's child-process limit (above).
+  2. See button presses over games, #740's accessibility unlock: on Android 13+, allow droidtop's restricted
+     settings (`appops set <pkg> ACCESS_RESTRICTED_SETTINGS allow`). Add droidtop's service to Android's enabled
+     list, keeping every service already there, and switch accessibility on. The HOME button combos' own "Allow"
+     (`AccessibilityKeyboard.turnOn`) runs this same item.
+- **Asked first, in plain words.** Each item has its question (what changes, for whom, and that it can be undone),
+  asked before it runs on every surface.
+- **Undone from the same row, putting back what was there.** droidtop keeps what it found (prefs `device_setup`) and
+  offers the undo only for a change it made itself:
+  - Child processes: the limit's own restore.
+  - Button presses: droidtop's service comes off the list. Android's accessibility switch goes back off only when
+    droidtop turned it on and no other service is left. The restricted-settings mode goes back to the one
+    `appops get` showed before ("default" when it showed none).
+- **Where.**
+  - **Onboarding's "Android settings" step,** right before the summary, in both modes' runs. It is asked only when
+    an item is left to do and a shell can do it, or wireless debugging can be paired: Android 11+.
+  - **Settings > Accounts and sources > Device setup,** beside elevated access.
+  - **What's new.** After an update, a step offers the child-process lift once, when the shell can run it.
+  - **The pages that show one item in their own words,** Child processes on Desktop's and Windows games' pages.
+- **No shell yet.** The step pairs wireless debugging (or says to turn it back on), and every row says "Needs
+  Shizuku or wireless debugging to change". Nothing is changed without a shell, and nothing pretends to be.
 
 ### The task manager (decided 2026-10-01, Droidtop/tracker#245, #252, #247)
 

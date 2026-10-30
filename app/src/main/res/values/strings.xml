@@ -145,4 +145,8 @@
     <string name="shelf_configure_done">Done</string>
     <string name="companion_app_picker_game">Game</string>
     <string name="companion_power_battery">Battery: %1$s</string>
+    <!-- Onboarding's Android settings step (docs/SPEC.md "Device setup", Droidtop/tracker#816) -->
+    <string name="device_setup_change">Change it</string>
+    <string name="device_setup_undo">Undo</string>
+    <string name="device_setup_not_now">Not now</string>
 </resources>

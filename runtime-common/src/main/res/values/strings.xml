@@ -34,4 +34,23 @@
     <string name="accessibility_how_big_everything_on_screen">How big everything on screen is, in every app</string>
     <string name="accessibility_talkback">TalkBack</string>
     <string name="accessibility_android_s_screen_reader_speaks">Android\'s screen reader speaks what is on screen</string>
+    <!-- Device setup (docs/SPEC.md "Device setup", Droidtop/tracker#816) -->
+    <string name="device_setup_no_shell">Needs Shizuku or wireless debugging to change</string>
+    <string name="device_setup_failed">Couldn\'t change it. Shizuku or wireless debugging may have stopped</string>
+    <string name="device_setup_done">Done. Press again to undo it</string>
+    <string name="device_setup_undone">Undone</string>
+    <string name="device_setup_group">Device setup</string>
+    <string name="device_setup_child_title">Lift the child-process limit</string>
+    <string name="device_setup_child_ask">Lift Android\'s limit on child processes? Android stops ending desktop programs and Windows games when apps together run more than 32. It applies to every app, and you can undo it here</string>
+    <string name="device_setup_child_undo_ask">Put Android\'s limit back? Android may then end droidtop\'s programs when there are too many</string>
+    <string name="device_setup_child_not_needed">This Android has no such limit</string>
+    <string name="device_setup_child_to_do">Android ends programs past 32 without a word. Press to lift it</string>
+    <string name="device_setup_child_by_droidtop">Lifted by droidtop. Press to put Android\'s limit back</string>
+    <string name="device_setup_child_done">Already lifted on this device</string>
+    <string name="device_setup_buttons_title">See button presses over games</string>
+    <string name="device_setup_buttons_ask">Let droidtop see button presses over other apps? It turns on droidtop\'s accessibility service, which HOME + R2, L2 and Start need over a game, and allows Android\'s restricted settings for droidtop. You can undo it here</string>
+    <string name="device_setup_buttons_undo_ask">Turn droidtop\'s accessibility service off again? HOME button combos stop working over games</string>
+    <string name="device_setup_buttons_on">On: HOME button combos work over games</string>
+    <string name="device_setup_buttons_to_do">Off: HOME button combos need it. Press to turn it on</string>
+    <string name="device_setup_buttons_by_droidtop">Turned on by droidtop. Press to turn it off again</string>
 </resources>
