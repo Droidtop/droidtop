@@ -99,7 +99,7 @@ internal fun QuickSettingsPanel(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var version by remember { mutableStateOf(0) }
-    var focusIndex by remember { mutableStateOf(0) }
+    var focusIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
     var nested by remember { mutableStateOf<CatalogScreen?>(null) }
     var picking by remember { mutableStateOf<ChoiceItem?>(null) }
     var confirmArmedId by remember { mutableStateOf<String?>(null) }
@@ -179,6 +179,12 @@ internal fun QuickSettingsPanel(
                 }
             }
         }
+    }
+
+    // A restored cursor (one saved per section) stays on a slider or tile that still exists.
+    LaunchedEffect(panel.sliders.size + panel.tiles.size) {
+        val count = panel.sliders.size + panel.tiles.size
+        if (focusIndex >= count) focusIndex = (count - 1).coerceAtLeast(0)
     }
 
     // A held direction follows the cursor without animating each step.

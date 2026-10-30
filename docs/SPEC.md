@@ -4113,7 +4113,11 @@ the `ContainerRuntime` interface that already exists (§3):
   still appears with no edit to the menu, and none appears twice. **L1/R1 step the rail** (the
   panel is its own window and owns the shoulders), wrapping at the ends; the rail is not a focus
   target (the pad's focus stays in the section) and its icons tap for touch; a dot on a rail icon
-  says something is waiting (notifications, running jobs, an unread message). B closes; R2 closes. **Get games is
+  says something is waiting (notifications, running jobs, an unread message). **Each section keeps its place**
+  while the panel is open (DroidDeck's per-page focus and scroll memory, Droidtop/tracker#363): stepping away with
+  L1/R1 and back returns to the row it was on and its scroll, and a page opened inside it, one saved state per
+  section (`rememberSaveableStateHolder`); a remembered row that has gone moves to the last one; closing the panel
+  starts fresh. B closes; R2 closes. **Get games is
   not in the Quick Menu**: it is a contextual action on the pages that need it (#151, #258).
   Colours and type come from `MenuTokens` only, so the panel follows the theme.
   **Frame (decided 2026-10-02, #273 slice 6, Steam's right panel):** in landscape the Quick Menu is a

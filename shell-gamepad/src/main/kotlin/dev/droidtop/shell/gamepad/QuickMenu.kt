@@ -29,7 +29,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -188,6 +187,7 @@ internal fun QuickMenu(
             QuickTiles.visibleSections(gameRunning, hasPlugins, hasSocial, uiMode, order)
         }
         var section by remember { mutableStateOf(startSection?.takeIf { it in sections } ?: QuickTiles.initialSection(gameRunning, granted)) }
+        val sectionStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
         LaunchedEffect(sections, section) {
             if (section !in sections) section = QuickTiles.initialSection(gameRunning, granted)
         }
@@ -265,10 +265,11 @@ internal fun QuickMenu(
                     }
                     // Closing's touch route is the hint row's own "B Close"
                     // pill, which dispatches a real B into this window.
-                    // key(): sections share one composable (the tile
-                    // grids), and a cursor must not carry from one to
-                    // the next.
-                    key(section) {
+                    // One saved state per section: sections share one composable (the tile grids), so a cursor must
+                    // not carry from one to the next, and each keeps its own cursor and scroll while the sheet is open,
+                    // so stepping away with L1/R1 and back lands where the person was (DroidDeck's per-page focus
+                    // and scroll memory, Droidtop/tracker#363).
+                    sectionStates.SaveableStateProvider(section.name) {
                         when (section) {
                             // Catalog pages (Social, Downloads, Plugins and every plugin's page) pad their rows by the
                             // window's content gutter. Under the window's own size that was 2.8 percent of the whole
@@ -389,7 +390,9 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
     }
     var modeNote by remember { mutableStateOf<String?>(null) }
     val rowCount = if (modeItem != null) 2 else 1
-    var focusIndex by remember { mutableStateOf(0) }
+    var focusIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+    // A restored cursor (one saved per section) stays on a row that still exists.
+    LaunchedEffect(rowCount) { if (focusIndex >= rowCount) focusIndex = rowCount - 1 }
 
     val cycleOverlay = {
         if (!canDraw) {
@@ -624,7 +627,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
     // The cursor runs over Recent, then the access row or Android's notifications.
     val systemRows = if (granted) items.size else 1
     val rowCount = recent.size + systemRows
-    var focusIndex by remember { mutableStateOf(0) }
+    var focusIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
     val listState = rememberLazyListState()
     val focusRequester = remember { FocusRequester() }
     // Every action below is defined once, in the key handler. A tap
@@ -893,7 +896,7 @@ private fun GameTab(
     onDismiss: () -> Unit,
     onSearchSystem: (systemId: String, systemName: String) -> Unit,
 ) {
-    var focusIndex by remember(entry.id) { mutableStateOf(0) }
+    var focusIndex by androidx.compose.runtime.saveable.rememberSaveable(entry.id) { mutableStateOf(0) }
     val focusRequester = remember { FocusRequester() }
     val press = rememberGamepadTouch()
     // Whether a row asks first is GameControls' one decision, which the companion's Game tab reads too.
@@ -1021,6 +1024,8 @@ private fun GameTab(
             add(ending(GameEnding.RESTART, "Restart", null, restart = true))
         }
     }
+    // A restored cursor (one saved per section) stays on a tile that still exists.
+    LaunchedEffect(tiles.size) { if (focusIndex != STOP_PILL && focusIndex >= tiles.size) focusIndex = (tiles.size - 1).coerceAtLeast(0) }
     // The Stop pill in the header (DroidDeck's red Stop, Steam's destructive red): ending the game
     // without restarting it, with the same second press as the rows.
     // Kill force-stops at once, not the gentler Quit (Droidtop/tracker#571 row 16; the owner: "kill should
