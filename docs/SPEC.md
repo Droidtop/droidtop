@@ -8321,6 +8321,11 @@ while a hardware keyboard is attached. It shows Android's keyboard (droidtop's o
 the desktop, or hides it. The surface is an editor for it (`DesktopSurfaceView`) with a terminal's attributes, so no
 suggestions or composing. Committed text becomes key presses through Android's virtual key map, and keys the keyboard
 sends as keys (Enter, Backspace, arrows, Ctrl, Esc) go as they are; both take the router's typed-text path.
+Whatever keyboard is up types into the desktop: each time the surface or its window gets the focus, its input is
+started again (`InputMethodManager.restartInput`). Android's keyboard can already be up then, shown for another field
+or by Android itself with a hardware keyboard attached (`show_ime_with_hard_keyboard`), and it stayed bound to that
+field, so its taps reached nothing (Droidtop/tracker#685, rig 2638). The binding and each commit are logged under
+`droidtop.DesktopIme`.
 
 The keyboard also follows Linux text fields (2026-10-29, the second step on #685). host-bridge registers as the
 seat's input method (input-method-unstable-v2, which sway offers). The compositor activates it when a text-input-v3

@@ -56,11 +56,28 @@ class DesktopSurfaceView(context: Context, private val router: DesktopInputRoute
 
     override fun onCheckIsTextEditor(): Boolean = keyboardWanted
 
+    /**
+     * Android's keyboard can already be up when the desktop gets the focus back: shown for another field (the search
+     * sheet's) or by Android itself (`show_ime_with_hard_keyboard`). It stayed bound to that field, so its taps reached
+     * nothing in the container (Droidtop/tracker#685, rig 2638). The input is started again on the desktop each time it
+     * or its window gets the focus, so whatever keyboard is up types into the container.
+     */
+    override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: android.graphics.Rect?) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        if (gainFocus) manager.restartInput(this)
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (hasWindowFocus && isFocused) manager.restartInput(this)
+    }
+
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
         // A terminal's attributes: no suggestions, no autocorrect, no composing, so each key arrives as it is typed.
         outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
             InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN or EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_ACTION_NONE
+        android.util.Log.d(TAG, "Keyboard input bound to the desktop (asked for: $keyboardWanted)")
         return Connection()
     }
 
@@ -95,7 +112,9 @@ class DesktopSurfaceView(context: Context, private val router: DesktopInputRoute
             val text = editable.toString()
             editable.clear()
             if (text.isEmpty()) return
-            for (event in typedKeys(text)) router.onKeyEvent(event)
+            val keys = typedKeys(text)
+            android.util.Log.d(TAG, "Keyboard typed ${text.length} characters, ${keys.size} key events")
+            for (event in keys) router.onKeyEvent(event)
         }
 
         private fun tap(code: Int) {
@@ -105,6 +124,8 @@ class DesktopSurfaceView(context: Context, private val router: DesktopInputRoute
     }
 
     private companion object {
+        const val TAG = "droidtop.DesktopIme"
+
         /** A keyboard asking to delete more than this at once is deleting a selection it imagines; cap it. */
         const val MAX_DELETE = 64
 
