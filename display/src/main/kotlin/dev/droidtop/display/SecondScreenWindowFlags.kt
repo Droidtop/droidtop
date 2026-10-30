@@ -38,18 +38,40 @@ object TouchOnlySurfaceFocus {
     @Volatile
     var forwardKeyToShell: ((KeyEvent) -> Boolean)? = null
 
+    /**
+     * The display of a surface that became the top activity before any shell was in front to hand the pad to, or null.
+     * At droidtop's start the companion is started beside the shell and can become the top activity first; with no
+     * shell resumed yet the hand-back found nobody, and the pad stayed on the companion's display until a tap
+     * (Droidtop/tracker#820: "on launch, droidtop doesn't have anything focused by the pad"). [shellResumed] finishes it.
+     */
+    @Volatile
+    private var waitingFrom: Int? = null
+
     fun onTopResumedChanged(activity: Activity, isTop: Boolean, displayId: Int?) {
         if (!isTop) {
             activity.window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+            if (waitingFrom == displayId) waitingFrom = null
             return
         }
         activity.window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         val handed = runCatching { returnPadToShell?.invoke(displayId) ?: false }.getOrDefault(false)
+        waitingFrom = if (handed) null else displayId
         Log.i(
             "droidtop.SecondScreen",
             "${activity.javaClass.simpleName} on display $displayId is the top activity: " +
                 if (handed) "pad handed back to the shell" else "no shell in front on another screen, keys stop here",
         )
+    }
+
+    /**
+     * The shell is resumed: a surface still waiting to hand the pad back ([waitingFrom]) hands it now, so the first
+     * press at start, after a restart or back from a game reaches the shell without a tap first.
+     */
+    fun shellResumed() {
+        val from = waitingFrom ?: return
+        val handed = runCatching { returnPadToShell?.invoke(from) ?: false }.getOrDefault(false)
+        if (handed) waitingFrom = null
+        Log.i("droidtop.SecondScreen", "shell resumed: pad ${if (handed) "handed back from display $from" else "still on display $from"}")
     }
 
     /**

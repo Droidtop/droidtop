@@ -5763,7 +5763,9 @@ naming `CompanionActivity`, 15:55:44, from the owner's own pad). Decisions: a ne
 finishes any older live one (one shell, ever); and `TouchOnlySurfaceFocus` (`:display`) makes the
 companion and the idle cover focusable only while they are the top resumed activity (when the pad
 already points at their display, so it takes nothing from the shell), hands the pad back by moving
-the shell's task to the front when the shell is resumed on the other screen (`REORDER_TASKS`, a
+the shell's task to the front when the shell is resumed on the other screen, or, when no shell is resumed yet (droidtop's
+start: the companion can be the top activity first), as soon as one is (`TouchOnlySurfaceFocus.shellResumed`;
+Droidtop/tracker#820, the owner: "on launch, droidtop doesn't have anything focused by the pad") (`REORDER_TASKS`, a
 normal permission), delivers any key that still arrives to the shell's window, and swallows pad,
 D-pad and Back keys when there is no shell to give them to. The moment the surface stops being the
 top activity it is touch-only again (#186 holds). The orchestrator's separate "re-front the shell

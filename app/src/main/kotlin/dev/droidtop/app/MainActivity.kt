@@ -685,6 +685,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // Gaming mode: this window, through ordinary dispatchKeyEvent.
         // See ForegroundShell for why that is the only route available.
         ForegroundShell.set(this)
+        // A companion that became the top activity before this shell was in front hands the pad over now (#820).
+        dev.droidtop.display.TouchOnlySurfaceFocus.shellResumed()
         // Home on this display brings the shell back (dev.droidtop.runtime.HomeDisplays).
         val shellDisplay = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) display?.displayId else android.view.Display.DEFAULT_DISPLAY
         dev.droidtop.runtime.HomeDisplays.shellShown(shellDisplay)
