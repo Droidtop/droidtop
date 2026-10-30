@@ -17,6 +17,7 @@ import dev.droidtop.runtime.ContainerUser
 import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.ImageRunConfig
 import dev.droidtop.runtime.ContainerInfo
+import dev.droidtop.runtime.ClipboardFilters
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
@@ -306,6 +307,7 @@ class ProotRuntime(
         ContainerSockets(
             waylandShared = config?.getProperty(KEY_SOCKET_WAYLAND)?.toBooleanStrictOrNull() ?: true,
             audioShared = config?.getProperty(KEY_SOCKET_AUDIO)?.toBooleanStrictOrNull() ?: true,
+            clipboardShared = config?.getProperty(KEY_SOCKET_CLIPBOARD)?.toBooleanStrictOrNull() ?: true,
         )
     }
 
@@ -313,6 +315,8 @@ class ProotRuntime(
         val config = readConfig(container.id)
         config[KEY_SOCKET_WAYLAND] = sockets.waylandShared.toString()
         config[KEY_SOCKET_AUDIO] = sockets.audioShared.toString()
+        config[KEY_SOCKET_CLIPBOARD] = sockets.clipboardShared.toString()
+        if (sockets.clipboardShared) ClipboardFilters.stop(container.id)
         configOf(container.id).outputStream().use { config.store(it, "droidtop proot container") }
         Unit
     }
@@ -646,9 +650,13 @@ class ProotRuntime(
         } else {
             null
         }
+        // The clipboard kept from a sibling (docs/SPEC.md 3d "Clipboard per container"): the filtering socket is bound over
+        // the compositor's, and sway's IPC, whose exec runs a program in the primary, is out of reach.
+        val swayIpc = ContainerLayout.findSwayIpcSocket(socketsDir)
+        val clipboardFiltered = waylandSocketName != null && !sessionSockets.clipboardShared && containerId != PRIMARY_NAME
         val guestEnvironment = LinkedHashMap<String, String>().apply {
             putAll(baseGuestEnvironment)
-            val swaySocketName = if (sessionSockets.waylandShared) ContainerLayout.findSwayIpcSocket(socketsDir)?.name else null
+            val swaySocketName = if (sessionSockets.waylandShared && !clipboardFiltered) swayIpc?.name else null
             putAll(ContainerLayout.clientEnvironment(waylandSocketName, sessionSockets.audioShared, swaySocketName, readLookSync(containerId)))
             putAll(env)
             putAll(marker)
@@ -666,6 +674,11 @@ class ProotRuntime(
             add("--bind=/sys")
             add("--bind=${shmDir.absolutePath}:/dev/shm")
             add("--bind=${socketsDir.absolutePath}:${ContainerLayout.SOCKET_DIR}")
+            if (clipboardFiltered) {
+                val filter = ClipboardFilters.socketFor(containerId, context.filesDir, socketsDir)
+                add("--bind=${filter.absolutePath}:${ContainerLayout.SOCKET_DIR}/$waylandSocketName")
+                swayIpc?.let { add("--bind=${ClipboardFilters.blank(context.filesDir).absolutePath}:${ContainerLayout.SOCKET_DIR}/${it.name}") }
+            }
             add("--bind=${appStorageDir.absolutePath}:${ContainerLayout.APP_STORAGE_DIR}")
             // Volumes mounted now, looked up per session: a card or USB
             // drive mounted since the last one is there the next time.
@@ -752,6 +765,7 @@ class ProotRuntime(
         return ContainerSockets(
             waylandShared = config?.getProperty(KEY_SOCKET_WAYLAND)?.toBooleanStrictOrNull() ?: true,
             audioShared = config?.getProperty(KEY_SOCKET_AUDIO)?.toBooleanStrictOrNull() ?: true,
+            clipboardShared = config?.getProperty(KEY_SOCKET_CLIPBOARD)?.toBooleanStrictOrNull() ?: true,
         )
     }
 
@@ -909,6 +923,7 @@ class ProotRuntime(
         private const val KEY_DAEMONS = "provision.daemons"
         private const val KEY_SOCKET_WAYLAND = "socket.wayland"
         private const val KEY_SOCKET_AUDIO = "socket.audio"
+        private const val KEY_SOCKET_CLIPBOARD = "socket.clipboard"
         private const val KEY_LOOK_SCALE = "look.scale"
         private const val KEY_LOOK_THEME = "look.theme"
         private const val KEY_LOOK_KEYBOARD = "look.keyboard"

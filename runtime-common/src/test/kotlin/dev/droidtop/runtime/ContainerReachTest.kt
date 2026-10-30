@@ -20,6 +20,7 @@ class ContainerReachTest {
             mapOf(
                 "Files" to "Its own home, the device's shared storage",
                 "Screen" to "Shows its windows on the desktop",
+                "Clipboard" to "Reads and sets the clipboard",
                 "Sound" to "Plays sound; no microphone",
                 "USB devices" to "None",
                 "Network" to "This device's network, as any app has",
@@ -40,6 +41,8 @@ class ContainerReachTest {
         )
         assertEquals("Home in Work, the device's shared storage, and 2 folders (Photos, Code)", chosen["Files"])
         assertEquals("No windows on the desktop", lines(sockets = ContainerSockets(waylandShared = false))["Screen"])
+        assertEquals("None: its windows can't copy or paste", lines(sockets = ContainerSockets(clipboardShared = false))["Clipboard"])
+        assertEquals("None", lines(sockets = ContainerSockets(waylandShared = false))["Clipboard"])
         assertEquals("No sound", lines(sockets = ContainerSockets(audioShared = false), microphone = true)["Sound"])
         assertEquals("Plays sound and hears the microphone", lines(microphone = true)["Sound"])
         assertEquals("1 device", lines(devices = 1)["USB devices"])

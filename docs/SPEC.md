@@ -3488,12 +3488,43 @@ the `ContainerRuntime` interface that already exists (§3):
     takes #618 C6's per-app layouts, not yet built, and is built on them.
   **Clipboard per container (Droidtop/tracker#787 slice 2, owner
   2026-10-30: "A sounds good").** Every container's windows share one
-  compositor, and the clipboard is the core protocol's `wl_data_device`,
-  which any focused client can use, so no compositor setting can keep it
-  from one container. A container whose clipboard is off reaches the
-  compositor through a filtering Wayland proxy droidtop runs, which drops
-  `wl_data_device_manager` and `zwp_primary_selection_device_manager_v1`
-  from that client's registry, its Xwayland included.
+  compositor. The clipboard is a global any client can bind, so no
+  compositor setting can keep it from one container. A sibling's page has
+  "Clipboard" under Sockets: on by default, and it applies from the
+  container's next start, as Network does.
+  - **The filter.** A container with it off reaches the compositor through
+    a filtering Wayland socket droidtop runs as itself
+    (`WaylandFilterProxy`, `ClipboardFilters`, one per container, kept
+    while droidtop runs). Each client gets its own connection to the real
+    socket. Every message both ways goes through `WaylandClipboardFilter`
+    (pure, tested). File descriptors travel with the bytes they came with.
+  - **What it drops.** The registry's announcements of every global that
+    reaches the clipboard: `wl_data_device_manager`, the two
+    primary-selection managers, and both data-control managers
+    (`ext_data_control_manager_v1`, `zwlr_data_control_manager_v1`). The
+    data-control managers read and set the selection with no focus at
+    all; sway creates both, and droidtop's own bridge uses one (6d). A
+    client that binds a name it was not shown, a guess, is disconnected.
+  - **The real socket is out of reach.** Every container's
+    `/run/droidtop-sockets` is one shared folder. So the filtering socket
+    is bound over the compositor's socket name in that container's view
+    (proot `--bind`, a droidspaces bind entry), and `WAYLAND_DISPLAY` is
+    unchanged.
+  - **sway's IPC is blanked too**, an empty file bound over its socket and
+    no `SWAYSOCK`. Its `exec` command runs a program in the primary, where
+    the clipboard is.
+  - **Everything else in the folder stays shared:** audio, CUPS, the
+    session bus, Docker.
+  - **Xwayland.** A sibling's processes get no `DISPLAY`, and sway's
+    Xwayland socket is in the primary's own `/tmp`, so a sibling's X
+    programs reach no X server today. Any X server a sibling gets
+    connects through the same socket.
+  - **The primary** runs the compositor itself, and sway's own children
+    connect directly. Its row says "always shared" in place of the switch.
+  - **droidspaces** binds at start, so the compositor must be up then. A
+    container started before the desktop, or still running after droidtop
+    itself restarted, shows new windows again from its next start.
+  - "What it can reach" has a Clipboard line.
   **Resource usage (Droidtop/tracker#757 slice 3).** A running
   container's page has "Memory and processor" under Storage used: the
   memory its processes hold (their resident sets, summed) and their share

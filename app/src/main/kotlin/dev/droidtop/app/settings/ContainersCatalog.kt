@@ -667,6 +667,31 @@ object ContainersCatalog {
                     },
                 ),
             )
+            // The clipboard kept from this container's windows (docs/SPEC.md 3d "Clipboard per container",
+            // Droidtop/tracker#787 slice 2). The primary runs the compositor itself, so its own programs reach it directly.
+            if (container.role == ContainerRole.PRIMARY) {
+                add(
+                    ActionItem(
+                        id = "container_socket_clipboard",
+                        title = "Clipboard: always shared",
+                        subtitle = "This container runs the desktop itself, so its programs reach the clipboard directly",
+                    ),
+                )
+            } else {
+                add(
+                    ToggleItem(
+                        id = "container_socket_clipboard",
+                        title = "Clipboard",
+                        subtitle = "Let its programs read and set the clipboard. Applies from its next start",
+                        current = sockets.clipboardShared,
+                        onToggle = { _, on ->
+                            withContext(Dispatchers.IO) {
+                                runCatching { runtime.setSockets(container, sockets.copy(clipboardShared = on)) }
+                            }
+                        },
+                    ),
+                )
+            }
             val audioReason = runtime.audioSharingUnavailableReason
             if (audioReason != null) {
                 add(ActionItem(id = "container_socket_audio", title = "Audio: not available here", subtitle = audioReason))

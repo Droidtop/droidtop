@@ -27,6 +27,14 @@ object ContainerReach {
         Line("Files", files(s.mounts)),
         Line("Screen", if (s.sockets.waylandShared) "Shows its windows on the desktop" else "No windows on the desktop"),
         Line(
+            "Clipboard",
+            when {
+                !s.sockets.waylandShared -> "None"
+                s.sockets.clipboardShared -> "Reads and sets the clipboard"
+                else -> "None: its windows can't copy or paste"
+            },
+        ),
+        Line(
             "Sound",
             when {
                 !s.sockets.audioShared -> "No sound"

@@ -85,8 +85,11 @@ data class ExtraMount(val hostPath: String, val name: String) {
  * Sockets row). Both on by default -- droidtop shares the desktop's
  * Wayland display and, where the backend can, the host's audio, unless a
  * container is deliberately isolated from one.
+ *
+ * [clipboardShared] false keeps the clipboard from a sibling's windows (docs/SPEC.md 3d "Clipboard per container",
+ * Droidtop/tracker#787 slice 2): it reaches the compositor through [ClipboardFilters]' socket instead of the real one.
  */
-data class ContainerSockets(val waylandShared: Boolean = true, val audioShared: Boolean = true)
+data class ContainerSockets(val waylandShared: Boolean = true, val audioShared: Boolean = true, val clipboardShared: Boolean = true)
 
 /**
  * How a container's programs look (docs/SPEC.md 3d "Scale and theme", Droidtop/tracker#787 slice 5): [scale] is their

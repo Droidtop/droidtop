@@ -7,6 +7,7 @@ import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerExecResult
 import dev.droidtop.runtime.ContainerDiskUsage
+import dev.droidtop.runtime.ClipboardFilters
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
@@ -212,7 +213,7 @@ class DroidSpacesRuntime(
             bindMounts = listOf(
                 socketsDir.absolutePath to ContainerLayout.SOCKET_DIR,
                 appStorageDir.absolutePath to ContainerLayout.APP_STORAGE_DIR,
-            ) + ContainerLayout.sharedStorageBinds(SharedVolume.mounted(context)) +
+            ) + clipboardBinds(name, sockets) + ContainerLayout.sharedStorageBinds(SharedVolume.mounted(context)) +
                 // Device nodes the person chose on the container's Devices
                 // row, each at its own path. One that is gone (unplugged)
                 // is skipped by droidspaces with a warning (mount.c, "Failed
@@ -389,9 +390,12 @@ class DroidSpacesRuntime(
             }
             name
         }
-        val waylandShared = readSockets(container.id).waylandShared
+        val sockets = readSockets(container.id)
+        val waylandShared = sockets.waylandShared
         val waylandSocketName = if (waylandShared) ContainerLayout.findWaylandSocket(socketsDir)?.name else null
-        val swaySocketName = if (waylandShared) ContainerLayout.findSwayIpcSocket(socketsDir)?.name else null
+        // A sibling with its clipboard off has sway's IPC blanked ([clipboardBinds]), so SWAYSOCK would name nothing.
+        val clipboardFiltered = !sockets.clipboardShared && container.id != PRIMARY_NAME
+        val swaySocketName = if (waylandShared && !clipboardFiltered) ContainerLayout.findSwayIpcSocket(socketsDir)?.name else null
         // Same reasoning as writeConfig: PULSE_SERVER is droidspaces' own
         // to set, not ContainerLayout's.
         val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName, audioShared = false, swaySocketName = swaySocketName, look = readLook(container.id)) + env +
@@ -545,6 +549,23 @@ class DroidSpacesRuntime(
 
     // ---- sockets (docs/SPEC.md 3d) ----
 
+    /**
+     * For a sibling whose clipboard is off (docs/SPEC.md 3d "Clipboard per container"): droidtop's filtering socket bound
+     * over the compositor's, and an empty file over sway's IPC, whose exec runs a program in the primary. Bound at
+     * start, so the compositor must be up then; a container started before it gets no windows until its next start.
+     */
+    private fun clipboardBinds(name: String, sockets: ContainerSockets): List<Pair<String, String>> {
+        if (sockets.clipboardShared || !sockets.waylandShared || name == PRIMARY_NAME) return emptyList()
+        val wayland = ContainerLayout.findWaylandSocket(socketsDir) ?: return emptyList()
+        val filter = ClipboardFilters.socketFor(name, context.filesDir, socketsDir)
+        return listOf(filter.absolutePath to "${ContainerLayout.SOCKET_DIR}/${wayland.name}") +
+            listOfNotNull(
+                ContainerLayout.findSwayIpcSocket(socketsDir)?.let {
+                    ClipboardFilters.blank(context.filesDir).absolutePath to "${ContainerLayout.SOCKET_DIR}/${it.name}"
+                },
+            )
+    }
+
     private fun socketsFile(name: String) = File(configsDir, "$name.sockets")
 
     private fun readSockets(name: String): ContainerSockets {
@@ -555,6 +576,7 @@ class DroidSpacesRuntime(
         return ContainerSockets(
             waylandShared = lines["wayland"]?.toBooleanStrictOrNull() ?: true,
             audioShared = lines["audio"]?.toBooleanStrictOrNull() ?: true,
+            clipboardShared = lines["clipboard"]?.toBooleanStrictOrNull() ?: true,
         )
     }
 
@@ -562,7 +584,8 @@ class DroidSpacesRuntime(
 
     override suspend fun setSockets(container: Container, sockets: ContainerSockets) = withContext(Dispatchers.IO) {
         socketsFile(container.id).apply { parentFile?.mkdirs() }
-            .writeText("wayland=${sockets.waylandShared}\naudio=${sockets.audioShared}\n")
+            .writeText("wayland=${sockets.waylandShared}\naudio=${sockets.audioShared}\nclipboard=${sockets.clipboardShared}\n")
+        if (sockets.clipboardShared) ClipboardFilters.stop(container.id)
         Unit
     }
 
