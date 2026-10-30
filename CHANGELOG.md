@@ -5,9 +5,11 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 versions follow [Semantic Versioning](https://semver.org/) (0.x releases are
 pre-release: no compatibility promises between them).
 
-Every dev build published between releases gets its own release notes,
-generated the same way as this file's entries (grouped Added / Changed /
-Fixed); this file only gains a new section when a real version is cut.
+Every dev build's release notes are its own changelog entry: the
+`changelog.d/` fragments it was the first to carry, grouped Added / Changed
+/ Fixed, which droidtop also shows after an update (changelog.d/README.md).
+This file only gains a new section when a real version is cut, written from
+those fragments.
 
 ## [Unreleased]
 

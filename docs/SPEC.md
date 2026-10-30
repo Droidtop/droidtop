@@ -20973,13 +20973,8 @@ what changed. `android-build.yml`'s publish job now runs
 `release_channel.py publish-build`, which creates a brand new, permanent
 release per build, tagged `v0.2.0-dev.<versionCode>` (matching `versionName`
 with a `v` in front) and marked prerelease while every version is 0.x-dev.
-Its notes are generated from the commit subjects since the previous
-per-build release (`build_notes`, via the shared `categorize_commits` /
-`render_sections`): grouped Added (subject starts with "add"/"adds"/"added"),
-Changed and Fixed ("fix"/"fixed"/"fixes") -- Keep a Changelog's own
-vocabulary, one line per subject, merge commits and any line naming a
-private plugin (`PRIVATE_NAMES`) dropped, never a link to the private
-tracker. A rebuild of the same commit (workflow_dispatch, or a retry after
+Its notes are that build's changelog entry (below, "Every build carries its
+changelog"). A rebuild of the same commit (workflow_dispatch, or a retry after
 this exact run was cancelled) reuses the same tag and replaces only that
 release; every other version's release is untouched, so nothing is ever
 pruned by this path (old releases are kept; a future pruning pass would
@@ -21001,20 +20996,45 @@ per-build suffix changed shape too, `-dev.<versionCode>` (a dot, matching
 Keep a Changelog's own dotted identifiers) rather than `-dev-<versionCode>`
 (a dash): `v0.2.0-dev.1234`, not `v0.1.0-dev-1234`. `CHANGELOG.md` (Keep a
 Changelog format: an Unreleased section, then one section per version,
-newest first) is droidtop's human-readable version history, separate from
-the per-build Unstable release notes above: release notes are generated
-from raw commit subjects for every single dev build and read by testers
-following Unstable, most of them developer-facing ("Container audio: bridge
-proot..."); CHANGELOG.md entries are curated, in end-user language, and
-only written when a real version is cut, which is not every dev build.
-Both documents group the same way (Added / Changed / Fixed) and share the
-same commit-categorizing code (`categorize_commits`, `render_sections` in
-`release_channel.py`) -- one mechanism, not two -- but CHANGELOG.md is never
-machine-written: `release_channel.py changelog-entry FROM TO` prints that
-grouping for a commit range so a person (or an agent acting on the owner's
-behalf) can rewrite it into plain language and paste it in, the same way
-the 0.2.0 section was seeded from droidtop's git history to date. Never a
+newest first) is droidtop's version history by real version. Never a
 tracker link, a private plugin name, or an AI model/tool name in it.
+
+**Every build carries its changelog (owner, Droidtop/tracker#727,
+2026-10-29: "every build should contain a complete changelog in its release
+notes").** Until then a build's notes were its commit subjects, written for
+developers ("Container audio: bridge proot..."), and nothing in droidtop
+showed them. Now:
+- *Fragments.* Every change that reaches `main` adds one file under
+  `changelog.d/` (its README is the rule), in Keep a Changelog's headings
+  (`### Added`, `### Changed`, `### Fixed`) over `- ` lines, in plain words
+  for the people using droidtop. One file per change, so two branches never
+  edit the same lines and landing never conflicts on the changelog. A
+  change nobody will notice says so in a few words. A fragment's name is
+  its identity and is never reused.
+- *A build's entry.* CI's Changelog step (`release_channel.py changelog`,
+  before Gradle) reads the previous per-build release's `changelog.json`
+  (the history up to it) and adds this build's entry: the fragments no
+  earlier build carried, grouped. The result, every build's entry newest
+  first, is this build's `changelog.json`: bundled in the APK's assets for
+  What's new (7b), uploaded with the APKs, and published as a release
+  asset, from which the next build's history starts. No git history is
+  read, so CI's one-commit checkout is enough, and the history is complete
+  from the first build that carried one.
+- *The notes.* `publish-build` renders this build's entry, whole, as the
+  release notes: the same file the APK carries, so the notes and What's
+  new cannot differ. A build whose entry is empty (no new fragment since
+  the previous release) fails the publish job before anything is
+  published; the build job still uploads its APKs, so a rig can test it.
+  A fragment that does not parse, or names a private plugin
+  (`PRIVATE_NAMES`), fails the build.
+- *A real version.* `release_channel.py fragments` prints every fragment
+  grouped, which is rewritten into `CHANGELOG.md` as that version's section;
+  the fragments are then removed by name. The grouping and rendering are
+  the same code as a build's entry: one mechanism for both documents. The
+  commit-subject notes and `changelog-entry`, which this replaces, are
+  deleted.
+- Enginehost and windowcast releases follow the same rule in their own
+  repositories (#727); this section is droidtop's.
 
 Two channels, one job each, deliberately not the same mechanism (one
 mechanism per job, not one mechanism forced onto two different jobs): every

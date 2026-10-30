@@ -327,6 +327,10 @@ tasks.matching { it.name == "packageDebug" }.configureEach {
     mustRunAfter("packageRelease")
 }
 
+// This build's changelog.json (docs/SPEC.md 10b, "Every build carries its changelog"), written by CI's Changelog step
+// before Gradle runs: What's new reads it from the APK's assets. A local build has none and shows an empty history.
+android.sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/changelog"))
+
 // The throwaway app the priv.packages rig check installs (Droidtop/tracker#130): built by :rigtest-throwaway and
 // carried as an asset of the androidTest APK only, never of droidtop itself.
 val rigThrowawayAssets = layout.buildDirectory.dir("generated/rigThrowaway")
