@@ -76,6 +76,10 @@ fun friendlyLocation(path: String): String {
 fun fits(downloadBytes: Long, freeBytes: Long): Boolean = downloadBytes <= freeBytes
 
 /** "46.7 GB free of 128.0 GB", the volume's own room in one line. Pure, for the tests. */
+/** How much of [volume] is used, 0 to 1, for its meter; null when its size is not known. Pure. */
+fun usedFraction(volume: InstallVolume): Float? =
+    if (volume.totalBytes <= 0L) null else ((volume.totalBytes - volume.freeBytes).coerceAtLeast(0L).toFloat() / volume.totalBytes).coerceIn(0f, 1f)
+
 fun freeSpaceLine(volume: InstallVolume, formatSize: (Long) -> String): String =
     "${formatSize(volume.freeBytes)} free of ${formatSize(volume.totalBytes)}"
 

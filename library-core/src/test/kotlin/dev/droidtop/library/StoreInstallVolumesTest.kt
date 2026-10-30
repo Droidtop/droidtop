@@ -128,4 +128,12 @@ class StoreInstallVolumesTest {
         assertEquals("windows / Games / Cool Game", friendlyLocation("/mnt/windows/Games/Cool Game"))
         assertEquals("Internal storage", friendlyLocation("/storage/emulated/0"))
     }
+
+    @Test
+    fun `a volume's meter is its used share, and none when its size is unknown`() {
+        // The Storage page's meter beside "X free of Y" (Droidtop/tracker#363).
+        assertEquals(0.75f, usedFraction(InstallVolume("Internal storage", "/storage/emulated/0", 25L, 100L))!!, 0.0001f)
+        assertEquals(1f, usedFraction(InstallVolume("Card", "/storage/0000-0000", 0L, 100L))!!, 0.0001f)
+        assertNull(usedFraction(InstallVolume("Gone", "/mnt/gone", 0L, 0L)))
+    }
 }

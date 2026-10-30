@@ -17110,9 +17110,14 @@ install of unknown size is never refused on its behalf. A picks a game
 folder and starts the store's install job there (`startOwnStoreInstall`),
 Steam's included. B closes with nothing started. Downloads already in
 flight (`Downloading`, `Paused`) skip the offer and go to the Downloads
-place. The Storage view (bytes per store and per game,
-sorted by size, free space per folder, an uninstall per row) is the rest
-of Droidtop/tracker#227.
+place. The Storage view (Game sources > Storage, `StorageCatalog`): the room
+left on each game folder's volume, drawn as a meter of what is used with "X
+free of Y" beside it (`JobLook.LEVEL`, a quantity rather than a job: the fill
+stands, said as its percent; DroidDeck's usage bar, Droidtop/tracker#363), then
+each console system's games, then each store's installs by size with an
+Uninstall through the store's own service, then the folder games measured in
+the background. It reports sizes only and never moves or copies a person's
+files.
 
 **Live downloads: a game says what its job says (2026-10-23, Droidtop/tracker#577).** The capsule, the game page's
 button and the game menu read the game's store job itself: `StoreInstallJob.live`, the jobs list's own entries by store

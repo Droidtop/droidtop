@@ -23,6 +23,13 @@ enum class JobLook {
 
     /** Ended in failure: a short shake and the track in the danger colour; the reason is one press away. */
     FAILED,
+
+    /**
+     * Not a job: a quantity drawn as a meter (show, then say, Droidtop/tracker#738), such as a disk's used share on
+     * the Storage page (Droidtop/tracker#363). The fill stands at the value with no motion or mark, and is said as
+     * its percent.
+     */
+    LEVEL,
     ;
 
     companion object {
@@ -47,6 +54,7 @@ enum class JobLook {
             PAUSED -> "Paused"
             DONE -> "Done"
             FAILED -> "Failed"
+            LEVEL -> "Level"
         }
     }
 }

@@ -9,6 +9,7 @@ import dev.droidtop.library.PcSource
 import dev.droidtop.library.freeSpaceLine
 import dev.droidtop.library.friendlyLocation
 import dev.droidtop.library.installVolumes
+import dev.droidtop.library.usedFraction
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -149,11 +150,15 @@ internal object StorageCatalog {
             )
         } else {
             volumes.map { volume ->
+                // A meter of what is used, with the words beside it (show, then say; DroidDeck's usage bar, #363).
+                val used = usedFraction(volume)
                 ActionItem(
                     id = "storage_volume_${volume.path}",
                     title = volume.name,
                     subtitle = volume.path,
                     value = freeSpaceLine(volume, size),
+                    progress = used,
+                    progressLook = used?.let { dev.droidtop.library.settings.JobLook.LEVEL },
                 )
             }
         }

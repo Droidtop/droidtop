@@ -66,7 +66,7 @@ fun JobProgress(fraction: Float, look: JobLook, colors: JobProgressColors, modif
     val shimmer = shimmerOf(look == JobLook.CHECKING)
     val shake = shakeOf(look == JobLook.FAILED)
     val segments = parts.takeIf { it in 2..JobLook.MAX_PARTS } ?: 1
-    val said = JobLook.words(look) + if (look == JobLook.ACTIVE) ", ${(target * 100).toInt()} percent" else ""
+    val said = JobLook.words(look) + if (look == JobLook.ACTIVE || look == JobLook.LEVEL) ", ${(target * 100).toInt()} percent" else ""
     Canvas(
         modifier
             .height(height)
