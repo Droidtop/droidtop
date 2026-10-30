@@ -3866,6 +3866,12 @@ the `ContainerRuntime` interface that already exists (§3):
     the overlay is drawn.
   - The Retroid Pocket 5's Home button is to be logged on the console (`getevent`); if it is not `KEYCODE_HOME`,
     `HomeChords(homeKeys)` takes that key instead.
+  The overlay's window has no activity, so its one host (`InGameOverlays.overlayView`) gives the shell's screens what an
+  activity would (`ProvideOverlayOwners`): a result registry for a catalog tab's pickers and a Back dispatcher. Without
+  them the Quick Menu's Downloads tab over RetroArch crashed droidtop ("No ActivityResultRegistryOwner",
+  Droidtop/tracker#788). A picker cannot answer a window over a game, so one asked for there is answered cancelled and
+  the person is told to choose the file from droidtop itself. `OverlayQuickMenuRigTest` (on-device, run by hand)
+  composes every Quick Menu tab in that host.
   The drawing half. **An overlay never pauses or signals the app** (the owner's correction, 2026-10-29: "We don't want
   to pause the game or etc when we do this, unless we want to tie a specific button to 'tell a game it was
   backgrounded, even if it wasn't'"): the app keeps running and rendering underneath, nothing is sent to it when an
@@ -5523,6 +5529,12 @@ had not moved.
   events rerun the same pure orchestration decisions; if the shell's display
   disappears, it is relaunched on the remaining display immediately, and a
   later reconnect restores the selected arrangement.
+- **The companion is never the only droidtop screen (Droidtop/tracker#788).** When droidtop died with both
+  screens up (the overlay crash of 2026-10-29), Android kept `CompanionActivity`, and the next Home resumed only it:
+  `MainActivity`, which owns placing the screens and their reinit, never started, and the other screen mirrored the
+  companion (the owner: "Now we ONLY see the companion, on both screens"). A companion resumed with no live shell while
+  Gaming or Desktop is the mode in use now starts the shell (`ModeReturn`, the way back to the mode in use; at most
+  once in five seconds), and the shell places both screens as at any start.
 - The companion surfaces enforce the one-display rule themselves
   (`CompanionSurfaceLifetime`, `DualScreenOrchestration.companionSurfaceRetires`,
   tracker#182), because the shell's orchestration runs only while a shell

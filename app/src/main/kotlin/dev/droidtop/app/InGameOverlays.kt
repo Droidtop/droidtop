@@ -112,6 +112,77 @@ internal object InGameOverlays {
             return
         }
         val wm = windowContext.getSystemService(WindowManager::class.java) ?: return
+        val (view, lifecycle) = overlayView(windowContext) {
+            when (request.kind) {
+                OverlayRequest.Kind.QUICK_MENU -> QuickMenuStandalone(
+                    library = library,
+                    // Start swaps to the left menu, as it does in Gaming.
+                    onOpenStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
+                    onDismiss = { close() },
+                )
+                OverlayRequest.Kind.CONTEXT_MENU -> if (!gameInFront) {
+                    front?.let { packageName ->
+                        AppInFrontStandalone(
+                            packageName = packageName,
+                            onResume = { close() },
+                            onAppInfo = {
+                                open(
+                                    Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.fromParts("package", packageName, null))
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            },
+                            onDismiss = { close() },
+                        )
+                    }
+                } else runningEntry?.let { entry ->
+                    GameOptionsStandalone(
+                        library = library,
+                        entry = entry,
+                        // The game never left: Play is closing the overlay.
+                        onResume = { close() },
+                        onOpenDownloads = { open(PlaceLinks.intent(app, Place.DOWNLOADS)) },
+                        onDismiss = { close() },
+                    )
+                }
+                OverlayRequest.Kind.LEFT_MENU -> LeftMenuStandalone(
+                    gamingSections = gamingInUse,
+                    runningTitle = runningEntry?.let { dev.droidtop.library.GameNaming.displayName(it.title) },
+                    onResume = { close() },
+                    onOpenSection = { section, placeScreenId -> open(sectionIntent(section, placeScreenId)) },
+                    onOpenQuickMenu = { swap(request.copy(kind = OverlayRequest.Kind.QUICK_MENU)) },
+                    onSearch = { open(Intent(app, LauncherSearchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+                    onDismiss = { close() },
+                )
+            }
+        }
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            type,
+            // Focusable on purpose: the pad's keys must reach the menu, never the game under it.
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT,
+        )
+        runCatching { wm.addView(view, params) }
+            .onSuccess {
+                shown = Shown(request.kind, view, wm, lifecycle)
+                OverlayRequests.open = true
+                view.requestFocus()
+                Log.i(TAG, "${request.kind} over ${request.frontPackage ?: "the screen"} on display ${request.displayId}")
+            }
+            .onFailure {
+                lifecycle.currentState = Lifecycle.State.DESTROYED
+                Log.w(TAG, "${request.kind} on display ${request.displayId} refused", it)
+            }
+    }
+
+    /**
+     * The one host for an overlay's content, in a window that has no activity: its own lifecycle and saved state,
+     * droidtop's theme, what an activity would give the shell's screens ([ProvideOverlayOwners][dev.droidtop.shell.gamepad.hosted.ProvideOverlayOwners],
+     * Droidtop/tracker#788) and [LocalInGameOverlay]. The overlays and the on-device check of every Quick Menu tab
+     * (OverlayQuickMenuRigTest) both draw through it. Returns the view and its lifecycle, set to destroyed on close.
+     */
+    internal fun overlayView(windowContext: android.content.Context, content: @androidx.compose.runtime.Composable () -> Unit): Pair<ComposeView, LifecycleRegistry> {
         val lifecycleOwner = object : LifecycleOwner {
             val registry = LifecycleRegistry(this)
             override val lifecycle: Lifecycle get() = registry
@@ -128,71 +199,14 @@ internal object InGameOverlays {
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
             setContent {
                 dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
-                    CompositionLocalProvider(LocalInGameOverlay provides true) {
-                        when (request.kind) {
-                            OverlayRequest.Kind.QUICK_MENU -> QuickMenuStandalone(
-                                library = library,
-                                // Start swaps to the left menu, as it does in Gaming.
-                                onOpenStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
-                                onDismiss = { close() },
-                            )
-                            OverlayRequest.Kind.CONTEXT_MENU -> if (!gameInFront) {
-                                front?.let { packageName ->
-                                    AppInFrontStandalone(
-                                        packageName = packageName,
-                                        onResume = { close() },
-                                        onAppInfo = {
-                                            open(
-                                                Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.fromParts("package", packageName, null))
-                                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                            )
-                                        },
-                                        onDismiss = { close() },
-                                    )
-                                }
-                            } else runningEntry?.let { entry ->
-                                GameOptionsStandalone(
-                                    library = library,
-                                    entry = entry,
-                                    // The game never left: Play is closing the overlay.
-                                    onResume = { close() },
-                                    onOpenDownloads = { open(PlaceLinks.intent(app, Place.DOWNLOADS)) },
-                                    onDismiss = { close() },
-                                )
-                            }
-                            OverlayRequest.Kind.LEFT_MENU -> LeftMenuStandalone(
-                                gamingSections = gamingInUse,
-                                runningTitle = runningEntry?.let { dev.droidtop.library.GameNaming.displayName(it.title) },
-                                onResume = { close() },
-                                onOpenSection = { section, placeScreenId -> open(sectionIntent(section, placeScreenId)) },
-                                onOpenQuickMenu = { swap(request.copy(kind = OverlayRequest.Kind.QUICK_MENU)) },
-                                onSearch = { open(Intent(app, LauncherSearchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
-                                onDismiss = { close() },
-                            )
-                        }
+                    // What an activity would give the shell's screens: a catalog tab's pickers and Back.
+                    dev.droidtop.shell.gamepad.hosted.ProvideOverlayOwners {
+                        CompositionLocalProvider(LocalInGameOverlay provides true, content = content)
                     }
                 }
             }
         }
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            type,
-            // Focusable on purpose: the pad's keys must reach the menu, never the game under it.
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT,
-        )
-        runCatching { wm.addView(view, params) }
-            .onSuccess {
-                shown = Shown(request.kind, view, wm, lifecycleOwner.registry)
-                OverlayRequests.open = true
-                view.requestFocus()
-                Log.i(TAG, "${request.kind} over ${request.frontPackage ?: "the screen"} on display ${request.displayId}")
-            }
-            .onFailure {
-                lifecycleOwner.registry.currentState = Lifecycle.State.DESTROYED
-                Log.w(TAG, "${request.kind} on display ${request.displayId} refused", it)
-            }
+        return view to lifecycleOwner.registry
     }
 
     /** One overlay for another on the same display (R2 in the left menu, Start in the Quick Menu). */

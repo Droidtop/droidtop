@@ -100,6 +100,29 @@ class CompanionActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         dev.droidtop.display.CompanionCover.resumed(displayIdCompat())
+        bringBackShellIfGone()
+    }
+
+    /**
+     * The companion is never the only droidtop screen (Droidtop/tracker#788). When droidtop died with both screens up,
+     * Android kept this activity and, on the next Home, resumed only it: MainActivity, which owns placing the screens
+     * and their reinit, never started, and the other screen mirrored this one. So a companion resumed with no live
+     * shell while Gaming or Desktop is the mode in use starts the shell (ModeReturn, the way back to the mode in use),
+     * and the shell places both screens as at any start. At most once in [SHELL_RESTORE_MS], so a shell that cannot
+     * start is not started in a loop.
+     */
+    private fun bringBackShellIfGone() {
+        val shell = MainActivity.live?.get()
+        if (shell != null && !shell.isFinishing && !shell.isDestroyed) return
+        val mode = dev.droidtop.library.settings.Mode.byId(dev.droidtop.library.settings.Modes.lastMode(this))
+        if (mode != dev.droidtop.library.settings.Mode.GAMING && mode != dev.droidtop.library.settings.Mode.DESKTOP) return
+        if (!GamesRootPrefs.isOnboardingComplete(this)) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastShellRestoreMs < SHELL_RESTORE_MS) return
+        lastShellRestoreMs = now
+        android.util.Log.i("droidtop.SecondScreen", "companion resumed with no shell: starting ${mode.id}")
+        runCatching { startActivity(ModeReturn.intent(this)) }
+            .onFailure { android.util.Log.w("droidtop.SecondScreen", "could not start the shell", it) }
     }
 
     // Touch-only, except while Android has made it the top activity: then keys reach this
@@ -176,6 +199,10 @@ class CompanionActivity : AppCompatActivity() {
 
     companion object {
         const val ACTION_DISMISS = "dev.droidtop.app.action.DISMISS_COMPANION"
+
+        /** How often a companion with no shell may start one (bringBackShellIfGone). */
+        private const val SHELL_RESTORE_MS = 5_000L
+        private var lastShellRestoreMs = -SHELL_RESTORE_MS
 
         /**
          * Whether a companion instance is currently started/visible — read
