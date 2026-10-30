@@ -139,6 +139,44 @@ class UnifiedSearchTest {
         assertTrue(last.sources.first { it.source.id == "hung" }.failure != null)
     }
 
+    /** Droidtop/tracker#848: a source is started first, on its own bound, so a slow start is not spent out of its search. */
+    private fun runWarm(source: GameSourceProvider, warm: suspend (GameSourceProvider) -> String?, timeoutMs: Long, loadTimeoutMs: Long) =
+        UnifiedSearch.stream(
+            query = "sonic",
+            local = { emptyList() },
+            debounceMs = 0,
+            timeoutMs = timeoutMs,
+            loadSources = { listOf(source) to emptyList() },
+            fetch = { it.search(android.content.ContextWrapper(null), "sonic", null) },
+            warm = warm,
+            loadTimeoutMs = loadTimeoutMs,
+        )
+
+    @Test
+    fun `a slow start is not taken out of the search's budget, and the row says it is starting`() = runBlocking {
+        val s = source("cold", delayMs = 20, results = listOf(result("r", "Sonic")))
+        // Starting takes longer than the whole search budget: before, that was "did not answer in time".
+        val states = runWarm(s, warm = { delay(150); null }, timeoutMs = 100, loadTimeoutMs = 2_000).toList()
+        assertTrue(states.any { st -> st.sources.single().starting })
+        val last = states.last()
+        assertTrue(last.settled)
+        assertEquals(null, last.sources.single().failure)
+        assertEquals(listOf("Sonic"), last.rows.map { it.title })
+    }
+
+    @Test
+    fun `a source that does not start says why, and one that never starts is bounded`() = runBlocking {
+        val s = source("s", results = listOf(result("r", "Sonic")))
+        val refused = runWarm(s, warm = { "its protection did not start" }, timeoutMs = 100, loadTimeoutMs = 2_000).toList().last()
+        assertTrue(refused.settled)
+        assertTrue(refused.rows.isEmpty())
+        assertTrue(refused.sources.single().failure!!.isNotBlank())
+        val stuck = runWarm(s, warm = { delay(10_000); null }, timeoutMs = 100, loadTimeoutMs = 50).toList().last()
+        assertTrue(stuck.settled)
+        assertTrue(stuck.sources.single().failure!!.isNotBlank())
+        assertTrue(stuck.rows.isEmpty())
+    }
+
     @Test
     fun `a blank query is an empty settled state and asks nothing`() = runBlocking {
         var asked = false

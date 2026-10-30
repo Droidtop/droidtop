@@ -25618,6 +25618,22 @@ interface GameSourceProvider {
   caller-side backstop for a source that never returns;
   `search`/`lookup` return `Result.failure` rather than throwing across
   this boundary. A future store adapter must honor the same shape.
+- **Starting a source is not searching (2026-10-30, Droidtop/tracker#848).**
+  The owner: "We need to optimize our python runner somehow". A plugin
+  process is let go a minute after its last call, and a cold start (about
+  10 s on BlueStacks) used to be spent out of the search's 11 s, so every
+  python source read "did not answer in time".
+  - The one search starts each source first (`GameSourceProvider.warm`,
+    `PluginCrashPolicy.prepare`: the same gates as a call, then the load),
+    bounded by `UnifiedSearch.LOAD_TIMEOUT_MS` (30 s). Only then is it
+    asked, with its own budget as above. While it starts, its status says
+    so (`SourceStatus.starting`).
+  - `SourceWarmth` holds the sources started while the search or Get
+    games is open, and for two minutes after it closes. Opening the screen
+    starts them all at once (`SourceWarmth.prewarm`), while the person
+    types.
+  - Each start logs one `droidtop.plugin` line with the process and load
+    times, and the first call's answer time, for #848's measurements.
 - **Versioning**: this is droidtop's own internal Kotlin interface, not a
   wire contract. `PluginGameSource` is the one real implementation today,
   adapting a plugin declaring `PluginCapability.ACQUIRE_CONTENT` onto this

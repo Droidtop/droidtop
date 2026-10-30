@@ -13,6 +13,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 
 /**
  * What a row of the one search list is. The order is the tie-break between
@@ -74,6 +77,8 @@ class SourceStatus(
     val source: GameSourceProvider,
     /** Null while the source has not answered. */
     val outcome: SourceOutcome?,
+    /** The source is still starting, not yet asked (Droidtop/tracker#848): its row says so rather than waiting silently. */
+    val starting: Boolean = false,
 ) {
     val pending: Boolean get() = outcome == null
     val failure: String? get() = outcome?.failure
@@ -196,6 +201,15 @@ object UnifiedSearch {
     /** How long the text must rest before any source is asked. */
     const val SOURCE_DEBOUNCE_MS = 350L
 
+    /**
+     * How long a source may take to start before it is asked (Droidtop/tracker#848): apart from the search's own budget
+     * ([PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS]), so a cold start is not taken out of it.
+     */
+    const val LOAD_TIMEOUT_MS = 30_000L
+
+    private const val READY = ""
+    internal const val STILL_STARTING = "did not start within 30 seconds; try again in a moment"
+
     /** The most rows one source adds, so a chatty source cannot bury the rest. */
     const val MAX_ROWS_PER_SOURCE = 10
 
@@ -234,10 +248,14 @@ object UnifiedSearch {
             },
             // One search per source in flight, the newest query asked next ("Fetchers answer in the one search").
             fetch = { source -> SourceSearchFlight.shared.run(source.id) { source.search(context, query.trim(), platform) } },
+            warm = { source -> source.warm(context) },
             needOf = { source -> PluginSearchAggregator.runtimeNeedOf(context, source) },
             isOff = { it.id in off },
             featured = if (featuredWhenEmpty) { source -> source.featured(context, platform, MAX_ROWS_PER_SOURCE) } else null,
         )
+            // The sources stay started while this search runs and a little after (Droidtop/tracker#848).
+            .onStart { SourceWarmth.hold(context) }
+            .onCompletion { SourceWarmth.release() }
     }
 
     /** [search] with the Android parts injected: what the unit tests drive with fake sources. */
@@ -253,6 +271,8 @@ object UnifiedSearch {
         needOf: (GameSourceProvider) -> RuntimeNeed? = { null },
         isOff: (GameSourceProvider) -> Boolean = { false },
         featured: (suspend (GameSourceProvider) -> Result<List<AcquireContentResult>>)? = null,
+        warm: suspend (GameSourceProvider) -> String? = { null },
+        loadTimeoutMs: Long = LOAD_TIMEOUT_MS,
     ): Flow<UnifiedState> = channelFlow {
         val q = query.trim()
         // No query: nothing, or what the sources feature now when the surface asks for it (Droidtop/tracker#825).
@@ -293,6 +313,32 @@ object UnifiedSearch {
         coroutineScope {
             for (source in sources) {
                 launch {
+                    // Started first, on its own bound (Droidtop/tracker#848): a slow start is not spent out of the
+                    // search's budget, and the row says the source is starting meanwhile.
+                    gate.withLock {
+                        statuses = statuses.map { if (it.source.id == source.id) SourceStatus(source, null, starting = true) else it }
+                        send(state(settled = false))
+                    }
+                    val notReady = try {
+                        withTimeoutOrNull(loadTimeoutMs) { warm(source) ?: READY } ?: STILL_STARTING
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        e.message ?: "it did not start"
+                    }
+                    if (notReady != READY) {
+                        val failed = PluginSearchAggregator.failureOutcome(source, RuntimeException(notReady)).copy(runtimeNeed = needOf(source))
+                        gate.withLock {
+                            answered[source.id] = failed
+                            statuses = statuses.map { if (it.source.id == source.id) SourceStatus(source, failed) else it }
+                            send(state(settled = answered.size == sources.size))
+                        }
+                        return@launch
+                    }
+                    gate.withLock {
+                        statuses = statuses.map { if (it.source.id == source.id) SourceStatus(source, null) else it }
+                        send(state(settled = false))
+                    }
                     val asked = PluginSearchAggregator.fanOutOutcomes(listOf(source), timeoutMs, ask).single()
                     val outcome = if (asked.failure == null) asked.copy(results = asked.results.filter(keep)) else asked.copy(runtimeNeed = needOf(source))
                     gate.withLock {

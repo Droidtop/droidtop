@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -616,6 +617,13 @@ internal fun LibrarySearchDialog(
                 SourceGets.handOff(context, integration, systemId, systemFolder, q) { statusLine = it }
             }
         }
+
+    // The sources are started as the screen opens, while the person types, and held until it closes
+    // (Droidtop/tracker#848): a search then asks sources that are already up.
+    DisposableEffect(sourcePlatform ?: systemId) {
+        dev.droidtop.library.integrations.SourceWarmth.prewarm(context, sourcePlatform ?: systemId)
+        onDispose { dev.droidtop.library.integrations.SourceWarmth.release() }
+    }
 
     // Restarted by every keystroke: the previous query is cancelled, the device's rows are back at once and the sources
     // are asked only once the text rests (UnifiedSearch.SOURCE_DEBOUNCE_MS).

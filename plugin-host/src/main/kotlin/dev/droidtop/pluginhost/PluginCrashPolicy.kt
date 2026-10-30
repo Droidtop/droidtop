@@ -212,6 +212,22 @@ class PluginCrashPolicy(
     }
 
     /**
+     * Starts [record] for calls to [point] without making one (Droidtop/tracker#848): the gates [handle] applies, then
+     * the load, in this policy's runner, so the plugin's process stays up while this policy is held. Null when it is
+     * ready, else why not, as [handle] would answer. A search starts its sources this way first, so a cold start is
+     * not spent out of the search's own budget. Never asks the person anything: nothing they started is waiting on it.
+     */
+    suspend fun prepare(record: PluginRecord, point: String): String? {
+        if (!record.runnable()) return "plugin is not approved/enabled"
+        waitingReason(record)?.let { return it }
+        if (record.manifest.kind !in RUNNABLE_KINDS) return "no runner for kind ${record.manifest.kind.id} yet"
+        pointGate(record, point, userInitiated = false)?.let { return it }
+        gateOnVerification(record)?.let { return it.error ?: "plugin failed verification" }
+        missingRuntime(record)?.let { return it.message }
+        return loadFor(record, userInitiated = false)
+    }
+
+    /**
      * Why a call to [point] must not be made ([PluginGrants.pointRefusal]), or null when it may. A point set to Ask first
      * (or not answered yet) is asked about on the first-use sheet during a call the person started, and the answer is
      * kept: Allow turns it on, Never blocks it, Not now leaves it to be asked again (Droidtop/tracker#270). From the

@@ -72,6 +72,13 @@ interface GameSourceProvider {
      */
     suspend fun featured(context: Context, platform: String?, limit: Int): Result<List<AcquireContentResult>> = Result.success(emptyList())
 
+    /**
+     * Gets the source ready to answer, before it is asked (Droidtop/tracker#848): a plugin source is started in its
+     * process, held by [SourceWarmth], so a cold start is not spent out of [search]'s own budget. Null when it is
+     * ready, else why not. A source that needs nothing started has nothing to do.
+     */
+    suspend fun warm(context: Context): String? = null
+
     fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: File?): CatalogScreen
 
     fun settingsScreen(): CatalogScreen? = null
@@ -115,6 +122,8 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
 
     override suspend fun search(context: Context, query: String, platform: String?): Result<List<AcquireContentResult>> =
         searchWithValues(context, query, platform, emptyMap(), null, platform.orEmpty(), limit = UnifiedSearch.MAX_ROWS_PER_SOURCE)
+
+    override suspend fun warm(context: Context): String? = SourceWarmth.warm(context, source.record)
 
     /**
      * [limit] is how many results the caller will show: the one search shows ten per source, so it asks for ten

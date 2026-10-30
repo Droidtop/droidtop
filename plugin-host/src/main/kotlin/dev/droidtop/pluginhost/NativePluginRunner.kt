@@ -122,6 +122,8 @@ class NativePluginRunner(
         // access included"): the contained loader with the network, and droidtop's relays for the system services it was allowed.
         val isolatedFull = tier == PluginTier.FULL_TRUST && PluginTiers.fullAccessRunsIsolated(record, PluginTiers.fullAccessIsolated())
         val isolated = isolatedNet || isolatedFull
+        // Each start's phases on one line (Droidtop/tracker#848): the process, then the plugin's own load in it.
+        val startedAt = android.os.SystemClock.elapsedRealtime()
         val runtime = PluginProcesses.acquire(appContext, id, if (isolated) PluginTier.CONTAINED else tier, network = isolated)
             ?: return failLoad(id, if (tier == PluginTier.CONTAINED) "its contained process could not be started" else "the plugin process could not be started")
         if (runtimes.put(id, runtime) != null) PluginProcesses.release(appContext, id)
@@ -130,6 +132,7 @@ class NativePluginRunner(
             val callback = ProcessCallback(binder).also { callbacks[binder] = it }
             runCatching { runtime.registerCallback(callback) }
         }
+        val processAt = android.os.SystemClock.elapsedRealtime()
         return try {
             // A blocking binder call: on the IO dispatcher so the budget below can fire and a caller on the main thread is
             // never held for a cold start (rig, 2026-09-30: 15 s of skipped frames while a Flutter plugin started).
@@ -153,6 +156,8 @@ class NativePluginRunner(
                 listenForShizuku()
                 withContext(Dispatchers.IO) { runCatching { ShizukuRelays.attach(appContext, runtime, record) } }
             }
+            val doneAt = android.os.SystemClock.elapsedRealtime()
+            Log.i("droidtop.plugin", "$id: start ${record.manifest.kind.id} ${tier.name.lowercase()}: process ${processAt - startedAt} ms, load ${doneAt - processAt} ms, loaded=$loaded")
             if (!loaded) {
                 // The reason is the process's own (runtime missing, version mismatch, a refusal); a crash it also reported already disabled the plugin.
                 failLoad(id, runCatching { runtime.lastLoadError(id) }.getOrNull().orEmpty().ifBlank { loadFailures[id] ?: "plugin failed to load" })
@@ -315,11 +320,14 @@ class NativePluginRunner(
         // Only the default budget is extended: a shorter one is the UI choosing not to wait, and stays short.
         val cold = crashOnTimeout && isCold(pluginId, runtime)
         val budget = timeoutMs + if (cold) PluginRunner.COLD_START_GRACE_MS else 0L
+        val askedAt = android.os.SystemClock.elapsedRealtime()
         return try {
             val text = withTimeout(budget) {
                 withContext(Dispatchers.IO) { runtime.handle(pluginId, call.toJson().toString()) }
             }
-            answeredOn[pluginId] = runtime.asBinder()
+            if (answeredOn.put(pluginId, runtime.asBinder()) !== runtime.asBinder()) {
+                Log.i("droidtop.plugin", "$pluginId: first call ${call.point} ${call.op} answered in ${android.os.SystemClock.elapsedRealtime() - askedAt} ms")
+            }
             PluginReply.parse(text)
         } catch (e: TimeoutCancellationException) {
             if (cold) return PluginReply.error(PluginErrorCode.TIMEOUT, "still starting up (the first call can take a while); try again in a moment")
