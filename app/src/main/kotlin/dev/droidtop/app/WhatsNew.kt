@@ -34,6 +34,13 @@ object WhatsNew {
 
     private val checked = AtomicBoolean(false)
 
+    /** The shell screen last in front, which What's new opens over once the screens have settled. */
+    @Volatile
+    private var lastShell: java.lang.ref.WeakReference<Activity>? = null
+
+    /** How often What's new was opened again in this process after something covered it ([covered]). */
+    private val reopened = java.util.concurrent.atomic.AtomicInteger(0)
+
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     /** The bundled changelog, newest first; empty for a build CI did not make. Reads the APK: off the main thread. */
@@ -82,10 +89,9 @@ object WhatsNew {
      * first run is the setup, not an update.
      */
     fun onShellResumed(activity: Activity) {
+        lastShell = java.lang.ref.WeakReference(activity)
         if (!checked.compareAndSet(false, true)) return
         val app = activity.applicationContext
-        // Opened from the screen in front, in its task, so closing it lands back there.
-        val from = java.lang.ref.WeakReference(activity)
         AppScopes.io.launch {
             if (!GamesRootPrefs.isOnboardingComplete(app)) {
                 // Onboarding marks this version seen when it finishes; check again at the next start.
@@ -99,8 +105,13 @@ object WhatsNew {
                 markCurrentSeen(app)
                 return@launch
             }
+            // The screens are still being placed at a start: the shell may start again on the main screen a moment
+            // later and cover anything opened now (console, build 2730: What's new started at 09:46:05.045 and a second
+            // MainActivity start at 05.462 covered it). So it waits for that, then opens over the shell in front then,
+            // in its task, so closing it lands back there.
+            kotlinx.coroutines.delay(SETTLE_MS)
             AppScopes.main.launch {
-                val screen = from.get()?.takeUnless { it.isFinishing || it.isDestroyed }
+                val screen = lastShell?.get()?.takeIf { showsOver(it) }
                 if (screen != null) {
                     screen.startActivity(WhatsNewActivity.intent(screen, all = false))
                 } else {
@@ -110,6 +121,33 @@ object WhatsNew {
             }
         }
     }
+
+    /**
+     * What's new stopped without being closed: something covered it (a shell started again on the main screen, a
+     * screen-placement pass). It finishes, and opens again over the shell in front, so an update's What's new is
+     * never left unseen beneath another screen. At most [MAX_REOPENS] times in a process.
+     */
+    fun covered() {
+        if (!reopenAfterStop(closed = false, changingConfigurations = false, reopenedSoFar = reopened.get())) return
+        reopened.incrementAndGet()
+        checked.set(false)
+        lastShell?.get()?.takeIf { showsOver(it) }?.let(::onShellResumed)
+    }
+
+    /** Whether a What's new that stopped should open again. Pure. */
+    internal fun reopenAfterStop(closed: Boolean, changingConfigurations: Boolean, reopenedSoFar: Int): Boolean =
+        !closed && !changingConfigurations && reopenedSoFar < MAX_REOPENS
+
+    /** A shell screen What's new can open over: alive and at least started. */
+    private fun showsOver(activity: Activity): Boolean =
+        !activity.isFinishing && !activity.isDestroyed &&
+            ((activity as? androidx.lifecycle.LifecycleOwner)?.lifecycle?.currentState?.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) ?: true)
+
+    /** How long the screens get to settle at a start before What's new opens. */
+    private const val SETTLE_MS = 2_000L
+
+    /** How many times What's new opens again after being covered, in one process. */
+    internal const val MAX_REOPENS = 3
 
     /** The steps droidtop registers, at its start (DroidtopApplication), before onboarding or What's new reads them. */
     fun registerSteps() {

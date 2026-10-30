@@ -58,6 +58,17 @@ class WhatsNewActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    // Stopped without being closed: covered (a shell started again on the main screen). It goes, and opens again over
+    // the shell in front, so it is never left unseen underneath (WhatsNew.covered, Droidtop/tracker#727).
+    override fun onStop() {
+        super.onStop()
+        val all = intent.getBooleanExtra(EXTRA_ALL, false)
+        if (!all && WhatsNew.reopenAfterStop(closing, isChangingConfigurations, 0)) {
+            finish()
+            WhatsNew.covered()
+        }
+    }
+
     private var closing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {

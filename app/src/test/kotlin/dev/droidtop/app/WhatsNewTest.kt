@@ -1,6 +1,8 @@
 package dev.droidtop.app
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** What's new reads the changelog.json CI bundles and picks the builds since the last one seen (docs/SPEC.md 7b). */
@@ -38,5 +40,14 @@ class WhatsNewTest {
     fun `a build newer than the one installed is never shown`() {
         val since = WhatsNew.since(WhatsNew.parse(json), lastSeen = 2300, current = 2301)
         assertEquals(listOf(2301L), since.map { it.versionCode })
+    }
+
+    @Test
+    fun `a What's new covered before it was closed opens again, a few times at most`() {
+        // The console, build 2730: a second shell start during screen placement covered it and it was never seen.
+        assertTrue(WhatsNew.reopenAfterStop(closed = false, changingConfigurations = false, reopenedSoFar = 0))
+        assertFalse(WhatsNew.reopenAfterStop(closed = true, changingConfigurations = false, reopenedSoFar = 0))
+        assertFalse(WhatsNew.reopenAfterStop(closed = false, changingConfigurations = true, reopenedSoFar = 0))
+        assertFalse(WhatsNew.reopenAfterStop(closed = false, changingConfigurations = false, reopenedSoFar = WhatsNew.MAX_REOPENS))
     }
 }

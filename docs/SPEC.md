@@ -9687,7 +9687,12 @@ displays it."
   the one installed, so builds they skipped are there too (`WhatsNew.since`, tested), read from the APK, never from a
   hand-kept list or the network. It is drawn in onboarding's scaffold (title, the builds with their Added, Changed
   and Fixed lines, Done). Done, Back or B closes it, and closing is what marks this version seen (`WhatsNew`,
-  `last_seen_version_code`). A person updating from a build before What's new sees the installed build's entry. It
+  `last_seen_version_code`). **It opens once the screens have settled, and is never left covered (2026-10-30).** At a
+  start the shell may start again on the main screen a moment later. On the console (build 2730) What's new opened at
+  09:46:05.045, a second `MainActivity` start at 05.462 covered it, and it was never seen. So it waits two seconds,
+  then opens over the shell screen in front then. If it is stopped without being closed (covered), it finishes and
+  opens again over the shell in front, up to three times in a process (`WhatsNew.covered`, `reopenAfterStop`,
+  tested). A person updating from a build before What's new sees the installed build's entry. It
   never opens over onboarding or a game, nor before onboarding finished. Settings > About droidtop > What's new
   opens it with every build's entry, any time.
 - **Feature steps, one registry.** A feature that needs explaining declares a `FeatureStep` in code
