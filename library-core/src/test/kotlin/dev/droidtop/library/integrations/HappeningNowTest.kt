@@ -54,4 +54,18 @@ class HappeningNowTest {
         assertEquals(JobLook.CHECKING, now.look)
         assertEquals("Checking for updates", now.words)
     }
+
+    @Test
+    fun `the spot stays on one job and its fill only moves forward (tracker 834)`() {
+        val held = HappeningNow.Held()
+        assertEquals(0.6f, held.next(listOf(job("a", LibraryScrapeJob.KIND, percent = 60)))!!.fraction, 0.001f)
+        // A second scrape starts: the first stays in front.
+        val both = held.next(listOf(job("b", LibraryScrapeJob.KIND, percent = 5), job("a", LibraryScrapeJob.KIND, percent = 61)))!!
+        assertEquals("a", both.jobId)
+        assertEquals(0.61f, both.fraction, 0.001f)
+        // The same job reporting less is not drawn as less.
+        assertEquals(0.61f, held.next(listOf(job("a", LibraryScrapeJob.KIND, percent = 10)))!!.fraction, 0.001f)
+        // When it ends, the next job shows its own number.
+        assertEquals(0.05f, held.next(listOf(job("a", LibraryScrapeJob.KIND, done = true), job("b", LibraryScrapeJob.KIND, percent = 5)))!!.fraction, 0.001f)
+    }
 }

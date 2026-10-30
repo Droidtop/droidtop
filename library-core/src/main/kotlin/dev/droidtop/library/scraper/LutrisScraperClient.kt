@@ -122,7 +122,9 @@ object LutrisScraperClient {
                 // for most real results -- `coverart` (Lutris's own
                 // IGDB-sourced cover_big image) is the field that is
                 // actually populated in practice.
-                coverUrl = row.optString("coverart", "").ifBlank { null },
+                // A JSON null reads as the text "null" through optString, which was fetched as an address ("no
+                // protocol: null", Droidtop/tracker#834): an absent or null cover is no cover.
+                coverUrl = row.takeUnless { it.isNull("coverart") }?.optString("coverart", "")?.ifBlank { null },
                 year = row.optInt("year", 0).takeIf { it > 0 },
                 steamAppId = provided("steam")?.toIntOrNull(),
                 gogId = provided("gog")?.takeIf { id -> id.all { it.isDigit() } },

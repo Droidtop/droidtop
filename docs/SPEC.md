@@ -16179,7 +16179,12 @@ minutes after droidtop starts and after a store's library is read, the one libra
 engine games (`LibraryScrapeJob.start(pcOnly = true)`), at most every twelve hours. It uses the PC sources below that
 need no account (Lutris, the Steam store's appdetails for a Steam game) and any the person set up, and the scrape's own
 filter skips games that already have their art and details, so a finished library asks nothing. It is a job in
-Downloads like any scrape (paused or cancelled there; the next run resumes a paused one). Consoles keep the one-time
+Downloads like any scrape (paused or cancelled there; the next run resumes a paused one). An automatic run (this one,
+and *Fetch automatically* after a walk) never runs twice at once (Droidtop/tracker#834): an ask while a scrape that
+covers it is running joins that scrape, and a walk that found the same number of games as the one that last started
+a scrape starts none. It does not ask again about a game whose last answer was "no match" or "needs a pick" under the
+same searched name (Review matches keeps both); that game is asked again when its name changes or the person asks. A
+game is in a pass once, and no picture is fetched without an address. Consoles keep the one-time
 question ("After the first library scan", below): an automatic console scrape is #568's next part, with the rest of
 its scope (a review list, honest states). Built-in sources are droidtop's own code, not the plugin API's
 `library.metadata` point (the owner: "our built-in scrapers don't talk over the API"); plugins fill gaps after them.
