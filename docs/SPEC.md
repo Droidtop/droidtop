@@ -3651,7 +3651,7 @@ the `ContainerRuntime` interface that already exists (§3):
     (`ContainersCatalog.kt:394`, `:411`, `:465`, `:736`) — but both
     renderers call a `ToggleItem.onToggle` and a `FolderPickItem.onPicked`
     synchronously on the main thread (`CatalogPreferenceBuilder.kt:111`,
-    `:387`; `SettingsCatalogView.kt:238`, `:593`), and `runBlocking` parks
+    `:387`; `CatalogNavigator.kt:501`, `:434`), and `runBlocking` parks
     its caller whatever dispatcher the body runs on, so each of those
     rows holds the UI thread for a container-config write. That is the
     remaining violation of the settings catalog's own C4 rule ("an
@@ -3662,7 +3662,7 @@ the `ContainerRuntime` interface that already exists (§3):
     export/restore (`ContainersCatalog.kt:302`, `:317`) run inside a
     `DocumentPickItem.onPicked`, which both renderers already run under
     `withContext(Dispatchers.IO)` (`CatalogPreferenceBuilder.kt:128`;
-    `SettingsCatalogView.kt:228`), so the `runBlocking` parks an IO
+    `CatalogNavigator.kt:422`), so the `runBlocking` parks an IO
     thread for the archive, not the UI. The plugin broker's surface is
     synchronous by contract, so its `runBlocking`s park the calling
     binder thread while a grant sheet is answered or a provider call runs
@@ -19015,9 +19015,28 @@ new screen cannot pass with a private palette. (Measured 2026-09-24: 53 colour l
 a hundred named colours and 273 `.dp` literals in the shell against 19 uses of `Space`, so the
 contract is the file and not yet the screens.)
 
-**Where it lives.** One file, `shell-gamepad/.../DesignTokens.kt`, in that module because it is
-the one both the Gaming shell and `:app` can see — a token half the chrome cannot reach is not
-a system. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
+**Where it lives.** One file, `ui-shared/.../DesignTokens.kt` (package `dev.droidtop.shell.gamepad`, unchanged),
+in `:ui-shared` since Droidtop/tracker#827 F1b so every mode's shell, not only Gaming and `:app`, reads the same
+tokens — a token half the chrome cannot reach is not a system. The theme palette they read (`GamingTheme`,
+`GamingPalette`), the motion tokens (`FocusLook`) and the window (`ShellWindow`, `ProvideShellCanvas`) moved with it,
+public. The input pipeline followed (part 2): `input/` (the pad gate, the key map, controller layouts, hints and
+their fit), the hint bar and touch actions (`TouchActions`), the one focus ring (`FocusGlide`), the selection look
+(`selectionFrame`, `rowFocus`), the frame bars' edges (`ChromeBar`), the keyboard routing (`KeyboardTargets`) and
+`currentShellWindow()`. The component set came next (part 3), one file each by what it holds: the rows and group
+labels (`MenuRow`, `MenuHeader`, `MenuSectionLabel`, `StatusChip`), the chip and button (`ShellChip`), the switch,
+slider and progress bar (`ShellControls`), the modal panel and its cursor and scroll rules (`MenuPanel`, `menuMove`),
+a dialog's choices (`DialogChoices`), the one modal window (`ShellDialog`) and the focus holder inside it
+(`PadFocusHolder`), the side panels (`SidePanelFrame`), the sheet of choices (`ActionSheet`), the tab rail (`TabRail`)
+with the glyphs it draws (`QuickGlyph`), a catalog row's glyph (`CatalogGlyph`), the sheen (`shine`),
+`requestFocusWhenAttached`, and the interface sounds the panels play (`theme/`: `EsDeNavigationSounds`, `UiSound`,
+the wav reader and normaliser). The settings renderer followed (part 4): `CatalogNavigator`, with its category column
+(`SettingsCategories`), the pickers and text dialog it opens (`CatalogChoicePicker`, `TextEditDialog`), the one value
+step (`adjustCatalogItem`) and the stack and selection savers, plus what it draws through: keeping the selection in view
+(`ScrollFollow`), the shoulder strip a page claims (`ShoulderStrip`), the room the status cluster takes
+(`StatusClusterRoom`) and droidtop's keyboard for a field (`DroidtopKeyboard`, `OwnFieldKeyboard`, `opensFocused`).
+Gaming's own Settings section and places stay in `:shell-gamepad` (`SettingsCatalogView`, `PlaceCatalogView`,
+`gamingSettingsRoot`): they are the shell's entries into the renderer, with the shell's theme browser behind Browse
+themes. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
 `TypeRole` naming the job of each role with `DroidtopTypography` behind it, `MenuTokens` as the
 shell's palette and row measures, and `ChromeColors` as the colour source for chrome outside
 the shell. `DroidtopTheme` supplies the colour
@@ -26059,6 +26078,21 @@ window's, a pin's, an Android app's and the clipboard notice's), so `:shell-desk
 and clipboard buttons at least 48 dp tall, the touch target (DESIGN-LANGUAGE); the tray and clipboard items are the
 bar's own `TaskbarButton` chip, not Material's `TextButton`. Mobile's dialogs move onto it in later steps. `scripts/check-ui-rules.sh` lists the raw dialogs left (`raw-dialog`, off until its last site is
 moved).
+
+**The anchored menu (Droidtop/tracker#827).** An item's own menu opens beside the item: `AnchoredMenu` in `:ui-shared`
+(`ui-shared/.../gamepad/AnchoredMenu.kt`), the anchored menu of DESIGN-LANGUAGE ("beside the item, up to 8 rows, L2").
+It is the sheet of choices' own body (`ActionSheetBody`: the same rows and the same pad handling), placed below the
+item and start-aligned with it, above it when there is no room below, and held inside the window by the window's edge
+gutter (`anchoredMenuPosition`, pure and unit-tested). It shows about eight rows and scrolls beyond them; a tap outside
+it closes it. The item's place is recorded with `Modifier.anchorFor` into an `AnchorRect` (screen pixels, as the menu
+is a window of its own). `ActionSheet` is `AnchoredMenu` with no anchor, centred; inside an in-game overlay the menu is
+centred too, since the overlay's popup does not share the shell's coordinates. `AppOptionsMenu` takes an anchor: in
+Gaming the Apps grid's tiles and the Games grid's cards pass theirs (L2 or a long press), so an app's or game's menu
+opens beside it; Home's shelves and the system view's Continue Playing row still open it centred, and the game menu
+(`PcGameMenu`) stays centred, as it has pages and is a work panel. Desktop's taskbar menus (a window's, a pin's, an
+Android app's, one of droidtop's own screens', the clipboard notice's) open beside their button: above the bar, or
+below it when the bar is at the top, since the placement takes the side with room. A right-click on those items opens
+the same menu as a long press, and is consumed there; only droidtop's bar has it, never the container's surface.
 
 **Run once with…, and Manage (owner, 2026-10-23, Droidtop/tracker#636).** The owner, asked to run MGQ Paradox's
 translation updater under Wine while Enginehost plays the game: "We can set the game type. We can probably also do a

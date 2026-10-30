@@ -33,16 +33,8 @@ import java.util.WeakHashMap
 object InWindowKeyboard {
     private const val HIDE_DELAY_MS = 150L
 
-    /** Root views with an [OwnFieldKeyboard] composed in them, counted. Weak: a gone window is forgotten. */
-    private val ownFieldRoots = WeakHashMap<View, Int>()
-
     /** Activities already watched. Weak keys, plain values: nothing here keeps an activity alive. */
     private val attached = WeakHashMap<Activity, Boolean>()
-
-    internal fun ownFieldShown(root: View, shown: Boolean) {
-        val count = (ownFieldRoots[root] ?: 0) + if (shown) 1 else -1
-        if (count <= 0) ownFieldRoots.remove(root) else ownFieldRoots[root] = count
-    }
 
     /**
      * The text field of a droidtop window that droidtop's keyboard serves right now ([KeyboardTargets.servesField]),
@@ -188,7 +180,7 @@ object InWindowKeyboard {
 
         private fun wanted(): Boolean {
             val displayId = decor.display?.displayId ?: return false
-            if ((ownFieldRoots[decor] ?: 0) > 0) return false
+            if (OwnFieldWindows.has(decor)) return false
             val focused = decor.findFocus() ?: return false
             if (!focused.onCheckIsTextEditor()) return false
             if (!KeyboardTargets.servesField(displayId)) return false

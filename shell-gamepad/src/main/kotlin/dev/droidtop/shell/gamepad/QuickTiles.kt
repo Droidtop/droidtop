@@ -29,16 +29,6 @@ import dev.droidtop.library.settings.UiMode
  * setting to the catalog and a tile for it appears here, with no edit to
  * this file.
  */
-enum class QuickGlyph {
-    NETWORK, VOLUME, BRIGHTNESS, MOON, ROTATE, TIMER, BLUETOOTH, VPN,
-    DISPLAY, GAMEPAD, SWAP, UPDATE, ANDROID, EXIT, SETTINGS, BATTERY, GENERIC,
-    // The rail's own marks and the rows added with the branching panel.
-    APPS, BELL, GAUGE, DOWNLOAD, POWER, AIRPLANE,
-    // The companion's tabs (docs/SPEC.md "The companion's tabs"), drawn by the same rail.
-    HOME, KEYBOARD, PEOPLE, MORE,
-    // Tiles that drew GENERIC, the placeholder ring, until each had its own (Droidtop/tracker#534).
-    CAMERA, STOP, SECOND_SCREEN, LOCATION, FLASHLIGHT, PLUGIN,
-}
 
 /**
  * The Quick Menu's sections: the icon rail (docs/SPEC.md "Quick Menu: a

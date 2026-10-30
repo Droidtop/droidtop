@@ -261,6 +261,8 @@ internal fun AppsSection(
     var sortOpen by remember { mutableStateOf(false) }
     LaunchedEffect(filterOpen) { TaskManager.refresh(context) }
     var optionsFor by remember { mutableStateOf<LibraryEntry?>(null) }
+    // Where the tile whose menu is open is on the screen, so the menu opens beside it (Droidtop/tracker#827).
+    var optionsAnchor by remember { mutableStateOf<AnchorRect?>(null) }
 
     val toggleHidden: (LibraryEntry) -> Unit = { entry ->
         val nowHidden = !entry.hidden
@@ -404,7 +406,10 @@ internal fun AppsSection(
                             columns = GamingPrefs.appsGridColumns(context),
                             firstTileFocus = if (sectionIndex == 0) firstFocus else null,
                             onLaunch = onLaunch,
-                            onOptions = { optionsFor = it },
+                            onOptions = { entry, anchor ->
+                                optionsAnchor = anchor
+                                optionsFor = entry
+                            },
                             onFocusedEntryChanged = onFocusedEntryChanged,
                         )
                     } else {
@@ -412,7 +417,10 @@ internal fun AppsSection(
                             homeSection,
                             firstCardFocus = if (sectionIndex == 0) firstFocus else null,
                             onShowDetail = onShowDetail,
-                            onOptions = { optionsFor = it },
+                            onOptions = {
+                                optionsAnchor = null
+                                optionsFor = it
+                            },
                             onFocusedEntryChanged = onFocusedEntryChanged,
                             onToggleFavorite = onToggleFavorite,
                         )
@@ -509,6 +517,7 @@ internal fun AppsSection(
                 startUninstall(context, entry.id)
             },
             onDismiss = { optionsFor = null },
+            anchor = optionsAnchor,
         )
     }
 }
@@ -526,7 +535,8 @@ internal fun AppIconGrid(
     columns: Int,
     firstTileFocus: FocusRequester?,
     onLaunch: (LibraryEntry) -> Unit,
-    onOptions: (LibraryEntry) -> Unit,
+    // The tile's entry, and where the tile is on the screen for its menu to open beside.
+    onOptions: (LibraryEntry, AnchorRect?) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
 ) {
     Column {
@@ -568,7 +578,7 @@ internal fun AppIconGrid(
                     entry = entry,
                     modifier = if (index == 0 && firstTileFocus != null) Modifier.focusRequester(firstTileFocus) else Modifier,
                     onLaunch = { onLaunch(entry) },
-                    onOptions = { onOptions(entry) },
+                    onOptions = { anchor -> onOptions(entry, anchor) },
                     onFocused = { onFocusedEntryChanged(entry) },
                 )
             }
@@ -584,13 +594,17 @@ internal fun AppIconTile(
     entry: LibraryEntry,
     modifier: Modifier = Modifier,
     onLaunch: () -> Unit,
-    onOptions: () -> Unit = {},
+    // Given where the tile is on the screen, so its menu opens beside it (Droidtop/tracker#827).
+    onOptions: (AnchorRect?) -> Unit = {},
     onFocused: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
+    val bounds = rememberAnchor()
+    val openOptions = { onOptions(bounds.value) }
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .anchorFor(bounds)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
@@ -608,7 +622,7 @@ internal fun AppIconTile(
                     // Droidtop/tracker#621). X and Y are the list's (Filter
                     // and Sort By) and bubble to the section around the grid.
                     GamepadAction.L2 -> {
-                        onOptions()
+                        openOptions()
                         true
                     }
                     else -> false
@@ -620,7 +634,7 @@ internal fun AppIconTile(
             // A long press opens the app's menu, as a long press does on
             // every thing (owner, 2026-10-23, Droidtop/tracker#610); Mark as
             // game is a row of that menu.
-            .padRow(onClick = onLaunch, onLongClick = onOptions)
+            .padRow(onClick = onLaunch, onLongClick = openOptions)
             // The shell's ONE selection idiom, the same one [GameCard]
             // and the menus draw: the accent ring over a brightened
             // surface, so both grids of the shell give one answer to "what

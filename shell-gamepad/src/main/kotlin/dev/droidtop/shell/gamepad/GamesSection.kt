@@ -192,6 +192,8 @@ internal fun GamesSection(
     var sortVersion by remember { mutableIntStateOf(0) }
     // The focused game's own menu, from L2 or a long press on its card (Droidtop/tracker#621 M6).
     var optionsFor by remember { mutableStateOf<LibraryEntry?>(null) }
+    // Where that game's card is on the screen, so the menu opens beside it (Droidtop/tracker#827); null centres it.
+    var optionsAnchor by remember { mutableStateOf<AnchorRect?>(null) }
     val firstFocus = remember { FocusRequester() }
     val context = LocalContext.current
 
@@ -1019,7 +1021,10 @@ internal fun GamesSection(
                                     HomeSection("Continue Playing", continuePlaying),
                                     firstCardFocus = null,
                                     onShowDetail = onShowDetail,
-                                    onOptions = { optionsFor = it },
+                                    onOptions = {
+                                        optionsAnchor = null
+                                        optionsFor = it
+                                    },
                                     onFocusedEntryChanged = onFocusedEntryChanged,
                                     modifier = Modifier.align(Alignment.TopStart).padding(top = 16.dp),
                                     onToggleFavorite = onToggleFavorite,
@@ -1169,15 +1174,20 @@ internal fun GamesSection(
                         verticalArrangement = Arrangement.spacedBy(24.dp),
                     ) {
                         gridItemsIndexed(games, key = { _, entry -> entry.id }) { index, entry ->
+                            val cardBounds = rememberAnchor()
                             GameCard(
                                 entry = entry,
                                 modifier = Modifier
+                                    .anchorFor(cardBounds)
                                     .focusRequester(pad.requester(index))
                                     .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier),
                                 // A opens the details, where Play is (Droidtop/tracker#641).
                                 onActivate = { onShowDetail(entry) },
                                 onShowDetail = { onShowDetail(entry) },
-                                onOptions = { optionsFor = entry },
+                                onOptions = {
+                                    optionsAnchor = cardBounds.value
+                                    optionsFor = entry
+                                },
                                 onFocused = {
                                     pad.focused = index
                                     onFocusedEntryChanged(entry)
@@ -1208,6 +1218,7 @@ internal fun GamesSection(
                 onToggleFavorite(entry)
             },
             onDismiss = { optionsFor = null },
+            anchor = optionsAnchor,
         )
     }
 }

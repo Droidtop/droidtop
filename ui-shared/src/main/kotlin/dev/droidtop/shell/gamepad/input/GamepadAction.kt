@@ -1,0 +1,230 @@
+package dev.droidtop.shell.gamepad.input
+
+import android.view.KeyEvent
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.nativeKeyCode
+import dev.droidtop.library.controller.FaceRole
+
+/**
+ * What a press MEANS -- the one vocabulary every screen in the shell reads
+ * (docs/SPEC.md 6e). It is real ES-DE's own `es_input.xml` vocabulary
+ * (a/b/x/y/start/select/up/down/left/right/l/r/l2/r2/l3/r3), which is
+ * also what a theme's `<helpsystem>` glyphs are keyed to, and it is
+ * LOGICAL, not physical: [A] is "accept" and [B] is "back one level"
+ * whichever face button the person chose for them, and a keyboard's Enter
+ * is [A] and Escape is [B]. What each one means in droidtop:
+ *
+ * - [A] accept, [B] back one level, [X] the focused thing's toggle
+ *   (favourite), [Y] the focused thing's detail or info;
+ * - [UP]/[DOWN]/[LEFT]/[RIGHT] move;
+ * - [L]/[R] previous/next tab of the nearest tab strip, else of the top
+ *   bar (a keyboard's Page Up/Page Down and Shift+Tab/Tab);
+ * - [R2] the Quick Menu (a held Select is the same press, for pads whose
+ *   triggers send no key), [START] the left menu, [SELECT] the options of the
+ *   list or screen you are on, [L2] the focused thing's own menu (a held Start is the
+ *   same press, as a held Select is R2's);
+ * - [BACK] the system back key. It belongs to the back dispatcher
+ *   (`BackHandler`), never to a key handler, so a long press of it still
+ *   reaches the activity.
+ */
+enum class GamepadAction {
+    A, B, X, Y, START, SELECT,
+    UP, DOWN, LEFT, RIGHT,
+    L, R, L2, R2, L3, R3,
+    BACK,
+    ;
+
+    /** A direction repeats while it is held; nothing else does. */
+    val isDirection: Boolean get() = this == UP || this == DOWN || this == LEFT || this == RIGHT
+}
+
+/**
+ * The ONE table from a key to the [GamepadAction] it means, and the label
+ * and key code the hint bar uses for each action (docs/SPEC.md 6e). Pad
+ * buttons and the keyboard are in the same table, so no screen keeps a
+ * key list of its own.
+ */
+object GamepadKeyMap {
+    /**
+     * Key code to action, BEFORE the face-button swap. Android's key codes
+     * are plain constants, so this is a pure table the unit tests read
+     * directly.
+     *
+     * The keyboard rows are SPEC 6's "a keyboard is treated as a pad":
+     * arrows are the D-pad, Enter is A, Escape is B, Space is X, Backspace
+     * is Y, the menu key is Select, F10 is R2, and Page Up/Page Down and
+     * Shift+Tab/Tab are L1/R1 -- the top bar is never a D-pad focus target
+     * (SPEC 7j), so a keyboard needs its own route to the shoulders that
+     * cycle the sections. A focused text field takes its own keys first.
+     */
+    fun physicalAction(keyCode: Int, shift: Boolean = false): GamepadAction? = when (keyCode) {
+        KeyEvent.KEYCODE_BUTTON_A,
+        KeyEvent.KEYCODE_DPAD_CENTER,
+        KeyEvent.KEYCODE_ENTER,
+        KeyEvent.KEYCODE_NUMPAD_ENTER,
+        -> GamepadAction.A
+        KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_ESCAPE -> GamepadAction.B
+        KeyEvent.KEYCODE_BACK -> GamepadAction.BACK
+        KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_SPACE -> GamepadAction.X
+        KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_DEL -> GamepadAction.Y
+        KeyEvent.KEYCODE_BUTTON_START -> GamepadAction.START
+        KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_MENU -> GamepadAction.SELECT
+        KeyEvent.KEYCODE_DPAD_UP -> GamepadAction.UP
+        KeyEvent.KEYCODE_DPAD_DOWN -> GamepadAction.DOWN
+        KeyEvent.KEYCODE_DPAD_LEFT -> GamepadAction.LEFT
+        KeyEvent.KEYCODE_DPAD_RIGHT -> GamepadAction.RIGHT
+        KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_PAGE_UP -> GamepadAction.L
+        KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_PAGE_DOWN -> GamepadAction.R
+        KeyEvent.KEYCODE_TAB -> if (shift) GamepadAction.L else GamepadAction.R
+        KeyEvent.KEYCODE_BUTTON_L2 -> GamepadAction.L2
+        KeyEvent.KEYCODE_BUTTON_R2, KeyEvent.KEYCODE_F10 -> GamepadAction.R2
+        KeyEvent.KEYCODE_BUTTON_THUMBL -> GamepadAction.L3
+        KeyEvent.KEYCODE_BUTTON_THUMBR -> GamepadAction.R3
+        else -> null
+    }
+
+    /**
+     * Keys a text field types or moves with. A PREVIEW handler sees a key
+     * before the focused field does, so it leaves these alone; otherwise a
+     * menu around a search box would eat its space bar.
+     */
+    fun isTextKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_DEL || keyCode == KeyEvent.KEYCODE_TAB
+
+    /**
+     * The action [keyCode] means, the swap applied. The swap is a fact about
+     * the active PAD's face buttons ([ControllerLayouts], read live: a
+     * handheld's own layout toggle changes it at any time), so a keyboard's
+     * own Enter and Escape are outside it: Enter confirms and Escape cancels
+     * whatever a pad's buttons say. DPAD_CENTER stays inside it, because it
+     * is what Android re-sends for a pad's unhandled bottom face button
+     * (`Generic.kcm`), and the system back key stays back.
+     */
+    fun actionFor(keyCode: Int, shift: Boolean = false): GamepadAction? {
+        val action = physicalAction(keyCode, shift) ?: return null
+        val keyboardOnly = keyCode == KeyEvent.KEYCODE_ENTER ||
+            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ||
+            keyCode == KeyEvent.KEYCODE_ESCAPE
+        return if (keyboardOnly) action else applySwap(action)
+    }
+
+    /** [actionFor] for a Compose [Key]. */
+    fun actionFor(key: Key): GamepadAction? = actionFor(key.nativeKeyCode)
+
+    /**
+     * The swap, in ONE place, applied to the meaning rather than to the
+     * table: A and B trade what they mean, and so do X and Y (the four
+     * buttons are one diamond, and the layout turns it as a whole); every
+     * other action is untouched. [ControllerLayouts.layout] is snapshot
+     * state, so a composable that reaches here through [labelFor] redraws
+     * when the layout changes, and the key path reads the same value.
+     */
+    private fun applySwap(action: GamepadAction): GamepadAction {
+        if (!ControllerLayouts.layout.swapped) return action
+        return when (action) {
+            GamepadAction.A -> GamepadAction.B
+            GamepadAction.B -> GamepadAction.A
+            GamepadAction.X -> GamepadAction.Y
+            GamepadAction.Y -> GamepadAction.X
+            else -> action
+        }
+    }
+
+    /**
+     * The reverse: the Android key code an on-screen touch affordance
+     * dispatches to MEAN this action. Touch does not get its own copy of
+     * what a press does -- it sends the real key event and every handler
+     * treats it as the press it is (see `rememberGamepadTouch`).
+     */
+    fun keyCodeFor(action: GamepadAction): Int = when (applySwap(action)) {
+        GamepadAction.A -> KeyEvent.KEYCODE_BUTTON_A
+        GamepadAction.B -> KeyEvent.KEYCODE_BUTTON_B
+        GamepadAction.X -> KeyEvent.KEYCODE_BUTTON_X
+        GamepadAction.Y -> KeyEvent.KEYCODE_BUTTON_Y
+        GamepadAction.START -> KeyEvent.KEYCODE_BUTTON_START
+        GamepadAction.SELECT -> KeyEvent.KEYCODE_BUTTON_SELECT
+        GamepadAction.UP -> KeyEvent.KEYCODE_DPAD_UP
+        GamepadAction.DOWN -> KeyEvent.KEYCODE_DPAD_DOWN
+        GamepadAction.LEFT -> KeyEvent.KEYCODE_DPAD_LEFT
+        GamepadAction.RIGHT -> KeyEvent.KEYCODE_DPAD_RIGHT
+        GamepadAction.L -> KeyEvent.KEYCODE_BUTTON_L1
+        GamepadAction.R -> KeyEvent.KEYCODE_BUTTON_R1
+        GamepadAction.L2 -> KeyEvent.KEYCODE_BUTTON_L2
+        GamepadAction.R2 -> KeyEvent.KEYCODE_BUTTON_R2
+        GamepadAction.L3 -> KeyEvent.KEYCODE_BUTTON_THUMBL
+        GamepadAction.R3 -> KeyEvent.KEYCODE_BUTTON_THUMBR
+        GamepadAction.BACK -> KeyEvent.KEYCODE_BACK
+    }
+
+    /**
+     * What a key IS on the pad, said by POSITION, for a person checking
+     * that droidtop reads their controller (onboarding's Controller step).
+     *
+     * Deliberately not [labelFor]: that says what a press MEANS, which is
+     * the thing the face-button question is about. Android's own gamepad
+     * key codes are positional -- `KEYCODE_BUTTON_A` is the bottom face
+     * button whatever the plastic says -- so this reads them that way and
+     * never claims to know what is printed on the pad.
+     */
+    fun positionName(key: Key): String? = when (key) {
+        Key.ButtonA, Key.DirectionCenter -> "the bottom face button"
+        Key.ButtonB -> "the right face button"
+        Key.ButtonX -> "the left face button"
+        Key.ButtonY -> "the top face button"
+        Key.ButtonL1 -> "the left shoulder"
+        Key.ButtonR1 -> "the right shoulder"
+        Key.ButtonL2 -> "the left trigger"
+        Key.ButtonR2 -> "the right trigger"
+        Key.ButtonThumbLeft -> "the left stick press"
+        Key.ButtonThumbRight -> "the right stick press"
+        Key.ButtonStart -> "Start"
+        Key.ButtonSelect -> "Select"
+        Key.DirectionUp -> "up on the d-pad"
+        Key.DirectionDown -> "down on the d-pad"
+        Key.DirectionLeft -> "left on the d-pad"
+        Key.DirectionRight -> "right on the d-pad"
+        else -> null
+    }
+
+    /**
+     * The label the hint bar shows for [action]: what is PRINTED on the
+     * button that does it on the active pad ([ControllerLayouts.layout]).
+     * An Xbox pad says A, a Nintendo pad says A on the right-hand button, a
+     * PlayStation pad says its cross, and a handheld whose layout toggle is
+     * flipped names the button that now confirms, so a hint for "confirm"
+     * always points at a real button.
+     */
+    fun labelFor(action: GamepadAction): String {
+        val layout = ControllerLayouts.layout
+        return when (action) {
+            GamepadAction.A -> layout.glyph(FaceRole.CONFIRM)
+            GamepadAction.B, GamepadAction.BACK -> layout.glyph(FaceRole.CANCEL)
+            GamepadAction.X -> layout.glyph(FaceRole.X)
+            GamepadAction.Y -> layout.glyph(FaceRole.Y)
+            GamepadAction.START -> "Start"
+            GamepadAction.SELECT -> "Select"
+            GamepadAction.UP -> "▲"
+            GamepadAction.DOWN -> "▼"
+            GamepadAction.LEFT -> "◄"
+            GamepadAction.RIGHT -> "►"
+            // The printed names: the shoulders carry "L1"/"R1" beside
+            // "L2"/"R2" on the pads droidtop targets, and a hint reading "R"
+            // next to an "R2" chip left which one was meant to the reader.
+            GamepadAction.L -> "L1"
+            GamepadAction.R -> "R1"
+            GamepadAction.L2, GamepadAction.R2 -> triggerLabel(action, ControllerLayouts.triggerless)
+            GamepadAction.L3 -> "L3"
+            GamepadAction.R3 -> "R3"
+        }
+    }
+
+    /**
+     * L2's and R2's names: the printed ones, or on a pad with no triggers the hold that stands in for each (a held
+     * Start is L2, a held Select R2), so the hint names a press the pad can make (Droidtop/tracker#621 M9). Pure.
+     */
+    fun triggerLabel(action: GamepadAction, triggerless: Boolean): String = when (action) {
+        GamepadAction.L2 -> if (triggerless) "Hold Start" else "L2"
+        GamepadAction.R2 -> if (triggerless) "Hold Select" else "R2"
+        else -> error("$action is not a trigger")
+    }
+}

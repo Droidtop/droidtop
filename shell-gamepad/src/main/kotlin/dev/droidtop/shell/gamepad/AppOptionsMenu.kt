@@ -17,7 +17,8 @@ import dev.droidtop.library.settings.CatalogScreen
  * droidtop's lists; this is the person's override, also on a long press),
  * then Hide from droidtop and Uninstall (Android's own prompt) for an installed app.
  * Controller-first like every menu here: Up/Down moves, A chooses, B closes,
- * and every row is a touch target.
+ * and every row is a touch target. With [anchor] it opens beside the item it
+ * is the menu of ([AnchoredMenu], Droidtop/tracker#827); without one, centred.
  */
 @Composable
 internal fun AppOptionsMenu(
@@ -35,10 +36,12 @@ internal fun AppOptionsMenu(
     onToggleHidden: (() -> Unit)? = null,
     onUninstall: (() -> Unit)? = null,
     detailsLabel: String = "App details",
+    // Where the item is on the screen, so the menu opens beside it; null opens it centred.
+    anchor: AnchorRect? = null,
 ) {
     // The game that is running leads with its own sheet, this menu one row into it (Droidtop/tracker#740).
     RunningGameFirst(entry, onDismiss) {
-        AppOptionsSheet(entry, onPrimary, onDetails, onToggleFavorite, onDismiss, isGame, onMarkGame, hidden, onToggleHidden, onUninstall, detailsLabel)
+        AppOptionsSheet(entry, onPrimary, onDetails, onToggleFavorite, onDismiss, isGame, onMarkGame, hidden, onToggleHidden, onUninstall, detailsLabel, anchor)
     }
 }
 
@@ -55,6 +58,7 @@ private fun AppOptionsSheet(
     onToggleHidden: (() -> Unit)?,
     onUninstall: (() -> Unit)?,
     detailsLabel: String,
+    anchor: AnchorRect?,
 ) {
     // What plugins offer on this app (C4, Droidtop/tracker#67): the same page as Standard's long-press menu.
     var pluginScreen by remember(entry) { mutableStateOf<CatalogScreen?>(null) }
@@ -100,7 +104,7 @@ private fun AppOptionsSheet(
             add(ActionRow("Close", onSelect = onDismiss))
         }
     }
-    ActionSheet(title = entry.title, rows = options, onDismiss = onDismiss)
+    AnchoredMenu(anchor = anchor, title = entry.title, rows = options, onDismiss = onDismiss)
 }
 
 /** Android's own uninstall prompt for [packageName]; it asks its own confirmation and refuses a system app. */

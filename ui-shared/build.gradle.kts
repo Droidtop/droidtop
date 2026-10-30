@@ -41,6 +41,16 @@ dependencies {
     // The text-entry slab (Slab, SlabView) that TextEntry hosts (docs/SPEC.md 4c, Droidtop/tracker#485 S7).
     api(project(":input-keyboard"))
     implementation(libs.androidx.core.ktx)
+    // The design tokens and the theme palette (docs/SPEC.md, Droidtop/tracker#827 F1b): GamingTheme holds the palette
+    // for its host's lifecycle.
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    // The component set (Droidtop/tracker#827 F1b part 3): PadFocusHolder places the focus again on a return to its
+    // window, and a catalog row's picture (CatalogGlyph) is drawn by the image loader, as it was in :shell-gamepad.
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.coil.compose)
+    // The settings renderer (Droidtop/tracker#827 F1b part 4): CatalogNavigator takes Back through the activity's back
+    // dispatcher and opens Android's folder and document pickers, as it did in :shell-gamepad.
+    implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)

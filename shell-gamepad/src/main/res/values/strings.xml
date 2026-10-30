@@ -18,8 +18,6 @@
     <string name="reading">Reading…</string>
     <string name="scrape_offer_title">Fetch box art and details for your games?</string>
     <string name="page_not_in_build">This page is not available in this build.</string>
-    <string name="paste">Paste</string>
-    <string name="cancel">Cancel</string>
     <string name="windows_setup_title">Windows games need a one-time download</string>
     <string name="no_games_match_view">No games match this view</string>
     <string name="run_with_wine_instead">Run with Wine instead</string>

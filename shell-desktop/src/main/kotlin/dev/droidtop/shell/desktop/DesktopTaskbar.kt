@@ -49,6 +49,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.hostbridge.DesktopWindows
@@ -98,7 +102,9 @@ import dev.droidtop.shell.gamepad.AppIcon
 import dev.droidtop.shell.gamepad.currentShellWindow
 import dev.droidtop.shell.gamepad.ActionNote
 import dev.droidtop.shell.gamepad.ActionRow
-import dev.droidtop.shell.gamepad.ActionSheet
+import dev.droidtop.shell.gamepad.AnchoredMenu
+import dev.droidtop.shell.gamepad.anchorFor
+import dev.droidtop.shell.gamepad.rememberAnchor
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.StatusCluster
 import dev.droidtop.shell.gamepad.hosted.HostedArt
@@ -234,12 +240,12 @@ internal val BAR_ONE_ROW_MIN = 600.dp
  * so no window row could show even with windows open (Droidtop/tracker#94).
  */
 @Composable
-internal fun TaskbarButton(onClick: () -> Unit, content: @Composable () -> Unit) {
+internal fun TaskbarButton(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     // A flat chip in the Gaming palette, not Material's filled pill (Droidtop/tracker#555 D4).
     androidx.compose.material3.Surface(
         onClick = onClick,
         // 48 dp, the touch target every one of droidtop's controls keeps (DESIGN-LANGUAGE, Droidtop/tracker#690).
-        modifier = Modifier.padding(horizontal = 3.dp).heightIn(min = 48.dp),
+        modifier = modifier.padding(horizontal = 3.dp).heightIn(min = 48.dp),
         shape = dev.droidtop.shell.gamepad.MenuTokens.RowShape,
         color = dev.droidtop.shell.gamepad.MenuTokens.Card,
         contentColor = dev.droidtop.shell.gamepad.MenuTokens.OnSurface,
@@ -355,6 +361,7 @@ internal fun TaskbarWindowList(
 internal fun TaskbarOwnScreenRow(screen: OwnScreen, onOpen: () -> Unit, onClose: () -> Unit) {
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
+    val anchor = rememberAnchor()
     Box {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -362,6 +369,8 @@ internal fun TaskbarOwnScreenRow(screen: OwnScreen, onOpen: () -> Unit, onClose:
             modifier = Modifier
                 .widthIn(max = 180.dp)
                 .heightIn(min = 48.dp)
+                .anchorFor(anchor)
+                .onSecondaryClick { menuOpen = true }
                 .combinedClickable(onClick = onOpen, onLongClick = { menuOpen = true })
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(horizontal = 10.dp),
@@ -371,7 +380,8 @@ internal fun TaskbarOwnScreenRow(screen: OwnScreen, onOpen: () -> Unit, onClose:
         }
         if (menuOpen) {
             val close = stringResource(R.string.desktop_close)
-            ActionSheet(
+            AnchoredMenu(
+                anchor = anchor.value,
                 title = screen.title,
                 rows = listOf(ActionRow(close, onSelect = { menuOpen = false; onClose() })),
                 onDismiss = { menuOpen = false },
@@ -404,6 +414,7 @@ internal fun TaskbarWindowRow(
     onPlace: ((DesktopWindows.Placement) -> Unit)? = null,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    val anchor = rememberAnchor()
     Box {
         // The app's icon ahead of the title, so windows of different programs tell apart at a glance (#689).
         Row(
@@ -411,6 +422,8 @@ internal fun TaskbarWindowRow(
             modifier = Modifier
                 .widthIn(max = 180.dp)
                 .heightIn(min = 48.dp)
+                .anchorFor(anchor)
+                .onSecondaryClick { menuOpen = true }
                 .combinedClickable(onClick = onTap, onLongClick = { menuOpen = true })
                 .background(
                     if (minimized) {
@@ -452,12 +465,37 @@ internal fun TaskbarWindowRow(
                 }
                 add(ActionRow(close, onSelect = { menuOpen = false; onClose() }))
             }
-            ActionSheet(title = windowTitle(toplevel), rows = rows, onDismiss = { menuOpen = false })
+            AnchoredMenu(anchor = anchor.value, title = windowTitle(toplevel), rows = rows, onDismiss = { menuOpen = false })
         }
     }
 }
 
 internal fun windowTitle(toplevel: Toplevel): String = toplevel.title.ifBlank { toplevel.appId.ifBlank { "(untitled window)" } }
+
+/**
+ * A press of a mouse's secondary button on a taskbar item runs [onOpen], the item's menu, as a long press does
+ * (Droidtop/tracker#827). Seen ahead of the item's own click and consumed until its release, so it is not also a
+ * tap. Only droidtop's own bar has it; the container's surface gets its pointer untouched. [onOpen] only sets
+ * remembered state, so the handler is installed once.
+ */
+private fun Modifier.onSecondaryClick(onOpen: () -> Unit): Modifier =
+    pointerInput(Unit) {
+        awaitPointerEventScope {
+            // From the secondary press to its release, the item's own click sees nothing.
+            var secondary = false
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                    secondary = true
+                    event.changes.forEach { it.consume() }
+                    onOpen()
+                } else if (secondary) {
+                    event.changes.forEach { it.consume() }
+                    if (event.type == PointerEventType.Release) secondary = false
+                }
+            }
+        }
+    }
 
 /**
  * What is pinned to the taskbar (docs/SPEC.md 2b, Droidtop/tracker#348): each pin as its picture, when it has
@@ -470,6 +508,7 @@ internal fun TaskbarPinChips(pins: List<TaskbarPin>, onOpen: (TaskbarPin) -> Uni
     LazyRow(modifier = Modifier.widthIn(max = 260.dp), verticalAlignment = Alignment.CenterVertically) {
         items(pins, key = { it.key }) { pin ->
             var menuOpen by remember { mutableStateOf(false) }
+            val anchor = rememberAnchor()
             Box {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -477,6 +516,8 @@ internal fun TaskbarPinChips(pins: List<TaskbarPin>, onOpen: (TaskbarPin) -> Uni
                     modifier = Modifier
                         .widthIn(max = 140.dp)
                         .heightIn(min = 48.dp)
+                        .anchorFor(anchor)
+                        .onSecondaryClick { menuOpen = true }
                         .combinedClickable(onClick = { onOpen(pin) }, onLongClick = { menuOpen = true })
                         .padding(horizontal = 8.dp),
                 ) {
@@ -490,7 +531,8 @@ internal fun TaskbarPinChips(pins: List<TaskbarPin>, onOpen: (TaskbarPin) -> Uni
                 }
                 if (menuOpen) {
                     val unpin = stringResource(R.string.desktop_unpin)
-                    ActionSheet(
+                    AnchoredMenu(
+                        anchor = anchor.value,
                         title = pin.title,
                         rows = listOf(ActionRow(unpin, onSelect = { menuOpen = false; onUnpin(pin) })),
                         onDismiss = { menuOpen = false },
@@ -505,6 +547,7 @@ internal fun TaskbarPinChips(pins: List<TaskbarPin>, onOpen: (TaskbarPin) -> Uni
 @Composable
 internal fun TaskbarAppRow(app: RunningApp, onOpen: () -> Unit, onClose: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
+    val anchor = rememberAnchor()
     Box {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -512,6 +555,8 @@ internal fun TaskbarAppRow(app: RunningApp, onOpen: () -> Unit, onClose: () -> U
             modifier = Modifier
                 .widthIn(max = 180.dp)
                 .heightIn(min = 48.dp)
+                .anchorFor(anchor)
+                .onSecondaryClick { menuOpen = true }
                 .combinedClickable(onClick = onOpen, onLongClick = { menuOpen = true })
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(horizontal = 10.dp),
@@ -527,7 +572,8 @@ internal fun TaskbarAppRow(app: RunningApp, onOpen: () -> Unit, onClose: () -> U
         }
         if (menuOpen) {
             val close = stringResource(R.string.desktop_close)
-            ActionSheet(
+            AnchoredMenu(
+                anchor = anchor.value,
                 title = app.label,
                 rows = listOf(ActionRow(close, onSelect = { menuOpen = false; onClose() })),
                 onDismiss = { menuOpen = false },
@@ -549,14 +595,16 @@ internal fun ClipboardNotice() {
     if (live) return
     val context = LocalContext.current
     var open by remember { mutableStateOf(false) }
+    val anchor = rememberAnchor()
     Box {
-        TaskbarButton(onClick = { open = !open }) {
+        TaskbarButton(onClick = { open = !open }, modifier = Modifier.anchorFor(anchor).onSecondaryClick { open = true }) {
             Text(stringResource(R.string.desktop_clipboard_on_focus))
         }
         if (open) {
             val title = stringResource(R.string.desktop_clipboard_on_focus)
             val switchKeyboard = stringResource(R.string.desktop_switch_keyboard)
-            ActionSheet(
+            AnchoredMenu(
+                anchor = anchor.value,
                 title = title,
                 rows = listOf(
                     ActionNote(dev.droidtop.hostbridge.ClipboardAccess.WHY_BLOCKED),
