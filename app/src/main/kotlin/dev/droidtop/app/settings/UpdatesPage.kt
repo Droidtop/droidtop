@@ -325,7 +325,9 @@ object UpdatesPage {
                     id = "updates_all",
                     label = "Update all",
                     enabled = installable.isNotEmpty(),
-                    disabledReason = "Nothing to update",
+                    // A row that opens its source's page has nothing for Update all to install: the button says so,
+                    // never "Nothing to update" beside rows (Droidtop/tracker#837).
+                    disabledReason = if (updates.isEmpty()) "Nothing to update" else "Each one opens its own page",
                 ) { ctx ->
                     // Each update is the row's own (tracked): the rest wait, each row changes as its own starts and ends.
                     waiting.addAll(installable.map { it.first })
@@ -441,6 +443,8 @@ object UpdatesPage {
         val published = LibraryCore.library(context).backgroundScanState(LibraryKinds.GAMES).value ?: return emptyList()
         return LibraryGrouping.group(published)
             .mapNotNull { group -> group.displayEntry.let { entry -> entry.availableUpdate?.let { Triple(entry, it, group) } } }
+            // One row per game: a game with a linked copy is one group, but its entry can appear in two (#745, #837).
+            .distinctBy { it.first.id }
             .sortedBy { it.first.title.lowercase() }
             .take(MAX_GAME_ROWS)
             .map { (entry, version, group) ->

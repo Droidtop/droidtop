@@ -281,7 +281,9 @@ fun CatalogNavigator(
     }
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val fillsPage = hostWidth >= screenWidth * PAGE_WIDTH_FRACTION
-    val categoryMode = fillsPage && categories.size >= MIN_SETTINGS_CATEGORIES
+    // A page drawn as a strip of views (Updates) is never cut into a column: its views are its groups (Droidtop/tracker#837,
+    // where Updates as a place drew each source row as a column entry of its own).
+    val categoryMode = fillsPage && categories.size >= MIN_SETTINGS_CATEGORIES && root.layout != dev.droidtop.library.settings.CatalogLayout.STRIP
     // Side by side only on a landscape window: held upright the two take turns, however wide the
     // window is (a 1080x1920 tablet is 720dp wide, which once put the column beside the pane).
     val twoPane = categoryMode && hostWidth >= TWO_PANE_MIN_WIDTH && !LocalShellWindow.current.portrait

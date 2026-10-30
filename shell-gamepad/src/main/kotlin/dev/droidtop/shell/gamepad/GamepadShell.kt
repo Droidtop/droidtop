@@ -1381,6 +1381,9 @@ internal fun GamepadShellBody(
                                     put(PcSource.IMPORTED_ITEM_ID, openGames { pcGames.showImported() })
                                     // Get games' Get new games row opens the search here, in place.
                                     put(dev.droidtop.library.integrations.GetGamesEntry.UPDATES_ROW_ID) { nav.openSection(GamingSection.NEW_GAMES) }
+                                    // Downloads and Updates' "Updates · N available" row opens the Updates place, the one page; as a
+                                    // link of its own it was a second Updates entry in the place's column (Droidtop/tracker#837).
+                                    put(dev.droidtop.library.integrations.PluginJobsScreen.UPDATES_LINK_ID) { nav.openSection(GamingSection.UPDATES) }
                                     put(dev.droidtop.library.integrations.GetGamesEntry.SEARCH_ROW_ID) { getGamesOpen = true }
                                 }
                             }

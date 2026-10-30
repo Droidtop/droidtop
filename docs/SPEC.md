@@ -19206,7 +19206,8 @@ menu still list every `listed` place.
   Now it is one page (`UpdatesPage`), first-class since 2026-10-30 (Droidtop/tracker#792; the owner: "We need a
   cleaner and more uniform updates page that covers everything (plugins, games, etc)"). The page's header says when
   the last check ran (or why droidtop's own check failed), its bar holds **Check now** and **Update all**, and its
-  views go on the strip (`CatalogLayout.STRIP`, L1/R1): All, then one per kind that has any, each with its count
+  views go on the strip (`CatalogLayout.STRIP`, L1/R1; a strip page is never cut into the settings column, and its
+  column keys are unique even for a game with a linked copy, Droidtop/tracker#837): All, then one per kind that has any, each with its count
   ("All · 5", "Plugins · 2", "Games · 1", "Apps · 1", "droidtop · 1"). Every row is the same shape whatever it updates:
   its icon or cover, its name, one line "installed → available · size · from where" ("v0.37 → v0.38 · 12 MB ·
   from the F95zone catalog"; `GameUpdates.step`, "unknown → v0.38" when the version here is not known, "a newer
