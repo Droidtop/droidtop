@@ -356,6 +356,7 @@ internal fun PillRow(content: @Composable () -> Unit) {
  */
 @Composable
 internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
+    val context = LocalContext.current
     val jobs by PluginJobsCenter.entries().collectAsState()
     val active = remember(jobs) { jobs.filter { !it.done } }
     val entries by CompanionState.libraryEntries.collectAsState()
@@ -414,6 +415,13 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
                     color = MaterialTheme.colorScheme.tertiary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    // Opens the one Updates list, where each has its Update and there is Update all (Droidtop/tracker#792).
+                    modifier = Modifier.clickable {
+                        context.startActivity(
+                            PlaceLinks.intent(context, dev.droidtop.library.settings.Place.UPDATES)
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    },
                 )
             }
         }

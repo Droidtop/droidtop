@@ -986,6 +986,9 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
     // explicit action, same as before.
     val runtimeGroup: List<CatalogItem> = listOfNotNull(runtimeItem(context, m.kind, m.label, runtimeNeed))
 
+    // Opening a plugin's page checks again when the last check is old, so its Update shows what is out now
+    // (Droidtop/tracker#792); the page redraws when the check ends.
+    dev.droidtop.app.update.UpdateChecks.refreshIfStale(context)
     val updateGroup = buildList<CatalogItem> {
         val listings = catalogListings
         val offer = catalogOffer
@@ -1002,7 +1005,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 ActionItem(
                     id = "plugin_${m.id}_version",
                     title = "Version ${m.version}",
-                    subtitle = if (listings.isEmpty()) "Catalog not fetched yet: open Add > Catalogs to check" else "No newer version on its channel in your catalogs",
+                    subtitle = if (listings.isEmpty()) "Checking the catalogs for a newer version" else "No newer version on its channel in your catalogs",
                 )
             },
         )

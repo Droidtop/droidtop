@@ -135,6 +135,32 @@ object UpdateChecks {
         line
     }
 
+    /**
+     * Checks now when the last check is older than [STALE_MS], for a place that shows what can update: the Updates
+     * list, Settings > About and a plugin's page (Droidtop/tracker#792). The list read what the last scheduled check
+     * had fetched, so a plugin published since (F95zone 0.7.1 on the console, a day after the daily check) did not show,
+     * and the owner found "no plugin, or DROIDTOP even, update path in the UI". Looking is asking: the check starts as
+     * the place opens and the place redraws as it ends. Not on a metered network when the person asked for Wi-Fi only.
+     * At most one started per [STALE_MS], so a place that redraws does not start another. Returns at once.
+     */
+    fun refreshIfStale(context: Context) {
+        val app = context.applicationContext
+        val now = System.currentTimeMillis()
+        val last = maxOf(lastCheck(app) ?: 0L, lastStartedMs)
+        if (!isStale(last, now)) return
+        if (AppSelfUpdate.unmeteredOnly(app) && isMetered(app)) return
+        lastStartedMs = now
+        dev.droidtop.runtime.util.AppScopes.io.launch { checkAll(app) {} }
+    }
+
+    /** Whether a check that ended (or started) at [lastMs] is too old to show at [nowMs]. Pure. */
+    internal fun isStale(lastMs: Long, nowMs: Long): Boolean = nowMs - lastMs >= STALE_MS
+
+    /** How old the last check may be before a place that shows updates checks again. */
+    internal const val STALE_MS = 15 * 60 * 1000L
+
+    @Volatile private var lastStartedMs = 0L
+
     /** The scheduled pass: the check, then each kind's policy; what is left to ask about is one notification. */
     suspend fun scheduled(context: Context) = withContext(Dispatchers.IO) {
         val app = context.applicationContext

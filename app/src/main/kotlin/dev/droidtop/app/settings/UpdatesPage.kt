@@ -201,7 +201,11 @@ object UpdatesPage {
     }
 
     private suspend fun rows(context: Context): List<CatalogItem> {
-        Section.entries.forEach { refresh(context, it) }
+        // Opening the list checks again when the last check is old, so it shows what is out now (Droidtop/tracker#792).
+        UpdateChecks.refreshIfStale(context)
+        // A section read before the last check ended is read again: the check fetched newer catalogs.
+        val checkedAt = UpdateChecks.lastCheck(context) ?: 0L
+        Section.entries.forEach { refresh(context, it, force = (kept[it]?.first ?: 0L) < checkedAt) }
         val slow = Section.entries.associateWith { kept[it]?.second }
         val updates = droidtop(context) + slow[Section.PLUGINS].orEmpty() + slow[Section.APPS].orEmpty() + games(context)
         // A section not read yet is one row of its own, loading; the rest of the page does not wait for it.

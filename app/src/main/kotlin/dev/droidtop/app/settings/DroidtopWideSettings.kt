@@ -118,21 +118,6 @@ object DroidtopWideSettings {
                         ),
                     ),
                 ),
-                // The one Updates screen, reachable from every mode's settings. Gaming also has it as a
-                // left-menu place (and the Quick Menu opens that place); all are links to this screen.
-                CatalogGroup(
-                    id = "global_updates",
-                    title = null,
-                    category = "System",
-                    items = listOf(
-                        dev.droidtop.library.settings.NestedScreenItem(
-                            id = "pref_global_updates", title = "Updates",
-                            subtitle = "droidtop, plugins and games with a newer version",
-                            registryId = AppSettingsCatalogs.SCREEN_UPDATES,
-                            icon = dev.droidtop.library.settings.CatalogIcon.SYSTEM_UPDATES,
-                        ),
-                    ),
-                ),
                 // Whether droidtop may change other apps for you (docs/SPEC.md "Risky actions"); off by default.
                 CatalogGroup(
                     id = "global_risky_actions",
@@ -251,6 +236,20 @@ object DroidtopWideSettings {
                     title = "About droidtop",
                     category = "System",
                     items = listOfNotNull(
+                        // The one Updates screen, in About where people look for it (Droidtop/tracker#792: "There's no plugin,
+                        // or DROIDTOP even, update path in the UI"). Gaming also has it as a left-menu place, and the Quick
+                        // Menu opens that place; all are links to this screen. Its value says when droidtop has a newer build.
+                        dev.droidtop.library.settings.NestedScreenItem(
+                            id = "pref_global_updates",
+                            title = "Updates",
+                            subtitle = "droidtop, plugins, apps and games with a newer version, and Update all",
+                            registryId = AppSettingsCatalogs.SCREEN_UPDATES,
+                            icon = dev.droidtop.library.settings.CatalogIcon.SYSTEM_UPDATES,
+                            valueLabel = { ctx ->
+                                dev.droidtop.app.update.AppSelfUpdate.newerSeenVersionName(ctx)?.let { "droidtop $it is out" }
+                                    ?: "Check for updates"
+                            },
+                        ),
                         ActionItem(
                             id = "pref_global_version",
                             title = "Version",

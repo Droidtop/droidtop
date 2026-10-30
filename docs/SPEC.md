@@ -18691,6 +18691,18 @@ menu still list every `listed` place.
   replaced the check that ran only when droidtop's process started, which a launcher's seldom does; the process start
   only makes sure the job is scheduled. `AppSelfUpdate.mayCheck` is its gate (a tenth early still counts, as Android
   runs a periodic job in a window before its period ends).
+  **Looking checks** (the owner on the console, 2026-10-29, Droidtop/tracker#792: "There's no plugin, or DROIDTOP even,
+  update path in the UI"; F95zone 0.7.1 had been out for hours and nothing showed it). The list, a plugin's page and
+  Settings > About read what the last check fetched, so after a daily check they could be a day behind. Opening any of
+  them now checks again when the last check is more than 15 minutes old (`UpdateChecks.refreshIfStale`; not on a
+  metered network when the person asked for Wi-Fi only), the check runs as the one job, and the list re-reads its
+  plugin and app sections when it ends. **Where Updates is reached:** the Quick Menu's Downloads tab; Settings > About
+  droidtop > Updates, whose value says when droidtop has a newer build ("droidtop 0.2.0-dev.2700 is out"; it was a
+  group of its own under System, now in About, one row); a plugin's page (its version and Update); the plugin list's
+  "N updates" row; the companion Home's "updates available" line, which opens it; and the "updates are ready"
+  notification. A plugin or core whose update asks for a new permission gets that permission only when the person
+  approves it ("Wants new access"), even when plugins install automatically; holding the whole update back until then
+  is the Plugins lane's.
   **Each kind asks or installs** (`UpdateKinds`, in Update settings): "Ask before installing" lists the update and
   posts one notification ("3 updates are ready", which opens Updates, replaced by the next check's); "Install
   automatically" installs after the scheduled check. droidtop asks by default, and installing it always ends with
