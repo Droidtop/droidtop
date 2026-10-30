@@ -3363,6 +3363,26 @@ the `ContainerRuntime` interface that already exists (§3):
     root shell the row says so, in place of a number.
   - Nothing is kept: each reading is made when asked for, and a stopped
     container has no row.
+  **Update its software (Droidtop/tracker#757 slice 4).** A container's
+  page has "Update its software", which asks first. It runs the
+  container's own package manager as root inside it (`PackageUpgrade`):
+  the first of apk, apt, dnf, pacman and zypper that the container has
+  (found inside it with `command -v`, so a droidspaces container whose
+  tree droidtop cannot read from outside works the same). Each manager
+  refreshes its package list and upgrades what is installed: `apk update`
+  and `apk upgrade`; `apt-get update` and `apt-get -y upgrade`
+  (noninteractive, keeping changed configuration files); `dnf -y upgrade`
+  without weak dependencies; `pacman -Syu --noconfirm`; `zypper refresh`
+  and `zypper update --no-recommends`. Never a distribution upgrade, so
+  nothing the person did not have is installed where the manager allows
+  it (pacman and dnf pull a new dependency an upgraded package needs, as
+  they must). The row says each step while it runs ("Refreshing the
+  package list (apt)", "Upgrading (apt)"), then what happened, read from
+  the manager's own output ("12 packages upgraded", "Already up to
+  date"), or the manager's last words when a step fails. A sibling that
+  needs starting is started first. droidtop never builds or changes an
+  image: this changes the container's own tree, as the person would in
+  its terminal.
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend

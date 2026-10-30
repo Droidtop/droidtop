@@ -43,6 +43,7 @@ import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerUsage
+import dev.droidtop.runtime.PackageUpgrade
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.CraneImageCatalogResolver
@@ -384,6 +385,7 @@ object ContainersCatalog {
             add(storageItem(diskUsageBytes))
             if (running) add(usageItem(runtime, container, usage))
             add(terminalItem(info, runtime, desktopUp))
+            add(updateSoftwareItem(info, runtime))
             add(
                 TextInputItem(
                     id = "container_name",
@@ -923,6 +925,41 @@ object ContainersCatalog {
         var n = 2
         while ("$base $n" in existing) n++
         return "$base $n"
+    }
+
+    /**
+     * "Update its software" (docs/SPEC.md 3d; Droidtop/tracker#757 slice 4): the container's own package manager,
+     * found inside it ([PackageUpgrade.FIND_SCRIPT]), refreshes and upgrades what is installed, as root, a step at a
+     * time on the row; it ends with what was upgraded or what the manager said when it failed.
+     */
+    private fun updateSoftwareItem(info: ContainerInfo, runtime: ContainerRuntime): CatalogItem {
+        val container = info.container
+        return AsyncActionItem(
+            id = "container_update_software",
+            title = "Update its software",
+            subtitle = "Upgrades what is installed in it with its own package manager (apk, apt, dnf, pacman or zypper). " +
+                "Nothing new is installed",
+            confirmTitle = "Upgrade the software in ${info.displayName}? Programs running in it may need restarting afterwards.",
+            run = { _, onStatus ->
+                if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart && !info.running) {
+                    onStatus("Starting it")
+                    runtime.start(container)
+                }
+                onStatus("Finding its package manager")
+                val root = dev.droidtop.runtime.ContainerUser.Spec("root", null)
+                val found = runtime.exec(container, listOf("/bin/sh", "-c", PackageUpgrade.FIND_SCRIPT), emptyMap(), root)
+                val manager = PackageUpgrade.byId(found.stdout)
+                    ?: error("it has none droidtop knows (apk, apt, dnf, pacman or zypper)")
+                var last = ""
+                for (step in manager.steps) {
+                    onStatus("${step.line} (${manager.label})")
+                    val result = runtime.exec(container, step.command, step.env, root)
+                    last = result.stdout + "\n" + result.stderr
+                    check(result.succeeded) { "${manager.label} stopped: ${PackageUpgrade.failureLine(last)}" }
+                }
+                PackageUpgrade.summary(manager, last) ?: "Done (${manager.label})"
+            },
+        )
     }
 
     private fun terminalItem(info: ContainerInfo, runtime: ContainerRuntime, desktopUp: Boolean): CatalogItem {
