@@ -13862,8 +13862,15 @@ it over the screen it is on and never navigates away to reach it:
 - then a link droidtop serves without a page (debrid, a host's API), then the person's host order (`HostOrder`, by
   default hosts that serve a file straight away before those that show a page), then the source's order.
 
-The one-press Get that tries them in turn, the host-order setting's screen, and the session page as a fallback with
-its reason are slice 2b; the record page's own rows stay pickable by hand.
+**Get the update** leads the record page's Downloads tab and the Updates record screen (two presses, as a download):
+- it tries the mirrors in that order, saying "Trying GOFILE", then "GOFILE started nothing. Trying MEGA";
+- a mirror that starts nothing gives way to the next, without opening the source's page; anything else (a download
+  that started, a check not passed, a sign-in declined) is the answer;
+- only when no mirror started anything does the source's page open, saying so ("No mirror started a download
+  (3 tried)").
+
+The rows below it stay pickable by hand, and a source result's page (a new game) lists its links as before.
+**Host order** is under Download rules: a press moves a host to the top, and Use the default order puts it back.
 
 **Getting an update: the source's record page (2026-10-17).** The owner, from
 the console: "we need actual update management. the f95 plugin surfaces

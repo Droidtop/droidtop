@@ -627,7 +627,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         }
         if (captured.isEmpty()) {
             Log.w(TAG, "update $source/$externalId: the web view started no download from ${dev.droidtop.pluginhost.NetScope.hostOf(url)}")
-            return "Nothing was downloaded from that page"
+            return dev.droidtop.library.DownloadPick.NOTHING_STARTED
         }
         val descriptors = UpdateLinks.descriptorsFor(captured)
         val title = "Download $name"

@@ -12,6 +12,9 @@ import dev.droidtop.pluginhost.DownloadSystems
 /** What A on a record row does. */
 sealed interface RecordAction {
     data class Download(val download: UpdateSources.Download) : RecordAction
+
+    /** droidtop's own pick (Droidtop/tracker#838): the build, the system and the host chosen, the mirrors tried in turn. */
+    data object GetBest : RecordAction
     data class Open(val url: String) : RecordAction
     data object Relink : RecordAction
 
@@ -106,8 +109,13 @@ fun partsLine(d: UpdateSources.Download): String? {
 fun downloadRows(record: UpdateSources.Record, picked: String?): List<RecordRow> {
     if (record.downloads.isEmpty()) return listOf(RecordRow("No downloads listed", subtitle = "The source lists no links for this version"))
     val offered = downloadSystems(record)
+    // droidtop's own pick first (Droidtop/tracker#838): one press, no link to choose; the rows below stay for picking by hand.
+    val get = listOfNotNull(
+        RecordRow("Get the update", subtitle = "droidtop picks the build and the host, and tries the next if one fails", action = RecordAction.GetBest)
+            .takeIf { DownloadPick.offers(record.downloads) },
+    )
     // Links that do not differ by system: the source's own list, as it gives it.
-    if (offered.isEmpty()) return groupedDownloads(record.downloads).map(::linkRow)
+    if (offered.isEmpty()) return get + groupedDownloads(record.downloads).map(::linkRow)
     val system = picked?.takeIf { it in offered } ?: DownloadSystems.first(offered)
     val head = listOfNotNull(
         if (offered.size >= 2) {
@@ -123,7 +131,7 @@ fun downloadRows(record: UpdateSources.Record, picked: String?): List<RecordRow>
     val (extras, other) = anySystem.partition { DownloadSystems.isExtra(it.section) || DownloadSystems.isExtra(it.label) }
     fun group(title: String, list: List<UpdateSources.Download>): List<RecordRow> =
         if (list.isEmpty()) emptyList() else listOf(RecordRow(title, subtitle = "For any system")) + groupedDownloads(list).map(::linkRow)
-    return head + links.ifEmpty { listOf(RecordRow("No links for $label")) } + group("Extras", extras) + group("Other", other)
+    return get + head + links.ifEmpty { listOf(RecordRow("No links for $label")) } + group("Extras", extras) + group("Other", other)
 }
 
 /** Where a record's Downloads keep the system last picked per source. */

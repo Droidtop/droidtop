@@ -165,6 +165,13 @@ object SourceRecordScreen {
                 confirmTitle = "Download this version? It lands beside your other versions",
                 run = { _, onStatus -> getDownload(library, facet.source, record, action.download, facet.gameName, facet.entry, onStatus) },
             )
+            RecordAction.GetBest -> AsyncActionItem(
+                id = id,
+                title = row.title,
+                subtitle = row.subtitle,
+                confirmTitle = "Get the update? droidtop picks the build and the host, and it lands beside your other versions",
+                run = { ctx, onStatus -> getBest(library, facet.source, record, facet.gameName, facet.entry, dev.droidtop.library.HostOrder.get(ctx), onStatus) },
+            )
             RecordAction.SignIn -> AsyncActionItem(
                 id = id,
                 title = row.title,

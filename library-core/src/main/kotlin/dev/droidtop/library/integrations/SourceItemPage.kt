@@ -119,7 +119,8 @@ object SourceItemPage {
         } else {
             null
         }
-        val rows = downloadRows(found, picked).filterNot { it.action == RecordAction.PickSystem }.mapIndexed { index, row ->
+        // Get the update is an update's (Droidtop/tracker#838); a source result's page lists its links as they are.
+        val rows = downloadRows(found, picked).filterNot { it.action == RecordAction.PickSystem || it.action == RecordAction.GetBest }.mapIndexed { index, row ->
             val id = "item_download_$index"
             when (val action = row.action) {
                 is RecordAction.Download -> AsyncActionItem(
@@ -185,7 +186,7 @@ object SourceItemPage {
                 }
             }
             val captured = PluginWebAccount.openForDownloads(context, record, url, DownloadJobs.MAX_FILES, refresh)
-            if (captured.isEmpty()) return "Nothing was downloaded from that page"
+            if (captured.isEmpty()) return dev.droidtop.library.DownloadPick.NOTHING_STARTED
             return said(AcquireDownload.run(context, record, title, hostContext, emptyMap(), UpdateLinks.descriptorsFor(captured), onStatus))
         }
 

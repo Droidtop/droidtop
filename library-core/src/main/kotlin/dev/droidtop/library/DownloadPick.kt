@@ -14,6 +14,19 @@ import android.content.Context
  *   the person's host order ([HostOrder]), then the rest in the source's order.
  */
 object DownloadPick {
+    /** What a link that started no download comes back as: the one sentence the pick reads as "try the next mirror". */
+    const val NOTHING_STARTED = "Nothing was downloaded from that page"
+
+    /** The systems droidtop runs [entry] with, best first: an Android app's own, else Windows (through Wine) then Linux. */
+    fun systemsFor(entry: LibraryEntry): List<String> =
+        if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) listOf("android") else listOf("windows", "linux")
+
+    /** Whether [entry] is a Steam copy, whose update is the source's "Steam" build. */
+    fun isSteamCopy(entry: LibraryEntry): Boolean = entry.id.startsWith("steam:")
+
+    /** Whether [downloads] hold a build droidtop could pick itself, so the record page offers Get the update. Pure. */
+    fun offers(downloads: List<UpdateSources.Download>): Boolean = downloads.any { it.role == "build" && it.official }
+
     /** [downloads], the record's, as the mirrors to try, best first; empty when none fits. Pure. */
     fun candidates(
         downloads: List<UpdateSources.Download>,

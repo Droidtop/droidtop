@@ -87,6 +87,18 @@ object DownloadRulesCatalog {
                 ),
             ),
             CatalogGroup(
+                id = "download_rules_pick",
+                title = "Picking a download",
+                items = listOf(
+                    dev.droidtop.library.settings.NestedScreenItem(
+                        id = "download_rules_host_order",
+                        title = "Host order",
+                        subtitle = "Which host droidtop tries first when it gets an update for you",
+                        inline = HostOrderCatalog.screen(),
+                    ),
+                ),
+            ),
+            CatalogGroup(
                 id = "download_rules_updates",
                 title = "Automatic updates",
                 items = listOf(

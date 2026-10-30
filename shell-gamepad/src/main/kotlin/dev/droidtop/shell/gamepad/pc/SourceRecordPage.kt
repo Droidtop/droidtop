@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.HostOrder
+import dev.droidtop.library.DownloadPick
 import dev.droidtop.library.UpdateSources
 import dev.droidtop.library.RecordAction
 import dev.droidtop.library.RecordRow
@@ -82,6 +84,9 @@ internal suspend fun getDownload(
     gameName: String,
     newest: LibraryEntry,
     say: (String) -> Unit,
+    // False while droidtop tries mirrors in turn (getBest): a link that starts nothing goes to the next mirror, not to
+    // the source's own page.
+    pageFallback: Boolean = true,
 ): String {
     val externalId = record.externalId
     // The game's own page on the source's site, opened in droidtop's web view when droidtop's own requests are turned
@@ -103,7 +108,9 @@ internal suspend fun getDownload(
         }
         return library.downloadUpdateParts(source.key, externalId, picked.parts, record.version, gameName, newest) { status -> say(status) }
     }
-    if (picked.url == null && sitePage != null && library.sourceNeedsCheck(source.key)) return pickOnSitePage()
+    if (picked.url == null && sitePage != null && library.sourceNeedsCheck(source.key)) {
+        return if (pageFallback) pickOnSitePage() else DownloadPick.NOTHING_STARTED
+    }
     // A site that checks the browser first: its check, then the rest (Droidtop/tracker#600).
     var checked = false
     if (library.sourceNeedsCheck(source.key)) {
@@ -124,18 +131,54 @@ internal suspend fun getDownload(
     }
     val url = use.url
     val outcome = if (url != null) {
-        library.openUpdateLink(source.key, externalId, url, record.url, record.version, gameName, newest) { status -> say(status) }
+        library.openUpdateLink(source.key, externalId, url, record.url.takeIf { pageFallback }, record.version, gameName, newest) { status -> say(status) }
     } else {
         library.downloadUpdate(source.key, externalId, use.link, record.version, gameName, newest) { status -> say(status) }
     }
     // The source's job was turned away by the site's check: the mirror is picked on the site's page instead.
-    if (url == null && sitePage != null && outcome.contains("checks the browser first")) return pickOnSitePage()
+    if (url == null && sitePage != null && outcome.contains("checks the browser first")) {
+        return if (pageFallback) pickOnSitePage() else DownloadPick.NOTHING_STARTED
+    }
     // Asked again right after a pass, with no page to open instead: said once, plainly, and the check is not opened again.
     return if (checked && outcome.contains("checks the browser first")) {
         "${source.label}'s site still asked for its check after it was passed, so nothing was downloaded"
     } else {
         outcome
     }
+}
+
+/**
+ * droidtop's own pick (Droidtop/tracker#838; the owner: "Downloads still don't auto-pick links"): the mirrors
+ * [DownloadPick] orders for [newest] (its build, the system droidtop runs it with, the person's host order, a link droidtop
+ * serves without a page first) are tried in turn. A mirror that starts nothing gives way to the next, said on the
+ * status line; anything else (a download that started, a check not passed, a sign-in declined) is the answer. Only
+ * when no mirror started anything does the source's own page open, with why.
+ */
+internal suspend fun getBest(
+    library: Library,
+    source: UpdateSources.Source,
+    record: UpdateSources.Record,
+    gameName: String,
+    newest: LibraryEntry,
+    hostOrder: List<String>,
+    say: (String) -> Unit,
+): String {
+    val candidates = DownloadPick.candidates(
+        record.downloads,
+        systems = DownloadPick.systemsFor(newest),
+        steamCopy = DownloadPick.isSteamCopy(newest),
+        order = hostOrder,
+        served = { d -> (d.url ?: d.parts.firstOrNull()?.url)?.let { dev.droidtop.pluginhost.hosts.HostLinks.served(it) } == true },
+    )
+    if (candidates.isEmpty()) return "${source.label} lists no build for this system, so pick a link below"
+    for ((index, candidate) in candidates.withIndex()) {
+        say(if (index == 0) "Trying ${candidate.host}" else "${candidates[index - 1].host} started nothing. Trying ${candidate.host}")
+        val outcome = getDownload(library, source, record, candidate, gameName, newest, say, pageFallback = false)
+        if (outcome != DownloadPick.NOTHING_STARTED) return outcome
+    }
+    val page = record.url?.takeIf { it.startsWith("https://") } ?: return "No mirror started a download (${candidates.size} tried)"
+    say("No mirror started a download (${candidates.size} tried). Pick one on ${source.label}'s page")
+    return library.openUpdateLink(source.key, record.externalId, page, null, record.version, gameName, newest) { status -> say(status) }
 }
 
 /** The system [step] away from [picked] among [offered], wrapping round. */
@@ -256,6 +299,18 @@ internal fun SourceRecordPage(
                     // Asked again, so a switch shows what the source now says.
                     asked++
                 }
+            }
+            RecordAction.GetBest -> {
+                if (armed != index) {
+                    armed = index
+                    return
+                }
+                armed = null
+                val current = record ?: return
+                onClose()
+                say("Getting ${current.version?.let { "v" + it.removePrefix("v") } ?: "the new version"}...")
+                val order = HostOrder.get(context)
+                scope.launch { say(getBest(library, source, current, gameName, newest, order, say)) }
             }
             is RecordAction.Download -> {
                 // Two presses: the first says what the second does (the design language's two-step confirm).
