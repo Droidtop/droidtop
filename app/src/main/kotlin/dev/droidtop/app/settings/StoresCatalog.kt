@@ -326,8 +326,7 @@ internal object StoresCatalog {
                     ChoiceItem(
                         id = "stores_auto_sync",
                         title = "Sync store libraries automatically",
-                        subtitle = "When the Gaming shell opens, signed-in stores last read longer ago than this are read again, on Wi-Fi " +
-                            "and other unmetered networks only. Nothing runs in the background",
+                        subtitle = "When Gaming opens, stores read longer ago are read again, on unmetered networks only",
                         options = StoreAutoSync.Interval.entries.map { ChoiceOption(it.name, it.label) },
                         current = StoreAutoSync.interval(context).name,
                         onSelect = { ctx, value -> StoreAutoSync.setInterval(ctx, StoreAutoSync.Interval.valueOf(value)) },

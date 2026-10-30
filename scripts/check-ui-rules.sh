@@ -94,7 +94,7 @@ done
 # Today's copy is over in places, so this is a ratchet, not a rule: COPY_CEILING is the count at the last copy pass
 # and only comes down. --check fails when the count rises above it; the commit that shortens copy lowers it to the
 # new count. --all (the fixture test) allows none.
-COPY_CEILING=19
+COPY_CEILING=0
 budget() { sed -n '/"copyWarnings"/,/}/p' "$self/docs/view-limits/plugin-view-limits.json" | sed -n "s/.*\"$1\": *\([0-9]*\).*/\1/p"; }
 title_max="$(budget title)"
 body_max="$(budget body)"

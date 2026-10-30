@@ -68,9 +68,7 @@ object LinuxGameToolsCatalog {
                     ToggleItem(
                         id = "linux_tools_own_home",
                         title = "Give this game its own home folder",
-                        subtitle = "Off: the game uses the container's home, as it always has, and its saves stay where they are. " +
-                            "On: from its next start the game's home and XDG folders are a folder only this game uses. " +
-                            "Saves already in the container's home are not moved",
+                        subtitle = "On: from its next start this game has its own home folder. Existing saves stay put",
                         current = ownHome,
                         onToggle = { ctx, on -> withContext(Dispatchers.IO) { LinuxGameOptionsPrefs.setOwnHome(ctx, target.entryId, on) } },
                     ),

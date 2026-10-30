@@ -440,8 +440,7 @@ object UpdatesPage {
                             ChoiceItem(
                                 id = "updates_frequency",
                                 title = "Check for updates",
-                                subtitle = "How often droidtop asks every source for updates: its own build, the plugin and app catalogs, the " +
-                                    "stores. Nothing about this device or your library is sent. Never stops the automatic checks; Check now still works",
+                                subtitle = "How often droidtop, the catalogs and the stores are checked. Nothing about you is sent",
                                 options = AppSelfUpdate.Frequency.entries.map { ChoiceOption(it.name, it.label) },
                                 current = update.frequency(context).name,
                                 onSelect = { ctx, value ->

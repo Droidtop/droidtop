@@ -1300,8 +1300,7 @@ object GamingSettingsCatalog {
                 ChoiceItem(
                     id = "companion_idle",
                     title = "Dim the companion screen",
-                    subtitle = "With no input, the companion screen dims after this and turns its backlight down 3 minutes later; " +
-                        "what it shows stays drawn. Social, a chat and the keyboard keep it on",
+                    subtitle = "With no input it dims after this, and its backlight 3 minutes later. Chats keep it on",
                     options = dev.droidtop.runtime.CompanionIdle.DIM_CHOICES_MS.map {
                         ChoiceOption(it.toString(), dev.droidtop.runtime.CompanionIdle.dimLabel(it))
                     },

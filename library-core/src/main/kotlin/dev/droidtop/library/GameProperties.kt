@@ -48,8 +48,7 @@ object GameProperties {
                 TextInputItem(
                     id = "properties_launch_options",
                     title = "Launch options",
-                    subtitle = "Added after the program's own arguments, one argument per word; use quotes around a word with spaces. " +
-                        "Handed to the program as it is, never through a shell",
+                    subtitle = "Added after the program's own, one per word; quote words with spaces. Never run by a shell",
                     value = options,
                     onChange = { ctx, text ->
                         withContext(Dispatchers.IO) {

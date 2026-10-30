@@ -50,8 +50,7 @@ internal object FoldersCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Game folders",
-        subtitle = "Where droidtop looks for games. Console games go in a folder named for their system (snes, psx) " +
-            "inside one of these; PC and engine games can be anywhere under them",
+        subtitle = "Where droidtop looks for games. Console games go in a folder per system (snes, psx) inside",
         groups = { context -> groups(context) },
         // The search index must not read the library: it gets the rows that never change.
         indexGroups = { listOf(actionsGroup(shortcuts = null), byPathGroup()) },
@@ -144,8 +143,7 @@ internal object FoldersCatalog {
                         ActionItem(
                             id = "folders_root_remove_${root.path}",
                             title = "Remove this folder",
-                            subtitle = "droidtop stops looking here. Its games leave the library, and adding it back restores them. " +
-                                "Nothing on the device is deleted",
+                            subtitle = "Its games leave the library until you add it back. Nothing on the device is deleted",
                             confirmTitle = "Stop looking in ${root.path}?",
                             run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, root.path) },
                         ),

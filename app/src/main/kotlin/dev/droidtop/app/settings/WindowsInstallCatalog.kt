@@ -50,8 +50,7 @@ object WindowsInstallCatalog {
                             FolderPickItem(
                                 id = "windows_install_target",
                                 title = if (chosen == null) "Install into a folder of mine (optional)" else "Install into: ${chosen.path}",
-                                subtitle = "Without one, the game is installed inside the new prefix and none of your folders is written to. " +
-                                    "With one, the installer sees that folder as a drive and you choose it there",
+                                subtitle = "The installer sees it as a drive. Without one, the game goes in the new prefix",
                                 onPicked = { _, uri ->
                                     val folder = withContext(Dispatchers.IO) { GamesRootPrefs.resolveStoragePath(uri) }
                                     if (folder == null) {
@@ -76,8 +75,7 @@ object WindowsInstallCatalog {
                             DocumentPickItem(
                                 id = "windows_install_pick",
                                 title = "Choose the installer",
-                                subtitle = "A GOG offline installer (setup_*.exe) or any setup program. Its files are taken out without " +
-                                    "running it; a program that cannot be unpacked runs in a new Windows prefix. Nothing is copied or moved",
+                                subtitle = "A GOG offline installer (setup_*.exe) or any setup program, unpacked if it can be",
                                 mimeType = "*/*",
                                 onPicked = { ctx, uri ->
                                     val file = withContext(Dispatchers.IO) { PickedFiles.fileOf(uri) }

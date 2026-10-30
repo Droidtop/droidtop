@@ -88,8 +88,7 @@ object PluginCatalogScreen {
         id = ID,
         title = "More catalogs",
         needsNetwork = true,
-        subtitle = "Other places plugins are listed. They are not part of droidtop and droidtop has not vetted them: " +
-            "you read each one's notice before it is added",
+        subtitle = "Other plugin lists, not droidtop's and not vetted. You read each notice before adding it",
         groups = { context -> catalogsGroups(context) },
     )
 
@@ -257,8 +256,7 @@ object PluginCatalogScreen {
                     AsyncActionItem(
                         id = "plugins_catalogs_proposal_accept",
                         title = "Accept and add",
-                        subtitle = "You accept the notice above. Plugins from the publishers listed can then be installed and updated " +
-                            "from this catalog, marked Unofficial; each still runs only after you approve it",
+                        subtitle = "Its publishers' plugins can then install, marked Unofficial; each runs once you approve it",
                         gate = gate,
                         confirmTitle = "Accept the notice of \"${proposal.info.name}\"" +
                             (if (newOrigins > 0) " and trust its $newOrigins publisher${if (newOrigins == 1) "" else "s"}?" else "?"),

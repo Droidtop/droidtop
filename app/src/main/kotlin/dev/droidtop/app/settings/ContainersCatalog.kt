@@ -619,8 +619,7 @@ object ContainersCatalog {
         return ToggleItem(
             id = "container_socket_microphone",
             title = "Microphone",
-            subtitle = "Lets programs in the desktop record from the device's microphone, for voice chat and calls. " +
-                "Applies from the desktop's next start, and works while droidtop is on screen",
+            subtitle = "Desktop programs may use the microphone, for calls. From the next start, droidtop in front",
             current = DesktopSetupPrefs.microphone(context) && granted,
             onToggle = { ctx, on ->
                 val allowed = ctx.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED

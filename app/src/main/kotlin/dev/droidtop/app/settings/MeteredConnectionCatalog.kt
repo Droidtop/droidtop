@@ -108,9 +108,7 @@ object MeteredConnectionCatalog {
             ActionItem(
                 id = "metered_always_wifi_permission",
                 title = "Always allow on this Wi-Fi",
-                subtitle = "Needs the location permission: Android tells an app which Wi-Fi it is on only with it. droidtop " +
-                    "would use it for this alone, to remember this network for downloads. We do not recommend granting it; " +
-                    "\"This network is not metered\" above does the same without it",
+                subtitle = "Needs location, only to know this Wi-Fi. Not recommended: use \"not metered\" above",
                 confirmTitle = "Ask Android for the location permission, only to remember this Wi-Fi for downloads? Not recommended.",
                 run = { ctx ->
                     if (MeteredGrants.canNameWifi(ctx)) {

@@ -1901,8 +1901,7 @@ internal suspend fun AppSettingsCatalogs.appKeysGroup(context: Context): Catalog
 internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
     id = SCREEN_PLUGIN_KEYS,
     title = "Keys you trust",
-    subtitle = "Origins whose plugin signatures droidtop verifies. The official one is certified inside droidtop itself; " +
-        "any other is one YOU chose to trust: third-party, not official, and droidtop has not vetted it",
+    subtitle = "Signers droidtop checks plugins against. Any but the official one is yours, not vetted",
     groups = { context ->
         val userKeys = withContext(Dispatchers.IO) { UserOriginKeys.load(UserOriginKeys.storeFile(context)) }
         // The pinned signing root is read from the APK's resources on first use: off the main thread.
@@ -1972,9 +1971,7 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                     TextInputItem(
                         id = "plugin_keys_source_url",
                         title = "Source address",
-                        subtitle = "A GitHub plugin repo (https://github.com/<owner>/<repo>), a catalog index ending in .json, " +
-                            "or a plain https address. droidtop fetches the key it publishes and asks you to trust it below; " +
-                            "plain http addresses are refused",
+                        subtitle = "A GitHub repo, a catalog's .json index or an https address; its key is fetched to trust",
                         value = pendingKeySourceUrl,
                         onChange = { _, v -> pendingKeySourceUrl = v.trim() },
                     ),
@@ -1995,8 +1992,7 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                     TextInputItem(
                         id = "plugin_keys_manual_origin",
                         title = "Origin id",
-                        subtitle = "The origin's own id, e.g. acme; every plugin it signs carries it in its name (<origin>.<name>). " +
-                            "It can never be \"${PluginOriginKeys.OFFICIAL_ORIGIN}\": that is the official origin",
+                        subtitle = "The id in its plugins' names (<origin>.<name>), e.g. acme",
                         value = pendingKeyManualOrigin,
                         onChange = { _, v -> pendingKeyManualOrigin = v.trim() },
                     ),

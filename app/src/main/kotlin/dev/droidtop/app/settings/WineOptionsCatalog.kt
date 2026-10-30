@@ -79,8 +79,7 @@ object WineOptionsCatalog {
                         ActionItem(
                             id = "wine_options_where",
                             title = "Runs in the shared prefix",
-                            subtitle = "Changes here are this game's own and apply when it starts; the shared settings stay as they are. " +
-                                "Choosing another Wine build makes it a prefix of its own.",
+                            subtitle = "This game's own changes, from its next start. Another Wine build gives it its own prefix",
                             // A count of this game's own settings over the
                             // shared prefix, not of prefixes: "1 of its own"
                             // under this title read as if a prefix had been
@@ -113,8 +112,7 @@ object WineOptionsCatalog {
                     ActionItem(
                         id = "wine_options_other_builds",
                         title = "Games on another Wine build",
-                        subtitle = "A game that chose its own Wine build runs in a prefix of its own and starts on that build, not the one above. " +
-                            "Change it under that game's Wine and graphics",
+                        subtitle = "Games on their own Wine build use their own prefix; change it in the game's Wine settings",
                         value = state.otherBuilds.entries.joinToString(", ") { (build, games) -> if (games > 1) "$build x$games" else build },
                     ),
                 )
@@ -265,8 +263,7 @@ object WineOptionsCatalog {
 internal fun windowsSetupItem(provisioned: Boolean, state: WindowsSetup.State): AsyncActionItem = AsyncActionItem(
     id = "windows_provision",
     title = if (provisioned) "Reinstall the Windows environment" else "Set up Windows games",
-    subtitle = "Downloads the Wine build, graphics driver and Windows system files, then makes the one Windows environment " +
-        "every Windows game runs in. Asks first; uses the game folders you have added.",
+    subtitle = "Downloads Wine, a graphics driver and Windows files to run Windows games. Asks first",
     value = WindowsSetup.label(state),
     confirmTitle = if (provisioned) "Reinstall the Windows environment?" else "Download Windows system files?",
     run = { ctx, onStatus ->
