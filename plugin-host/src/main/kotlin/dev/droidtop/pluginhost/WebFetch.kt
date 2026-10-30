@@ -21,8 +21,8 @@ import org.json.JSONObject
 /**
  * A page fetched by droidtop's web view instead of its HTTP client (Droidtop/tracker#600): Cloudflare tells
  * droidtop's client from a browser by more than cookies and user agent, so on a host that has shown a check a plugin's
- * GET is loaded by an off-screen web view with the cookies it would have sent, and the plugin gets the page's final
- * HTML as an ordinary answer. A check the view passes by itself (most do, in a few seconds) is waited for; one that
+ * GET is loaded by a web view out of sight ([HiddenWebViews]) with the cookies it would have sent, and the plugin gets
+ * the page's final HTML as an ordinary answer. A check the view passes by itself (most do, in a few seconds) is waited for; one that
  * still shows after [SETTLE_MS] is the person's to pass, as before. Blocking: never on the main thread.
  */
 object WebFetch {
@@ -67,6 +67,9 @@ object WebFetch {
         view.settings.allowContentAccess = false
         view.settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         jar.setAcceptThirdPartyCookies(view, true)
+        // In droidtop's window, out of sight: a page in no window never finishes a check (Droidtop/tracker#783).
+        val shown = HiddenWebViews.attach(view)
+        Log.i(TAG, "$host: fetching in ${if (shown) "droidtop's window, out of sight" else "no window: no droidtop screen is in front"}")
         val handler = Handler(Looper.getMainLooper())
         val startedAt = System.currentTimeMillis()
         var status = 200
@@ -76,6 +79,7 @@ object WebFetch {
             done.complete(result)
             handler.post {
                 view.stopLoading()
+                HiddenWebViews.detach(view)
                 view.destroy()
             }
         }
