@@ -122,7 +122,6 @@ internal object InGameOverlays {
         val (view, lifecycle) = overlayView(windowContext, request.displayId) {
             when (request.kind) {
                 OverlayRequest.Kind.QUICK_MENU -> QuickMenuStandalone(
-                    library = library,
                     // Start swaps to the left menu, as it does in Gaming.
                     onOpenStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
                     onDismiss = { close() },
@@ -147,6 +146,8 @@ internal object InGameOverlays {
                         entry = entry,
                         // The game never left: Play is closing the overlay.
                         onResume = { close() },
+                        // Restart, once the game really ended: the one launch path, as the shell's.
+                        onLaunch = { scope.launch { runCatching { library.launch(it) }.onFailure { e -> Log.w(TAG, "restart of ${it.title} failed", e) } } },
                         onOpenDownloads = { open(PlaceLinks.intent(app, Place.DOWNLOADS)) },
                         onDismiss = { close() },
                     )

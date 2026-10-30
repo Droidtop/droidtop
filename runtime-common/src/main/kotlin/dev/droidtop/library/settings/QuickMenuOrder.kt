@@ -17,7 +17,6 @@ object QuickMenuOrder {
 
     /** The Quick Menu's sections in droidtop's own order, with their names: the order a fresh install shows. */
     val DEFAULT: List<Pair<ControlPanel, String>> = listOf(
-        ControlPanel.GAME to "Game",
         ControlPanel.APPS to "Running apps",
         ControlPanel.NOTIFICATIONS to "Notifications",
         // Steam's Friends, moved off the left menu (owner, 2026-10-24: "Game sources go into the qam, as does social").

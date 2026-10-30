@@ -587,7 +587,7 @@ class WineGameActivity : Activity() {
         if (winHandler?.onKeyEvent(event) == true) return true
         if (keyboard?.onKeyEvent(event) == true) return true
         // Only a back press nothing else wanted leaves the game, and it does not end it: the shell
-        // comes forward with its Quick Menu on the Game section (Resume, Restart, Stop). The order
+        // comes forward with the running game's sheet (Resume, Restart, Quit, Kill). The order
         // matters: several pads report their B button as KEYCODE_BACK.
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP) openQuickMenu()

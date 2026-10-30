@@ -357,7 +357,6 @@ fun DesktopShell(
         }
         if (quickMenuOpen) {
             QuickMenuStandalone(
-                library = library,
                 onOpenStartMenu = {
                     quickMenuOpen = false
                     startMenuOpen = true

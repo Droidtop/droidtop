@@ -4099,16 +4099,26 @@ the `ContainerRuntime` interface that already exists (§3):
     this app/game/etc").** Every tool for the thing in front is reached from HOME + L2: its guides and walkthroughs and
     notes (#817), cheats and the memory editor (#720), achievements, saves and states, its own settings, its controls
     and Report a problem. Nothing contextual goes in R2, nothing global in L2.
+  - **L2 on the running game in Gaming opens the same sheet** (`RunningGameFirst`, #740): the game menus
+    (`PcGameMenu`, `AppOptionsMenu`) lead with `RunningGameSheet` when their game is the one running, and its Game
+    options row opens the menu itself; inside it the menu does not lead with the sheet again. Resume and Restart
+    launch the shell's one way (`onLaunch`). Coming back to the shell while the game runs opens the sheet too (7f,
+    "Return to the game").
   - HOME + L2 is the menu of what is in front, contextual like L2 itself:
     - the game droidtop launched (in front, or with nothing else known to be): its own overlay
-      (`GameOptionsStandalone`), a surface of its own: the game's name and what runs it, **Resume** (closes the
-      overlay; the game never left), **Pause the game** for a console game (RetroArch's `PAUSE_TOGGLE` over its
-      command port, `RetroArchCommands`, sent only on that press; pressed again carries on), **Guides** (the game's
-      guides over it, the game menu's own `GuidesScreen`; 7i "Guides"; B comes back), **Game options** (what L2
-      opens on the game in Gaming: a PC or engine game's `PcGameMenu`, whose Game page is drawn over the game too, or
-      a console game's game menu, `AppOptionsMenu`, whose Game details is Gaming's detail screen; B there comes back),
-      and **Quit** and **Kill**, each on a second press, ending it the shell's way (`Library.quitRunning`,
-      `killRunning`) and closing the overlay once it has ended. Nothing else ever pauses the game;
+      (`GameOptionsStandalone`), a surface of its own that draws **the running game's sheet** (`RunningGameSheet`,
+      the one L2 on the running game opens in Gaming too, #740): the game's name and what runs it, **Resume** (closes
+      the overlay; the game never left), **Pause the game** for a console game (RetroArch's `PAUSE_TOGGLE` over its
+      command port, `RetroArchCommands`, sent only on that press; pressed again carries on), **Emulator** (the game's
+      own choice, `GameEmulatorChoice`), **Report a problem**, **Mouse mode** and **Controls** for a game in
+      droidtop's own screen, **Guides** (the game's guides over it, the game menu's own `GuidesScreen`; 7i "Guides";
+      B comes back), the console's **Search** where the host has one (Gaming), **Game options** (what L2 opens on the
+      game in Gaming: a PC or engine game's `PcGameMenu`, whose Game page is drawn over the game too, or a console
+      game's game menu, `AppOptionsMenu`, whose Game details is Gaming's detail screen; B there comes back), and
+      **Quit**, **Restart** and **Kill**, ending it the shell's way (`Library.quitRunning`, `killRunning`), asking
+      first in the one `ConfirmDialog` when `GameControls.asks` says so, saying the outcome on the row and closing
+      the sheet once it has ended; Restart starts the game again only then. The rows a mode shows are
+      `GameControls.rows`' (Kid and Kiosk get fewer). Nothing else ever pauses the game;
     - another app, Android's Settings included (`AppInFrontStandalone`): its name, **Resume**, **Close the app** on a
       second press (`TaskManager.close`, its outcome on the row) and **App info** (Android's page for it);
     - droidtop's own screen: that screen's own context menu, the one L2 opens there (droidtop's foreground screen is
@@ -4134,11 +4144,11 @@ the `ContainerRuntime` interface that already exists (§3):
   place ("1st", "2nd"), and picking a section for a place swaps it with the one there (`QuickMenuOrder`, the one list in
   preferences the rail and that screen both read, with the section names). A section droidtop adds later comes in at
   its own place.
-  - **Game** (only while a game is parked, first when present): the Game section below. **Quit is back** beside
-    Restart (owner, 2026-10-23: "Quit still exists on the companion, so it should exist in the quick menu"): the gentle
-    end, asking first like Restart; Kill stays the header's force-stop. Whether its Quit, Restart and
-    its Kill pill need the second A is `GameControls.needsSecondPress` (Droidtop/tracker#414, slice C8): the same
-    decision the companion's Game tab asks by, so turning Ask before stopping off makes both act at once.
+  - **No Game section (moved to L2, 2026-10-30, Droidtop/tracker#740;** the owner: "r2 is the global menu. L2 is
+    everything we can do contextually for this app/game/etc", answering "6: Yes" to moving it). What it held (Resume,
+    Emulator, Report a problem, Mouse mode, Controls, the console's search, Quit, Restart and Kill) is the running
+    game's L2 sheet, `RunningGameSheet`, below; nothing is in both. Performance (the overlay and the performance mode,
+    which apply to every game) stays here. The companion's Game tab keeps all of its rows.
   - **Running apps**: the task manager's list with Close and Clear all (`AppsTab`, #245, #252).
   - **Notifications**: unchanged (`NotificationsTab`, grant row when access is missing, #180).
   - **Social** (moved off the left menu 2026-10-24, Droidtop/tracker#644 slice 3; owner: "Game sources go into the
@@ -4513,7 +4523,7 @@ a close path of its own. Every call works off the main thread.
   "Ending <game>…" at once, then nothing when it ended or the reason where it was pressed, as well as on the
   banner; after 15 s without an outcome they say it has not ended yet, and the stop goes on.
 - **The running game's session ends in one place** (`SessionMonitor`, `SessionLiveness`, Droidtop/tracker#289,
-  #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, Quick Menu Game section,
+  #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, the running game's L2 sheet,
   companion Game tab and Now card, keep-awake) follows it and none polls for itself. `SessionMonitor` looks
   at the game's package while a session stands (every 3 s in the first minute after a start, where launches
   die, then every 15 s) and ends it (`clearRunning`) when the app looks gone on two looks in a row: the
@@ -4538,7 +4548,7 @@ a close path of its own. Every call works off the main thread.
 - **Close current app (superseded 2026-10-02).** A "Close <app>" tile on the System tab ran the same
   `TaskManager.close` as the Game section's Kill row and the Running apps list's X. With the Quick Menu
   branching into sections it was a third route to one job and is gone: the app in front is closed from
-  Running apps, and a game that is parked from the Game section.
+  Running apps, and the running game from its L2 sheet (#740).
 - **One running-apps list, and what a non-privileged app can know** (`TaskManager.snapshot`,
   `RunningApp`: name, package, display id, task id). Android hides other apps' tasks from a normal app:
   `getRunningTasks` and `getRunningAppProcesses` return only the caller's own, `getAppTasks` only
@@ -4979,7 +4989,7 @@ droidtop 0.2.0-dev.1931).
   only while that tile is on a Home that is on screen); a stat tile is not a live region. A pin for a control that needs the helper app is not
   drawn without it; a pin whose grant is missing shows its grant row. Kid and Kiosk keep volume and brightness,
   cannot edit, and Home shows nothing past the pins there (`ControlAccess`). Then the sections:
-  1. **Now**: the running game (`LaunchDisplay.running`, the same parked launch the Quick Menu's Game section
+  1. **Now**: the running game (`LaunchDisplay.running`, the same parked launch the running game's L2 sheet
      uses, now an observable flow carrying when the session started): art, name, this session's time, Resume
      (a relaunch of the entry, the Quick Menu's resume), Quit (`Library.quitRunning`, the one quit path both
      surfaces call, which clears the running state only on a confirmed end) and Controls (the System tab).
@@ -5130,7 +5140,7 @@ droidtop 0.2.0-dev.1931).
   ("Disconnect"). `GameControls.asks` is the one decision whether a row asks first: the runner's or a plugin's
   `confirm` flag; **Ask before stopping** (Companion group, on by default) for Quit, Restart, Kill, an Apps row's
   Stop and Clear all; **Ask before load and overwrite** (on by default) for plugin rows flagged `confirm`; and Kid
-  and Kiosk always ask. The Quick Menu's Game section reads the same decision. The question starts on Keep playing,
+  and Kiosk always ask. The running game's L2 sheet reads the same decision. The question starts on Keep playing,
   the two answers large and well apart; a pad press that reaches the companion while it is open closes it as
   Cancel and says "Cancelled. Tap Quit on this screen to quit." Restart is the one quit, then the one launch.
 - **The one question (Droidtop/tracker#786 S2a, 2026-10-30).** Every question the companion asks is `CompanionAsk`:
@@ -8086,7 +8096,7 @@ pointer (a Unity configuration window, say) works without touching the screen:
 - R1 clicks and L1 right-clicks (or, per game, A and B), held for a drag;
 - the moving stick's own click held turns that stick into a wheel (up to 12 steps a second);
 - the other buttons and the other stick still reach the game; the stick that moves the pointer does not;
-- both stick clicks held 0.6 s turn it on or off at any time, and the Quick Menu's Game section has a Mouse mode row;
+- both stick clicks held 0.6 s turn it on or off at any time, and the running game's L2 sheet has a Mouse mode row;
   a "Mouse mode" badge in the top corner shows while it is on, and TalkBack hears the change;
 - remembered per game (`PadMousePrefs`); off by default, unless the game's runner says it needs a mouse (none says so
   yet; `PadMouse.initial`).
@@ -8123,7 +8133,7 @@ percent, in screen widths the sink scales; in `joystick_move` mode it is passed 
 (`output_joystick` 0 left, 1 right, else the stick it came from). Pure; time is passed in. Chords, turbo, joystick
 camera, scroll wheel, menus and layers come next, then the Wine sink and the defaults; until then
 Controller mouse mode above is the pad's only pointer. **The Wine sink** (`LayoutDriver`): a Windows
-game's Quick Menu Game section has a Controls row that steps through Gamepad (no layout, the default), "Keyboard
+game's L2 sheet has a Controls row that steps through Gamepad (no layout, the default), "Keyboard
 and mouse" and "Mouse only", kept per game (`WineControls`, `WineControlsPrefs`). "Mouse only" is for point-and-click
 games: left stick the pointer, A click, B right-click, the bumpers scroll, the d-pad the arrows, X Enter, Y Space, Start
 Escape (`res/raw/controls_mouse_only.vdf`). A "Gamepad with mouse" layout is not offered: Android gives both sticks in
@@ -8145,8 +8155,8 @@ the `gestureConfig` launch override (`Container.LAUNCH_OVERRIDE_KEYS`), so a sha
 
 **Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
 Back in a Windows game does **not** end it: it brings the shell forward with
-the Gaming Quick Menu open on its Game section (Resume, Restart, Stop with two
-presses; §7f, tracker#258), the one in-game menu, with no menu of its own in the
+the running game's sheet open (Resume first, then the rest of what L2 offers on
+it, Quit, Restart and Kill asking first; §7f, tracker#740), the one in-game menu, with no menu of its own in the
 game screen. `WineGameActivity` registers itself with `OwnGameScreens`
 (`:library-core`) while it runs. Back starts MainActivity with
 `OwnGameScreens.EXTRA_QUICK_MENU` (and the home-press reinit extra, so the shell
@@ -11075,7 +11085,7 @@ runs (Wine's output so far from the run's `RunLogCollector`, the run's setup, th
 Share diagnostics (`DiagnosticsArchive.share`, the same step as Settings' row), so the person chooses where it goes;
 droidtop sends nothing itself. Every Wine record now also names the run's setup: the Wine build, Direct3D (DXVK or
 VKD3D and its version), the graphics driver and its version, and the emulator. The owner confirmed 45 s
-(2026-10-23, asked "Is 45 seconds right": "yeah"). **Report a problem is also in the Quick Menu's Game section**
+(2026-10-23, asked "Is 45 seconds right": "yeah"). **Report a problem is also in the running game's L2 sheet**
 for a running Wine game (owner, 2026-10-28, asked whether it should be: "Yes"): the same report, headed "Wine report:
 from the Quick Menu", with no frame, the row saying "Saving the report..." and then what happened. **A report never
 links to the tracker** (owner: "no. The tracker is private. We need, like, a bugzilla"); a public bug tracker is
@@ -11615,7 +11625,7 @@ Two checks, both required:
    cursor, and the action in the danger tone; A on Cancel, B or Back cancel, only A on the action runs it (owner,
    2026-10-30, Droidtop/tracker#835: "if I hit something like "quit", I can't back out of it, all I can do is
    confirm it"). It replaced "press A again to confirm", which armed the row and could only be confirmed or left
-   with the whole page. Quit, Restart and Kill in the Quick Menu's Game section and the in-game L2 menus ask the
+   with the whole page. Quit, Restart and Kill in the running game's L2 sheet (over the game and in Gaming) ask the
    same way; the companion's question card already put "Keep playing" first. The Preference surface asks in a
    dialog with Cancel. A trust question names the key's fingerprint
    first, so it survives the two lines a row's title gets. The sentence (`RiskyPrompts`) names the app and the exact thing: the package and the
@@ -13019,8 +13029,8 @@ sleeps on idle, by the system's own timer; the screensaver keeps its own timer a
   `SessionMonitor`, which releases the lock like any other end; the lock has no check of its own. Droidtop's own Windows
   game screen no longer sets `FLAG_KEEP_SCREEN_ON`: it ignored the setting, and this is the one mechanism.
 - **Return to the game.** With a game running, coming back to the Gaming shell from it (HOME, Recents, or a
-  wake with the shell in front) opens the Quick Menu on its Game section, Resume first and focused: one A
-  resumes. It is decided when the shell resumes (`ShellReturn.returnsToGame`): the shell stopped while a game
+  wake with the shell in front) opens the running game's sheet, the one L2 opens on it, Resume first and
+  focused: one A resumes (#740: the game's controls are L2's, not R2's). It is decided when the shell resumes (`ShellReturn.returnsToGame`): the shell stopped while a game
   ran, the game still runs, and no other droidtop screen came up since (a sign-in page, Type from another
   device; its own Windows game screen counts as the game). HOME cannot decide it: when the shell's task is
   already there, Android brings it to the front and only resumes it, with no new intent and no run of the
@@ -18172,8 +18182,8 @@ carries an accent dot after its label: Downloads while a job runs, Social while 
 message is unread (`leftMenuAttention`, read while the menu is open, never polled).
 While a game runs, a **Resume** row leads the menu (DroidDeck's Resume item, owner
 2026-10-08): a live dot in the affirmative colour whose ring pulses outwards while
-motion is on, over "Resume" and the game's name; A resumes it through the Quick
-Menu Game section's own path (the shell's `onLaunch`), and which game is running
+motion is on, over "Resume" and the game's name; A resumes it through the running
+game sheet's own path (the shell's `onLaunch`), and which game is running
 is resolved the same way, when either menu opens. Icons come from the one
 Material set (`LeftMenuEntry.glyph`, CatalogIconGlyphs.kt). There is no Power row:
 Android gives an app no call that opens the power menu (the Quick Menu marks its
@@ -25526,7 +25536,7 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 **One search: where it opens (decided 2026-10-14, Droidtop/tracker#485 F7c; owner: "We also want per-console search items").** One runner (`UnifiedSearch`, drawn by `LibrarySearchDialog`), three kinds of entry (`SearchEntry`):
 
 - **Everything**: **Y on Home**: the device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope. The left menu has one **Search** row, the one in its order above (under Resume, not in Kiosk and Kid), which opens the same runner through `LauncherSearchScreen` with the matching settings too; there is no second Search row under Home (two branches each added one; the merge of 2026-10-15 kept that one).
-- **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). The Quick Menu's Game section has the same row for a running console game's system ("Search SNES", between Emulator and Restart; it opens the one search over that system's games and the sources that serve it, the Quick Menu closing first). Home's system tiles get it with Your library's systems (#485 F7b), which are not built yet.
+- **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). The running console game's L2 sheet in Gaming has the same row for its system ("Search SNES", after Guides; it opens the one search over that system's games and the sources that serve it, the sheet closing first). Home's system tiles get it with Your library's systems (#485 F7b), which are not built yet.
 - **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
 
 The games a search looks through are the games the lists show (`searchablePool`): the person's own ownership
@@ -25998,8 +26008,7 @@ a sheet can hold a heading (`ActionHeading`) and a line of text (`ActionNote`) t
 under its title (the game menu's source, engine and size). Up and Down move, A chooses, Select or L2 closes, and B and
 the system Back go back: out of a page first where the sheet has pages (the game menu's categories), else they close
 it. The sheet holds the pad and keeps the system bars hidden. A row that has a choice of its own opens a page or a
-task, never a second sheet. The Quick Menu's Game section is a pane of the Quick Menu, not a sheet, but its rows are
-`ActionRow`s too (its `GameQuickTile` is gone). Desktop's taskbar menus are on it since Droidtop/tracker#690 (a
+task, never a second sheet. The running game's sheet (`RunningGameSheet`, #740) is one of them, wherever it is drawn. Desktop's taskbar menus are on it since Droidtop/tracker#690 (a
 window's, a pin's, an Android app's and the clipboard notice's), so `:shell-desktop` has no `DropdownMenu` left, and
 `ActionSheet` and its rows are public for it. The same change made the bar's window, pin and app rows and its tray
 and clipboard buttons at least 48 dp tall, the touch target (DESIGN-LANGUAGE); the tray and clipboard items are the

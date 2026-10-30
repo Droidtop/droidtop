@@ -417,8 +417,8 @@ private fun SearchRow(selected: Boolean, onClick: () -> Unit, onHover: () -> Uni
  * ui/FrontEndRail.kt at 9310d19, reworked to the menu's row and the shell's
  * tokens): a live dot in the affirmative colour, whose ring pulses outwards
  * while motion is on and is absent when it is off, then "Resume" over the
- * game's name. A resumes it through the same launch path the Quick Menu's
- * Game section uses.
+ * game's name. A resumes it through the same launch path the running game's
+ * L2 sheet uses.
  */
 @Composable
 private fun ResumeRow(title: String, selected: Boolean, onClick: () -> Unit, onHover: () -> Unit) {

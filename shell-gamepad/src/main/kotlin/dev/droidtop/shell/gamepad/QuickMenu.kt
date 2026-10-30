@@ -74,8 +74,7 @@ import kotlinx.coroutines.launch
  * this menu's button: it opens the left menu ([LeftMenu]), and Start inside
  * this sheet swaps to it.
  *
- * Sections: Game (only while a game runs), Running apps (the task
- * manager), Notifications, System, Performance, Audio, Display, Downloads
+ * Sections: Running apps (the task manager), Notifications, System, Performance, Audio, Display, Downloads
  * and jobs, and Plugins (only while a running plugin has a panel or
  * tiles here). Which
  * are shown, where the menu opens and how L1/R1 step the rail are pure
@@ -96,16 +95,12 @@ import kotlinx.coroutines.launch
  * path. Downloads and jobs is the same jobs screen Settings opens
  * ([PluginJobsScreen]), hosted in the sheet.
  *
- * The Game section exists only while [runningEntry] is non-null -- while
- * the most recent launch is still parked rather than explicitly reclaimed
- * (see [dev.droidtop.library.LaunchDisplay.parkedDisplayId]'s own doc
- * comment). The shell checks Android's package force-stop flag off the
- * main thread while the menu is open and clears the parked launch when it
- * is set. This cannot detect ordinary process death or a task swipe;
- * Android exposes no general task/process query to this app. When
- * present, Game opens first: the point of a distinct in-game section is
- * that it is what greets you, not something you have to cycle to find
- * (Droidtop/tracker#82). Its rows are resume, restart and quit to library.
+ * The running game has no section here: R2 is the global menu, and what
+ * can be done with the game (Resume, Quit, Restart, Kill, its emulator and
+ * the rest) is L2's [RunningGameSheet] (the owner, 2026-10-30, Droidtop/
+ * tracker#740: "r2 is the global menu. L2 is everything we can do
+ * contextually for this app/game/etc"). [runningEntry] is the running
+ * game for the Plugins section's game panels.
  *
  * The Plugins section is Decky Loader's plugin list (docs/plugin-api.md
  * C17, Droidtop/tracker#316): one row per plugin, A opens that plugin's
@@ -131,18 +126,11 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun QuickMenu(
     runningEntry: dev.droidtop.library.LibraryEntry?,
-    library: dev.droidtop.library.Library,
-    onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
-    onQuit: (entry: dev.droidtop.library.LibraryEntry, restart: Boolean) -> Unit,
-    onKill: (entry: dev.droidtop.library.LibraryEntry) -> Unit,
-    quitOutcome: dev.droidtop.library.QuitResult?,
     onOpenLeftMenu: () -> Unit,
     openPlace: (screenId: String) -> Boolean,
     /** Whether [openPlace] would open this place in the current mode (Kiosk and Kid hide the device-management places). */
     placeAvailable: (screenId: String) -> Boolean,
     onDismiss: () -> Unit,
-    // The running console game's system searched (docs/SPEC.md 12a, "One search: where it opens"): its id and name.
-    onSearchSystem: (systemId: String, systemName: String) -> Unit = { _, _ -> },
     // The section to open on, when it is shown (a link to Updates opens Downloads, Droidtop/tracker#749); null is the usual one.
     startSection: QuickSection? = null,
 ) {
@@ -158,10 +146,6 @@ internal fun QuickMenu(
         // Steam's quick access panel floats: in from the edge, the panel radius and a hairline.
         floatMargin = if (window.portrait) 0.dp else Space.Md,
     ) { sheetWidth, close ->
-        // Game only while a game is actually running (see this
-        // function's own doc comment) -- computed once per sheet
-        // opening, same as runningEntry itself is (GamepadShell only
-        // re-resolves it when quickMenuOpen flips true).
         val context = androidx.compose.ui.platform.LocalContext.current
         // The Plugins section is the one way to plugins (Droidtop/tracker#644): it shows whenever a plugin is installed or
         // plugins can be managed from here, never only when one has a panel. Read off the main thread.
@@ -172,7 +156,6 @@ internal fun QuickMenu(
             }
         }
         val granted = remember { NotificationsStore.isGranted(context) }
-        val gameRunning = runningEntry != null
         // The sections Kid and Kiosk allow come from ControlAccess, like the companion's tabs.
         val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
         // The person's order for the rail (Settings > Shell > Quick Menu order), read once off the main thread.
@@ -183,13 +166,13 @@ internal fun QuickMenu(
         }
         val order by dev.droidtop.library.settings.QuickMenuOrder.order.collectAsState()
         val hasSocial = placeAvailable(PLACE_SOCIAL_SCREEN_ID)
-        val sections = remember(gameRunning, hasPlugins, hasSocial, uiMode, order) {
-            QuickTiles.visibleSections(gameRunning, hasPlugins, hasSocial, uiMode, order)
+        val sections = remember(hasPlugins, hasSocial, uiMode, order) {
+            QuickTiles.visibleSections(hasPlugins, hasSocial, uiMode, order)
         }
-        var section by remember { mutableStateOf(startSection?.takeIf { it in sections } ?: QuickTiles.initialSection(gameRunning, granted)) }
+        var section by remember { mutableStateOf(startSection?.takeIf { it in sections } ?: QuickTiles.initialSection(granted)) }
         val sectionStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
         LaunchedEffect(sections, section) {
-            if (section !in sections) section = QuickTiles.initialSection(gameRunning, granted)
+            if (section !in sections) section = QuickTiles.initialSection(granted)
         }
         // What is waiting, for the rail's dots: read while the sheet is open, never polled.
         val notifications by NotificationsStore.items.collectAsState()
@@ -290,9 +273,6 @@ internal fun QuickMenu(
                                 }
                             else -> Box(Modifier.padding(horizontal = 16.dp)) {
                                 when (section) {
-                                    QuickSection.GAME -> runningEntry?.let {
-                                        GameTab(it, library, onResume, onQuit, onKill, quitOutcome, close, onSearchSystem)
-                                    }
                                     QuickSection.APPS -> AppsTab(close)
                                     QuickSection.NOTIFICATIONS -> NotificationsTab(close)
                                     QuickSection.CONNECTIONS, QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
@@ -910,302 +890,6 @@ private fun PluginsTab(
         val close = { replyScreen = null }
         // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the screen behind show through (rig, 0.2.0-dev.2070).
         CatalogSheet(root = screen, onExit = close)
-    }
-}
-
-/**
- * The Quick Menu's Game section (docs/SPEC.md, Droidtop/tracker#82): who is
- * running, and the actions a console's in-game overlay always offers --
- * resume, restart and quit to library. Same interaction model as
- * [NotificationsTab]: a virtual cursor over [MenuRow] tiles, A activates
- * the focused one, B/Back closes the whole sheet (there is nothing to
- * back OUT to within this section -- unlike Notifications' list, one level
- * is all there is).
- *
- * [onResume] is `GamepadShell`'s real `onLaunch`, the one entry point
- * every launch in the shell already goes through (console ROM, PC and
- * engine games alike) -- relaunching the SAME entry is what real ES-DE's
- * own planned Recents tab (docs/SPEC.md, "Recents (decided 2026-08-30)")
- * already decided "resume" means here, reused rather than invented a
- * second time. [onQuit] fires [dev.droidtop.library.Library.quit] and
- * reports its outcome through [quitOutcome], which this section shows in
- * the pressed row's subtitle: droidtop clears its own running-game state
- * only when that outcome is [dev.droidtop.library.QuitResult.Ended], so a
- * quit that left the emulator alive (the Android 13 case,
- * Droidtop/tracker#82) is shown honestly instead of being reported as a
- * success. Restart is quit with `restart = true`: the shell starts the
- * entry again only once the quit really ended, so a game that would not
- * end is never launched twice. Both ending rows need a second A press,
- * since unsaved progress may be lost. See
- * [dev.droidtop.library.LibraryProvider.quit]'s own doc comment.
- */
-@Composable
-private fun GameTab(
-    entry: dev.droidtop.library.LibraryEntry,
-    library: dev.droidtop.library.Library,
-    onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
-    onQuit: (entry: dev.droidtop.library.LibraryEntry, restart: Boolean) -> Unit,
-    onKill: (entry: dev.droidtop.library.LibraryEntry) -> Unit,
-    quitOutcome: dev.droidtop.library.QuitResult?,
-    onDismiss: () -> Unit,
-    onSearchSystem: (systemId: String, systemName: String) -> Unit,
-) {
-    var focusIndex by androidx.compose.runtime.saveable.rememberSaveable(entry.id) { mutableStateOf(0) }
-    val focusRequester = remember { FocusRequester() }
-    val press = rememberGamepadTouch()
-    // Whether a row asks first is GameControls' one decision, which the companion's Game tab reads too.
-    val gameContext = androidx.compose.ui.platform.LocalContext.current
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            dev.droidtop.library.settings.CompanionPrefs.load(gameContext.applicationContext)
-        }
-    }
-    val companionSettings by dev.droidtop.library.settings.CompanionPrefs.settings.collectAsState()
-    val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
-    // Quit, Restart and Kill ask in the one confirmation, Cancel first (Droidtop/tracker#835), when they ask at all.
-    var pending by remember(entry.id) { mutableStateOf<PendingConfirm?>(null) }
-    fun confirmed(row: dev.droidtop.library.settings.GameRow, action: String, run: () -> Unit) {
-        if (dev.droidtop.library.settings.GameControls.asks(row, uiMode, companionSettings.ask)) {
-            pending = PendingConfirm(dev.droidtop.library.settings.GameControls.question(row, dev.droidtop.library.settings.GameRunner.LOCAL, entry.title), action, run)
-        } else {
-            run()
-        }
-    }
-    // The row whose outcome the subtitle reports.
-    var lastEnding by remember(entry.id) { mutableStateOf<GameEnding?>(null) }
-    // The per-game emulator (Droidtop/tracker#248): the installed candidates for a console game's
-    // system, loaded off the main thread, and the game's own stored choice (null follows the system).
-    val scope = rememberCoroutineScope()
-    val emulators = rememberSystemEmulators(entry)
-    var emulatorChoice by remember(entry.id) { mutableStateOf<String?>(null) }
-    // Controller mouse mode (docs/SPEC.md 5b, Droidtop/tracker#565), when this game runs in droidtop's own screen that
-    // has a pointer: null there is nothing to offer.
-    val ownScreen = dev.droidtop.library.OwnGameScreens.current?.takeIf { it.entryId == entry.id }
-    var padMouse by remember(entry.id) { mutableStateOf(ownScreen?.padMouse) }
-    var controls by remember(entry.id) { mutableStateOf(ownScreen?.controls) }
-    // Report a problem for a game in droidtop's own screen (docs/SPEC.md 7e2; owner, Droidtop/tracker#601): what the
-    // row says while the report is made and after.
-    var reportLine by remember(entry.id) { mutableStateOf<String?>(null) }
-    LaunchedEffect(entry.id) { emulatorChoice = library.getMetadataForEditing(entry)?.altEmulator }
-
-    val tiles = remember(entry.id, quitOutcome, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse, controls, reportLine) {
-        fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = ActionRow(
-            title = title,
-            detail = when {
-                lastEnding == kind && quitOutcome != null -> quitOutcome.message
-                else -> idle
-            },
-            danger = true,
-            onSelect = {
-                confirmed(if (restart) dev.droidtop.library.settings.GameRow.RESTART else dev.droidtop.library.settings.GameRow.QUIT, title) {
-                    lastEnding = kind
-                    onQuit(entry, restart)
-                }
-            },
-        )
-        buildList {
-            add(
-                ActionRow(
-                    title = "Resume",
-                    onSelect = { onResume(entry) },
-                ),
-            )
-            // Only for a console game with something installed to choose from. A cycles Follow the
-            // system, then each installed emulator; the launch reads it, so it applies from the next start.
-            // The model is GameEmulatorChoice, which the companion's Game tab draws too.
-            if (emulators != null && dev.droidtop.library.consoles.GameEmulatorChoice.offered(emulators) &&
-                dev.droidtop.library.settings.ControlAccess.shows(uiMode, dev.droidtop.library.settings.ControlRow.GAME_EMULATOR)
-            ) {
-                add(
-                    ActionRow(
-                        title = "Emulator",
-                        detail = dev.droidtop.library.consoles.GameEmulatorChoice.summary(emulators, emulatorChoice),
-                        onSelect = {
-                            val next = dev.droidtop.library.consoles.GameEmulatorChoice.next(emulators, emulatorChoice)
-                            scope.launch {
-                                if (dev.droidtop.library.consoles.GameEmulatorChoice.save(library, entry, next)) emulatorChoice = next
-                            }
-                        },
-                    ),
-                )
-            }
-            if (ownScreen?.canReport == true) {
-                add(
-                    ActionRow(
-                        title = "Report a problem",
-                        detail = reportLine ?: "Saves what the game printed and its logs, then you choose where to send them",
-                        onSelect = {
-                            reportLine = "Saving the report..."
-                            ownScreen.reportProblem { said -> scope.launch { reportLine = said } }
-                        },
-                    ),
-                )
-            }
-            padMouse?.let { on ->
-                add(
-                    ActionRow(
-                        title = "Mouse mode",
-                        detail = if (on) "On. Both stick clicks held also turn it off" else "Off",
-                        onSelect = {
-                            ownScreen?.setPadMouse(!on)
-                            padMouse = !on
-                        },
-                    ),
-                )
-            }
-            controls?.let { line ->
-                add(
-                    ActionRow(
-                        title = "Controls",
-                        detail = line,
-                        onSelect = { controls = ownScreen?.nextControls() ?: line },
-                    ),
-                )
-            }
-            // A console game's system, searched (owner, 2026-10-14: "We also want per-console search items"): its games
-            // and the sources that serve it, a download landing in its folder, as Search SNES in its list does.
-            emulators?.system?.takeIf { entry.kind == dev.droidtop.library.LibraryEntryKind.CONSOLE_ROM }?.let { system ->
-                add(
-                    ActionRow(
-                        title = dev.droidtop.shell.gamepad.query.SearchEntry.systemLabel(system.displayName),
-                        onSelect = { onSearchSystem(system.id, system.displayName) },
-                    ),
-                )
-            }
-            // Quit, the gentle end the companion's Game tab has too (owner, 2026-10-23: "Quit still exists on the
-            // companion, so it should exist in the quick menu"); Kill stays the header's force-stop.
-            if (dev.droidtop.library.settings.ControlAccess.shows(uiMode, dev.droidtop.library.settings.ControlRow.GAME_QUIT)) {
-                add(ending(GameEnding.QUIT, "Quit", null, restart = false))
-            }
-            add(ending(GameEnding.RESTART, "Restart", null, restart = true))
-        }
-    }
-    // A restored cursor (one saved per section) stays on a tile that still exists.
-    LaunchedEffect(tiles.size) { if (focusIndex != STOP_PILL && focusIndex >= tiles.size) focusIndex = (tiles.size - 1).coerceAtLeast(0) }
-    // The Stop pill in the header (DroidDeck's red Stop, Steam's destructive red): ending the game
-    // without restarting it, asking as the rows do.
-    // Kill force-stops at once, not the gentler Quit (Droidtop/tracker#571 row 16; the owner: "kill should
-    // immediately force-stop it"); it asks Kill's own question.
-    val stop = ActionRow(title = "Kill", danger = true) {
-        confirmed(dev.droidtop.library.settings.GameRow.KILL, "Kill") {
-            lastEnding = GameEnding.KILL
-            onKill(entry)
-        }
-    }
-    pending?.let { ask ->
-        ConfirmDialog(ask.question, ask.action, onConfirm = { pending = null; ask.run() }, onCancel = { pending = null })
-    }
-
-    // Asked each frame until the window is attached: one early request was lost in the Quick Menu over a game,
-    // and the first D-pad press only gave the section focus (Droidtop/tracker#820).
-    LaunchedEffect(Unit) { requestFocusWhenAttached(focusRequester, "Quick Menu Game") }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .focusRequester(focusRequester)
-            .focusable()
-            .onPad { press ->
-                when (press.action) {
-                    // The pill sits above the rows: Up from the first row reaches it, Down leaves it.
-                    GamepadAction.UP -> {
-                        focusIndex = if (focusIndex <= 0) STOP_PILL else menuStep(focusIndex, tiles.size, -1)
-                    }
-                    GamepadAction.DOWN -> {
-                        focusIndex = if (focusIndex == STOP_PILL) 0 else menuStep(focusIndex, tiles.size, 1)
-                    }
-                    GamepadAction.B -> onDismiss()
-                    GamepadAction.A -> if (focusIndex == STOP_PILL) stop.onSelect?.invoke() else tiles.getOrNull(focusIndex)?.onSelect?.invoke()
-                    else -> Unit
-                }
-                true
-            },
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-            Text(
-                entry.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MenuTokens.OnSurface,
-                maxLines = 2,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            StopPill(
-                label = stop.title,
-                selected = focusIndex == STOP_PILL,
-                onClick = {
-                    focusIndex = STOP_PILL
-                    press(GamepadAction.A)
-                },
-            )
-        }
-        if (lastEnding == GameEnding.KILL && quitOutcome != null) {
-            Text(
-                quitOutcome.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MenuTokens.OnSurfaceMuted,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-        }
-        Column(
-            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            tiles.forEachIndexed { index, tile ->
-                MenuRow(
-                    title = tile.title,
-                    subtitle = tile.detail,
-                    danger = tile.danger,
-                    selected = index == focusIndex,
-                    onClick = {
-                        focusIndex = index
-                        press(GamepadAction.A)
-                    },
-                )
-            }
-        }
-        HintRow(
-            bindings = listOf(
-                HintBinding(GamepadAction.A, "Select"),
-                HintBinding(GamepadAction.B, "Close"),
-            ),
-            background = androidx.compose.ui.graphics.Color.Transparent,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-    }
-}
-
-/** The two controls of the Game section that end the game, so each can wait for its own second press. */
-private enum class GameEnding { QUIT, RESTART, KILL }
-
-/** The Game section's cursor on the header's Stop pill rather than on a row. */
-private const val STOP_PILL = -1
-
-/**
- * The Game section's Stop: a pill in the danger colour with the power glyph (DroidDeck's Stop pill,
- * ui/SessionOverlay.kt at 9310d19; Steam's destructive red is the theme's danger role). Under the
- * cursor it fills faintly with that red; the window's ring marks it like any control.
- */
-@Composable
-private fun StopPill(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .heightIn(min = 40.dp)
-            .semantics { contentDescription = label }
-            .selectionFrame(
-                selected,
-                Corners.Pill,
-                rest = Color.Transparent,
-                restOutline = MenuTokens.NoticeDanger.copy(alpha = 0.55f),
-                selectedFill = MenuTokens.NoticeDanger.copy(alpha = 0.18f),
-            )
-            .padRow(onClick = onClick)
-            .padding(start = 12.dp, end = 14.dp),
-    ) {
-        QuickGlyphIcon(QuickGlyph.POWER, tint = MenuTokens.NoticeDanger, modifier = Modifier.size(18.dp))
-        Text(label, style = TypeRole.button, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = MenuTokens.NoticeDanger)
     }
 }
 

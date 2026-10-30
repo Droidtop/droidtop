@@ -339,7 +339,6 @@ fun PadLegend(
  */
 @Composable
 fun QuickMenuStandalone(
-    library: Library,
     onOpenStartMenu: () -> Unit,
     onDismiss: () -> Unit,
     // The tab it opens on (OverlayQuickMenuRigTest opens each one); null for the menu's own choice.
@@ -349,11 +348,6 @@ fun QuickMenuStandalone(
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         QuickMenu(
             runningEntry = null,
-            library = library,
-            onResume = {},
-            onQuit = { _, _ -> },
-            onKill = { },
-            quitOutcome = null,
             onOpenLeftMenu = onOpenStartMenu,
             openPlace = { screenId ->
                 context.startActivity(CatalogScreenLink.intent(context, screenId))
@@ -418,103 +412,59 @@ fun LeftMenuStandalone(
 /**
  * The running game's own overlay (HOME + L2, docs/SPEC.md "In-game overlays: HOME chords", Droidtop/tracker#740): its
  * own surface, not the Quick Menu (the owner, 2026-10-29: "You shouldn't be adding to tbe quick menu. The pause goes in
- * the overlay, which is supposed to be different"). The game's name and what runs it, then Resume (the game never left,
- * so it closes the overlay), **Pause the game** for a console game (RetroArch's PAUSE_TOGGLE over its command port,
- * sent only on this press; the overlay itself never pauses or signals the game), Game options (what L2 opens on the
- * game in Gaming: [dev.droidtop.shell.gamepad.pc.PcGameMenu] with its page for a PC or engine game, the game menu
- * with Gaming's detail screen for a console game), and Quit and Kill, each on a second press, ending it the shell's
- * way and closing the overlay once it has ended.
+ * the overlay, which is supposed to be different"). It is the running game's sheet ([RunningGameSheet][dev.droidtop.shell.gamepad.RunningGameSheet]),
+ * the same one L2 opens on the running game in Gaming: Resume closes the overlay (the game never left), Restart starts
+ * the game again with [onLaunch] once it really ended, and Game options is what L2 opens on the game in Gaming
+ * ([dev.droidtop.shell.gamepad.pc.PcGameMenu] with its page for a PC or engine game, the game menu with Gaming's detail
+ * screen for a console game).
  */
 @Composable
 fun GameOptionsStandalone(
     library: Library,
     entry: dev.droidtop.library.LibraryEntry,
     onResume: () -> Unit,
+    onLaunch: (dev.droidtop.library.LibraryEntry) -> Unit,
     onOpenDownloads: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var optionsOpen by remember(entry.id) { mutableStateOf(false) }
-    var pageOpen by remember(entry.id) { mutableStateOf(false) }
-    var detailOpen by remember(entry.id) { mutableStateOf(false) }
-    // Quit and Kill ask in the one confirmation, Cancel first (Droidtop/tracker#835).
-    var pending by remember(entry.id) { mutableStateOf<dev.droidtop.shell.gamepad.PendingConfirm?>(null) }
-    var said by remember(entry.id) { mutableStateOf<Pair<String, String>?>(null) }
-    var guidesOpen by remember(entry.id) { mutableStateOf(false) }
-    CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
-        if (guidesOpen) {
-            // The running game's guides over the game, one press from it (docs/SPEC.md 7i "Guides"): the game menu's own.
-            dev.droidtop.shell.gamepad.pc.GuidesScreen(
-                gameId = entry.id,
-                gameName = dev.droidtop.library.GameNaming.displayName(entry.title),
-                folder = dev.droidtop.library.guides.GuideContent.folderOf(entry),
-                onClose = { guidesOpen = false },
-            )
-            return@CompositionLocalProvider
-        }
+    CompositionLocalProvider(
+        LocalShellWindow provides currentShellWindow(),
+        dev.droidtop.shell.gamepad.LocalRunningGameHost provides remember(library) { dev.droidtop.shell.gamepad.RunningGameHost(library, onLaunch) },
+    ) {
         if (optionsOpen) {
-            GameOptions(library, entry, onResume, onOpenDownloads, onClose = { optionsOpen = false; pageOpen = false; detailOpen = false }, pageOpen, { pageOpen = it }, detailOpen, { detailOpen = it })
+            dev.droidtop.shell.gamepad.GameOptionsOfRunningGame {
+                RunningGameOptions(library, entry, onResume, onOpenDownloads, onClose = { optionsOpen = false })
+            }
             return@CompositionLocalProvider
         }
-        fun ending(key: String, title: String, idle: String, end: suspend () -> dev.droidtop.library.QuitResult) = dev.droidtop.shell.gamepad.ActionRow(
-            title = title,
-            detail = when {
-                said?.first == key -> said?.second
-                else -> idle
-            },
-            danger = key == "kill",
-            onSelect = {
-                val row = if (key == "kill") dev.droidtop.library.settings.GameRow.KILL else dev.droidtop.library.settings.GameRow.QUIT
-                pending = dev.droidtop.shell.gamepad.PendingConfirm(
-                    dev.droidtop.library.settings.GameControls.question(row, dev.droidtop.library.settings.GameRunner.LOCAL, entry.title),
-                    title,
-                ) {
-                    scope.launch {
-                        val outcome = end()
-                        said = key to outcome.message
-                        if (outcome is dev.droidtop.library.QuitResult.Ended) onDismiss()
-                    }
-                }
-            },
-        )
-        val rows = buildList<dev.droidtop.shell.gamepad.ActionSheetItem> {
-            add(dev.droidtop.shell.gamepad.ActionRow("Resume", "Back to the game; it never stopped") { onResume() })
-            // Only on this press, never when the overlay opens or closes (the owner, 2026-10-29: "unless we want to tie a
-            // specific button to 'tell a game it was backgrounded, even if it wasn't'").
-            if (entry.systemId != null) {
-                add(
-                    dev.droidtop.shell.gamepad.ActionRow(
-                        title = "Pause the game",
-                        detail = said?.takeIf { it.first == "pause" }?.second ?: "Tells RetroArch to pause or carry on",
-                    ) {
-                        scope.launch {
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                runCatching { dev.droidtop.pluginhost.RetroArchCommands.send("PAUSE_TOGGLE", 0) }
-                            }
-                            said = "pause" to "Sent to RetroArch. Press again to carry on"
-                        }
-                    },
-                )
-            }
-            add(dev.droidtop.shell.gamepad.ActionRow("Guides", "Walkthroughs and readmes, with your place kept") { guidesOpen = true })
-            add(dev.droidtop.shell.gamepad.ActionRow("Game options", "This game's own menu, as L2 opens it in Gaming") { optionsOpen = true })
-            add(ending("quit", "Quit", "Ends the game the way it ends itself") { library.quitRunning(context, entry) })
-            add(ending("kill", "Kill", "Force-stops it; unsaved progress is lost") { library.killRunning(context, entry) })
-        }
-        dev.droidtop.shell.gamepad.ActionSheet(
-            title = dev.droidtop.library.GameNaming.displayName(entry.title),
-            subtitle = entry.kind.itemName(),
-            rows = rows,
+        dev.droidtop.shell.gamepad.RunningGameSheet(
+            entry = entry,
+            onResume = onResume,
+            onGameOptions = { optionsOpen = true },
             onDismiss = onDismiss,
+            resumeDetail = "Back to the game; it never stopped",
         )
-        pending?.let { ask ->
-            dev.droidtop.shell.gamepad.ConfirmDialog(ask.question, ask.action, onConfirm = { pending = null; ask.run() }, onCancel = { pending = null })
-        }
     }
 }
 
-/** What L2 opens on [entry] in Gaming, drawn over the game: [onClose] goes back to the running game's overlay. */
+/**
+ * The running game's Game options: what L2 opens on [entry] in Gaming, drawn over the game or over Gaming on coming back
+ * to it. [onClose] goes back to the running game's sheet.
+ */
+@Composable
+internal fun RunningGameOptions(
+    library: Library,
+    entry: dev.droidtop.library.LibraryEntry,
+    onResume: () -> Unit,
+    onOpenDownloads: () -> Unit,
+    onClose: () -> Unit,
+) {
+    var pageOpen by remember(entry.id) { mutableStateOf(false) }
+    var detailOpen by remember(entry.id) { mutableStateOf(false) }
+    GameOptions(library, entry, onResume, onOpenDownloads, onClose, pageOpen, { pageOpen = it }, detailOpen, { detailOpen = it })
+}
+
 @Composable
 private fun GameOptions(
     library: Library,

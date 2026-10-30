@@ -34,13 +34,12 @@ class OverlayQuickMenuRigTest {
         instrumentation.uiAutomation.executeShellCommand("appops set ${app.packageName} SYSTEM_ALERT_WINDOW allow").close()
         Thread.sleep(500)
         assertTrue("draw over other apps was not granted", Settings.canDrawOverlays(app))
-        val library = LibraryCore.library(app)
         val wm = app.getSystemService(WindowManager::class.java)
         for (section in QuickSection.entries) {
             var added: Pair<android.view.View, androidx.lifecycle.LifecycleRegistry>? = null
             instrumentation.runOnMainSync {
                 val (view, lifecycle) = InGameOverlays.overlayView(app) {
-                    QuickMenuStandalone(library = library, onOpenStartMenu = {}, onDismiss = {}, startSection = section)
+                    QuickMenuStandalone(onOpenStartMenu = {}, onDismiss = {}, startSection = section)
                 }
                 wm.addView(
                     view,

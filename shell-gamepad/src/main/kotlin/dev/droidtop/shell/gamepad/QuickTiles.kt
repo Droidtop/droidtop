@@ -48,7 +48,6 @@ enum class QuickGlyph {
  * Downloads and Updates.
  */
 enum class QuickSection(val glyph: QuickGlyph, val panel: ControlPanel) {
-    GAME(QuickGlyph.GAMEPAD, ControlPanel.GAME),
     APPS(QuickGlyph.APPS, ControlPanel.APPS),
     NOTIFICATIONS(QuickGlyph.BELL, ControlPanel.NOTIFICATIONS),
     // The Social place in the sheet: friends and their games, then conversations, a chat opening in place (Droidtop/tracker#644).
@@ -136,11 +135,11 @@ object QuickTiles {
 
     /**
      * The sections the rail shows now: those [mode] allows on the Quick Menu ([ControlAccess], the one
-     * restriction model), Game only while a game runs, Plugins only when a plugin is installed or plugins can be
-     * managed, Social only where its place opens ([hasSocial]: not in Kiosk and Kid, which hide the places).
+     * restriction model), Plugins only when a plugin is installed or plugins can be managed, Social only where its
+     * place opens ([hasSocial]: not in Kiosk and Kid, which hide the places). The running game has no section: what
+     * can be done with it is L2's (Droidtop/tracker#740, [RunningGameSheet]).
      */
     fun visibleSections(
-        gameRunning: Boolean,
         hasPlugins: Boolean,
         hasSocial: Boolean = true,
         mode: UiMode = UiMode.FULL,
@@ -149,18 +148,17 @@ object QuickTiles {
     ): List<QuickSection> {
         val allowed = ControlAccess.panels(mode, ControlSurface.QUICK_MENU)
         return QuickSection.entries.filter {
-            it.panel in allowed && (it != QuickSection.GAME || gameRunning) && (it != QuickSection.PLUGINS || hasPlugins) &&
+            it.panel in allowed && (it != QuickSection.PLUGINS || hasPlugins) &&
                 (it != QuickSection.SOCIAL || hasSocial)
         }.sortedBy { section -> order.indexOf(section.panel).takeIf { it >= 0 } ?: (order.size + section.ordinal) }
     }
 
     /**
-     * Where the menu opens: the running game, else Notifications once
-     * notification access is granted, else System rather than an empty
-     * Notifications list (Droidtop/tracker#180).
+     * Where the menu opens: Notifications once notification access is
+     * granted, else System rather than an empty Notifications list
+     * (Droidtop/tracker#180).
      */
-    fun initialSection(gameRunning: Boolean, notificationsGranted: Boolean): QuickSection = when {
-        gameRunning -> QuickSection.GAME
+    fun initialSection(notificationsGranted: Boolean): QuickSection = when {
         notificationsGranted -> QuickSection.NOTIFICATIONS
         else -> QuickSection.SYSTEM
     }

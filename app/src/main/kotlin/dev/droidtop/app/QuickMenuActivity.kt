@@ -17,11 +17,9 @@ class QuickMenuActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val library = LibraryCore.library(applicationContext)
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 QuickMenuStandalone(
-                    library = library,
                     onOpenStartMenu = { finish() },
                     onDismiss = { finish() },
                 )

@@ -55,13 +55,11 @@ class GameControlsTest {
         assertTrue(GameRow.KILL in GameControls.rows(UiMode.FULL, GameRunner.STREAM.copy(restartAndKill = true)))
     }
 
-    @Test fun `turning Ask before stopping off changes the Quick Menu and the companion the same way`() {
+    @Test fun `turning Ask before stopping off stops every ending row asking`() {
         for (row in listOf(GameRow.QUIT, GameRow.RESTART, GameRow.KILL)) {
-            // The Quick Menu arms on a first A exactly when the companion would ask.
-            assertEquals(GameControls.asks(row, UiMode.FULL, on), GameControls.needsSecondPress(row, armed = false, mode = UiMode.FULL, ask = on))
-            assertEquals(GameControls.asks(row, UiMode.FULL, off), GameControls.needsSecondPress(row, armed = false, mode = UiMode.FULL, ask = off))
-            assertFalse(GameControls.needsSecondPress(row, armed = false, mode = UiMode.FULL, ask = off))
-            assertFalse(GameControls.needsSecondPress(row, armed = true, mode = UiMode.FULL, ask = on))
+            // One answer for the companion and the running game's L2 sheet alike.
+            assertTrue(GameControls.asks(row, UiMode.FULL, on))
+            assertFalse(GameControls.asks(row, UiMode.FULL, off))
         }
     }
 }
