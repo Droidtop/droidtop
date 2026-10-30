@@ -5086,7 +5086,8 @@ droidtop 0.2.0-dev.1931).
 - **Game (slice C8).** `CompanionGameTab`: a header (art, name, this session's play time), then the rows
   `GameControls` (`:runtime-common`, pure) gives for the UI mode and the runner: Resume, Quit, Restart, Kill, the
   game's emulator (`GameEmulatorChoice`, the model the Quick Menu's Emulator row cycles; only for a console game
-  with an emulator to choose, from the next start; see "Launch resolution"), the overlay level and performance mode. Kid and Kiosk get Resume and Quit. A stream (`REMOTE_STREAM`, windowcast)
+  with an emulator to choose, from the next start; see "Launch resolution"), the overlay level and performance mode,
+  then Guides, the running game's guides in a pane that fills the tab (`CompanionGuides`; 7i "Guides"). Kid and Kiosk get Resume and Quit. A stream (`REMOTE_STREAM`, windowcast)
   hides Restart and Kill unless its runner says they apply and uses its own Quit label and question
   ("Disconnect"). `GameControls.asks` is the one decision whether a row asks first: the runner's or a plugin's
   `confirm` flag; **Ask before stopping** (Companion group, on by default) for Quit, Restart, Kill, an Apps row's
@@ -17440,9 +17441,18 @@ time at the screen's width, rendered off the main thread (`PdfRenderer`), Left a
 Y marks the place, X goes to the next mark, B closes. **The place is kept per game** (`GuidePlaces`, droidtop's own
 data, never the game's folder): the guide last opened (marked "Last read"), where each was left, the marks, and the
 person's **notes**, the list's first row, showing their first line and opening one text field (the shell's own text
-entry, a catalog `TextInputItem`). The guide pane beside the game on the companion, the same in the HOME+L2 overlay,
-and guides from plugins (the `guide` facet agreed on #817: `v`, `title`, `from`, `format`, `url` or `document`,
-`updated`; places kept under `<pluginId>:<id>`) are the next slices of #817.
+entry, a catalog `TextInputItem`).
+
+**Beside the game, on the companion** (#817: "a walkthrough helper"): the Game tab's Guides row opens the same list
+over the whole tab (`CompanionGuides`), the notes shown above it (they are written in the game menu, where the text
+entry is). A guide reads by touch: a drag scrolls, Previous page and Next page turn a PDF's pages, Mark and Next mark
+do what Y and X do, Back closes; the place is kept the same way, also when the tab changes or the game ends. The pad
+stays on the game throughout, as it does for every companion screen, and the companion stays on while a guide is
+open. A web search opens the browser on the companion's screen. Both readers read through one `GuideContent` (the
+list, the text, the PDF pages, the next mark; tested), so they differ only in how they are driven, and a mark gone to
+on another PDF page lands where it was made, once that page is drawn. The same pane in the HOME+L2 overlay and guides
+from plugins (the `guide` facet agreed on #817: `v`, `title`, `from`, `format`, `url` or `document`, `updated`;
+places kept under `<pluginId>:<id>`) are the next slices of #817.
 
 **What's new, asked for the same way (2026-10-14, Droidtop/tracker#229).** A
 Steam game (its own row, or an engine copy that kept its Steam store id) has a

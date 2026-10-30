@@ -250,7 +250,7 @@ internal val CompanionKeepOn = kotlinx.coroutines.flow.MutableStateFlow(0)
 
 /** Keeps the companion's window on while [on] (a panel declaring `keep_on`); released when it leaves. */
 @Composable
-private fun KeepScreenOn(on: Boolean) {
+internal fun KeepScreenOn(on: Boolean) {
     val view = LocalView.current
     DisposableEffect(view, on) {
         if (on) {

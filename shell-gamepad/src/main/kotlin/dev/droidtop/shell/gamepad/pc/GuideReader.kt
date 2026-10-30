@@ -2,8 +2,6 @@ package dev.droidtop.shell.gamepad.pc
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.pdf.PdfRenderer
-import android.os.ParcelFileDescriptor
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.focusable
@@ -32,6 +30,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -42,15 +41,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.droidtop.library.GameResources
 import dev.droidtop.library.Links
-import dev.droidtop.library.guides.GameGuides
+import dev.droidtop.library.guides.GuideContent
 import dev.droidtop.library.guides.Guide
 import dev.droidtop.library.guides.GuideBookmark
 import dev.droidtop.library.guides.GuideFormat
 import dev.droidtop.library.guides.GuidePlace
+import dev.droidtop.library.guides.GuidePdf
 import dev.droidtop.library.guides.GuidePlaces
 import dev.droidtop.library.guides.GuidePosition
+import dev.droidtop.library.guides.nextMark
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
@@ -60,7 +60,6 @@ import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -79,8 +78,7 @@ internal fun GuidesScreen(gameId: String, gameName: String, folder: String?, onC
     val guides by produceState<List<Guide>?>(null, gameId, folder) {
         value = withContext(Dispatchers.IO) {
             place = GuidePlaces.load(context, gameId)
-            val local = folder?.let { GameGuides.inFolder(File(it)) }.orEmpty()
-            local + GameResources.forGame(gameName).map { Guide("web:${it.label}", it.label, it.detail, GuideFormat.WEB, url = it.url) }
+            GuideContent.forGame(folder, gameName)
         }
     }
     var reading by remember(gameId) { mutableStateOf<Guide?>(null) }
@@ -216,7 +214,7 @@ internal fun GuidesScreen(gameId: String, gameName: String, folder: String?, onC
 
 /**
  * One guide, read by pad: Up and Down scroll, L1 and R1 page through text, Left and Right turn a PDF's pages, Y marks
- * the place, X goes to the next mark, B closes and keeps the place. A text guide over [MAX_TEXT_BYTES] shows its start.
+ * the place, X goes to the next mark, B closes and keeps the place. A text guide over [GuideContent.MAX_TEXT_BYTES] shows its start.
  */
 @Composable
 private fun GuideReaderScreen(
@@ -252,23 +250,7 @@ private fun TextGuide(
 ) {
     val context = LocalContext.current
     val paragraphs by produceState<List<String>?>(null, guide.id) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                val file = File(checkNotNull(guide.path))
-                // At most MAX_TEXT_BYTES, read in a loop: InputStream.readNBytes is Android 13 and later.
-                val bytes = ByteArray(minOf(file.length(), MAX_TEXT_BYTES.toLong()).toInt())
-                var read = 0
-                file.inputStream().use { input ->
-                    while (read < bytes.size) {
-                        val n = input.read(bytes, read, bytes.size - read)
-                        if (n < 0) break
-                        read += n
-                    }
-                }
-                val text = String(bytes, 0, read, Charsets.UTF_8)
-                text.split(Regex("""\n\s*\n""")).map { it.trim() }.filter { it.isNotEmpty() }
-            }.getOrDefault(listOf(context.getString(R.string.guide_unreadable)))
-        }
+        value = withContext(Dispatchers.IO) { GuideContent.paragraphs(guide) ?: listOf(context.getString(R.string.guide_unreadable)) }
     }
     val state = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -329,26 +311,35 @@ private fun PdfGuide(
     say: (String) -> Unit,
 ) {
     val context = LocalContext.current
-    val document = remember(guide.id) { PdfDocument(guide.path) }
+    val document = remember(guide.id) { GuidePdf(guide.path) }
     DisposableEffect(document) { onDispose { document.close() } }
     var page by remember(guide.id) { mutableIntStateOf(start.page) }
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
     val width = context.resources.displayMetrics.widthPixels
-    val bitmap by produceState<Bitmap?>(null, page) { value = withContext(Dispatchers.IO) { document.render(page, width) } }
-    var restored by remember(guide.id) { mutableStateOf(false) }
-    LaunchedEffect(bitmap) {
-        if (bitmap != null && !restored) {
-            restored = true
-            scroll.scrollTo((start.fraction * scroll.maxValue).toInt())
-        }
+    // The page drawn, with its number: a place is landed on only once the page asked for is laid out.
+    val rendered by produceState<Pair<Int, Bitmap?>?>(null, page) {
+        val asked = page
+        value = asked to withContext(Dispatchers.IO) { document.render(asked, width) }
+    }
+    val bitmap = rendered?.takeIf { it.first == page }?.second
+    // Where on the page to land once it is drawn: the kept place, then a mark gone to.
+    var landAt by remember(guide.id) { mutableStateOf<Float?>(start.fraction) }
+    LaunchedEffect(bitmap, landAt) {
+        val fraction = landAt ?: return@LaunchedEffect
+        if (bitmap == null) return@LaunchedEffect
+        withFrameNanos { }
+        scroll.scrollTo((fraction * scroll.maxValue).toInt())
+        landAt = null
     }
     fun position() = GuidePosition(page, if (scroll.maxValue > 0) scroll.value.toFloat() / scroll.maxValue else 0f)
     fun turn(to: Int) {
         val pages = document.pageCount
         if (pages <= 0) return
-        page = to.coerceIn(0, pages - 1)
-        scope.launch { scroll.scrollTo(0) }
+        val next = to.coerceIn(0, pages - 1)
+        if (next == page) return
+        page = next
+        landAt = 0f
     }
     BackHandler { onClose(position()) }
     Column(
@@ -369,7 +360,7 @@ private fun PdfGuide(
                     }
                     GamepadAction.X -> nextMark(bookmarks, position())?.let {
                         page = it.position.page
-                        restored = false
+                        landAt = it.position.fraction
                         say(it.label)
                     } ?: say("No marks further on")
                     GamepadAction.B -> onClose(position())
@@ -395,42 +386,6 @@ private fun PdfGuide(
         HintRow(bindings = PDF_HINTS, background = Color.Transparent)
     }
 }
-
-/** The first mark after [here], else null: X goes forward through the marks. Pure. */
-internal fun nextMark(marks: List<GuideBookmark>, here: GuidePosition): GuideBookmark? =
-    marks.sortedWith(compareBy({ it.position.page }, { it.position.fraction }))
-        .firstOrNull { it.position.page > here.page || (it.position.page == here.page && it.position.fraction > here.fraction + 0.001f) }
-
-/** One open PDF, its pages rendered one at a time at the screen's width. [pageCount] is -1 when it cannot be opened. */
-private class PdfDocument(path: String?) {
-    private val descriptor = runCatching { ParcelFileDescriptor.open(File(checkNotNull(path)), ParcelFileDescriptor.MODE_READ_ONLY) }.getOrNull()
-    private val renderer = descriptor?.let { runCatching { PdfRenderer(it) }.getOrNull() }
-    val pageCount: Int = renderer?.pageCount ?: -1
-
-    @Synchronized
-    fun render(index: Int, width: Int): Bitmap? {
-        val pdf = renderer ?: return null
-        if (index !in 0 until pdf.pageCount) return null
-        return runCatching {
-            pdf.openPage(index).use { page ->
-                val height = (width.toFloat() * page.height / page.width).toInt().coerceAtLeast(1)
-                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
-                    bitmap.eraseColor(android.graphics.Color.WHITE)
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                }
-            }
-        }.getOrNull()
-    }
-
-    @Synchronized
-    fun close() {
-        runCatching { renderer?.close() }
-        runCatching { descriptor?.close() }
-    }
-}
-
-/** The most of a text guide read: about two million characters, more than any walkthrough. */
-private const val MAX_TEXT_BYTES = 2_000_000
 
 private val READER_HINTS = listOf(
     HintBinding(GamepadAction.R, "Page"),

@@ -92,7 +92,7 @@ internal fun runnerOf(entry: LibraryEntry?): GameRunner =
  * The Game tab, on the bar while a game runs (docs/SPEC.md "The companion's tabs", slice C8): the header (art, name,
  * this session's play time), then the rows [GameControls] gives for the mode and the runner: Resume, Quit (the
  * runner's own label: Disconnect for a stream), Restart and Kill (not for a stream), the overlay level and the
- * performance mode, then rows from plugins ([CompanionGamePluginRows]). Quit, Restart and Kill ask first while Ask
+ * performance mode, Guides ([CompanionGuides]), then rows from plugins ([CompanionGamePluginRows]). Quit, Restart and Kill ask first while Ask
  * before stopping is on, and always in Kid and Kiosk;
  * the question starts on Keep playing, with the two answers large and well apart.
  */
@@ -106,6 +106,12 @@ internal fun CompanionGameTab() {
     val runningId = running?.context?.gameId
     val entry = remember(runningId, entries) { runningId?.let { id -> entries.firstOrNull { it.id == id } } }
     val session = running
+    // The running game's guides fill the tab while open (docs/SPEC.md 7i "Guides"): a pane beside the game.
+    var readingGuides by remember(runningId) { mutableStateOf(false) }
+    if (readingGuides && entry != null && session != null) {
+        CompanionGuides(entry, onClose = { readingGuides = false })
+        return
+    }
     Column(
         modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -174,6 +180,7 @@ internal fun CompanionGameTab() {
                 GameRow.SCREENSHOT -> CompanionScreenshotRow(label)
             }
         }
+        GameButton("Guides") { readingGuides = true }
         // Rows from plugins whose panel declares the game ability (slice C9): RetroArch's save and load, a stream's controls.
         CompanionGamePluginRows(entry)
         // "Save and load from here: Set up" while RetroArch runs it and a step is missing (slice C11).

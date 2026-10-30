@@ -438,7 +438,7 @@ internal fun PcGameMenu(
             GuidesScreen(
                 gameId = entry.id,
                 gameName = gameName,
-                folder = entry.pcInfo?.installPath?.takeIf { it.startsWith("/") } ?: entry.id.takeIf { it.startsWith("/") },
+                folder = dev.droidtop.library.guides.GuideContent.folderOf(entry),
                 onClose = { readingGuides = false },
             )
         }
