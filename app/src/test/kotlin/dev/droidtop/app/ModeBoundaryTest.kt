@@ -26,6 +26,10 @@ class ModeBoundaryTest {
             """\bAPP_MAIN_ACTIVITY\b""",
             """SHOW_GAMES"\)""",
             """\bappModeIntent\(""",
+            // Standard's launcher activity by name, and its drawer's action: the taskbar's Apps button reached Standard
+            // from a game started in Gaming this way, which none of the patterns above saw (2026-10-30).
+            """\bStandardComponents\.LAUNCHER\b""",
+            """\bIntent\.ACTION_ALL_APPS\b""",
         ).joinToString("|"),
     )
 
@@ -59,11 +63,13 @@ class ModeBoundaryTest {
         "runtime-common/src/main/kotlin/dev/droidtop/runtime/tasks/TaskManager.kt" to (2 to "an ended app leaves the screen by a Home press marked for the mode in use (Modes.EXTRA_MODE_IN_USE); and a query"),
         "shell-default/src/app/murinelauncher/settings/SettingsMiscFragment.kt" to (1 to "Standard's settings ask which app is the home screen"),
         "shell-default/src/com/android/launcher3/dragndrop/AddItemActivity.java" to (1 to "upstream Launcher3's own home check"),
-        "shell-default/src/dev/droidtop/shell/standard/BackButtonMenu.kt" to (6 to "the mode menu, the person's switch"),
+        "shell-default/src/com/android/launcher3/Launcher.java" to (1 to "Standard's launcher reading the drawer intent it was sent; starts nothing"),
+        "shell-default/src/com/android/launcher3/views/OptionsPopupView.java" to (1 to "Standard's home-screen menu opens Standard's own drawer"),
+        "shell-default/src/dev/droidtop/shell/standard/BackButtonMenu.kt" to (7 to "the mode menu, the person's switch; and where Home goes by the person's choice"),
         "shell-default/src/dev/droidtop/shell/standard/HomeEntry.kt" to (1 to "the Home press, which goes where the person's Home choice says"),
         "shell-default/src/dev/droidtop/shell/standard/HomeRolePrefs.kt" to (1 to "asks Android which app opens on Home; starts nothing"),
-        "shell-default/src/dev/droidtop/shell/standard/HomeTrampolineActivity.kt" to (1 to "the Home press, which goes where the person's Home choice says"),
-        "shell-default/src/dev/droidtop/shell/standard/StandardTaskbar.kt" to (1 to "Standard's taskbar Home button, the person's press"),
+        "shell-default/src/dev/droidtop/shell/standard/HomeTrampolineActivity.kt" to (2 to "the Home press, which goes where the person's Home choice says"),
+        "shell-default/src/dev/droidtop/shell/standard/StandardTaskbar.kt" to (3 to "Standard's taskbar, drawn only while Standard is the mode in use (TaskbarPolicy.shown): its Home button and its Apps button, which opens the drawer only in Standard"),
     )
 
     @Test

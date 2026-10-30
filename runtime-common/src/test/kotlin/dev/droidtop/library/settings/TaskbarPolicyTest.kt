@@ -35,4 +35,14 @@ class TaskbarPolicyTest {
     fun `removing an app leaves the rest in order`() {
         assertEquals(listOf("a", "c"), TaskbarPolicy.without(listOf("a", "b", "c"), "b"))
     }
+
+    @Test
+    fun `the taskbar is Standard's alone, never over a game started from Gaming or Desktop`() {
+        // The console on 2026-10-30: Standard was switched on, Gaming was in use, a game was in front, and the bar showed.
+        assertFalse(TaskbarPolicy.shown(enabled = true, modeInUse = Mode.GAMING.id, appInFront = true, droidtopIsHome = true))
+        assertFalse(TaskbarPolicy.shown(enabled = true, modeInUse = Mode.DESKTOP.id, appInFront = true, droidtopIsHome = true))
+        assertTrue(TaskbarPolicy.shown(enabled = true, modeInUse = Mode.LAUNCHER.id, appInFront = true, droidtopIsHome = true))
+        assertFalse(TaskbarPolicy.shown(enabled = false, modeInUse = Mode.LAUNCHER.id, appInFront = true, droidtopIsHome = true))
+        assertFalse(TaskbarPolicy.shown(enabled = true, modeInUse = Mode.LAUNCHER.id, appInFront = false, droidtopIsHome = true))
+    }
 }

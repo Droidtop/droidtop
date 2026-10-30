@@ -19,6 +19,15 @@ object TaskbarPolicy {
      * external display is a desktop-style surface. A phone's own screen
      * does not.
      */
+    /**
+     * Whether the taskbar is drawn at all: it is Standard's, so only while Standard is the mode in use ([modeInUse],
+     * `Modes.lastMode`), never over a game started from Gaming or Desktop. Standard being switched on is not enough
+     * (Droidtop/tracker#639, the console on 2026-10-30: the bar showed over a game started from Gaming, and its Apps
+     * button opened Standard's drawer, a jump from Gaming into Standard). Pure.
+     */
+    fun shown(enabled: Boolean, modeInUse: String, appInFront: Boolean, droidtopIsHome: Boolean): Boolean =
+        enabled && modeInUse == Mode.LAUNCHER.id && appInFront && droidtopIsHome
+
     fun shownOnDisplay(smallestWidthDp: Int, isDefaultDisplay: Boolean): Boolean =
         !isDefaultDisplay || smallestWidthDp >= MIN_SMALLEST_WIDTH_DP
 

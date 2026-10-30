@@ -881,7 +881,10 @@ screen, whose Back opened Android's home screen (`START com.android.launcher3.La
 Standard, Desktop or the companion starts another mode's screen (MainActivity in another mode, Standard's games
 screen, the Android home screen, the mode switcher); only the person's own switch does: the mode menu and switcher,
 a widget's or the app icon's mode buttons, a row that says it switches ("Open Desktop"), and entries from outside
-droidtop (Open with, an exported launch). A physical Home press goes where Home goes (below). Audited 2026-10-24:
+droidtop (Open with, an exported launch). A physical Home press goes where Home goes (below). `ModeBoundaryTest`
+counts every start of a mode's screen by file, now including Standard's launcher named by class
+(`StandardComponents.LAUNCHER`) and its drawer's action (`Intent.ACTION_ALL_APPS`), the route the taskbar took
+(2026-10-30). Audited 2026-10-24:
 - an update row is a nested screen, never the game's page (7g, "Facets in place");
 - Standard's games screen goes Back to Standard's home only when opened in Standard;
 - a job row's game opens Standard's games screen only in Standard, Gaming's own page in Gaming, nothing in Desktop;
@@ -1153,6 +1156,13 @@ The owner: "Tablets and larger screens are important targets." Standard mode dra
 along the bottom of every tablet-sized or larger display, and of every external display, with
 the launcher's pinned apps, the apps opened since it started, an Apps button that opens the
 drawer, Recents, and a Hide button that folds it to a small tab.
+
+**Only while Standard is the mode in use (2026-10-30).** The bar is Standard's own, so it is drawn only while
+Standard is the mode in use (`TaskbarPolicy.shown`, tested), never over a game started from Gaming or Desktop.
+Standard merely being switched on is not enough. On the console (build 2730) it showed over a game started from
+Gaming, and its Apps button opened Standard's drawer (`com.android.launcher3.Launcher`): a jump from Gaming into
+Standard (the owner: "The bottom bar in game automatically kicks to tbe standard screen. And also, it exists, which
+seems wrong"). Its Apps button also checks the mode before it opens anything.
 
 **What upstream does, and why droidtop's is its own.** Launcher3's taskbar (`TaskbarActivityContext`
 and its controllers) is quickstep code drawn in a system-privileged window and fed by the

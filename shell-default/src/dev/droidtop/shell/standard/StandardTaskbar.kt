@@ -91,6 +91,10 @@ class StandardTaskbar(private val service: AccessibilityService) {
     /** The packages still running, as of the last app switch: the dot, and which opened apps stay listed. */
     private var running: Set<String> = emptySet()
     private var desktopInFront = false
+
+    /** The mode in use when the last window came to the front (`Modes.lastMode`): the bar is Standard's alone. */
+    private var modeInUse = ""
+
     private var collapsed = false
     private var focusedDisplay: Int? = null
 
@@ -167,11 +171,13 @@ class StandardTaskbar(private val service: AccessibilityService) {
         val home = pkg == service.packageName || pkg in homePackages()
         val launch = if (!home && pkg != SYSTEM_UI) service.packageManager.getLaunchIntentForPackage(pkg)?.component else null
         val isHome = HomeRolePrefs.isDroidtopHome(service)
-        val desktop = pkg == service.packageName && Modes.lastMode(service) == Mode.DESKTOP.id
+        val mode = Modes.lastMode(service)
+        val desktop = pkg == service.packageName && mode == Mode.DESKTOP.id
         val alive = runningPackages(opened + pkg)
         main.post {
             // droidtop's Desktop session owns the keyboard while it is in front: Meta is the session's Super (SPEC 6b).
             desktopInFront = desktop
+            modeInUse = mode
             droidtopIsHome = isHome
             val wasInFront = appInFront
             if (home) {
@@ -301,7 +307,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
 
     private fun renderAll() {
         val wanted = HashMap<Int, Display>()
-        if (enabled && appInFront && droidtopIsHome) {
+        if (TaskbarPolicy.shown(enabled, modeInUse, appInFront, droidtopIsHome)) {
             for (display in displays.displays) {
                 if (display.state == Display.STATE_OFF) continue
                 if (display.flags and Display.FLAG_PRIVATE != 0) continue
@@ -335,6 +341,8 @@ class StandardTaskbar(private val service: AccessibilityService) {
     }
 
     private fun openDrawer(displayId: Int) {
+        // Standard's drawer, from Standard's bar: never a way into Standard from another mode (Droidtop/tracker#639).
+        if (modeInUse != Mode.LAUNCHER.id) return
         val intent = Intent(Intent.ACTION_ALL_APPS)
             .setClassName(service.packageName, StandardComponents.LAUNCHER)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
