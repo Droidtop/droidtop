@@ -1062,6 +1062,10 @@ internal fun PcGameMenu(
                 )
             }
             actions.info.forEach { add(it) }
+            // Where to read about it (Droidtop/tracker#363): searches by its name, opened only when pressed.
+            dev.droidtop.library.GameResources.forGame(gameName).forEach { resource ->
+                add(ActionRow(resource.label, resource.detail) { dev.droidtop.library.Links.open(context, resource.url) })
+            }
             compat?.let {
                 add(ActionNote(it.summary() + "\nOther people's results on other hardware."))
             }

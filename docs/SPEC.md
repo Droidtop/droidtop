@@ -17410,6 +17410,12 @@ game of EXACTLY the same name (`ProtonDbClient.steamAppIdFor`) — a
 similar name is a suggestion, not an automatic identity, so it is never
 guessed.
 
+**Where to read about it (2026-10-30, DroidDeck's resources row, Droidtop/tracker#363).** Every PC game's About
+rows in `PcGameMenu` carry PCGamingWiki (fixes, settings, where saves are), Guides (GameFAQs' walkthroughs and FAQs)
+and Search the web (for a walkthrough). Each is a search by the game's display name (`GameResources`, tested), so
+nothing is asked of a site until the row is pressed, and it opens in the browser through `Links`. They are the way into
+the guide reader once #817 builds it.
+
 **What's new, asked for the same way (2026-10-14, Droidtop/tracker#229).** A
 Steam game (its own row, or an engine copy that kept its Steam store id) has a
 "What's new" row under About in `PcGameMenu`. Selecting it reads Steam's
