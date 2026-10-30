@@ -3836,6 +3836,24 @@ area, which reaches the same catalog screens from every mode:
 
 There is no second place.
 
+**Proposed (Droidtop/tracker#830 R0, for the owner; SPEC "Access").** The
+grant UI follows Android's permission UI as a whole:
+- the moment-of-use sheet asks "Allow <Plugin> to <do this>?" with the plugin's
+  quoted reason and the risk, choices Allow and Don't allow, B for Not now;
+- a plugin's Permissions page is sorted into Allowed and Not allowed (Not allowed
+  holds both "Ask every time" and "Don't allow"), plus a group for what it adds,
+  each row with its last use;
+- the one page's Allowed tab sorts By plugin or By permission (Android's
+  Permission manager: every holder of a group, "2 of 5 plugins allowed");
+- its Recent use tab is the last 7 days of dangerous and critical use from the
+  audit (§4.6), Android's privacy dashboard;
+- a plugin not called for 90 days has its dangerous and critical grants set back
+  to "Ask every time", quietly, listed under Removed while unused. This is on by
+  default and can be turned off for all plugins and per plugin.
+
+These are views of the same grants; there is still no second place where a
+grant is kept.
+
 ### 4.5 How trust tiers and permissions interact
 
 | | Official origin | User-trusted origin ("Added by you") | Unknown origin |

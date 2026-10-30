@@ -3969,7 +3969,7 @@ the `ContainerRuntime` interface that already exists (§3):
   with the level or when the ledger forgets the game. It rides droidtop's accessibility overlay when that
   service is on (no grant, as the keyboard overlay does, "Typing on the add-on display") and otherwise an application overlay, which
   needs "Display over other apps": with neither, the Overlay row's value reads "Needs display over apps"
-  and A opens that grant's screen (the permission table, "Permissions are asked at the feature", lists it).
+  and A opens that grant's screen (the permission table under "Access", Droidtop/tracker#830, lists it).
   **Where each figure comes from, and what a normal app cannot read.** Nothing Android gives an unprivileged
   app reports another app's frames: Choreographer, FrameMetrics and `dumpsys gfxinfo` see only a process's
   own HWUI windows, and a game draws into a SurfaceView or its own GL surface. The most reliable source is
@@ -10013,16 +10013,107 @@ not allow it, reading or writing failed). Code that already knows the words a pe
 screen (the owner's review, 2026-10-16: "raw exception text → plain sentences, with the throwable logged").
 A sentence that describes a consequence belongs where the consequence is chosen.
 
-### Permissions are asked at the feature, once, with the reason first
+### Access: what droidtop and its plugins may do (Droidtop/tracker#830; proposed, for the owner)
 
-Onboarding asks for exactly one grant, storage, because the library cannot
-exist without it. Every other grant Android makes special is asked where
-the feature that needs it is first used, never at start and never in a
-list on the Welcome step, with the reason stated before the system prompt
-and a row that stays until it is given (§7: "take me to the grant"). A
-declined grant disables the one feature, says which, and is not asked
-again until the person opens that feature. The complete set, and where
-each is asked:
+The owner, 2026-10-30: "We also need a better system than the 'needs something' UI", and, on how: "we want to look
+at Android's permissions UI as a whole as an example of how to do it well". This section is droidtop's equivalent of
+that UI, for two kinds of grant: what a **plugin** may do (its permissions and extension points, plugin-api.md §4)
+and what **droidtop itself** holds (the Android grants in the table below, and what More controls changes for it).
+It replaces the "Needs …" lines each feature wrote in its own words (#830's inventory) with one model, one wording,
+one way to fix in place and one page. Owner decisions so far:
+- **No silent grants.** droidtop takes nothing at start (`ElevatedGrants.takeAll` at start is removed). Each grant
+  is offered as a choice: one press with More controls on, a card that says what changes, and Undo. "Give the user
+  the choice … they can make an informed decision, we aren't making it for them."
+- **One page** for everything outstanding and everything allowed; Settings › Device setup and the "droidtop's
+  access" group go into it. Each plugin's Permissions page stays and is linked from it.
+- **Chores apart.** Missing artwork and similar go under Suggestions and are not counted.
+- **Hints may cover risky choices**, saying the risk plainly; a risky choice is never the default or the focused one.
+- **Removing unused grants can be turned off**, globally and per plugin, and never interrupts: "We want to be
+  unobtrusive".
+
+How Android does each part, and droidtop's equivalent:
+
+**1. Asked at the moment of use** (Android: the request dialog, after the app's own reason).
+- A grant is asked only when the person does the thing that needs it, never at start, never from a Service or at
+  boot, never for a plugin the person has not opened. Onboarding still asks for the one grant the library cannot
+  exist without (storage).
+- **droidtop's own grants:** the feature's row or notice says what does not work yet ("Brightness can't change
+  yet", §"One wording" below) and A opens the ask card: what changes, that it can be undone, Cancel left and
+  focused. With More controls on, the card's Allow makes the change itself through the fixed list of changes droidtop
+  knows how to make and undo, and reads the result back before it says "Allowed". Without it, Allow opens the exact
+  Android screen (`SettingsLaunch.start`), and droidtop reads the state again when the person comes back. The person
+  always acts; droidtop never toggles anything on its own.
+- **A plugin's permissions:** the sheet asks "Allow <Plugin> to <do this>?", then the plugin's own reason quoted as
+  the plugin's ("F95zone says: …"), then the risk in the Danger tone when the permission is dangerous or critical,
+  with Info (Y) for the exact permission. Choices: **Allow**, **Don't allow**; B is Not now. As today (plugin-api
+  §4.3), a call from the background never asks: it fails, and the plugin's row says what it wanted.
+- **Approval at install stays the tick list** (plugin-api §4.3, "Approval is a list"): consent to everything a plugin
+  declares, one line per item, the risky ones unticked.
+
+**2. Each one's permissions page, sorted into Allowed and Not allowed** (Android: App info › Permissions).
+- **A plugin's Permissions page** lists every permission it declared in two groups, **Allowed** and **Not allowed**
+  (the second holds both "Don't allow" and "Ask every time", the value saying which). Each row: the plain name
+  (a noun, "Your game folders"), the state as its value, and when it was last used from the audit log ("Used 2 h
+  ago"). A row opens that permission for that plugin: what it lets the plugin do, the plugin's reason, the three
+  choices **Allow**, **Ask every time**, **Don't allow**, its recent use (§4 below) and the exact terms in Info.
+  What the plugin adds to droidtop's screens (its extension points) is a third group, **Adds**, with the same
+  choices where an extension point can be turned off. At the foot: **Remove access if unused** (§5).
+- **droidtop's own** page is the Allowed tab of the one page (§6), sorted the same way.
+
+**3. Every holder of one permission** (Android: Permission manager).
+- On the Allowed tab, **By permission** lists every permission group (plugin-api §4.1) and droidtop's own grants,
+  each with "2 of 5 plugins allowed". A group opens its holders in Allowed and Not allowed, each changeable in
+  place. **By plugin** is the default sort and lists plugins, each opening its Permissions page.
+
+**4. What used it, and when** (Android: the privacy dashboard).
+- **Recent use**, a tab on the one page: the last 7 days of use of each dangerous or critical permission, from the
+  audit log that already exists (plugin-api §4.6), newest first. One row per (permission, plugin), e.g. "F95zone:
+  your game folders, 3 times, last 14:02". A row opens that plugin's entries for it, each with the one-line target
+  the audit already keeps (a domain, a folder name, never contents). droidtop's own changes made through More
+  controls (each Allow and each Undo) are listed the same way, as droidtop's.
+- Nothing about recent use is a pop-up or a notification.
+
+**5. Removing access from plugins that go unused** (Android: "Remove permissions if app isn't used").
+- A plugin droidtop has not called for 90 days (no call of any kind, user-started or background) has its dangerous
+  and critical grants set back to **Ask every time**. Normal permissions, extension points and the approval itself
+  are left alone, so nothing stops working that the person did not use.
+- **On by default; can be turned off** in Settings for all plugins, and per plugin at the foot of its Permissions
+  page.
+- **It never interrupts:** no sheet, no notification, no count on the Home card. What it removed is listed quietly
+  on the Allowed tab under **Removed while unused**, with the date and Allow again, and logged
+  (`droidtop.requirements`). The next time the plugin needs it, the moment-of-use sheet asks as usual.
+- droidtop's own grants are Android's to remove (Android's own unused-app reset); when Android does, the feature's
+  row asks again the next time it is opened, as now.
+
+**6. The one page** (the proposal's "Needs attention", one place for both kinds of grant).
+- **To do:** everything something the person turned on, pinned, installed or tried cannot work without, grouped by
+  what it blocks, most blocking first: one row each with the status glyph, the name, what does not work, and one verb
+  as the value. A runs the fix in place (§1). Below, **Suggestions** (chores such as missing artwork), not counted.
+- **Allowed:** everything granted, By plugin or By permission (§3), each with its way back: a plugin's
+  Permissions page; droidtop's Undo for what it changed through More controls (it puts back what it found); the
+  exact Android screen for an Android grant (an app cannot take back its own special access, so droidtop does not
+  pretend to); Sign out for a sign-in; Android's Home choice for the Home role. Then **Removed while unused** (§5).
+- **Recent use:** §4.
+- Only To do's blocking items count, on Gaming's Home card, a Quick Menu row and the first Settings row, each shown
+  only while the count is above zero (no permanent dot).
+
+**7. One wording.** Android names a group as a noun ("Camera") and asks with a verb phrase ("Allow … to take
+pictures and record video?"); it never shows a manifest string. droidtop does the same:
+- a missing grant's title is what does not work yet, in the person's words ("<Thing> can't <verb> yet"), never
+  "Needs …" and never the Android or plugin-api permission name;
+- its body is what turns on; its action is one verb ("Allow", "Turn on", "Set up", "Download", "Review", "Sign in");
+- a granted one is named as a noun ("Brightness and screen settings", "Your game folders");
+- the exact Android or plugin-api name, what it allows and where to take it back are in Info (Y), copyable;
+- a risk is said in the Danger tone, plainly, in the sheet and in any hint; it is never the default or focused
+  choice.
+
+**8. Built on one model** (R1): a requirement has a stable id, a kind (Android access, Home role, More controls,
+plugin, download, files, account), the feature that needs it, the one-line effect, a cheap check run off the main
+thread into one snapshot that every list reads (no list touches the disk), a fix route and a way back. Every
+check, fix and removal writes one log line, tag `droidtop.requirements`. Hints come from the shared hint component
+(#829, #827); notices from the shared `Notice`.
+
+droidtop's own Android grants, and the feature each is asked at (unchanged from before #830):
 
 | Grant | Feature that needs it | Where it is asked |
 | --- | --- | --- |

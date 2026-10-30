@@ -56,6 +56,9 @@ what it learned last.
 - A recommendation is one "We recommend <button>." sentence, on danger only, naming a button.
 - Never tell a person to do something they cannot do from where they are: give them the action.
 - Acknowledgements are past tense with no period ("Saved", "Copied").
+- Something missing is said as what does not work yet ("Brightness can't change yet"), never "Needs …" and never a
+  permission's name; a granted one is a noun ("Your game folders"); the exact name is in Info (SPEC "Access",
+  Droidtop/tracker#830).
 
 ## System integration
 - A disabled mode or feature runs no code (droidtop modes, 2026-09-11).
