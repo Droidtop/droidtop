@@ -355,6 +355,8 @@ internal fun PcGamesSection(
     var badgeStyle by remember { mutableStateOf(dev.droidtop.library.CapsuleBadgeStyle.FULL) }
     // Whether a capsule shows its game's name under its art (List options > Show names under images, #578).
     var namesUnder by remember { mutableStateOf(true) }
+    // How big the capsules are (List options > Card size).
+    var cardSize by remember { mutableStateOf(CardSize.STANDARD) }
     // Which games came through a launcher (Lutris): one read of the game settings.
     var viaByEntry by remember { mutableStateOf(emptyMap<String, String>()) }
     LaunchedEffect(Unit) {
@@ -366,6 +368,7 @@ internal fun PcGamesSection(
         stripTabs = withContext(Dispatchers.IO) { LibraryViewPrefs.stripTabs(context) }
         badgeStyle = withContext(Dispatchers.IO) { LibraryViewPrefs.capsuleBadge(context) }
         namesUnder = withContext(Dispatchers.IO) { LibraryViewPrefs.namesUnderImages(context) }
+        cardSize = withContext(Dispatchers.IO) { LibraryViewPrefs.cardSize(context) }
         viaByEntry = withContext(Dispatchers.IO) { runCatching { dev.droidtop.library.PcLaunchers.viaByEntry(context) }.getOrDefault(emptyMap()) }
         pcRoots = roots
     }
@@ -380,6 +383,10 @@ internal fun PcGamesSection(
     fun setNamesUnder(next: Boolean) {
         namesUnder = next
         coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setNamesUnderImages(context, next) } }
+    }
+    fun setCardSize(next: CardSize) {
+        cardSize = next
+        coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setCardSize(context, next) } }
     }
     // How many sources the library has rows from: a PC capsule names its source only when there
     // is more than one (docs/SPEC.md 7i, "Badges"). One pass over the fold, off the main thread.
@@ -1183,6 +1190,7 @@ internal fun PcGamesSection(
                     shelves = shelves,
                     state = state,
                     namesUnder = namesUnder,
+                    cardSize = cardSize,
                     onDest = onDest,
                     home = if (state.home) {
                         HomeParts(
@@ -1237,7 +1245,7 @@ internal fun PcGamesSection(
                         // Whole capsules at the tier width, 12dp apart, the
                         // row centred in what is left (Steam's library grid);
                         // a cell is never stretched past the capsule.
-                        val width = capsuleWidth()
+                        val width = capsuleWidth(cardSize)
                         // A badge part every card here shares says nothing (#496).
                         val gridBadges = remember(grid, systemNames, origins, badgeStyle) { ViewBadges(grid.map { badgeOf(it) }) }
                         LazyVerticalGrid(
@@ -1445,6 +1453,11 @@ internal fun PcGamesSection(
                     setStripTabs(stripTabs.copy(collections = !stripTabs.collections))
                 },
                 ListOption("Show names under images", on = namesUnder) { setNamesUnder(!namesUnder) },
+                // Smaller fits more games on a screen; larger shows more of each one's art.
+                ListOption("Card size", value = cardSize.label) {
+                    val sizes = CardSize.entries
+                    setCardSize(sizes[(sizes.indexOf(cardSize) + 1) % sizes.size])
+                },
                 // Full ("PC · GOG", "Engine · Ren'Py"), Kind only ("PC"), Off: what a capsule's badge says.
                 ListOption("Capsule badge", value = badgeStyle.label) {
                     val styles = dev.droidtop.library.CapsuleBadgeStyle.entries
@@ -1693,6 +1706,8 @@ private fun PcShelvesHome(
     state: PcGamesState,
     // Each card's name under its art (List options > Show names under images, #578).
     namesUnder: Boolean,
+    // How big the cards are (List options > Card size).
+    cardSize: CardSize,
     onDest: Boolean,
     onOpenSection: (Int) -> Unit,
     columnState: LazyListState,
@@ -1723,7 +1738,7 @@ private fun PcShelvesHome(
         }
         return
     }
-    val width = capsuleWidth()
+    val width = capsuleWidth(cardSize)
     val heroCardWidth = heroWidth(width)
     // The shelves rise in one after another when the page first appears
     // (docs/SPEC.md "Gaming motion and focus"); a shelf scrolled back into

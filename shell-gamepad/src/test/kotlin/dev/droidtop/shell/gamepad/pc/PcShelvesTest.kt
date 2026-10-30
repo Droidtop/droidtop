@@ -193,6 +193,16 @@ class PcShelvesTest {
     }
 
     @Test
+    fun `Card size steps a capsule from the window's tier, in whole dp`() {
+        // On the console's 1280dp canvas: 172dp at Standard (List options > Card size, Droidtop/tracker#363).
+        assertEquals(129f, capsuleWidthFor(1280f, CardSize.SMALLEST).value, 0.001f)
+        assertEquals(150f, capsuleWidthFor(1280f, CardSize.SMALL).value, 0.001f)
+        assertEquals(172f, capsuleWidthFor(1280f, CardSize.STANDARD).value, 0.001f)
+        assertEquals(206f, capsuleWidthFor(1280f, CardSize.LARGE).value, 0.001f)
+        assertEquals(249f, capsuleWidthFor(1280f, CardSize.LARGEST).value, 0.001f)
+    }
+
+    @Test
     fun `only art noticeably wider than tall is shown whole in a portrait capsule`() {
         assertTrue(isWideArt(640f, 480f))
         assertFalse(isWideArt(600f, 900f))

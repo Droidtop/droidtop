@@ -16803,6 +16803,14 @@ own games, in droidtop's own treatment:
   preview, preselected on. The focus line still names the selected game.
   Retro systems, the ES-DE themed views, Standard's widgets and the companion
   are not changed by it.
+- **Card size** (DroidDeck's library Display menu, Droidtop/tracker#363): a List
+  option beside Show names under images that steps the PC capsules through
+  Smallest, Small, Standard, Large and Largest (0.75, 0.875, 1, 1.2 and 1.45 of
+  the window's tier width, in whole dp; `CardSize`), on the PC grid and every
+  capsule shelf alike, so the games grid has the density control the Apps grid's
+  columns give apps. Standard by default; remembered. The capsule's top-left
+  corner already carries the one fact a card needs (download, update, not
+  installed, missing), so DroidDeck's corner chip is not added again.
 - **Art that does not load is no art** (console, build 1386: three empty
   frames on Recently added). A card whose art fails to load (`AsyncImage`
   `onError`) draws the plate with the name, the same as a card with no art.

@@ -881,6 +881,18 @@ object LibraryViewPrefs {
         prefs(context).edit().putString(CAPSULE_BADGE, style.name).apply()
     }
 
+    private const val CARD_SIZE = "droidtop_library_pc_card_size"
+
+    /** How big the games' capsules are (List options > Card size, docs/SPEC.md 7i); Standard until changed. A preferences read. */
+    fun cardSize(context: Context): dev.droidtop.shell.gamepad.pc.CardSize {
+        val stored = prefs(context).getString(CARD_SIZE, null)
+        return dev.droidtop.shell.gamepad.pc.CardSize.entries.firstOrNull { it.name == stored } ?: dev.droidtop.shell.gamepad.pc.CardSize.STANDARD
+    }
+
+    fun setCardSize(context: Context, size: dev.droidtop.shell.gamepad.pc.CardSize) {
+        prefs(context).edit().putString(CARD_SIZE, size.name).apply()
+    }
+
     private const val NAMES_UNDER_IMAGES = "droidtop_library_pc_names_under_images"
 
     /**

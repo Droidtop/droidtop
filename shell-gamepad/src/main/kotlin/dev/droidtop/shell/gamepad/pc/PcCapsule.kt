@@ -114,13 +114,29 @@ internal fun heroWidth(capsuleWidth: Dp): Dp = capsuleWidth * (HERO_ASPECT / CAP
  * stretches them.
  */
 @Composable
-internal fun capsuleWidth(): Dp = capsuleWidthFor(LocalShellWindow.current.widthDp.toFloat())
+internal fun capsuleWidth(size: CardSize = CardSize.STANDARD): Dp = capsuleWidthFor(LocalShellWindow.current.widthDp.toFloat(), size)
 
-/** [capsuleWidth] for a window [widthDp] wide. Pure. */
-internal fun capsuleWidthFor(widthDp: Float): Dp = when {
-    widthDp <= CAPSULE_TIER_NARROW_MAX_DP -> 110.dp
-    widthDp < CAPSULE_TIER_WIDE_MIN_DP -> 134.dp
-    else -> 172.dp
+/** [capsuleWidth] for a window [widthDp] wide, at the person's [size]. Pure. */
+internal fun capsuleWidthFor(widthDp: Float, size: CardSize = CardSize.STANDARD): Dp {
+    val tier = when {
+        widthDp <= CAPSULE_TIER_NARROW_MAX_DP -> 110f
+        widthDp < CAPSULE_TIER_WIDE_MIN_DP -> 134f
+        else -> 172f
+    }
+    return kotlin.math.round(tier * size.scale).dp
+}
+
+/**
+ * How big the games' capsules are (List options > Card size, docs/SPEC.md 7i; DroidDeck's library Display menu,
+ * Droidtop/tracker#363): a step on the window's tier width, so smaller fits more games on a screen and larger shows
+ * more of each one's art.
+ */
+enum class CardSize(val label: String, val scale: Float) {
+    SMALLEST("Smallest", 0.75f),
+    SMALL("Small", 0.875f),
+    STANDARD("Standard", 1f),
+    LARGE("Large", 1.2f),
+    LARGEST("Largest", 1.45f),
 }
 
 /** The window widths where Steam's capsule tiers change. */
