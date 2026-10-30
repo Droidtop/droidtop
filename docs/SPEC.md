@@ -5965,8 +5965,8 @@ own home long-press menu, and droidtop's games screen -- see that object's own c
 doc). It sends the same intent extra the double-tap already sends, with no `EXTRA_MODE`,
 so it never changes which mode is showing, only forces the display-role reinit.
 Self-detection (droidtop noticing the addon has gone empty and surfacing this action, or
-running it, without the user having to notice a mirror first) is NOT built -- recorded
-as open scope, not attempted alongside this reachability fix. A dedicated hardware
+running it, without the user having to notice a mirror first) was left out of this
+reachability fix and built on 2026-09-25: "Self-detection, built" below. A dedicated hardware
 shortcut (chord) was considered and dropped for this pass: everywhere this menu already
 opens from is reachable without inventing new key-combo plumbing to audit against every
 bundled emulator's own hotkeys first.
@@ -6017,6 +6017,16 @@ in both, and neither shell needs a second copy of when to show it. Standard mode
 covered (Launcher3's own secondary-display handling, not this orchestration, owns that
 display there) -- the existing menu row and gestures remain its route to the same
 recovery.
+
+The check runs in `MainActivity`, so it cannot catch the shell itself being gone. That
+case is droidtop's process dying with both screens up: Android brings back only the
+companion, and the add-on mirrors it (console, 2026-10-29, Droidtop/tracker#788). It is
+covered by the companion, not by a second watcher. A companion that resumes while
+Gaming or Desktop is the mode in use and no shell is alive starts the shell, which
+places both screens as at any start (`CompanionActivity.bringBackShellIfGone`). The
+companion checks only when it resumes, never on a timer: within one process a shell
+that is gone while the companion stays resumed was closed on purpose, and a timer would
+start it again against the person (decided 2026-10-30, Droidtop/tracker#810).
 
 **Needs a rig check** (no dual-screen hardware reachable from this environment): attach
 the "DP Screen" add-on, launch a game onto it from Gaming mode with two displays
