@@ -526,6 +526,8 @@ internal fun LibrarySearchDialog(
     val panelFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val view = LocalView.current
+    // Its window must not raise Android's keyboard by itself when the field takes the cursor (Droidtop/tracker#832).
+    dev.droidtop.shell.gamepad.KeepKeyboardDownOnFocus()
     // A page a result opens (a source's detail, a plugin's settings) takes the window over: the
     // search panel is not drawn under it, because two translucent windows put text on text (Droidtop/tracker#542).
     // What was typed and where the cursor was stay in this composition and are there when the page closes.

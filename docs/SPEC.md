@@ -6072,7 +6072,10 @@ rig check in the commit message.
   the companion's keys typed nothing until D-pad Up reached the field (rig, 2026-10-29). Android's keyboard comes up
   with that focus only where droidtop raises one on its own (one screen, no controller or keyboard:
   `raisesOnOwnFocus`); otherwise A on the field, or a tap, brings it up where droidtop's own keyboard does not serve
-  the screen.
+  the screen. The field's window says so to Android too (`KeepKeyboardDownOnFocus`: the soft input state is always
+  hidden, adjustResize kept), because a window that leaves it unspecified gets the system keyboard on a large screen
+  the moment a field in it is focused, whatever the field asks: on the console Y's Search raised Gboard over Gaming
+  that way (Droidtop/tracker#832, dev.2778). The search activity no longer asks for `stateVisible`.
 - **One keyboard at a time (Droidtop/tracker#523).** When a droidtop field's keys are served on another screen
   (`KeyboardTargets.open` answers `Elsewhere`: the companion's Input controller or the internal screen), Android's own
   keyboard is sent away from the field's window while the request stands (`KeyboardTargets.hideAndroidKeyboard`, from

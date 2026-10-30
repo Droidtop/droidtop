@@ -143,6 +143,7 @@ fun Modifier.opensFocused(tag: String): Modifier {
     val focus = remember { androidx.compose.ui.focus.FocusRequester() }
     val view = LocalView.current
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    KeepKeyboardDownOnFocus()
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, tag) }
     return this
         .onPad { press ->
@@ -158,3 +159,25 @@ fun Modifier.opensFocused(tag: String): Modifier {
 
 /** Whether a field that takes the cursor on its own also brings Android's keyboard up ([opensFocused]). */
 val raisesKeyboardWithFocus: Boolean get() = KeyboardTargets.raisesOnOwnFocus()
+
+/**
+ * Keeps Android's keyboard from coming up by itself when this window takes focus with a field in it, unless droidtop's
+ * own rule raises one ([raisesKeyboardWithFocus]). A window that leaves its soft input state unspecified gets the system
+ * keyboard on a large screen as soon as a text field in it is focused, whatever Compose asks for: on the console Y
+ * opened Search and Gboard came up over Gaming although the field asked for none (Droidtop/tracker#832, dev.2778).
+ * Only the state bits change, never adjustResize. An explicit show (A or a tap on the field) still raises it.
+ */
+@Composable
+fun KeepKeyboardDownOnFocus() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+            ?: (view.context as? android.app.Activity)?.window
+        val before = window?.attributes?.softInputMode
+        if (window != null && before != null && !raisesKeyboardWithFocus) {
+            val state = android.view.WindowManager.LayoutParams.SOFT_INPUT_MASK_STATE
+            window.setSoftInputMode((before and state.inv()) or android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+        }
+        onDispose { if (window != null && before != null) window.setSoftInputMode(before) }
+    }
+}
