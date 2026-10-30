@@ -1720,6 +1720,54 @@ So:
 
 ---
 
+### 1.11 Sources behave the same: match, links, states (proposed 2026-10-30 for the owner's review, Droidtop/tracker#784)
+
+The owner, 2026-10-29: "We need to normalize the other plugins as much as possible. We want users to be able to
+interact with them consistently", after F95's Match showed a correct link as "thread 214581" and could not be changed
+(#784), and its downloads opened stale links and pages the person had nothing to do on (#783). This section is what
+every source plugin (`library.metadata`, `library.updates`, `library.sources`) can count on droidtop doing, and the
+little it must do itself. Where droidtop can do a thing once, it does, so no plugin builds its own.
+
+**Status: a proposal.** Nothing below is built until the owner has read it. The parts marked *(built)* landed with
+#783 and #784's first commits.
+
+1. **A candidate has a name, or says it has none.**
+   - A `match` candidate carries `title`, the name the source's record goes by.
+   - A source that cannot name it leaves `title` out. It never puts in a stand-in such as `"Thread 214581"`.
+   - droidtop shows an untitled candidate as "<source> <ids> (name not given)" *(built, #784)*. Before the person
+     picks one, droidtop asks `fetch {ids}` for its `title`, so a name the source can read still shows.
+   - The conformance check (the fake host in `plugin-host-testing`, #71) fails a candidate whose title is only its
+     id.
+2. **One rematch path, droidtop's.**
+   - The automatic scrape is unchanged: a linked game's `match` gets the link in `storeIds` and `sourceLinks`, and
+     the source answers by it without searching (A3).
+   - A Match the person starts (`facts.asked: "person"`) never sends the source's own link. The source searches by
+     `title` and `folder.name`, as for a game it has never seen.
+   - droidtop then puts the current link first, named by `fetch {ids}` and marked "Current link", followed by the
+     search's candidates without it. A source does not build this list itself.
+   - Picking another candidate replaces the link under that source's key. Picking the current one changes nothing.
+3. **One link path: the record.**
+   - A source gives download links only in its record (`record` / `item.page` downloads, A6 and §1.10).
+   - droidtop keeps the record's links, opens a link out of sight first, and asks for the record again when the page
+     carries the source's declared `expiredText` *(built, #783; G3)*. A served host (a debrid or host API) takes the
+     link with no page shown. The visible web view opens only when the person has something to do.
+   - A source that knows its links expire declares `expiredText`. No source resolves, retries or opens links on its
+     own, and there is no second "resolve" op: asking for the record again is that op.
+   - A source's `acquire` job that opens a page itself (`web.session open_in_session`) goes the same way, and answers
+     `{captured: false, expired: true}` for the plugin to ask its site again *(built, #783)*.
+4. **One set of states, droidtop's words.**
+   - A source answers the shared codes (§1.3): `SIGN_IN_REQUIRED`, `BROWSER_CHECK_REQUIRED`, `RATE_LIMITED`,
+     `NOT_FOUND` (the record is gone) and `FAILED` (anything else, the site being down included).
+   - Its `message` is one plain sentence about its own site, never instructions for droidtop's screens.
+   - droidtop draws every one of them the same way for every source: "Sign in", "Open the site" and "Try again", with
+     the same sentence shape ("<source> could not ...: <message>").
+   - A source draws no sign-in, retry or error row of its own.
+5. **What each source is checked against.** The audit on #784 goes through every source plugin and lists, per point
+   above, what it does now and what changes:
+   - gamegrab-sources: F95, the ROM catalog plugin, LewdCorner, Repacks, Nyaa, Abandonware, BIOS, the F95 adapter in
+     droidtop-agent;
+   - Droidtop: Old versions, and any other plugin that matches or acquires.
+
 ## 2. Plugin-provided APIs
 
 *Added at the owner's direction on 2026-09-28: "the shizuku and magisk
