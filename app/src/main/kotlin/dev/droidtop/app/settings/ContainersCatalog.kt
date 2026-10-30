@@ -409,6 +409,7 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "reach", title = "What it can reach", items = reachItems(context, runtime, info, mounts))
         if (primary) groups += CatalogGroup(id = "printing", title = "Printing", items = printingItems(context, runtime, desktopUp))
         if (primary) groups += CatalogGroup(id = "fonts", title = "Languages", items = fontItems(context))
+        groups += CatalogGroup(id = "network", title = "Network", items = listOf(networkItem(runtime, info)))
         groups += CatalogGroup(id = "vpn", title = "VPN", items = vpnItems(context, runtime, info))
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
@@ -548,7 +549,8 @@ object ContainersCatalog {
         val devices = if (runtime.deviceSharingUnavailableReason != null) 0 else runCatching { runtime.sharedDevices(container).size }.getOrDefault(0)
         val servesVpn = withContext(Dispatchers.IO) { VpnPrefs.read(context) }.containerId == container.id &&
             DroidtopVpnService.state.value != VpnState.Off
-        val settings = ContainerReach.Settings(mounts, sockets, microphone, devices, servesVpn)
+        val network = runtime.networkUnavailableReason != null || runCatching { runtime.networkShared(container) }.getOrDefault(true)
+        val settings = ContainerReach.Settings(mounts, sockets, microphone, devices, servesVpn, network)
         return ContainerReach.lines(settings).map { line ->
             ActionItem(id = "container_reach_${line.kind.lowercase().replace(' ', '_')}", title = line.kind, subtitle = line.what)
         }
@@ -630,6 +632,42 @@ object ContainersCatalog {
                 if (runtime.microphoneUnavailableReason == null) add(microphoneItem(context))
             }
         }
+    }
+
+    /**
+     * Whether the container has the device's network (docs/SPEC.md 3d "Network", Droidtop/tracker#787 slice 3). Taking
+     * it away asks first and says what stops; giving it back does not. Either applies from the container's next start.
+     * A backend that cannot take it away says why in its place.
+     */
+    private suspend fun networkItem(runtime: ContainerRuntime, info: ContainerInfo): CatalogItem {
+        runtime.networkUnavailableReason?.let { reason ->
+            return ActionItem(id = "container_network", title = "Network", subtitle = reason, value = "This device's")
+        }
+        val container = info.container
+        val shared = runCatching { runtime.networkShared(container) }.getOrDefault(true)
+        return AsyncActionItem(
+            id = "container_network",
+            title = "Network",
+            subtitle = if (shared) {
+                "It has this device's network, as any app has. Press to take it away"
+            } else {
+                "It has no network at all. Press to give it this device's network again"
+            },
+            value = if (shared) "On" else "Off",
+            confirmTitle = if (shared) {
+                "Take ${info.displayName}'s network away? Nothing in it can reach the internet or this network, " +
+                    "downloads and updates in it stop, and a VPN it carries stops working. Its windows, sound and folders " +
+                    "stay. Applies when it next starts"
+            } else {
+                null
+            },
+            run = { _, _ ->
+                runCatching { runtime.setNetworkShared(container, !shared) }.fold(
+                    onSuccess = { if (shared) "Off from its next start" else "On from its next start" },
+                    onFailure = { FailureText.of("Containers", it) },
+                )
+            },
+        )
     }
 
     /**

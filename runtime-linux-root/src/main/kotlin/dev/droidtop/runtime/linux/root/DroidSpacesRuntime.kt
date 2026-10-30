@@ -231,6 +231,9 @@ class DroidSpacesRuntime(
             // class's doc comment). Off skips the bridge entirely, unlike
             // Wayland (below) which only withholds the client env var.
             enablePulseAudio = sockets.audioShared,
+            // Its network taken away on the container's page (docs/SPEC.md 3d "Network"). The desktop's sockets are
+            // files in a bound folder, which no network namespace touches.
+            noNetwork = !readNetworkShared(name),
         )
         config.writeTo(File(configsDir, "$name.config"))
     }
@@ -462,7 +465,7 @@ class DroidSpacesRuntime(
             RootArchive.copy(source.container.rootfsPath, rootfs)
             if (container.role == ContainerRole.PRIMARY) writeInit(rootfs, null)
             withContext(Dispatchers.IO) {
-                for (file in listOf(::imageRecordFile, ::runConfigFile, ::mountsFile, ::socketsFile, ::devicesFile, ::lookFile)) {
+                for (file in listOf(::imageRecordFile, ::runConfigFile, ::mountsFile, ::socketsFile, ::devicesFile, ::lookFile, ::networkFile)) {
                     file(container.id).takeIf { it.isFile }?.copyTo(file(id), overwrite = true)
                 }
                 writeConfig(id, rootfs)
@@ -471,7 +474,7 @@ class DroidSpacesRuntime(
         } catch (e: Throwable) {
             withContext(kotlinx.coroutines.NonCancellable) {
                 RootfsDelete.delete(rootfs)
-                for (file in listOf(::imageRecordFile, ::runConfigFile, ::mountsFile, ::socketsFile, ::devicesFile, ::lookFile)) file(id).delete()
+                for (file in listOf(::imageRecordFile, ::runConfigFile, ::mountsFile, ::socketsFile, ::devicesFile, ::lookFile, ::networkFile)) file(id).delete()
                 File(configsDir, "$id.config").delete()
                 File(configsDir, "$id.env").delete()
                 names.remove(id)
@@ -492,6 +495,7 @@ class DroidSpacesRuntime(
         provisioningFile(container.id).delete()
         socketsFile(container.id).delete()
         lookFile(container.id).delete()
+        networkFile(container.id).delete()
         mountsFile(container.id).delete()
         runConfigFile(container.id).delete()
         names.remove(container.id)
@@ -559,6 +563,23 @@ class DroidSpacesRuntime(
     override suspend fun setSockets(container: Container, sockets: ContainerSockets) = withContext(Dispatchers.IO) {
         socketsFile(container.id).apply { parentFile?.mkdirs() }
             .writeText("wayland=${sockets.waylandShared}\naudio=${sockets.audioShared}\n")
+        Unit
+    }
+
+    // ---- network (docs/SPEC.md 3d "Network") ----
+
+    private fun networkFile(name: String) = File(configsDir, "$name.network")
+
+    /** Shared unless the file says otherwise. */
+    private fun readNetworkShared(name: String): Boolean =
+        networkFile(name).takeIf { it.isFile }?.readText()?.trim()?.removePrefix("shared=")?.toBooleanStrictOrNull() ?: true
+
+    override val networkUnavailableReason: String? = null
+
+    override suspend fun networkShared(container: Container): Boolean = withContext(Dispatchers.IO) { readNetworkShared(container.id) }
+
+    override suspend fun setNetworkShared(container: Container, shared: Boolean) = withContext(Dispatchers.IO) {
+        networkFile(container.id).apply { parentFile?.mkdirs() }.writeText("shared=$shared\n")
         Unit
     }
 

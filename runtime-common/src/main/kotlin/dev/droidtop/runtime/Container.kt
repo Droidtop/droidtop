@@ -235,6 +235,18 @@ interface ContainerRuntime {
     suspend fun setLook(container: Container, look: ContainerLook): Unit = error("This backend keeps no look for its containers")
 
     /**
+     * Why this backend cannot take a container's network away (docs/SPEC.md 3d "Network", Droidtop/tracker#787 slice
+     * 3); null when it can.
+     */
+    val networkUnavailableReason: String? get() = "This backend cannot take a container's network away"
+
+    /** Whether [container] has the device's network; true unless it was taken away. */
+    suspend fun networkShared(container: Container): Boolean = true
+
+    /** Gives [container] the device's network or takes it away, from its next start. */
+    suspend fun setNetworkShared(container: Container, shared: Boolean): Unit = error(networkUnavailableReason ?: "not supported")
+
+    /**
      * Why this backend cannot bridge host audio into a container; null
      * when it can (docs/SPEC.md 3d Sockets row). Parallels
      * [deviceSharingUnavailableReason]. Both backends can now: droidspaces
