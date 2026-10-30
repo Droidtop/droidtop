@@ -3345,6 +3345,17 @@ the `ContainerRuntime` interface that already exists (§3):
   - **Backend:** proot only for now, as with backup. droidspaces shows why
     on the row (`cloneUnavailableReason`); its copy and backup are their
     own queued item (Droidtop/tracker#758).
+  **What it can reach (Droidtop/tracker#787 slice 1, #750 part 2).** A
+  container's page opens with "What it can reach", one line a kind, in
+  plain words: Files (its home: its own, the shared home folder or the
+  folder chosen; the device's shared storage, which every container
+  sees; each extra folder by name), Screen (its windows on the desktop or
+  none), Sound (sound, and the microphone when it is shared), USB devices
+  (how many), Network (the device's own, as any app has, and whether it
+  carries droidtop's VPN). `ContainerReach` builds them from the same
+  settings the rows below write, so the summary cannot say what the rows
+  do not; each later slice of #787 (clipboard, network, GPU, scale and
+  theme, keyboard and pad) adds its line here.
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend
