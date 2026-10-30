@@ -862,7 +862,11 @@ object PcScraper {
         val source: dev.droidtop.library.integrations.PluginMetadataSources.Source,
         val candidate: PluginMetadataProtocol.Candidate,
     ) {
-        val name: String get() = candidate.title ?: entryIdText()
+        /**
+         * The candidate's title, or, when the source gave none, its record said plainly as one with no name
+         * ("f95zone thread 214581 (name not given)", Droidtop/tracker#784): never the id as if it were the name.
+         */
+        val name: String get() = candidate.title ?: "${source.label} ${entryIdText()} (name not given)"
         private fun entryIdText(): String = candidate.ids.keys().asSequence().joinToString(", ") { "$it ${candidate.ids.opt(it)}" }
     }
 
