@@ -28,12 +28,19 @@ object ElevatedAccessHost {
         ShizukuTransport.install(application)
         // The risky-action switches load on their own thread; until they have, the gate answers no.
         RiskyActions.preload(application)
-        val built = ElevatedShell(app, PluginPrivilegedOps(application)) { ElevatedChoicePrefs.get(application) }
+        val built = ElevatedShell(app, PluginPrivilegedOps(application), { ElevatedChoicePrefs.get(application) }, wireless(application))
         installed = built
         TaskManager.install(built)
     }
 
     fun shizukuAppState(): BackendState = app.state()
+
+    @Volatile
+    private var wirelessOps: WirelessDebuggingOps? = null
+
+    /** The wireless debugging backend (docs/SPEC.md "Wireless debugging"); made on first use, no IPC. */
+    fun wireless(context: Context): WirelessDebuggingOps =
+        wirelessOps ?: synchronized(this) { wirelessOps ?: WirelessDebuggingOps(context).also { wirelessOps = it } }
 
     /** Asks the Shizuku app to allow droidtop. A binder call, so it runs on its own thread. */
     fun requestShizukuPermission() {

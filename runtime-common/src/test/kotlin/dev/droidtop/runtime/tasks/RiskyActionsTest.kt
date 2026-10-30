@@ -44,7 +44,7 @@ class RiskyActionsTest {
     }
 
     private fun shell(backend: ElevatedBackend, vararg on: RiskyClass) =
-        ElevatedShell(backend, backend) { ElevatedChoice.SHIZUKU_APP }.also { it.risk = RiskyGate { risk -> risk in on } }
+        ElevatedShell(backend, backend, { ElevatedChoice.SHIZUKU_APP }).also { it.risk = RiskyGate { risk -> risk in on } }
 
     private val game = "com.example.emulator"
     private val file = "/storage/emulated/0/Android/data/com.example.emulator/files/config.ini"

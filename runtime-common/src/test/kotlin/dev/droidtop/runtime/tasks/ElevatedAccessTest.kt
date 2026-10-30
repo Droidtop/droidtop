@@ -53,16 +53,16 @@ class ElevatedAccessTest {
 
         val pluginRoot = SpawnBackend(fromPlugin)
         val app = SpawnBackend(fromApp)
-        assertTrue(ElevatedShell(app, pluginRoot) { ElevatedChoice.AUTO }.spawn(listOf("id")) === fromPlugin)
+        assertTrue(ElevatedShell(app, pluginRoot, { ElevatedChoice.AUTO }).spawn(listOf("id")) === fromPlugin)
         assertEquals(0, app.asked)
 
         // No provider at root level: Auto falls back to the app's binder.
-        assertTrue(ElevatedShell(app, SpawnBackend(null)) { ElevatedChoice.AUTO }.spawn(listOf("id")) === fromApp)
+        assertTrue(ElevatedShell(app, SpawnBackend(null), { ElevatedChoice.AUTO }).spawn(listOf("id")) === fromApp)
 
         // A named backend is used alone, and Off is none.
-        assertNull(ElevatedShell(app, SpawnBackend(null)) { ElevatedChoice.SHIZUKU_PLUGIN }.spawn(listOf("id")))
-        assertTrue(ElevatedShell(app, pluginRoot) { ElevatedChoice.SHIZUKU_APP }.spawn(listOf("id")) === fromApp)
-        assertNull(ElevatedShell(app, pluginRoot) { ElevatedChoice.OFF }.spawn(listOf("id")))
+        assertNull(ElevatedShell(app, SpawnBackend(null), { ElevatedChoice.SHIZUKU_PLUGIN }).spawn(listOf("id")))
+        assertTrue(ElevatedShell(app, pluginRoot, { ElevatedChoice.SHIZUKU_APP }).spawn(listOf("id")) === fromApp)
+        assertNull(ElevatedShell(app, pluginRoot, { ElevatedChoice.OFF }).spawn(listOf("id")))
     }
 
     @Test
@@ -207,5 +207,30 @@ class ElevatedAccessTest {
         plugin.state = ready
         assertEquals(full, shell.capabilities())
         assertEquals(ElevatedBackendId.SHIZUKU_PLUGIN, shell.active())
+    }
+
+    @Test
+    fun `wireless debugging comes last in Auto, and a named pick keeps it while paired`() {
+        assertEquals(ElevatedBackendId.WIRELESS_DEBUGGING, ElevatedAccess.resolve(ElevatedChoice.AUTO, absent, absent, ready))
+        assertEquals(ElevatedBackendId.SHIZUKU_APP, ElevatedAccess.resolve(ElevatedChoice.AUTO, ready, absent, ready))
+        assertNull(ElevatedAccess.resolve(ElevatedChoice.AUTO, absent, absent, needs))
+        assertEquals(ElevatedBackendId.WIRELESS_DEBUGGING, ElevatedAccess.resolve(ElevatedChoice.WIRELESS_DEBUGGING, ready, ready, needs))
+        assertNull(ElevatedAccess.resolve(ElevatedChoice.WIRELESS_DEBUGGING, ready, ready, absent))
+    }
+
+    @Test
+    fun `paired with its switch off says to turn it on, and it is offered once paired`() {
+        assertEquals(ElevatedAccess.WIRELESS_OFF, ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, absent, absent, wireless = needs))
+        assertNull(ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, absent, absent, wireless = ready))
+        assertTrue(ElevatedChoice.WIRELESS_DEBUGGING in ElevatedAccess.options(absent, absent, needs))
+        assertTrue(ElevatedAccess.options(absent, absent, absent).isEmpty())
+    }
+
+    @Test
+    fun `the shell runs commands through wireless debugging when it is the one ready`() {
+        val wireless = FakeBackend(ready, TaskPrivileges(forceStop = true, shell = true), "wireless")
+        val shell = ElevatedShell(FakeBackend(absent, TaskPrivileges.NONE, "app"), FakeBackend(absent, TaskPrivileges.NONE, "plugin"), { ElevatedChoice.AUTO }, wireless)
+        assertEquals(ElevatedBackendId.WIRELESS_DEBUGGING, shell.active())
+        assertEquals("wireless", shell.exec(listOf("id"))?.stdout)
     }
 }

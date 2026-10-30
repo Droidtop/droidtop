@@ -4290,6 +4290,35 @@ the `ContainerRuntime` interface that already exists (§3):
   this gets built out (workspace switching, per-app window rules, etc.),
   not a component to fork code from.
 
+### Wireless debugging (Droidtop/tracker#816, owner 2026-10-30)
+
+The owner: "Add it to the things droidtop can do for setup, when shizuku is running, or through wireless debugging's
+autosetup". Elevated access (More controls) has a third backend beside the Shizuku app and the Shizuku plugin:
+Android's own wireless debugging, which droidtop pairs with once and then talks to as `adb` does, as the shell user.
+Nothing else is installed. Android 11 and later; earlier, the row is not drawn.
+
+- **One shell for every setup item.** `ElevatedShell` picks among the three, so the child-process limit, #740's
+  accessibility unlock and anything later run through `TaskManager.shell` whichever backend is there. In Auto the
+  Shizuku app comes first, then the plugin, then wireless debugging, which is usable only while its switch is on.
+  The person can also pick it by name in Elevated access. It never serves a long-lived root spawn: the shell user
+  is not root.
+- **Pairing, once** (`WirelessPairing`). Settings > Accounts and sources > Plugins and integrations > Pair with
+  wireless debugging opens Developer options at Wireless debugging and posts a notification. The person taps "Pair
+  device with pairing code" and replies to the notification with the six digits, so Settings stays in front and
+  the code stays shown; Shizuku does the same. droidtop finds the pairing service on the device itself
+  (`_adb-tls-pairing._tcp`, NsdManager), pairs on its own thread, and says in the same notification how it went.
+- **Each use** (`WirelessDebuggingOps`, plugin-host). droidtop finds `_adb-tls-connect._tcp` the same way,
+  connects with its key and runs the command. adb's shell stream has no exit status, so the command prints its own
+  after it, on a line droidtop reads back. Its state: absent until paired; paired with Android's switch off is
+  "turn it on" (the switch turns itself off on another network and after a restart); paired and on is ready.
+- **Its key** is droidtop's own: RSA 2048 with a self-signed certificate, made with BouncyCastle on first pairing
+  and kept in app storage (`files/wireless_debugging`). Forget, on the same row after asking, deletes it; the row
+  then reminds the person to remove droidtop under Paired devices too.
+- **Library (lane default, 2026-10-30).** libadb-android 3.1.1 (MuntashirAkon, from JitPack; GPL-3.0-or-later or
+  Apache-2.0, and its SPAKE2 dependency is LGPL), the adb pairing and TLS client Shizuku-like apps use, with
+  Conscrypt for the TLS it needs. It is a Gradle dependency, not vendored.
+- **No root and no device list:** what is offered follows what the device reports.
+
 ### Child processes and Android's limit (Droidtop/tracker#816, 2026-10-30)
 
 Android 12 counts the native processes every app forks, its "phantom processes", allows 32 across all apps
@@ -4538,7 +4567,10 @@ droidtop; the official app gives control and independent updates, updated by its
 as it normally would. Auto takes the first backend that is ready, the app before the plugin; a named backend
 is never swapped for the other. The row offers only what is present and is absent when neither is, and a
 privileged control is drawn only while the active backend reports its capability, so with no backend none
-appears. droidtop has no adb client, no pairing flow and no stored adb keys, and makes no `su` call.
+appears. The third backend is the device's own **wireless debugging** (Droidtop/tracker#816, owner 2026-10-30:
+"through wireless debugging's autosetup"; section "Wireless debugging"). droidtop pairs with it using the code
+the person reads from Android, keeps its own key in app storage (Forget deletes it), and runs commands as the
+shell user while Android's switch is on. It still makes no `su` call.
 
 ## 4a. Networking & VPN (directed 2026-08-30)
 

@@ -16,13 +16,19 @@ enum class BackendState {
     READY,
 }
 
-/** The two ways droidtop reaches elevated actions (docs/SPEC.md "The task manager"). */
+/** The ways droidtop reaches elevated actions (docs/SPEC.md "The task manager"). */
 enum class ElevatedBackendId(val id: String, val label: String) {
     /** The official Shizuku app, or Sui, through the Shizuku API in droidtop's own process. */
     SHIZUKU_APP("shizuku_app", "Shizuku app"),
 
     /** The official Shizuku provider plugin, through the plugin broker. */
     SHIZUKU_PLUGIN("shizuku_plugin", "Shizuku plugin"),
+
+    /**
+     * Android's own wireless debugging, which droidtop pairs with once and then talks to as `adb` does, as the shell user
+     * (docs/SPEC.md "Wireless debugging", Droidtop/tracker#816). Android 11 and later.
+     */
+    WIRELESS_DEBUGGING("wireless_debugging", "Wireless debugging"),
 }
 
 /** What the user picked: a backend, Auto, or no elevated access at all. */
@@ -30,6 +36,7 @@ enum class ElevatedChoice(val id: String, val label: String) {
     AUTO("auto", "Auto"),
     SHIZUKU_APP("shizuku_app", "Shizuku app"),
     SHIZUKU_PLUGIN("shizuku_plugin", "Shizuku plugin"),
+    WIRELESS_DEBUGGING("wireless_debugging", "Wireless debugging"),
     OFF("off", "Off"),
     ;
 
@@ -55,13 +62,21 @@ object ElevatedAccess {
      * named backend is used while it is there at all, even before droidtop is allowed in it, and is never swapped
      * for the other one behind the user's back. Off is always none.
      */
-    fun resolve(choice: ElevatedChoice, app: BackendState, plugin: BackendState): ElevatedBackendId? = when (choice) {
+    fun resolve(
+        choice: ElevatedChoice,
+        app: BackendState,
+        plugin: BackendState,
+        wireless: BackendState = BackendState.ABSENT,
+    ): ElevatedBackendId? = when (choice) {
         ElevatedChoice.OFF -> null
         ElevatedChoice.SHIZUKU_APP -> ElevatedBackendId.SHIZUKU_APP.takeIf { app != BackendState.ABSENT }
         ElevatedChoice.SHIZUKU_PLUGIN -> ElevatedBackendId.SHIZUKU_PLUGIN.takeIf { plugin != BackendState.ABSENT }
+        ElevatedChoice.WIRELESS_DEBUGGING -> ElevatedBackendId.WIRELESS_DEBUGGING.takeIf { wireless != BackendState.ABSENT }
+        // Wireless debugging last: it is there only while its switch is on, and Shizuku, when running, needs nothing.
         ElevatedChoice.AUTO -> when {
             app == BackendState.READY -> ElevatedBackendId.SHIZUKU_APP
             plugin == BackendState.READY -> ElevatedBackendId.SHIZUKU_PLUGIN
+            wireless == BackendState.READY -> ElevatedBackendId.WIRELESS_DEBUGGING
             else -> null
         }
     }
@@ -70,6 +85,9 @@ object ElevatedAccess {
     const val SETTINGS_PLACE = "Settings > Accounts and sources > Plugins and integrations"
 
     private const val NOT_ALLOWED = "droidtop is not allowed in Shizuku yet: $SETTINGS_PLACE > Allow droidtop in Shizuku"
+
+    /** Paired, but Android's switch is off: it turns itself off on another network and after a restart. */
+    const val WIRELESS_OFF = "Wireless debugging is off: turn it on in Developer options, then try again"
 
     private const val PLUGIN_NOT_APPROVED = "The Shizuku plugin is installed but not approved and turned on yet: open it in $SETTINGS_PLACE"
 
@@ -80,7 +98,13 @@ object ElevatedAccess {
      * plugin installed and waiting for approval (console, build 1773, where Kill said to add a plugin that was added).
      * [appInstalled] is whether the Shizuku app is on the device even though it is not running.
      */
-    fun unavailableReason(choice: ElevatedChoice, app: BackendState, plugin: BackendState, appInstalled: Boolean = false): String? = when (choice) {
+    fun unavailableReason(
+        choice: ElevatedChoice,
+        app: BackendState,
+        plugin: BackendState,
+        appInstalled: Boolean = false,
+        wireless: BackendState = BackendState.ABSENT,
+    ): String? = when (choice) {
         ElevatedChoice.OFF -> "Elevated access is Off: $SETTINGS_PLACE > Elevated access"
         ElevatedChoice.SHIZUKU_APP -> when (app) {
             BackendState.READY -> null
@@ -92,10 +116,16 @@ object ElevatedAccess {
             BackendState.NEEDS_PERMISSION -> PLUGIN_NOT_APPROVED
             BackendState.ABSENT -> "The Shizuku plugin picked in $SETTINGS_PLACE > Elevated access is not installed or not running"
         }
+        ElevatedChoice.WIRELESS_DEBUGGING -> when (wireless) {
+            BackendState.READY -> null
+            BackendState.NEEDS_PERMISSION -> WIRELESS_OFF
+            BackendState.ABSENT -> "droidtop isn't paired with wireless debugging yet: $SETTINGS_PLACE > Wireless debugging"
+        }
         ElevatedChoice.AUTO -> when {
-            app == BackendState.READY || plugin == BackendState.READY -> null
+            app == BackendState.READY || plugin == BackendState.READY || wireless == BackendState.READY -> null
             app == BackendState.NEEDS_PERMISSION -> NOT_ALLOWED
             plugin == BackendState.NEEDS_PERMISSION -> PLUGIN_NOT_APPROVED
+            wireless == BackendState.NEEDS_PERMISSION -> WIRELESS_OFF
             appInstalled -> "Shizuku is installed but not running: open the Shizuku app and start it"
             else -> "droidtop can only ask Android to close apps. Install Shizuku, or add the Shizuku plugin in $SETTINGS_PLACE"
         }
@@ -105,10 +135,11 @@ object ElevatedAccess {
      * The choices the row offers: only what is actually there. With neither backend present the list is empty and
      * the row is not drawn. Off and Auto appear as soon as there is anything to choose between.
      */
-    fun options(app: BackendState, plugin: BackendState): List<ElevatedChoice> {
+    fun options(app: BackendState, plugin: BackendState, wireless: BackendState = BackendState.ABSENT): List<ElevatedChoice> {
         val present = buildList {
             if (app != BackendState.ABSENT) add(ElevatedChoice.SHIZUKU_APP)
             if (plugin != BackendState.ABSENT) add(ElevatedChoice.SHIZUKU_PLUGIN)
+            if (wireless != BackendState.ABSENT) add(ElevatedChoice.WIRELESS_DEBUGGING)
         }
         return if (present.isEmpty()) emptyList() else listOf(ElevatedChoice.AUTO) + present + ElevatedChoice.OFF
     }
@@ -126,18 +157,20 @@ class ElevatedShell(
     private val app: ElevatedBackend,
     private val plugin: ElevatedBackend,
     private val choice: () -> ElevatedChoice,
+    private val wireless: ElevatedBackend = NoElevatedBackend,
 ) : PrivilegedShell {
     /** Who says a class of risky action is allowed: the person's switches. Replaceable only so a test can decide. */
     var risk: RiskyGate = RiskyActions
 
-    fun active(): ElevatedBackendId? = ElevatedAccess.resolve(choice(), app.state(), plugin.state())
+    fun active(): ElevatedBackendId? = ElevatedAccess.resolve(choice(), app.state(), plugin.state(), wireless.state())
 
     /** The choices to show, from the live state of both backends. Not for the main thread: it pings binders. */
-    fun options(): List<ElevatedChoice> = ElevatedAccess.options(app.state(), plugin.state())
+    fun options(): List<ElevatedChoice> = ElevatedAccess.options(app.state(), plugin.state(), wireless.state())
 
     private fun target(): PrivilegedShell = when (active()) {
         ElevatedBackendId.SHIZUKU_APP -> app
         ElevatedBackendId.SHIZUKU_PLUGIN -> plugin
+        ElevatedBackendId.WIRELESS_DEBUGGING -> wireless
         null -> NoPrivilegedOps
     }
 
@@ -148,12 +181,13 @@ class ElevatedShell(
     /** Only the Shizuku app's binder arrives late; the plugin backend is a registry lookup with nothing to wait for. */
     override fun connect(timeoutMs: Long) {
         when (choice()) {
-            ElevatedChoice.OFF, ElevatedChoice.SHIZUKU_PLUGIN -> Unit
+            ElevatedChoice.OFF, ElevatedChoice.SHIZUKU_PLUGIN, ElevatedChoice.WIRELESS_DEBUGGING -> Unit
             ElevatedChoice.AUTO, ElevatedChoice.SHIZUKU_APP -> app.connect(timeoutMs)
         }
     }
 
-    override fun unavailableReason(): String? = ElevatedAccess.unavailableReason(choice(), app.state(), plugin.state(), app.installed())
+    override fun unavailableReason(): String? =
+        ElevatedAccess.unavailableReason(choice(), app.state(), plugin.state(), app.installed(), wireless.state())
 
     override fun forceStop(packageName: String): ForceStopResult = target().forceStop(packageName)
 
@@ -177,6 +211,8 @@ class ElevatedShell(
         ElevatedChoice.OFF -> null
         ElevatedChoice.SHIZUKU_APP -> app.spawn(argv)
         ElevatedChoice.SHIZUKU_PLUGIN -> plugin.spawn(argv)
+        // The shell user over wireless debugging is never root, which is what a long-lived spawn is for.
+        ElevatedChoice.WIRELESS_DEBUGGING -> null
         ElevatedChoice.AUTO -> plugin.spawn(argv) ?: app.spawn(argv)
     }
 
@@ -205,4 +241,9 @@ object ElevatedChoicePrefs {
         cached = choice
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, choice.id).apply()
     }
+}
+
+/** A backend that is never there: [ElevatedShell]'s third backend until one is installed, and in tests. */
+object NoElevatedBackend : ElevatedBackend, PrivilegedShell by NoPrivilegedOps {
+    override fun state(): BackendState = BackendState.ABSENT
 }

@@ -79,6 +79,16 @@ dependencies {
     // (and its binder) instead of bundling its own.
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
+    // Wireless debugging, the third elevated-access backend (docs/SPEC.md "Wireless debugging"): the adb pairing and
+    // TLS client, the TLS it needs, and BouncyCastle for droidtop's own adb key and certificate.
+    // libadb brings BouncyCastle as bcprov-jdk15to18, the same classes the build already has as bcprov-jdk18on: one
+    // copy only, or the build fails on duplicate classes.
+    implementation(libs.libadb.android) {
+        exclude(group = "org.bouncycastle")
+    }
+    implementation(libs.conscrypt.android)
+    implementation(libs.bouncycastle.bcpkix)
+    implementation(libs.bouncycastle.bcprov)
     // docs/SPEC.md 12a, flutter_embed kind: the Flutter embedding's own
     // Java classes (FlutterEngine/FlutterJNI/FlutterLoader/MethodChannel),
     // pinned to the EXACT engine version

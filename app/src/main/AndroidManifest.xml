@@ -250,6 +250,15 @@
           no intent-filter category exposed for others to target).
         -->
         <!-- Enginehost's game-ended report, sent to this package alone: uploads a store game's cloud saves (tracker#580). -->
+        <!--
+          The wireless debugging pairing code, typed into droidtop's own
+          notification while Settings shows it (docs/SPEC.md "Wireless
+          debugging"). Only droidtop's own PendingIntent reaches it.
+        -->
+        <receiver
+            android:name="dev.droidtop.app.WirelessPairing$Receiver"
+            android:exported="false" />
+
         <receiver
             android:name="dev.droidtop.app.EnginehostGameEndedReceiver"
             android:exported="true">

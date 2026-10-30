@@ -11,13 +11,42 @@ import dev.droidtop.runtime.tasks.ElevatedChoice
 import dev.droidtop.runtime.tasks.ElevatedChoicePrefs
 
 /**
- * The row that picks where elevated actions come from: Auto, the Shizuku app, the Shizuku plugin or Off
+ * The row that picks where elevated actions come from: Auto, the Shizuku app, the Shizuku plugin, wireless debugging or Off
  * (docs/SPEC.md "The task manager"). It offers only what is there and is not drawn at all when neither backend
  * is, so no privileged control has a reason to appear. While the Shizuku app is running but has not allowed droidtop,
  * a second row asks it to. Reads binder state: build it off the main thread.
  */
 object ElevatedAccessCatalog {
-    fun rows(context: Context): List<CatalogItem> = listOfNotNull(choiceRow(context), allowRow())
+    fun rows(context: Context): List<CatalogItem> = listOfNotNull(choiceRow(context), allowRow(), wirelessRow(context))
+
+    /**
+     * Wireless debugging, the backend that needs nothing installed (docs/SPEC.md "Wireless debugging"): Pair until
+     * paired, then whether Android's switch is on, and Forget. Android 11 and later only.
+     */
+    private fun wirelessRow(context: Context): CatalogItem? {
+        val wireless = ElevatedAccessHost.wireless(context)
+        if (!wireless.supported) return null
+        if (!wireless.paired) {
+            return dev.droidtop.library.settings.AsyncActionItem(
+                id = "accounts_wireless_debugging",
+                title = "Pair with wireless debugging",
+                subtitle = "More controls with nothing to install. Android shows a code; reply with it",
+                run = { ctx, _ -> dev.droidtop.app.WirelessPairing.start(ctx) },
+            )
+        }
+        val on = wireless.state() == BackendState.READY
+        return dev.droidtop.library.settings.AsyncActionItem(
+            id = "accounts_wireless_debugging",
+            title = "Wireless debugging",
+            subtitle = if (on) "Paired and on. Press to forget the pairing" else "Paired, but it's off. Turn it on in Developer options",
+            value = if (on) "On" else "Off",
+            confirmTitle = "Forget droidtop's pairing with wireless debugging? Pairing again needs a new code",
+            run = { _, _ ->
+                wireless.forget()
+                "Forgotten. Remove droidtop under Paired devices in Wireless debugging too"
+            },
+        )
+    }
 
     private fun allowRow(): CatalogItem? {
         if (ElevatedAccessHost.shizukuAppState() != BackendState.NEEDS_PERMISSION) return null
