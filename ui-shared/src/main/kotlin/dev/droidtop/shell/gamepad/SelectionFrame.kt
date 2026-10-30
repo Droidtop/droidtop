@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.foundation.background
+import dev.droidtop.shell.gamepad.input.PadModality
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
