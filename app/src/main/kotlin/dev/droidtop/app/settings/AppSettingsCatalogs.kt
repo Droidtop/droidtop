@@ -1009,6 +1009,8 @@ object AppSettingsCatalogs {
                     // the long download or reinstall starts (Droidtop/tracker#299);
                     // the same WindowsSetup path launch and the game page use.
                     add(windowsSetupItem(provisioned, setupState))
+                    // Wine's process tree counts against Android's limit on child processes (Droidtop/tracker#816).
+                    PhantomProcessRow.item(context, "windows_child_processes")?.let(::add)
                     // A new game from an installer, in a prefix of its own (docs/SPEC.md 7c).
                     if (provisioned) {
                         add(

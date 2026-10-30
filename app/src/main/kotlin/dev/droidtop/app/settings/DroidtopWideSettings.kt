@@ -314,7 +314,7 @@ object DroidtopWideSettings {
                 CatalogGroup(
                     id = "desktop",
                     title = null,
-                    items = listOf(
+                    items = listOfNotNull(
                         orientationChoice(context, Mode.DESKTOP),
                         ToggleItem(
                             id = DesktopPrefs.KEY_TASKBAR_TOP,
@@ -364,6 +364,8 @@ object DroidtopWideSettings {
                             },
                         ),
                         // The rows above that apply "when the desktop next starts" can apply now (Droidtop/tracker#687).
+                        // What Android allows droidtop's programs before it ends them (Droidtop/tracker#816).
+                        PhantomProcessRow.item(context, "pref_desktop_child_processes"),
                         ActionItem(
                             id = "pref_desktop_restart",
                             title = "Restart the desktop",

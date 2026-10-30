@@ -4203,6 +4203,36 @@ the `ContainerRuntime` interface that already exists (§3):
   this gets built out (workspace switching, per-app window rules, etc.),
   not a component to fork code from.
 
+### Child processes and Android's limit (Droidtop/tracker#816, 2026-10-30)
+
+Android 12 counts the native processes every app forks, its "phantom processes", allows 32 across all apps
+together, and ends the excess with signal 9, saying nothing. droidtop forks many: proot and each program in a
+container, sway, Xwayland, and Wine with its tree. Its declared app processes (the main one, `:pluginhost`,
+`:plugin_sandbox`, `:plugin_open`, `:wallpaper_chooser`) are not counted. `PhantomProcesses` (runtime-common)
+keeps the rules; they are pure and tested.
+
+- **What the row says.** "Child processes" on Desktop's settings and on Windows games: droidtop's count against the
+  limit ("14 of 32"), and a warning when droidtop alone is at or over it. The count is every process of droidtop's
+  own user that is not one of its app processes, read from `/proc`, which shows an app only its own: exactly what
+  Android counts for it. Before Android 12 there is no limit and no row.
+- **What the device reports, never a device list.** With Shizuku the limit is read
+  (`device_config get activity_manager max_phantom_processes`; "null" is Android's default, 32) and whether Android
+  watches at all (`settings get global settings_enable_monitor_phantom_procs`, Android 12L and later; false is
+  off). Without Shizuku the row assumes Android's default and says how to change it.
+- **Lifting it, with the person's OK.** The row asks first and says what changes: Android stops ending desktop
+  programs and games, for every app, until it is put back here.
+  - Android 12 and 13 have no switch. droidtop runs `device_config set_sync_disabled_for_tests persistent`, so
+    Android's server-side sync does not put the default back, then
+    `device_config put activity_manager max_phantom_processes 2147483647`.
+  - Android 14 and later: `settings put global settings_enable_monitor_phantom_procs false`, the flag Developer
+    options' "Disable child process restrictions" sets. Without Shizuku the row points there.
+  - Putting it back is offered only when droidtop lifted it: `device_config delete` and
+    `set_sync_disabled_for_tests none`, or `settings delete global` on 14.
+- **The next slices of #816:** a killed container program or Wine game says it was
+  Android's limit (from the log's `Killing PhantomProcessRecord` line, read through Shizuku); a measure of a
+  Desktop session's and a Wine game's count and a cut in droidtop's own helpers; the same line on the companion's
+  droidtop page (#786).
+
 ### The task manager (decided 2026-10-01, Droidtop/tracker#245, #252, #247)
 
 droidtop is a general compute device in every mode, so seeing what is open and ending it stay
