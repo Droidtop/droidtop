@@ -6075,7 +6075,9 @@ the person is on Standard or an Alternative-forwarded launcher.
 Fixed by reusing the SAME pattern at the one remaining place it was missing:
 `reassertSecondaryDisplays` (`:shell-default`) explicitly starts
 `dev.droidtop.display.SecondaryDisplayActivity` on every attached secondary display
-(`DisplayManager.displays`, filtered to non-default `FLAG_PRESENTATION` displays), called
+(`DisplayManager.displays`, filtered to non-default `FLAG_PRESENTATION` displays) that does
+not already show it (`SecondaryCover.resumedDisplayId`, in `:runtime-common` so both modules
+read the one value; a start that fails is logged, Droidtop/tracker#771), called
 from both `HomeTrampolineActivity.forwardToStandard` and `AlternativeLauncherActivity`'s
 forward path, right alongside the `Modes.setLastMode(LAUNCHER)` call each already makes. A
 string component name (`Intent().setClassName(...)`), not a class reference: `:shell-default`
