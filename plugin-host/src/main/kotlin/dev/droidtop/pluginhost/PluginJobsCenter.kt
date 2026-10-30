@@ -307,7 +307,7 @@ object PluginJobsCenter {
             { _, eventJobId, result ->
                 if (eventJobId == jobId) {
                     PluginBrokers.jobEnded(jobId)
-                    update(jobId) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100, finishedAtMs = System.currentTimeMillis()) }
+                    update(jobId) { ended(it, result).copy(done = true, result = result, percent = 100, finishedAtMs = System.currentTimeMillis()) }
                     if (!deferred.isCompleted) deferred.complete(result)
                     onComplete(result)
                     runners.remove(jobId)?.shutdown()
@@ -550,7 +550,7 @@ object PluginJobsCenter {
             } else {
                 PluginResult.failure(reply.message ?: "failed")
             }
-            update(jobId) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100, finishedAtMs = System.currentTimeMillis()) }
+            update(jobId) { ended(it, result).copy(done = true, result = result, percent = 100, finishedAtMs = System.currentTimeMillis()) }
             brokeredJobs.remove(jobId)
             prune()
         }
@@ -635,7 +635,7 @@ object PluginJobsCenter {
             }
             val runner = runners[jobId] ?: runnerFactory(context, { _, _, _, _, payload ->
                 if (payload != null) update(jobId) { it.copy(resumePayload = payload) }
-            }, { _, _, result -> update(jobId) { it.copy(done = true, paused = false, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), finishedAtMs = System.currentTimeMillis()) } }).also { runners[jobId] = it }
+            }, { _, _, result -> update(jobId) { ended(it, result).copy(done = true, paused = false, result = result, finishedAtMs = System.currentTimeMillis()) } }).also { runners[jobId] = it }
             val accepted = runner.resumeJob(record, capability, spec.args, jobId, checkpoint)
             if (!accepted) update(jobId) { it.copy(paused = true, statusLine = "Resume failed") }
         }
@@ -678,6 +678,34 @@ object PluginJobsCenter {
     /** Whether the person cleared [jobId] (Clear, or Clear finished) while droidtop ran. */
     fun wasCleared(jobId: String): Boolean = jobId in clearedIds
 
+    /**
+     * A plugin job's last line (Droidtop/tracker#790): "Done", or its failure as one plain sentence ([JobFailureLine]) with
+     * a runtime's own words kept as the report's Details, never as the line.
+     */
+    private fun ended(entry: Entry, result: PluginResult): Entry {
+        if (result.ok) return entry.copy(statusLine = "Done")
+        val line = JobFailureLine.of(entry.pluginLabel, result.error)
+        val report = line.detail?.let { detail ->
+            android.util.Log.w("droidtop.plugin", "${entry.pluginLabel}: ${entry.title} failed: $detail")
+            JobReport((entry.report?.items.orEmpty() + ReportItem("Details", Outcome.FAILED, detail)).takeLast(JobReport.MAX_ITEMS))
+        } ?: entry.report
+        return entry.copy(statusLine = line.sentence, report = report)
+    }
+
+    /** What a Retry of a finished plugin job does, given by whoever starts that job again ([offerRetry]). */
+    private val retryHandlers = ConcurrentHashMap<String, () -> Unit>()
+
+    /**
+     * Offers Retry on [jobId], a finished plugin job: [again] starts its work afresh (a plugin service is started again,
+     * Droidtop/tracker#790), and the row gives way to the new run. Nothing when the job is gone or still running.
+     */
+    fun offerRetry(jobId: String, again: () -> Unit) {
+        val entry = find(jobId) ?: return
+        if (!entry.done) return
+        retryHandlers[jobId] = again
+        update(jobId) { it.copy(retryable = true) }
+    }
+
     /** Forgets a finished job and its report (the row's Clear). False for a job still running or paused. */
     fun clear(jobId: String): Boolean {
         val entry = find(jobId) ?: return false
@@ -685,6 +713,7 @@ object PluginJobsCenter {
         clearedIds += jobId
         state.update { list -> list.filterNot { it.jobId == jobId } }
         finishedSpecs.remove(jobId)
+        retryHandlers.remove(jobId)
         persist()
         return true
     }
@@ -694,6 +723,7 @@ object PluginJobsCenter {
         state.value.filter { it.done }.forEach { clearedIds += it.jobId }
         state.update { list -> list.filterNot { it.done } }
         finishedSpecs.clear()
+        retryHandlers.clear()
         persist()
     }
 
@@ -704,6 +734,12 @@ object PluginJobsCenter {
     fun retry(context: Context?, jobId: String): String? {
         val entry = find(jobId) ?: return null
         if (!entry.done) return null
+        // A plugin job whose starter offered Retry: that starter runs it again, and its new run takes this row's place.
+        retryHandlers.remove(jobId)?.let { again ->
+            clear(jobId)
+            again()
+            return jobId
+        }
         val spec = finishedSpecs[jobId] ?: return null
         val started = startNative(context, spec.kind, entry.title, spec.args, owner = entry.pluginLabel, pausable = entry.pausable) ?: return null
         successors[jobId] = started

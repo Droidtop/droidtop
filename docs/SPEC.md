@@ -6504,7 +6504,14 @@ one:
   until the person clears one (`clear`) or all (`clearFinished`); before this a finished job left the list after
   15 seconds and never reached storage. The list is written at most once a second (`PERSIST_INTERVAL_MS`), so
   keeping reports does not bring back the progress lag. **Retry** runs a finished native job again with the
-  arguments it had (`retry`), replacing its row. The Downloads widget and the Home strip read a job's kind from
+  arguments it had (`retry`), replacing its row. A finished plugin job offers Retry when whoever started it says how
+  to run it again (`offerRetry`, 2026-10-30, Droidtop/tracker#790): a failing plugin service keeps one row, its last
+  failed run, whose Retry starts the service at once with no failures counted, and each new run takes that row's place
+  (on the console Syncthing's service left a row per failed start). A plugin job's failed line is one plain sentence
+  (`JobFailureLine`): a runtime's own words (a class name, an exception, a stack trace, over 200 characters or on
+  several lines) become "<plugin> couldn't load its native code on this device" or "<plugin> ran into a problem it
+  didn't explain", and the words go to the job's report as its Details and to the log; a plugin's own plain sentence
+  stays the line. The Downloads widget and the Home strip read a job's kind from
   `nativeKind`, as the download rules do; they read `kind`, which is "native" for every job droidtop runs itself,
   so no native download showed in either.
   **The Downloads place reads it (2026-10-22).** Its sections are Current, Waiting (held by the download rules),

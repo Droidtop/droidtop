@@ -94,6 +94,12 @@ object PluginBackground {
     private val failures = ConcurrentHashMap<String, Int>()
     private val restarts = ConcurrentHashMap<String, Job>()
 
+    /**
+     * Each service's last failed run: the one row a failing service keeps in Downloads, with Retry (Droidtop/tracker#790).
+     * On the console a service that failed on every start left a row per attempt.
+     */
+    private val lastFailed = ConcurrentHashMap<String, String>()
+
     /** What each service last said when it stopped on its own, for its row on the plugin page. */
     val lastStop = ConcurrentHashMap<String, String>()
 
@@ -108,6 +114,8 @@ object PluginBackground {
     }
 
     private suspend fun start(context: Context, service: Entry) {
+        // A new run takes the place of the last failed one's row.
+        lastFailed.remove(service.key)?.let { PluginJobsCenter.clear(it) }
         val args = JSONObject().put("serviceId", BackgroundProtocol.entryId(service.entry))
         val jobId = startPluginJob(context, service.record, BackgroundProtocol.SERVICE_POINT, "run", args, "background", service.label) { result ->
             stopped(context, service, result)
@@ -117,9 +125,18 @@ object PluginBackground {
 
     private fun stopped(context: Context, service: Entry, result: PluginResult) {
         // Cancelled by droidtop (switched off): already out of [running], nothing to do.
-        running.remove(service.key) ?: return
+        val jobId = running.remove(service.key) ?: return
         host?.servicesRunning(context, running.size)
-        lastStop[service.key] = if (result.ok) "Stopped" else (result.error ?: "Stopped with an error")
+        lastStop[service.key] = if (result.ok) "Stopped" else dev.droidtop.pluginhost.JobFailureLine.of(service.record.manifest.label, result.error).sentence
+        if (!result.ok) {
+            lastFailed[service.key] = jobId
+            // Retry starts it now, as a fresh run with no failures counted, whatever the restart schedule says.
+            PluginJobsCenter.offerRetry(jobId) {
+                failures.remove(service.key)
+                restarts.remove(service.key)?.cancel()
+                scope.launch { syncServices(context) }
+            }
+        }
         if (result.ok || !BackgroundProtocol.restartsOnFailure(service.entry)) return
         val count = (failures[service.key] ?: 0) + 1
         failures[service.key] = count

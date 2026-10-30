@@ -102,6 +102,7 @@ open class PluginSandboxService : PluginProcessService() {
         }
         return try {
             val loader = ContainedDex.loader(ContainedDex.read(jar), javaClass.classLoader!!, libraryPath)
+            libraries.keys.forEach { name -> ContainedDex.reportLibrary(pluginId, loader, SandboxFiles.PLUGIN + name) }
             val plugin = loader.loadClass(entryClass).getDeclaredConstructor().newInstance() as? DroidtopPlugin
                 ?: return failLoad(pluginId, "its entry class does not implement the plugin interface")
             start(pluginId, plugin, context)
@@ -278,6 +279,25 @@ internal object ContainedDex {
         }
         check(found.isNotEmpty()) { "classes.jar holds no classes.dex" }
         return found.values.toList()
+    }
+
+    /**
+     * Whether [loader] finds the native library at [path] as the plugin's `System.loadLibrary` will (Droidtop/tracker#790):
+     * on the console Syncthing's `loadLibrary("syncthing")` found no `libsyncthing.so` in the virtual folder its class
+     * loader names. Logged under `droidtop.plugin` with what an access and a stat of the virtual path answer in this
+     * process, so a device's log says which step failed. Nothing changes for the plugin.
+     */
+    fun reportLibrary(pluginId: String, loader: ClassLoader, path: String) {
+        val base = path.substringAfterLast('/')
+        val name = base.removePrefix("lib").removeSuffix(".so")
+        val found = runCatching { (loader as? dalvik.system.BaseDexClassLoader)?.findLibrary(name) }.getOrElse { "error: ${it.message}" }
+        if (found != null) {
+            android.util.Log.i("droidtop.plugin", "$pluginId: $base is found at $found")
+            return
+        }
+        val access = runCatching { android.system.Os.access(path, android.system.OsConstants.R_OK); "ok" }.getOrElse { it.message ?: "failed" }
+        val stat = runCatching { "${android.system.Os.stat(path).st_size} bytes" }.getOrElse { it.message ?: "failed" }
+        android.util.Log.w("droidtop.plugin", "$pluginId: its class loader does not find $base; $path: access $access, stat $stat")
     }
 
     /**
