@@ -1,8 +1,14 @@
 package dev.droidtop.shell.standard
 
+import android.app.role.RoleManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Process
+import android.provider.Settings
+import android.util.Log
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
@@ -26,7 +32,18 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 object HomeRolePrefs {
     private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
     private const val KEY_ALTERNATIVE_TARGET = "droidtop_alternative_launcher_target"
+    private const val KEY_ICON_PENDING = "droidtop_home_icon_pending"
 
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    /** What Android starts on Home, to ask which app that is. */
+    private fun homeIntent() = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+
+    /** Android's Home role, on 10 and later where the device offers it; null where Home is a plain preference. */
+    private fun homeRole(context: Context): RoleManager? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+        return context.getSystemService(RoleManager::class.java)?.takeIf { it.isRoleAvailable(RoleManager.ROLE_HOME) }
+    }
 
     enum class HomeImplementation { STANDARD, ALTERNATIVE, NONE }
 
@@ -75,9 +92,7 @@ object HomeRolePrefs {
 
     /** The launcher [AlternativeLauncherActivity] forwards to -- null if never configured. */
     fun alternativeTarget(context: Context): ComponentName? =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_ALTERNATIVE_TARGET, null)
-            ?.let { ComponentName.unflattenFromString(it) }
+        prefs(context).getString(KEY_ALTERNATIVE_TARGET, null)?.let { ComponentName.unflattenFromString(it) }
 
     /**
      * Whether droidtop is the app Android opens on Home -- the real
@@ -88,15 +103,8 @@ object HomeRolePrefs {
      * read "On" (dq-onboard-01).
      */
     fun isDroidtopHome(context: Context): Boolean {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            val roles = context.getSystemService(android.app.role.RoleManager::class.java)
-            if (roles != null && roles.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME)) {
-                return roles.isRoleHeld(android.app.role.RoleManager.ROLE_HOME)
-            }
-        }
-        val home = android.content.Intent(android.content.Intent.ACTION_MAIN)
-            .addCategory(android.content.Intent.CATEGORY_HOME)
-        val resolved = context.packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
+        homeRole(context)?.let { return it.isRoleHeld(RoleManager.ROLE_HOME) }
+        val resolved = context.packageManager.resolveActivity(homeIntent(), PackageManager.MATCH_DEFAULT_ONLY)
         return resolved?.activityInfo?.packageName == context.packageName
     }
 
@@ -107,30 +115,23 @@ object HomeRolePrefs {
      * screen. Enable the HOME activity first ([setActiveHomeImplementation]):
      * the request offers only an enabled one.
      */
-    fun homeRequestIntent(context: Context): android.content.Intent {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            val roles = context.getSystemService(android.app.role.RoleManager::class.java)
-            if (roles != null && roles.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME)) {
-                return roles.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME)
-            }
-        }
+    fun homeRequestIntent(context: Context): Intent {
+        homeRole(context)?.let { return it.createRequestRoleIntent(RoleManager.ROLE_HOME) }
         // Below 10 there is no role request. When no Home app has been
         // chosen "Always" yet, Home itself resolves to Android's chooser,
         // which is the Home choice with droidtop in it: open that. Only when
         // another app is already the default does Android's settings screen
         // have to do it; on BlueStacks that screen is the Default apps list,
         // one level above the Home choice (rig, dq-onboard-02).
-        val home = android.content.Intent(android.content.Intent.ACTION_MAIN)
-            .addCategory(android.content.Intent.CATEGORY_HOME)
+        val home = homeIntent()
         val resolved = context.packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
         val noDefaultYet = resolved == null || resolved.activityInfo?.packageName == "android"
         return if (noDefaultYet) home else homeSettingsIntent()
     }
 
     /** Android's own Default home app screen, for a caller that cannot wait for a result. */
-    fun homeSettingsIntent(): android.content.Intent =
-        android.content.Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
-            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    fun homeSettingsIntent(): Intent =
+        Intent(Settings.ACTION_HOME_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /**
      * Puts droidtop's one icon on droidtop's own home screen, through the
@@ -141,9 +142,7 @@ object HomeRolePrefs {
      * ([placePendingIcon]).
      */
     fun placeDroidtopIcon(context: Context) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_ICON_PENDING, true)
-            .apply()
+        prefs(context).edit().putBoolean(KEY_ICON_PENDING, true).apply()
     }
 
     /**
@@ -156,20 +155,16 @@ object HomeRolePrefs {
      */
     @JvmStatic
     fun placePendingIcon(context: Context) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = prefs(context)
         if (!prefs.getBoolean(KEY_ICON_PENDING, false)) return
         prefs.edit().putBoolean(KEY_ICON_PENDING, false).apply()
         runCatching {
             com.android.launcher3.model.ItemInstallQueue.INSTANCE.get(context)
-                .queueItem(context.packageName, android.os.Process.myUserHandle())
-        }.onFailure { android.util.Log.w("droidtop.HomeRole", "Could not queue droidtop's icon", it) }
+                .queueItem(context.packageName, Process.myUserHandle())
+        }.onFailure { Log.w("droidtop.HomeRole", "Could not queue droidtop's icon", it) }
     }
 
-    private const val KEY_ICON_PENDING = "droidtop_home_icon_pending"
-
     fun setAlternativeTarget(context: Context, component: ComponentName) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            .putString(KEY_ALTERNATIVE_TARGET, component.flattenToString())
-            .apply()
+        prefs(context).edit().putString(KEY_ALTERNATIVE_TARGET, component.flattenToString()).apply()
     }
 }

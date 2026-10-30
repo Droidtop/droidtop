@@ -61,6 +61,7 @@ class ModeBoundaryTest {
         "shell-default/src/com/android/launcher3/dragndrop/AddItemActivity.java" to (1 to "upstream Launcher3's own home check"),
         "shell-default/src/dev/droidtop/shell/standard/BackButtonMenu.kt" to (6 to "the mode menu, the person's switch"),
         "shell-default/src/dev/droidtop/shell/standard/HomeEntry.kt" to (1 to "the Home press, which goes where the person's Home choice says"),
+        "shell-default/src/dev/droidtop/shell/standard/HomeRolePrefs.kt" to (1 to "asks Android which app opens on Home; starts nothing"),
         "shell-default/src/dev/droidtop/shell/standard/HomeTrampolineActivity.kt" to (1 to "the Home press, which goes where the person's Home choice says"),
         "shell-default/src/dev/droidtop/shell/standard/StandardTaskbar.kt" to (1 to "Standard's taskbar Home button, the person's press"),
     )
