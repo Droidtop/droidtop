@@ -4079,7 +4079,8 @@ the `ContainerRuntime` interface that already exists (§3):
     - the game droidtop launched (in front, or with nothing else known to be): its own overlay
       (`GameOptionsStandalone`), a surface of its own: the game's name and what runs it, **Resume** (closes the
       overlay; the game never left), **Pause the game** for a console game (RetroArch's `PAUSE_TOGGLE` over its
-      command port, `RetroArchCommands`, sent only on that press; pressed again carries on), **Game options** (what L2
+      command port, `RetroArchCommands`, sent only on that press; pressed again carries on), **Guides** (the game's
+      guides over it, the game menu's own `GuidesScreen`; 7i "Guides"; B comes back), **Game options** (what L2
       opens on the game in Gaming: a PC or engine game's `PcGameMenu`, whose Game page is drawn over the game too, or
       a console game's game menu, `AppOptionsMenu`, whose Game details is Gaming's detail screen; B there comes back),
       and **Quit** and **Kill**, each on a second press, ending it the shell's way (`Library.quitRunning`,
@@ -17458,9 +17459,10 @@ do what Y and X do, Back closes; the place is kept the same way, also when the t
 stays on the game throughout, as it does for every companion screen, and the companion stays on while a guide is
 open. A web search opens the browser on the companion's screen. Both readers read through one `GuideContent` (the
 list, the text, the PDF pages, the next mark; tested), so they differ only in how they are driven, and a mark gone to
-on another PDF page lands where it was made, once that page is drawn. The same pane in the HOME+L2 overlay and guides
-from plugins (the `guide` facet agreed on #817: `v`, `title`, `from`, `format`, `url` or `document`, `updated`;
-places kept under `<pluginId>:<id>`) are the next slices of #817.
+on another PDF page lands where it was made, once that page is drawn. **Over the game** the HOME+L2 overlay's game
+sheet has a Guides row too (`GameOptionsStandalone`), opening the game menu's own Guides screen, notes and reader, for
+any game, one press from it. Guides from plugins (the `guide` facet agreed on #817: `v`, `title`, `from`, `format`, `url` or `document`, `updated`;
+places kept under `<pluginId>:<id>`) are the next slice of #817.
 
 **What's new, asked for the same way (2026-10-14, Droidtop/tracker#229).** A
 Steam game (its own row, or an engine copy that kept its Steam store id) has a

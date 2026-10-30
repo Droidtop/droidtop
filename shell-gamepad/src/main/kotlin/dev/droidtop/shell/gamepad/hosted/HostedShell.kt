@@ -440,7 +440,18 @@ fun GameOptionsStandalone(
     var detailOpen by remember(entry.id) { mutableStateOf(false) }
     var armed by remember(entry.id) { mutableStateOf<String?>(null) }
     var said by remember(entry.id) { mutableStateOf<Pair<String, String>?>(null) }
+    var guidesOpen by remember(entry.id) { mutableStateOf(false) }
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
+        if (guidesOpen) {
+            // The running game's guides over the game, one press from it (docs/SPEC.md 7i "Guides"): the game menu's own.
+            dev.droidtop.shell.gamepad.pc.GuidesScreen(
+                gameId = entry.id,
+                gameName = dev.droidtop.library.GameNaming.displayName(entry.title),
+                folder = dev.droidtop.library.guides.GuideContent.folderOf(entry),
+                onClose = { guidesOpen = false },
+            )
+            return@CompositionLocalProvider
+        }
         if (optionsOpen) {
             GameOptions(library, entry, onResume, onOpenDownloads, onClose = { optionsOpen = false; pageOpen = false; detailOpen = false }, pageOpen, { pageOpen = it }, detailOpen, { detailOpen = it })
             return@CompositionLocalProvider
@@ -485,6 +496,7 @@ fun GameOptionsStandalone(
                     },
                 )
             }
+            add(dev.droidtop.shell.gamepad.ActionRow("Guides", "Walkthroughs and readmes, with your place kept") { guidesOpen = true })
             add(dev.droidtop.shell.gamepad.ActionRow("Game options", "This game's own menu, as L2 opens it in Gaming") { optionsOpen = true })
             add(ending("quit", "Quit", "Ends the game the way it ends itself") { library.quitRunning(context, entry) })
             add(ending("kill", "Kill", "Force-stops it; unsaved progress is lost") { library.killRunning(context, entry) })
