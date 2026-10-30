@@ -112,7 +112,7 @@ object DroidtopWideSettings {
                         modeToggle(context, Mode.DESKTOP),
                         modeToggle(context, Mode.GAMING),
                         dev.droidtop.library.settings.NestedScreenItem(
-                            id = "pref_standard_settings", title = "Standard mode settings",
+                            id = "pref_standard_settings", title = "Mobile mode settings",
                             subtitle = "Launcher and screen settings", registryId = SCREEN_STANDARD,
                             icon = dev.droidtop.library.settings.CatalogIcon.STANDARD,
                         ),
@@ -413,7 +413,7 @@ object DroidtopWideSettings {
 
     fun standardScreen() = CatalogScreen(
         id = SCREEN_STANDARD,
-        title = "Standard mode",
+        title = "Mobile mode",
         subtitle = "Settings for the launcher",
         groups = { context -> listOf(CatalogGroup(
             id = "standard", title = null,

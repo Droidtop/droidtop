@@ -1503,7 +1503,7 @@ object AppSettingsCatalogs {
     internal fun placementWords(mode: String): String? = when (mode) {
         PluginConsent.MODE_ANY -> null
         "Gaming" -> "In Gaming"
-        "Android" -> "On the Android home screen"
+        "Mobile" -> "In Mobile"
         "Desktop" -> "In Desktop"
         else -> mode
     }

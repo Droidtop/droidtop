@@ -17,7 +17,7 @@ import android.content.pm.PackageManager
  */
 enum class Mode(val id: String, val label: String) {
     /** The Launcher3 fork: home screen, app drawer, widgets. */
-    LAUNCHER("standard", "Android"),
+    LAUNCHER("standard", "Mobile"),
 
     /** The gaming shell: ES-DE theme engine, Quick Menu, PC surface, scraper. */
     GAMING("gaming", "Gaming"),

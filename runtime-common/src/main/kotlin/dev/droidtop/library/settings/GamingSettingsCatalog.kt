@@ -993,7 +993,7 @@ object GamingSettingsCatalog {
                     // label, and the Standard home's own long-press menu
                     // item): one name for one page (UI pass 2026-09-24, M8).
                     title = "Home settings",
-                    subtitle = "Standard mode's home screen, icons and app drawer",
+                    subtitle = "Mobile mode's home screen, icons and app drawer",
                     fragmentClassName = "app.murinelauncher.settings.SettingsRootFragment",
                     icon = CatalogIcon.STANDARD,
                 ),
@@ -1178,7 +1178,7 @@ object GamingSettingsCatalog {
     /** The names of plugin panels last offered as tab choices, so a bar's summary can name them without reading manifests. */
     @Volatile private var companionPluginTabNames: Map<String, String> = emptyMap()
 
-    private val COMPANION_MODE_NAMES = mapOf("GAMING" to "Gaming", "STANDARD" to "Standard", "DESKTOP" to "Desktop")
+    private val COMPANION_MODE_NAMES = mapOf("GAMING" to "Gaming", "STANDARD" to "Mobile", "DESKTOP" to "Desktop")
 
     /**
      * The Companion group (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): the bar's tabs and the
@@ -1727,7 +1727,7 @@ object GamingSettingsCatalog {
         return ChoiceItem(
             id = ID_ICON_PACK,
             title = "Icon pack",
-            subtitle = "App icons in Apps and on the Android home screen",
+            subtitle = "App icons in Apps and on Mobile's home screen",
             options = packs.map { (pack, label) -> ChoiceOption(pack, label) },
             current = source.selected(context),
             onSelect = { ctx, pack -> source.select(ctx, pack) },
