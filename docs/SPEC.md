@@ -19214,10 +19214,11 @@ menu still list every `listed` place.
   build" when neither is), and one value that is its state: **Update**, **Updating** (with the moving bar),
   **Waiting** (queued by Update all) or **Failed · Retry**. A folder game whose source names a newer version opens
   that source's record in place (its downloads and its changelog); the other kinds have no changelog to show yet,
-  so their rows have none. **One count** (`UpdatesWaiting`) is what every way in says: the left menu's Updates row
-  (a row of its own again, with a dot while any wait), the "Updates · N available" row heading Downloads and
-  Updates and the Quick Menu's Downloads tab (the owner, 2026-10-30: "An updates link should be in the Downloads and
-  Updates tab. Not there directly, but a shortcut"), and the companion's Home. The page publishes it each time it
+  so their rows have none. **One count** (`UpdatesWaiting`) is what every way in says: the "Updates · N available" row
+  heading Downloads and Updates and the Quick Menu's Downloads tab (the owner, 2026-10-30: "An updates link should be
+  in the Downloads and Updates tab. Not there directly, but a shortcut"), and the companion's Home. The left menu has
+  no Updates row of its own (the owner, seeing one: "Uh... There's a separate "updates" item in the left menu, now?";
+  "We don't want a bunch of different ways"): its way in is that row of Downloads and Updates. The page publishes it each time it
   reads the kinds; the first of those ways in after the process starts reads them off the main thread. What the
   page does, in that order:
   - **Check now**, saying when the last check ran and, when droidtop's own check failed, why; its value is how many
@@ -19269,7 +19270,7 @@ menu still list every `listed` place.
   stop what the game uses, and droidtop's install ends in Android's confirmation over the screen, so while
   `LaunchDisplay.running` holds a game the policy step waits and runs once when the game ends; a scheduled pass's
   wait keeps its droidtop install and its notification. "Only on Wi-Fi" already holds every check and install to an
-  unmetered network, and a capsule's top-left corner already marks a game with an update. **Where Updates is reached:** its page, from the left menu, the companion, or the shortcut row in the Quick Menu's Downloads tab and in Downloads and Updates; Settings > About
+  unmetered network, and a capsule's top-left corner already marks a game with an update. **Where Updates is reached:** its page, from the shortcut row in Downloads and Updates and in the Quick Menu's Downloads tab, or the companion; Settings > About
   droidtop > Updates, whose value says when droidtop has a newer build ("droidtop 0.2.0-dev.2700 is out"; it was a
   group of its own under System, now in About, one row); a plugin's page (its version and Update), in Settings and
   as its panel in the Quick Menu and on the companion; the plugin list's "N updates" row, each row's value naming the

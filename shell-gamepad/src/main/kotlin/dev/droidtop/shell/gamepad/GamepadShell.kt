@@ -1771,7 +1771,7 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
      * The left menu row that stands for this section: itself, or Downloads and Updates for Updates and Get new games,
      * its pages (Droidtop/tracker#639).
      */
-    val menuSection: GamingSection get() = if (this == NEW_GAMES) DOWNLOADS else this
+    val menuSection: GamingSection get() = if (this == NEW_GAMES || this == UPDATES) DOWNLOADS else this
 
     /**
      * A place that is no row of Gaming's left menu (Droidtop/tracker#644 slice 3). Plugins and Social are sections of
@@ -1828,9 +1828,9 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
  */
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
-    // The listed places; Kiosk and Kid hide them all, since they manage the device. Updates is a row of its own with
-    // its badge (Droidtop/tracker#792); Get new games is a page of Downloads and Updates; Plugins, Social and Game
-    // sources are elsewhere (offLeftMenu).
+    // The listed places; Kiosk and Kid hide them all, since they manage the device. Updates and Get new games are pages
+    // of Downloads and Updates (Place.listed, Droidtop/tracker#792); Plugins, Social and Game sources are elsewhere
+    // (offLeftMenu).
     val places = GamingSection.entries.filter { it.place?.listed == true && !it.offLeftMenu && !mode.hidesSettings }
     // Home leads, then PC Games (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
     val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy {
