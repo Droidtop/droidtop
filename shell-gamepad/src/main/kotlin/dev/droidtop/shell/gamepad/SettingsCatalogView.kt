@@ -1599,10 +1599,22 @@ private fun CatalogRowView(
     val toggle = item as? ToggleItem
     val slider = item as? SliderItem
     val value = if (toggle != null) null else catalogRowValue(item, context)
+    // A text or search field is an input box, never a settings row reading "not set" (owner, 2026-10-30,
+    // Droidtop/tracker#825: "why "not set"? It's not a freeform search bar?"). A sends it to the same edit as before.
+    if (item is TextInputItem && !locked && !confirmArmed) {
+        CatalogInputBox(
+            title = item.title,
+            text = status ?: value?.takeIf { it.isNotEmpty() },
+            hint = if (item.search) "Type to search" else "Type here",
+            selected = isSelected,
+            onClick = onClick,
+        )
+        return
+    }
     val placeholder = status == null && value == null && item is TextInputItem
     MenuRow(
         title = if (confirmArmed) "${item.title}: ${PressWords.again} to confirm" else item.title,
-        value = if (locked) "Read it first" else status ?: value ?: if (placeholder) (if ((item as? TextInputItem)?.search == true) "Type to search" else "not set") else null,
+        value = if (locked) "Read it first" else status ?: value ?: if (placeholder) "Type here" else null,
         chip = item.chip?.label,
         // A state with a tone (a plugin's Allowed / Ask first / Blocked) is a chip in that tone (tracker#519).
         valueChip = status == null && !locked && (item as? ChoiceItem)?.toned == true,
@@ -1644,6 +1656,32 @@ private fun CatalogRowView(
         progressParts = item.progressParts,
         statusMark = item.statusMark,
     )
+}
+
+/** A [TextInputItem] drawn as what it is: its name over a box holding its text, or a dim hint while it is empty. */
+@Composable
+private fun CatalogInputBox(title: String, text: String?, hint: String, selected: Boolean, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Text(title, style = MaterialTheme.typography.labelLarge, color = MenuTokens.OnSurfaceMuted)
+        Box(
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .fillMaxWidth()
+                .clip(Corners.Crisp)
+                .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
+                .focusRing(selected && PadModality.showsFocus, Corners.Crisp)
+                .padRow(onClick = onClick)
+                .padding(12.dp),
+        ) {
+            Text(
+                text ?: hint,
+                color = if (text == null) MenuTokens.Placeholder else MenuTokens.OnSurface,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 private const val CONFIRM_CANCEL = "cancel"

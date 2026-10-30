@@ -26020,6 +26020,19 @@ without its runtime said "Running". Decisions:
 
   A source's settings (sign-in, account, options) stay on its plugin page. The data and the merging are
   library-core's; the Gaming shell draws the section (the UI lane).
+  **How it is drawn.** Every Get games entry (a place's chip, Downloads and Updates' one Get games row) opens the one
+  search dialog in its Get games form (`GetGamesSearch`, `LibrarySearchDialog(getGames = true)`), titled Get games:
+  the field first, with the cursor in it; under it the chip row (`sourceChips`: the sources asked, then the ones off;
+  a turning ring beside a chip while its source answers, "· failed" on a chip whose source failed, with its fix as a
+  row under the results); then the rows. Left and Right move between the chips, A turns one over, kept, and the
+  search runs again. With no text the rows are what the sources feature, under "Featured"; with text, matches. Each
+  source result shows its box art, and one game several sources have reads "from F95zone · LewdCorner"
+  (`sourcesLine`). Downloads and Updates lists one Get games row, not a row per source plugin: in Gaming it opens the
+  search over the place; elsewhere `LauncherSearchActivity` hosts the same dialog. The rows are the search list's
+  rows with art, not a grid of cards.
+  **A text field is an input box.** The settings renderer draws every `TextInputItem` (a plugin's text or search field
+  on any page) as its name over a box holding its text, or a dim "Type here" / "Type to search", never a row whose
+  value reads "not set" (owner: "why "not set"? It's not a freeform search bar?"). A opens the same edit.
   **Get new games: under the results, and a page of Updates (owner, 2026-10-23, Droidtop/tracker#612, #621).** "Get new
   games should be presented under the search results, presenting matches that are relevant (so roms from romgi, abd
   etc). Also add a 'get new games' under 'updates' that's its own UI." Earlier the same day: Get More Games "is

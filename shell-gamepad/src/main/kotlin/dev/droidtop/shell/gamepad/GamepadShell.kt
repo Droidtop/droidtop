@@ -1373,6 +1373,8 @@ internal fun GamepadShellBody(
                         // something here too, for the reason Settings' is.
                         shownSection.placeScreenId != null -> {
                             canGoBack = true
+                            // Downloads and Updates' Get games row opens the one search here, over the place (Droidtop/tracker#825).
+                            var getGamesOpen by remember { mutableStateOf(false) }
                             // Every registered store's Open library and holding rows, built in or plugged in,
                             // and Game sources' Wine shortcuts and Imported rows: PC Games, filtered.
                             val storeLibraries = remember {
@@ -1392,8 +1394,10 @@ internal fun GamepadShellBody(
                                     put(PcSource.IMPORTED_ITEM_ID, openGames { pcGames.showImported() })
                                     // Get games' Get new games row opens the search here, in place.
                                     put(dev.droidtop.library.integrations.GetGamesEntry.UPDATES_ROW_ID) { nav.openSection(GamingSection.NEW_GAMES) }
+                                    put(dev.droidtop.library.integrations.GetGamesEntry.SEARCH_ROW_ID) { getGamesOpen = true }
                                 }
                             }
+                            if (getGamesOpen) GetGamesSearch { getGamesOpen = false }
                             PlaceCatalogView(
                                 screenId = shownSection.placeScreenId.orEmpty(),
                                 // A page of another place goes back to that place (Updates to Downloads and Updates).
