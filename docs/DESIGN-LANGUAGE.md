@@ -165,6 +165,8 @@ chips. 8 dp grid, 32 dp safe margin, 16 dp between tiles.
 - Chrome stays neutral; colour comes from art. Tokens are named by role so a light set can follow.
 - Themed library views are the theme's own; sheets, menus, dialogs and the hint bar stay droidtop's components in the
   theme's colours.
+- Outside Gaming (Mobile, Desktop, the taskbar, the shared menus) droidtop wears the Gaming theme's colours too, by
+  default, or a Custom droidtop theme of droidtop's own palette in one chosen accent (owner, 2026-10-30, Droidtop/tracker#827).
 
 ### Type and focus
 | Role | Size | Use |

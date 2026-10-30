@@ -57,6 +57,50 @@ object AppearancePrefs {
         )
     }
 
+    /**
+     * Colours outside Gaming (docs/SPEC.md 7k, "Colours outside Gaming"; owner, 2026-10-30, Droidtop/tracker#827): what
+     * Mobile, Desktop, Mobile's taskbar and the shared menus are drawn in. [MATCH_GAMING], the default and droidtop's
+     * recommendation, is the selected Gaming theme's resolved colours; [CUSTOM] is a droidtop-only palette in the accent
+     * [KEY_CUSTOM_ACCENT] names. [dev.droidtop.library.theme.OutsideGamingColors] is the one reader.
+     */
+    const val KEY_OUTSIDE_GAMING = "pref_global_outside_gaming_colours"
+    const val MATCH_GAMING = "match_gaming"
+    const val CUSTOM = "custom"
+
+    /** The Custom droidtop theme's accent, one of [dev.droidtop.library.theme.OutsideGamingColors.ACCENTS] by id. */
+    const val KEY_CUSTOM_ACCENT = "pref_global_custom_accent"
+
+    /** The keys the colours outside Gaming are worked out again for. */
+    val OUTSIDE_GAMING_KEYS: Set<String> = setOf(KEY_OUTSIDE_GAMING, KEY_CUSTOM_ACCENT)
+
+    fun outsideGaming(context: Context): String =
+        CatalogPrefs.prefs(context).getString(KEY_OUTSIDE_GAMING, MATCH_GAMING)?.takeIf { it == CUSTOM } ?: MATCH_GAMING
+
+    fun customAccent(context: Context): String? = CatalogPrefs.prefs(context).getString(KEY_CUSTOM_ACCENT, null)
+
+    /** The Settings row that chooses where the colours outside Gaming come from. */
+    fun outsideGamingItem(context: Context): ChoiceItem = ChoiceItem(
+        id = KEY_OUTSIDE_GAMING,
+        title = words(R.string.appearance_colours_outside_gaming),
+        subtitle = words(R.string.appearance_colours_outside_gaming_explained),
+        options = listOf(
+            ChoiceOption(MATCH_GAMING, words(R.string.appearance_match_the_gaming_theme)),
+            ChoiceOption(CUSTOM, words(R.string.appearance_custom_droidtop_theme)),
+        ),
+        current = outsideGaming(context),
+        onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(KEY_OUTSIDE_GAMING, value).apply() },
+    )
+
+    /** The Settings row that picks the Custom droidtop theme's accent. */
+    fun customAccentItem(context: Context): ChoiceItem = ChoiceItem(
+        id = KEY_CUSTOM_ACCENT,
+        title = words(R.string.appearance_custom_accent),
+        subtitle = words(R.string.appearance_custom_accent_explained),
+        options = dev.droidtop.library.theme.OutsideGamingColors.ACCENTS.map { ChoiceOption(it.id, words(it.label)) },
+        current = dev.droidtop.library.theme.OutsideGamingColors.accentOf(customAccent(context)).id,
+        onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(KEY_CUSTOM_ACCENT, value).apply() },
+    )
+
     /** The label [schemeLabels] gives [scheme], else [scheme] itself; null stays null. Pure, for tests. */
     fun schemeLabel(scheme: String?, schemeLabels: Map<String, String>): String? = scheme?.let { schemeLabels[it] ?: it }
 

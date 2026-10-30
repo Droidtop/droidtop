@@ -8,7 +8,6 @@ import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
 import dev.droidtop.shell.gamepad.GamingTheme
-import dev.droidtop.shell.gamepad.GamingPalette
 import dev.droidtop.shell.gamepad.rememberLightAppearance
 import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.shell.gamepad.DroidtopTypography
@@ -22,8 +21,9 @@ import dev.droidtop.shell.gamepad.ProvideShellCanvas
  * [MaterialTheme] instead of hardcoding either.
  *
  * Both halves come from the design system in `:shell-gamepad`
- * (`DesignTokens.kt`, docs/SPEC.md section 7k): droidtop's own palette in
- * the Appearance setting's light or dark ([GamingPalette.defaultFor]) is the
+ * (`DesignTokens.kt`, docs/SPEC.md section 7k): the colours outside Gaming
+ * ([GamingTheme.outsidePalette]: the Gaming theme's colours by default, or the
+ * Custom droidtop theme, each in the Appearance setting's light or dark) are the
  * colour source for this surface family and [DroidtopTypography] is
  * droidtop's type scale, supplied here rather than inherited from the
  * platform default so that two screens in the same flow cannot size the
@@ -34,7 +34,7 @@ import dev.droidtop.shell.gamepad.ProvideShellCanvas
  * from Gaming's Settings, Console systems, the containers and store
  * screens): they take their colours and typefaces from the active ES-DE
  * theme exactly as the Gaming shell does, through [GamingTheme] (docs/SPEC.md
- * "Gaming theming"). Everything else keeps droidtop's own scheme.
+ * "Gaming theming"). Everything else takes the colours outside Gaming.
  *
  * The Gaming shell's ES-DE-themed gamelist and carousel views are not drawn
  * through here at all: a themed view owns its whole surface (section 7f).
@@ -45,13 +45,15 @@ fun DroidtopTheme(
     content: @Composable () -> Unit,
 ) {
     if (gamingThemed) {
-        GamingTheme(content)
+        GamingTheme(content = content)
         return
     }
-    // Light or dark is the Appearance setting's, for every root (docs/SPEC.md 7k, "Light and dark"): droidtop's own
-    // palette in that appearance, its Material scheme and its notice colours, the ones a Gaming surface draws with
-    // when no theme is held. Every root used to force dark, the companion among them (rig 1931, Droidtop/tracker#559).
-    val palette = GamingPalette.defaultFor(rememberLightAppearance())
+    // Light or dark is the Appearance setting's, for every root (docs/SPEC.md 7k, "Light and dark"); the colours are
+    // the ones outside Gaming ("Colours outside Gaming", Droidtop/tracker#827), with their Material scheme and notice
+    // colours, the ones a Gaming surface draws with when no theme is held. Every root used to force dark, the companion
+    // among them (rig 1931, Droidtop/tracker#559).
+    rememberLightAppearance()
+    val palette = GamingTheme.outsidePalette
     CompositionLocalProvider(LocalNoticePalette provides palette.notice) {
         MaterialTheme(colorScheme = palette.colorScheme, typography = DroidtopTypography) {
             // No full-screen input method over droidtop's own fields (Droidtop/tracker#485 comment 6224857113).

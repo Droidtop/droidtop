@@ -18604,9 +18604,11 @@ UI through the one palette (`GamingPalette`) every token reads:
   the appearance. When no scheme matches (or the theme has one), the themed views keep the theme's colours and the
   chrome's palette is derived for the appearance (`GamingThemeMapping.map(theme, light)`): the theme's accent and fonts
   over droidtop's own ground, every text role derived again at 4.5:1, no texture.
-- With none held, droidtop's own palette in that appearance: `GamingThemeColors.DEFAULT` or its light twin
-  (`GamingThemeMapping.defaultFor`), built the way a theme's palette is, over a pale grey ground with a blue accent,
-  every text role at 4.5:1. `MenuTokens` read outside a Gaming surface give this palette, not a fixed dark one.
+- With none held, the colours outside Gaming in that appearance ("Colours outside Gaming" below): the Gaming theme's
+  colours by default, or the Custom droidtop theme. droidtop's own palette, `GamingThemeColors.DEFAULT` or its light
+  twin (`GamingThemeMapping.defaultFor`), built the way a theme's palette is, over a pale grey ground with a blue
+  accent, every text role at 4.5:1, is the Custom theme's base and what is drawn until those colours are first
+  resolved. `MenuTokens` read outside a Gaming surface give these colours, not a fixed dark palette.
 - Every Compose root droidtop draws (`DroidtopTheme`) takes that palette's Material scheme and notice colours. The 17
   roots that forced dark, the companion among them, and onboarding no longer do; there is no `darkTheme` parameter.
 - A change applies at once: `rememberLightAppearance` watches the setting and the configuration's night mode in every
@@ -18644,7 +18646,7 @@ UI through the one palette (`GamingPalette`) every token reads:
 - Not yet covered, each its own issue: the Windows runtime's views (#561) and droidtop's keyboard (#562).
 - **The Windows runtime's views (Droidtop/tracker#561, 2026-10-28).** #561: "The game's own frame and the on-screen controls drawn over the game stay as they are." What droidtop draws there as a screen of its own, the "This Windows game did not start" page (`WineGameActivity.showFailure`), takes `RoleTokens.current` (ground and onSurface), read once off the main thread as the activity starts, black and white until then. The game's frame, the "Mouse mode" badge and the on-screen controls over the game stay as they are. The Winlator controls editor's grid (`InputControlsView.drawGrid`) is not reachable from droidtop (nothing turns its edit mode on), so it is left as upstream drew it. The Wine desktop's own colours (`WineThemeManager`) are the Windows guest's look, like the game's frame, and do not follow droidtop's Light or dark (lane default, 2026-10-28; #561 left it "a separate decision").
 - **The role tokens** for UI droidtop does not draw itself (a plugin's own pages, #559): one set, read from the palette
-  in use (`GamingTheme.palette`, the theme's in Gaming, droidtop's own otherwise), never restated. `theme` is `light`
+  in use (`GamingTheme.palette`, the theme's in Gaming, the colours outside Gaming otherwise), never restated. `theme` is `light`
   or `dark` (`colors.isLight`); `ground` is the page background (`ground`); `surface` is a sheet or panel
   (`overlaySurface`); `surfaceVariant` is a raised or focused card (`cardFocused`); `onSurface` and `onSurfaceMuted`
   are text (`onSurface`, `onSurfaceMuted`, both 4.5:1 on every surface above); `primary` and `onPrimary` are the
@@ -18653,9 +18655,40 @@ UI through the one palette (`GamingPalette`) every token reads:
   ring's outer edge (`accent`) and `focusInner` its inner edge (`FocusRingInks.inner(accent)`). The plugin lane carries
   them to plugins (`host.info.theme`, `ui.theme`, `host.theme_changed`; docs/plugin-api.md).
   `RoleTokens` (`:runtime-common`) is that set: the Gaming shell provides it from its palette while a theme is held,
-  droidtop's own for the appearance otherwise. Plugins read it with `ui.get_theme` (docs/plugin-api.md G7) and hear
+  the colours outside Gaming (`OutsideGamingColors`) otherwise. Plugins read it with `ui.get_theme` (docs/plugin-api.md G7) and hear
   `host.theme_changed`; droidtop's own screens built from plain Android views (the web sign-in screen,
   `WebSessionActivity`) draw with it and take the system's light or dark widgets to match.
+
+**Colours outside Gaming (decided 2026-10-30, Droidtop/tracker#827).** This replaces the rule that the Gaming theme's
+palette applied only while a Gaming surface was on screen, with droidtop's own palette everywhere else. The owner:
+"Maybe we set the default coloration to the retro theme, and let users pick between that (the "droidtop
+recommendation: consistent coloration across all themes" option), and a custom droidtop-only theme". One setting,
+Settings > Appearance > **Colours outside Gaming** (`AppearancePrefs.KEY_OUTSIDE_GAMING`), with two choices:
+- **Match the Gaming theme (recommended)**, the default: Mobile, Desktop, Mobile's taskbar and the shared menus take
+  the selected Gaming (ES-DE) theme's resolved colours, in its colour scheme and the Light or dark appearance, with
+  High contrast when it is on. Its colours only: the theme's typefaces and texture stay Gaming's (and Desktop's, which
+  wears the whole Gaming theme while this is chosen).
+- **Custom droidtop theme**: droidtop's own palette for Light or dark in an accent from a short list
+  (**Custom theme accent**, `KEY_CUSTOM_ACCENT`): droidtop blue `#3BB5FF`, the default and droidtop's own palette
+  exactly, then teal, green, violet, pink and orange (`OutsideGamingColors.ACCENTS`). Kept minimal on purpose: the
+  accent is the one choice, and the roles it decides (the accent held to 4.5:1, the focused row, the primary button)
+  are worked out again from it (`GamingThemeMapping.withAccent`); grounds, surfaces and text stay droidtop's. Gaming
+  itself always wears its theme.
+
+How it is built. `ThemeColorStore` (`:runtime-common`) parses and maps the active theme once
+(`GamingThemeMapping.resolved`, the same step the Gaming palette uses) on the app's IO scope, never on the main
+thread, and keeps the result in its own preferences file with the key it was worked out for (theme, colour scheme,
+variant, aspect ratio, Light or dark, High contrast). It is installed at process start (`SettingsCatalogInitProvider`),
+so it is current even if Gaming never opens: a start whose key matches reads the stored colours back; a theme
+selection or re-download, a scheme, variant or aspect ratio change, Light or dark, High contrast, Android's night mode
+and the setting itself each look again. `OutsideGamingColors` is the one reader (`current(context)`, a cheap read,
+and `colors(context)`, a flow): it applies the setting and is what everything outside Gaming draws with. Its readers:
+`GamingTheme.outsidePalette` (what `MenuTokens` give with no theme held, and every `DroidtopTheme` root outside
+Gaming); Desktop's `GamingTheme(outsideGaming = true)`, which holds the Gaming theme only while Match is chosen;
+Mobile's taskbar (`StandardTaskbar`: the running dot and the focus ring, held to 3:1 on its dark plate, redrawn on a
+change); Mobile's View-hosted notices, page headers, button bars and job bars (`NoticeViews`, `PageViews`,
+`JobViews`: the accent and the palette over the surface's own background and text, on their next bind); and the role
+tokens plugins read outside Gaming (`RoleTokens.current`).
 
 **Spacing.** One responsive source, `ShellWindow`: the screen-edge gutter, the gap between
 top-level tabs, the minimum grid item, the minimum touch target and the maximum modal width
@@ -20280,9 +20313,10 @@ letter as a capital). It is used for headings, labels, tabs and buttons, but whe
 roles that carry data (a row's name, its value, prose, a tooltip) keep droidtop's own face, so a URL, a plugin's
 name or a version is never shown in capitals the person did not write (Droidtop/tracker#532).
 
-**Scope.** The palette applies only while a Gaming surface is started: `GamingTheme` holds it
-between the host's start and stop, so the standard launcher and the desktop, which share the
-tokens' code, draw droidtop's own palette. Screens Gaming opens (Console systems, the container
+**Scope.** The whole palette, typefaces and texture included, applies while a Gaming surface is
+started: `GamingTheme` holds it between the host's start and stop. Everything else (Mobile,
+Desktop, the shared menus) draws the colours outside Gaming (section 7k, "Colours outside Gaming",
+Droidtop/tracker#827): the theme's colours by default, or the Custom droidtop theme. Screens Gaming opens (Console systems, the container
 and store screens, onboarding re-entered from Gaming's Settings) wrap in
 `DroidtopTheme(gamingThemed = rememberGamingThemed())`, true when Gaming was the last mode; a
 first run is still choosing a theme and stays droidtop's own. A themed gamelist or carousel view
