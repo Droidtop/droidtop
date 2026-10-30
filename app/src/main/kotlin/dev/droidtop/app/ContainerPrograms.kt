@@ -30,6 +30,9 @@ import kotlinx.coroutines.withContext
  */
 internal object ContainerPrograms {
     private const val TAG = "droidtop.Programs"
+
+    /** Where the person lifts Android's limit on child processes (docs/SPEC.md "Child processes and Android's limit"). */
+    private const val CHILD_PROCESSES_ROW = "Settings > Desktop mode > Child processes"
     private val scope = dev.droidtop.runtime.util.AppScopes.io
     private val jobs = ConcurrentHashMap<String, Job>()
 
@@ -41,7 +44,8 @@ internal object ContainerPrograms {
         data object Stopped : State
         data class Running(val sinceMs: Long) : State
         data class Waiting(val restartInMs: Long, val lastExit: Int) : State
-        data class Ended(val exitCode: Int, val gaveUp: Boolean) : State
+        /** [why]: Android's phantom process limit, when that ended it (Droidtop/tracker#816), in plain words. */
+        data class Ended(val exitCode: Int, val gaveUp: Boolean, val why: String? = null) : State
         data class Failed(val message: String) : State
     }
 
@@ -165,7 +169,15 @@ internal object ContainerPrograms {
                     val policy = restartPolicy(app, container.id)
                     if (!ContainerProgram.restarts(policy, exit, failures)) {
                         val gaveUp = policy != ContainerProgram.RestartPolicy.No && (exit != 0 || policy.withDesktop)
-                        set(container.id, result.exceptionOrNull()?.let { State.Failed(it.message ?: it.javaClass.simpleName) } ?: State.Ended(exit, gaveUp))
+                        val why = if (exit == dev.droidtop.runtime.tasks.PhantomKills.KILLED_STATUS) {
+                            val killed = dev.droidtop.runtime.tasks.PhantomKills.since(
+                                dev.droidtop.runtime.tasks.TaskManager.shell, android.os.Process.myUid(), now,
+                            )?.isNotEmpty()
+                            dev.droidtop.runtime.tasks.PhantomKills.explain(exit, killed, android.os.Build.VERSION.SDK_INT, CHILD_PROCESSES_ROW)
+                        } else {
+                            null
+                        }
+                        set(container.id, result.exceptionOrNull()?.let { State.Failed(it.message ?: it.javaClass.simpleName) } ?: State.Ended(exit, gaveUp, why))
                         break
                     }
                     val wait = ContainerProgram.restartDelayMs(failures.coerceAtLeast(1))

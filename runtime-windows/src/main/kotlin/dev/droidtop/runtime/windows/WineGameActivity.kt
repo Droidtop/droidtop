@@ -363,6 +363,22 @@ class WineGameActivity : Activity() {
         // in droidtop's logs folder with the logs the game wrote itself, which Share diagnostics packs.
         android.util.Log.i(WinePresentation.LOG_TAG, "Wine exited $status after $ranMs ms, window shown: $guestShowedWindow")
         writeRunRecord(status, ranMs, output)
+        // Killed (137) while the person was still playing: Android's limit on child processes may have done it, and the
+        // log says so when the privileged shell can read it (Droidtop/tracker#816). Read on its own thread.
+        if (status == dev.droidtop.runtime.tasks.PhantomKills.KILLED_STATUS && !isFinishing) {
+            val since = startedAtWallMs
+            Thread({
+                val killed = dev.droidtop.runtime.tasks.PhantomKills.since(dev.droidtop.runtime.tasks.TaskManager.shell, android.os.Process.myUid(), since)
+                    ?.isNotEmpty()
+                val why = dev.droidtop.runtime.tasks.PhantomKills.explain(status, killed, android.os.Build.VERSION.SDK_INT, CHILD_PROCESSES_ROW)
+                showEnd(if (why != null) WinePresentation.ExitReport("Android ended the game", why) else report)
+            }, "droidtop-wine-ended").start()
+            return
+        }
+        showEnd(report)
+    }
+
+    private fun showEnd(report: WinePresentation.ExitReport?) {
         runOnUiThread {
             // The person left the game (Back): stopping the session killed
             // Wine (code 137), which is the quit itself, not a failure to report.
@@ -689,6 +705,9 @@ class WineGameActivity : Activity() {
     )
 
     companion object {
+        /** Where the person lifts Android's limit on child processes (docs/SPEC.md "Child processes and Android's limit"). */
+        private const val CHILD_PROCESSES_ROW = "Settings > Windows games > Child processes"
+
         private const val EXTRA_CONTAINER_ID = "dev.droidtop.wine.CONTAINER_ID"
         private const val EXTRA_TARGET = "dev.droidtop.wine.TARGET"
         private const val EXTRA_WORKING_DIR = "dev.droidtop.wine.WORKING_DIR"

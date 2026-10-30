@@ -911,7 +911,8 @@ object ContainersCatalog {
         ContainerPrograms.State.Stopped -> "Stopped"
         is ContainerPrograms.State.Running -> "Running"
         is ContainerPrograms.State.Waiting -> "Restarting in ${state.restartInMs / 1000} s (it exited with ${state.lastExit})"
-        is ContainerPrograms.State.Ended -> if (state.gaveUp) "Stopped after failing ${ContainerProgram.MAX_FAILURES_IN_A_ROW} times (exit ${state.exitCode})" else "Exited with ${state.exitCode}"
+        is ContainerPrograms.State.Ended -> state.why
+            ?: if (state.gaveUp) "Stopped after failing ${ContainerProgram.MAX_FAILURES_IN_A_ROW} times (exit ${state.exitCode})" else "Exited with ${state.exitCode}"
         is ContainerPrograms.State.Failed -> "Couldn't start: ${state.message}"
     }
 

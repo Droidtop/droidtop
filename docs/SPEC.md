@@ -4270,10 +4270,15 @@ keeps the rules; they are pure and tested.
     options' "Disable child process restrictions" sets. Without Shizuku the row points there.
   - Putting it back is offered only when droidtop lifted it: `device_config delete` and
     `set_sync_disabled_for_tests none`, or `settings delete global` on 14.
-- **The next slices of #816:** a killed container program or Wine game says it was
-  Android's limit (from the log's `Killing PhantomProcessRecord` line, read through Shizuku); a measure of a
-  Desktop session's and a Wine game's count and a cut in droidtop's own helpers; the same line on the companion's
-  droidtop page (#786).
+- **A program Android ended says so** (slice 2). A process killed by signal 9 exits 137, and Android says why
+  once, in its own log: `ActivityManager: Killing PhantomProcessRecord {… <pid>:<uid>/… <name>}`. When a
+  container's program or a Windows game ends with 137 and the person did not stop it, droidtop reads the log
+  through the privileged shell (`PhantomKills`) for a kill of its own user since the program started. Found, the
+  program's page says "Android ended it: too many child processes across your apps", and the game's end screen
+  is titled "Android ended the game", each naming the Child processes row that lifts the limit. Without the shell
+  the log cannot be read, so on Android 12+ the line says what probably happened instead, never that it did not.
+- **The next slices of #816:** a measure of a Desktop session's and a Wine game's count and a cut in droidtop's
+  own helpers; the same line on the companion's droidtop page (#786).
 
 ### The task manager (decided 2026-10-01, Droidtop/tracker#245, #252, #247)
 
