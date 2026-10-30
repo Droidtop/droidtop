@@ -3776,11 +3776,22 @@ the `ContainerRuntime` interface that already exists (§3):
     off, it turns the service on (`AccessibilityKeyboard.turnOn`): with elevated access droidtop first allows its
     restricted settings (`appops set ACCESS_RESTRICTED_SETTINGS allow`) and then adds itself to
     Android's enabled list, keeping every service already on it (a vendor's, such as Retroid's Game Assistant); else,
-    when blocked, droidtop's App info opens for "Allow restricted settings"; else Android's accessibility page opens. Pressed while on, it opens that page, where it is turned off again: every
+    when blocked, droidtop's App info opens for "Allow restricted settings"; else Android's accessibility page opens.
+    Some Androids have no "Allow restricted settings" item at all (the Retroid Pocket 5's, Android 13, the owner on the
+    console: "Allow restricted settings does not exist"), so the Blocked line and the press also give the way that
+    always works, the one command from a computer, `adb shell appops set <package> ACCESS_RESTRICTED_SETTINGS allow`
+    (copied to the clipboard on the press), and say that installing droidtop through an app store or a session
+    installer avoids the block. Pressed while on, it opens that page, where it is turned off again: every
     grant stays revocable. A Home press that reaches droidtop while the service is off says once, as a flash, that the
     combos are off and where to turn them on, so the person learns it before they are in a game. Whether a vendor's
     own service that also filters keys lets HOME through to droidtop's is the console's to show.
-  - `HomeChords` (`:runtime-common`, pure, tested) decides each key at once. HOME down is held; R2, L2 or Start while
+  - `HomeChords` (`:runtime-common`, pure, tested) decides each key at once. Nothing stays stuck when a release is
+    lost (the owner on the console: "it's possible to bug it so it stops working (maybe inputting too fast)"): a key
+    pressed again ends what its lost release left behind, a HOME with no HOME event for five seconds counts as let
+    go, and the state is forgotten when the filter goes off; a test feeds thousands of fast, interleaved sequences with
+    lost releases and checks each comes back to idle. Each decision on HOME or a chord button is logged under
+    `droidtop.input`. The Quick Menu over a game has the shell's rail, its Game section included (it had none, so
+    tabs were missing), and the overlay's window takes the shell's text scale and canvas density for its display. HOME down is held; R2, L2 or Start while
     it is held raises `OverlayRequest(kind, displayId)` on `OverlayRequests.requests`, and both keys are eaten, the
     button through its release. A second request of the same kind while it is open is the UI's to close it. Every
     other key goes on untouched, with no delay.

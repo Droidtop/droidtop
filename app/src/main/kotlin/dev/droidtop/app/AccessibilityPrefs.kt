@@ -150,11 +150,39 @@ object AccessibilityPrefs {
     @Suppress("DEPRECATION")
     fun applyTextScale(activity: Activity) {
         val res = activity.resources
-        val current = res.configuration
-        val wanted = Resources.getSystem().configuration.fontScale * textScale(activity)
-        val canvasDpi = canvasDensityDpi(activity) ?: current.densityDpi
-        if (current.fontScale == wanted && current.densityDpi == canvasDpi) return
-        val config = Configuration(current).apply {
+        val display = activity.windowManager?.defaultDisplay
+        val config = canvasConfiguration(activity, display, res.configuration) ?: return
+        res.updateConfiguration(config, res.displayMetrics)
+    }
+
+    /**
+     * [context] at the text scale and canvas density of [displayId], for a window that is not an activity's: the
+     * in-game overlays (InGameOverlays), drawn in a window context of droidtop's accessibility service or of a
+     * draw-over-apps grant, whose Resources [applyTextScale] never sees. Without it the overlay's Quick Menu took
+     * Android's font scale instead of the Text size setting (Droidtop/tracker#740: "the QAM seems to scale weirdly").
+     */
+    fun canvasContext(context: Context, displayId: Int): Context {
+        val display = context.getSystemService(android.hardware.display.DisplayManager::class.java)?.getDisplay(displayId)
+        val config = canvasConfiguration(context, display, context.resources.configuration) ?: return context
+        android.util.Log.i(
+            "droidtop.InGameOverlay",
+            "canvas on display $displayId: densityDpi ${context.resources.configuration.densityDpi} -> ${config.densityDpi}, " +
+                "fontScale ${context.resources.configuration.fontScale} -> ${config.fontScale}, " +
+                "${config.screenWidthDp}x${config.screenHeightDp}dp",
+        )
+        return context.createConfigurationContext(config)
+    }
+
+    /**
+     * [current] at the Text size setting's font scale and [display]'s canvas density ([scaledCanvasDensity], docs/SPEC.md
+     * 7k), the same pixels at the new density; null when it already is. One rule for an activity's Resources and an
+     * overlay's context, so the two draw alike.
+     */
+    private fun canvasConfiguration(context: Context, display: android.view.Display?, current: Configuration): Configuration? {
+        val wanted = Resources.getSystem().configuration.fontScale * textScale(context)
+        val canvasDpi = display?.let { canvasDensityDpi(context, it) } ?: current.densityDpi
+        if (current.fontScale == wanted && current.densityDpi == canvasDpi) return null
+        return Configuration(current).apply {
             fontScale = wanted
             if (current.densityDpi != canvasDpi) {
                 // The same pixels at the new density: a dp size scales by the ratio of the two.
@@ -165,24 +193,22 @@ object AccessibilityPrefs {
                 smallestScreenWidthDp = (current.smallestScreenWidthDp * ratio).roundToInt()
             }
         }
-        res.updateConfiguration(config, res.displayMetrics)
     }
 
-    /** The canvas density, as a dpi, for the display [activity] is on, from what that display reports; null if it reports nothing. */
+    /** The canvas density, as a dpi, for [display], from what that display reports; null if it reports nothing. */
     @Suppress("DEPRECATION")
-    private fun canvasDensityDpi(activity: Activity): Int? {
-        val display = activity.windowManager?.defaultDisplay ?: return null
+    private fun canvasDensityDpi(context: Context, display: android.view.Display): Int? {
         val metrics = DisplayMetrics().also { display.getRealMetrics(it) }
         if (metrics.densityDpi <= 0 || metrics.widthPixels <= 0) return null
         val density = metrics.densityDpi / 160f
-        // The Interface size of the screen this activity is on (Droidtop/tracker#656), on the canvas worked out from
+        // The Interface size of the screen the window is on (Droidtop/tracker#656), on the canvas worked out from
         // the display's own density: the one rule ProvideShellCanvas applies too, so the two agree.
         val target = scaledCanvasDensity(
             density,
             metrics.widthPixels.toFloat(),
             metrics.heightPixels.toFloat(),
             metrics.xdpi,
-            InterfaceSize.factorFor(activity, display.displayId),
+            InterfaceSize.factorFor(context, display.displayId),
         )
         return (target * 160f).roundToInt()
     }

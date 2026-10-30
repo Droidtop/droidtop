@@ -58,6 +58,12 @@ object OverlayRequests {
  *   service ate cannot go on as the key itself.
  * - While an overlay is open, the pad's presses go to it ([Decision.toOverlay]), each with its own release.
  * - Every other key goes on at once, untouched.
+ *
+ * A release can be lost (another accessibility service that filters keys ate it, the filter went off mid-press), and
+ * nothing may stay stuck for it (Droidtop/tracker#740: "it's possible to bug it so it stops working (maybe inputting
+ * too fast)"). So a key pressed again ends whatever its lost release left behind; a HOME held with no HOME event for
+ * [STALE_HOLD_MS] counts as let go; and [reset] forgets everything when the filter goes off. Every sequence of
+ * presses and releases leaves it idle once each key's last event was a release ([idle], HomeChordsTest).
  */
 class HomeChords(private val homeKeys: Set<Int> = setOf(KeyEvent.KEYCODE_HOME)) {
     data class Decision(
@@ -69,6 +75,8 @@ class HomeChords(private val homeKeys: Set<Int> = setOf(KeyEvent.KEYCODE_HOME)) 
 
     private var holding = false
     private var chorded = false
+    /** When HOME was last pressed or repeated, by the events' own clock. */
+    private var homeAt = 0L
 
     /** Chord buttons pressed under HOME: theirs to the release. */
     private val eaten = mutableSetOf<Int>()
@@ -76,13 +84,31 @@ class HomeChords(private val homeKeys: Set<Int> = setOf(KeyEvent.KEYCODE_HOME)) 
     /** Pad keys whose press went to an open overlay: their release goes there too, or nowhere if it has closed. */
     private val routed = mutableSetOf<Int>()
 
-    fun onKey(keyCode: Int, down: Boolean, repeatCount: Int, fromPad: Boolean, overlayOpen: Boolean): Decision {
+    /** Nothing held, nothing owed a release: where every sequence must come back to. */
+    val idle: Boolean get() = !holding && !chorded && eaten.isEmpty() && routed.isEmpty()
+
+    /** Forgets every key: the filter went off, so no release of a key it saw will come. */
+    fun reset() {
+        holding = false
+        chorded = false
+        eaten.clear()
+        routed.clear()
+    }
+
+    /** What to do with one key event; [eventTime] is the event's own time (`KeyEvent.getEventTime`). */
+    fun onKey(keyCode: Int, down: Boolean, repeatCount: Int, fromPad: Boolean, overlayOpen: Boolean, eventTime: Long = 0L): Decision {
+        // A HOME held this long with no HOME event at all lost its release: it is let go, not left holding every chord.
+        if (holding && keyCode !in homeKeys && eventTime - homeAt > STALE_HOLD_MS) {
+            holding = false
+            chorded = false
+        }
         if (keyCode in homeKeys) {
             if (down) {
                 if (repeatCount == 0) {
                     holding = true
                     chorded = false
                 }
+                if (holding) homeAt = eventTime
                 return if (holding) EAT else PASS
             }
             // A release whose press droidtop did not hold (the filter came on mid-press) is Android's.
@@ -95,6 +121,10 @@ class HomeChords(private val homeKeys: Set<Int> = setOf(KeyEvent.KEYCODE_HOME)) 
         if (!down) {
             if (eaten.remove(keyCode)) return EAT
             if (routed.remove(keyCode)) return Decision(consume = true, toOverlay = overlayOpen)
+        } else if (repeatCount == 0) {
+            // Pressed again: its last release never came, so nothing is still owed to that press.
+            eaten.remove(keyCode)
+            routed.remove(keyCode)
         }
         if (down && holding) {
             kindOf(keyCode)?.let { kind ->
@@ -111,6 +141,9 @@ class HomeChords(private val homeKeys: Set<Int> = setOf(KeyEvent.KEYCODE_HOME)) 
     }
 
     companion object {
+        /** How long HOME may be held with no HOME event before it counts as let go. */
+        const val STALE_HOLD_MS = 5_000L
+
         private val PASS = Decision(consume = false)
         private val EAT = Decision(consume = true)
 

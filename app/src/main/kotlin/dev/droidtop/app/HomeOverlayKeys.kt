@@ -54,7 +54,17 @@ object HomeOverlayKeys {
         if (!filtering) return false
         val fromPad = event.isFromSource(InputDevice.SOURCE_GAMEPAD) || event.isFromSource(InputDevice.SOURCE_JOYSTICK)
         val sink = OverlayRequests.keys
-        val decision = chords.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount, fromPad, sink != null)
+        val decision = chords.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount, fromPad, sink != null, event.eventTime)
+        // Every decision on HOME, a chord button or a key it took, so a console log shows where a chord went
+        // (Droidtop/tracker#740); a key passed on untouched is not logged.
+        if (decision.consume || event.keyCode == KeyEvent.KEYCODE_HOME || HomeChords.kindOf(event.keyCode) != null) {
+            android.util.Log.i(
+                "droidtop.input",
+                "chord ${KeyEvent.keyCodeToString(event.keyCode)} ${if (event.action == KeyEvent.ACTION_DOWN) "down" else "up"}" +
+                    "#${event.repeatCount}: consume=${decision.consume} open=${decision.open} home=${decision.home} " +
+                    "overlay=${decision.toOverlay} idle=${chords.idle}",
+            )
+        }
         decision.open?.let { OverlayRequests.raise(OverlayRequest(it, frontDisplay, frontPackage)) }
         if (decision.home) s.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
         if (decision.toOverlay) sink?.invoke(event)
@@ -70,6 +80,9 @@ object HomeOverlayKeys {
         if (want == filtering) return
         dev.droidtop.runtime.keyboard.AccessibilityHost.wantKeyFilter("home chords", want)
         filtering = want
+        // No release of a key seen so far will come through a filter that is off.
+        if (!want) chords.reset()
+        android.util.Log.i("droidtop.input", "chord filter ${if (want) "on" else "off"}")
     }
 
     private fun isDefaultHome(s: AccessibilityService): Boolean {

@@ -69,6 +69,12 @@ internal object InGameOverlays {
         app = application
         scope.launch {
             OverlayRequests.requests.collect { request ->
+                // A window Android took away (its display went, the service unbound) is not open any more: the chord
+                // opens a new one instead of closing what is no longer there (Droidtop/tracker#740).
+                shown?.takeIf { !it.view.isAttachedToWindow }?.let {
+                    Log.i(TAG, "${it.kind} was no longer on screen")
+                    close()
+                }
                 val open = shown
                 // The same chord again closes it; another chord replaces it.
                 if (open != null && open.kind == request.kind) {
@@ -123,7 +129,8 @@ internal object InGameOverlays {
         }
         savedStateOwner.controller.performRestore(null)
         lifecycleOwner.registry.currentState = Lifecycle.State.RESUMED
-        val view = ComposeView(windowContext).apply {
+        // The shell's text scale and canvas density on this display, as droidtop's activities get them.
+        val view = ComposeView(AccessibilityPrefs.canvasContext(windowContext, request.displayId)).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
             setContent {
@@ -132,6 +139,10 @@ internal object InGameOverlays {
                         when (request.kind) {
                             OverlayRequest.Kind.QUICK_MENU -> QuickMenuStandalone(
                                 library = library,
+                                // Over the running game the rail has its Game section, as in the shell (Droidtop/tracker#740:
+                                // the owner saw a rail with tabs missing).
+                                runningEntry = runningEntry,
+                                onRestart = { entry -> open(GameLaunchActivity.intentFor(app, entry.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                                 // Start swaps to the left menu, as it does in Gaming.
                                 onOpenStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
                                 onDismiss = { close() },

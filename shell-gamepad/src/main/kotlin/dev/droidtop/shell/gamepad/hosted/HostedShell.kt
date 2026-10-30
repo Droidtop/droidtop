@@ -344,16 +344,40 @@ fun QuickMenuStandalone(
     onDismiss: () -> Unit,
     // The tab it opens on (Updates links open Downloads, Droidtop/tracker#749); null for the menu's own choice.
     startSection: QuickSection? = null,
+    // The game droidtop launched and still runs, when the menu is drawn over it (HOME + R2, Droidtop/tracker#740): then
+    // the rail has the Game section as the shell's Quick Menu does, and Resume closes the menu over the game. Restart
+    // starts it again ([onRestart]) once Quit has really ended it.
+    runningEntry: dev.droidtop.library.LibraryEntry? = null,
+    onRestart: (dev.droidtop.library.LibraryEntry) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var quitOutcome by remember { mutableStateOf<dev.droidtop.library.QuitResult?>(null) }
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         QuickMenu(
-            runningEntry = null,
+            runningEntry = runningEntry,
             library = library,
-            onResume = {},
-            onQuit = { _, _ -> },
-            onKill = { },
-            quitOutcome = null,
+            // The game never left: resuming is closing the menu.
+            onResume = { onDismiss() },
+            // The one quit path, as Gaming's Quick Menu: it stays open until the game really ended.
+            onQuit = { entry, restart ->
+                scope.launch {
+                    val outcome = library.quitRunning(context, entry)
+                    quitOutcome = outcome
+                    if (outcome is dev.droidtop.library.QuitResult.Ended) {
+                        onDismiss()
+                        if (restart) onRestart(entry)
+                    }
+                }
+            },
+            onKill = { entry ->
+                scope.launch {
+                    val outcome = library.killRunning(context, entry)
+                    quitOutcome = outcome
+                    if (outcome is dev.droidtop.library.QuitResult.Ended) onDismiss()
+                }
+            },
+            quitOutcome = quitOutcome,
             onOpenLeftMenu = onOpenStartMenu,
             openPlace = { screenId ->
                 context.startActivity(CatalogScreenLink.intent(context, screenId))
