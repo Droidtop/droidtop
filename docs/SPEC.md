@@ -5114,6 +5114,12 @@ droidtop 0.2.0-dev.1931).
   and Kiosk always ask. The Quick Menu's Game section reads the same decision. The question starts on Keep playing,
   the two answers large and well apart; a pad press that reaches the companion while it is open closes it as
   Cancel and says "Cancelled. Tap Quit on this screen to quit." Restart is the one quit, then the one launch.
+- **The one question (Droidtop/tracker#786 S2a, 2026-10-30).** Every question the companion asks is `CompanionAsk`:
+  the question naming what it acts on, the safe answer first, large and filled, the action well apart. Stopping a
+  game or an app, a catalog or plugin row that asks first, a page button with a confirm title and RetroArch's setup
+  all use it; five separate drawings are gone. It is drawn in place where it was asked, never as a window of its own:
+  the companion is touch-only, and a dialog window would take the focus, and the pad, off the game on the other
+  screen.
 - **Plugins (slice C9).** A plugin's companion panel is its Quick Menu panel (`ui.panel`, docs/plugin-api.md 3
   C15 and C17), drawn for touch by `CompanionPluginsTab` with `context.surface` `<mode>.companion`: there is no
   second panel point. **A plugin on facets (Droidtop/tracker#602):** one whose `ui.facets` entry declares the

@@ -368,13 +368,7 @@ private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst
     }
     CatalogRow(item.title, item.subtitle, value, progress = item.progress, look = item.progressLook, statusMark = item.statusMark, switchOn = state) { if (asksFirst) asking = true else run() }
     if (asking) {
-        Column(modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) {
-            Text(item.confirmText ?: "${item.title}?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-            Row(horizontalArrangement = Arrangement.spacedBy(32.dp), modifier = Modifier.padding(top = 6.dp)) {
-                CompanionPill("Cancel", selected = true) { asking = false }
-                CompanionPill(item.title) { run() }
-            }
-        }
+        CompanionAsk(item.confirmText ?: "${item.title}?", "Cancel", item.title, onSafe = { asking = false }, onAction = { run() })
     }
 }
 
@@ -437,14 +431,10 @@ private fun CompanionButtonBar(bar: dev.droidtop.library.settings.ButtonBarItem,
     }
     asking?.let { button ->
         // The safe answer first (docs/SPEC.md 7k, copy rule 9).
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(button.confirmTitle.orEmpty(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-            CatalogRow("Cancel", null, null) { asking = null }
-            CatalogRow(button.label, null, null) {
-                asking = null
-                button.run(context)
-                onChanged()
-            }
-        }
+        CompanionAsk(button.confirmTitle.orEmpty(), "Cancel", button.label, onSafe = { asking = null }, onAction = {
+            asking = null
+            button.run(context)
+            onChanged()
+        })
     }
 }

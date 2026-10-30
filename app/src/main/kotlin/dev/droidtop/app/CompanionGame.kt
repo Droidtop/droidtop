@@ -25,8 +25,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -140,7 +138,10 @@ internal fun CompanionGameTab() {
         val cancelled by CompanionConfirm.cancelled.collectAsState()
         val open = question
         if (open != null) {
-            CompanionQuestion(open)
+            CompanionAsk(open.text, "Keep playing", open.action, onSafe = { CompanionConfirm.cancel() }, onAction = {
+                CompanionConfirm.cancel()
+                open.run()
+            })
             return@Column
         }
         cancelled?.let {
@@ -277,35 +278,6 @@ private fun GameButton(label: String, primary: Boolean = false, onClick: () -> U
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             Text(label, style = MaterialTheme.typography.titleMedium, color = if (primary) colors.onPrimary else colors.onSurface)
-        }
-    }
-}
-
-/** The question, starting on the safe answer: Keep playing first and focused, the action well apart. */
-@Composable
-private fun CompanionQuestion(question: CompanionConfirm.Question) {
-    val colors = MaterialTheme.colorScheme
-    val safe = remember { FocusRequester() }
-    LaunchedEffect(question) { runCatching { safe.requestFocus() } }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.surface)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(question.text, style = MaterialTheme.typography.titleMedium, color = colors.onSurface, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-        Row(horizontalArrangement = Arrangement.spacedBy(48.dp)) {
-            Column(modifier = Modifier.weight(1f).focusRequester(safe)) {
-                GameButton("Keep playing", primary = true) { CompanionConfirm.cancel() }
-            }
-            Column(modifier = Modifier.width(160.dp)) {
-                GameButton(question.action) {
-                    CompanionConfirm.cancel()
-                    question.run()
-                }
-            }
         }
     }
 }

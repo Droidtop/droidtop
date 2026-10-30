@@ -142,23 +142,22 @@ internal fun CompanionRetroArchSetup(entry: LibraryEntry, panelsRunning: List<de
         if (steps.approve) Text(stringResource(R.string.companion_retro_arch_setup_approve_the_retroarch_manager_under), style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
         status?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.primary, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         if (asking) {
-            Text(
+            CompanionAsk(
                 "Turning it on closes RetroArch and starts the game again: play since your last save is lost." +
                     // Through the helper this rewrites a file in RetroArch's folder (a risky action): name it.
                     if (reach == EmulatorSetup.Reach.HELPER) " " + RiskyPrompts.writeFileConfirm("RetroArch", DefaultPlayers.retroArchConfigFile(pkg!!)) else "",
-                style = MaterialTheme.typography.bodyMedium, color = colors.onSurface,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                CompanionPill("Keep playing", selected = true) { asking = false }
-                CompanionPill("Turn on") {
+                safe = "Keep playing",
+                action = "Turn on",
+                onSafe = { asking = false },
+                onAction = {
                     asking = false
                     scope.launch {
                         status = "Working…"
                         status = turnOnNetworkCommands(context, entry, pkg!!)
                         check++
                     }
-                }
-            }
+                },
+            )
             return@Column
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {

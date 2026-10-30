@@ -189,16 +189,14 @@ internal fun CompanionTasks() {
             )
         }
         stopping?.let { app ->
-            Text(
+            CompanionAsk(
                 "Stop ${app.label}? Anything not saved in it is lost.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 12.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                safe = "Keep it",
+                action = "Stop",
+                onSafe = { stopping = null },
+                onAction = { stop(app) },
+                modifier = Modifier.padding(top = 12.dp),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(32.dp), modifier = Modifier.padding(top = 8.dp)) {
-                CompanionPill("Keep it", selected = true) { stopping = null }
-                CompanionPill("Stop") { stop(app) }
-            }
         }
         forceStopIn?.let { pkg ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
