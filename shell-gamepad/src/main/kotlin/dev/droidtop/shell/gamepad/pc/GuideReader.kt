@@ -84,6 +84,39 @@ internal fun GuidesScreen(gameId: String, gameName: String, folder: String?, onC
         }
     }
     var reading by remember(gameId) { mutableStateOf<Guide?>(null) }
+    var editingNotes by remember(gameId) { mutableStateOf(false) }
+    if (editingNotes) {
+        // The game's notes: one text, the shell's own text entry through a catalog row (Droidtop/tracker#817).
+        val notesScreen = remember(gameId) {
+            dev.droidtop.library.settings.CatalogScreen(
+                id = "guide_notes",
+                title = context.getString(R.string.guide_notes_title, gameName),
+                groups = { _ ->
+                    listOf(
+                        dev.droidtop.library.settings.CatalogGroup(
+                            id = "guide_notes_group",
+                            title = null,
+                            items = listOf(
+                                dev.droidtop.library.settings.TextInputItem(
+                                    id = "guide_notes_text",
+                                    title = context.getString(R.string.guide_notes),
+                                    value = place?.notes.orEmpty(),
+                                    multiline = true,
+                                    onChange = { ctx, text ->
+                                        val next = (place ?: GuidePlace()).copy(notes = text)
+                                        place = next
+                                        withContext(Dispatchers.IO) { GuidePlaces.save(ctx, gameId, next) }
+                                    },
+                                ),
+                            ),
+                        ),
+                    )
+                },
+            )
+        }
+        dev.droidtop.shell.gamepad.CatalogNavigator(root = notesScreen, onExit = { editingNotes = false })
+        return
+    }
     val open = reading
     if (open != null) {
         val current = place ?: GuidePlace()
@@ -110,6 +143,8 @@ internal fun GuidesScreen(gameId: String, gameName: String, folder: String?, onC
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "Guides") }
     BackHandler { onClose() }
     val list = guides.orEmpty()
+    // The rows: the game's notes first, then its guides.
+    val rows = list.size + 1
     fun choose(guide: Guide) {
         if (guide.format == GuideFormat.WEB && guide.path == null) {
             guide.url?.let { Links.open(context, it) }
@@ -126,8 +161,8 @@ internal fun GuidesScreen(gameId: String, gameName: String, folder: String?, onC
             .onPad { press ->
                 when (press.action) {
                     GamepadAction.UP -> cursor = (cursor - 1).coerceAtLeast(0)
-                    GamepadAction.DOWN -> cursor = (cursor + 1).coerceAtMost((list.size - 1).coerceAtLeast(0))
-                    GamepadAction.A -> list.getOrNull(cursor)?.let(::choose)
+                    GamepadAction.DOWN -> cursor = (cursor + 1).coerceAtMost(rows - 1)
+                    GamepadAction.A -> if (cursor == 0) editingNotes = true else list.getOrNull(cursor - 1)?.let(::choose)
                     GamepadAction.B -> onClose()
                     else -> return@onPad false
                 }
@@ -137,20 +172,29 @@ internal fun GuidesScreen(gameId: String, gameName: String, folder: String?, onC
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(stringResource(R.string.guides_title, gameName), color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleLarge)
+        MenuRow(
+            title = stringResource(R.string.guide_notes),
+            value = place?.notes?.lineSequence()?.firstOrNull { it.isNotBlank() } ?: stringResource(R.string.guide_notes_none),
+            selected = cursor == 0,
+            onClick = {
+                cursor = 0
+                editingNotes = true
+            },
+        )
         when {
             guides == null -> Text(stringResource(R.string.guides_looking), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             else -> list.forEachIndexed { index, guide ->
                 MenuRow(
                     title = guide.title,
-                    subtitle = guide.source,
+                    subtitle = guide.from,
                     value = when {
                         place?.last == guide.id -> "Last read"
                         guide.format == GuideFormat.WEB && guide.path == null -> "Opens the browser"
                         else -> null
                     },
-                    selected = index == cursor,
+                    selected = index + 1 == cursor,
                     onClick = {
-                        cursor = index
+                        cursor = index + 1
                         choose(guide)
                     },
                 )

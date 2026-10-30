@@ -17438,9 +17438,11 @@ guides in one list (`GuidesScreen`):
 **The reader** reads by pad. A text guide scrolls with Up and Down and pages with L1 and R1; a PDF shows a page at a
 time at the screen's width, rendered off the main thread (`PdfRenderer`), Left and Right or L1 and R1 turning pages.
 Y marks the place, X goes to the next mark, B closes. **The place is kept per game** (`GuidePlaces`, droidtop's own
-data, never the game's folder): the guide last opened (marked "Last read"), where each was left, and the marks. The
-guide pane beside the game on the companion, the same in the HOME+L2 overlay, notes, and guides from plugins (a `guide`
-facet, proposed on #817) are the next slices of #817.
+data, never the game's folder): the guide last opened (marked "Last read"), where each was left, the marks, and the
+person's **notes**, the list's first row, showing their first line and opening one text field (the shell's own text
+entry, a catalog `TextInputItem`). The guide pane beside the game on the companion, the same in the HOME+L2 overlay,
+and guides from plugins (the `guide` facet agreed on #817: `v`, `title`, `from`, `format`, `url` or `document`,
+`updated`; places kept under `<pluginId>:<id>`) are the next slices of #817.
 
 **What's new, asked for the same way (2026-10-14, Droidtop/tracker#229).** A
 Steam game (its own row, or an engine copy that kept its Steam store id) has a

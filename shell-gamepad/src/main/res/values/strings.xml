@@ -45,4 +45,7 @@
     <string name="guide_unreadable">This guide could not be read.</string>
     <string name="guide_opening_page">Opening the page</string>
     <string name="guide_pdf_heading">%1$s  ·  page %2$d of %3$d</string>
+    <string name="guide_notes">Notes</string>
+    <string name="guide_notes_none">None yet</string>
+    <string name="guide_notes_title">Notes for %1$s</string>
 </resources>
