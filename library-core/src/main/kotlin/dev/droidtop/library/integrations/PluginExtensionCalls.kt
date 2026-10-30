@@ -642,14 +642,26 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
      * the mirror is found in droidtop's saved copy of the record by that address, and the same mirror in the record asked
      * again ([RecordMirrors.sameIn]). Null when the record cannot be asked or no longer lists it.
      */
-    private suspend fun currentLink(source: String, externalId: String, expired: String): String? {
+    private suspend fun currentLink(source: String, externalId: String, expired: String): String? =
+        currentDownload(source, externalId) { it.url == expired }?.url?.takeIf { it != expired }
+
+    /**
+     * The download [picked] names in droidtop's saved copy of [source]'s record [externalId], as the record asked again
+     * gives it now ([RecordMirrors.sameIn]); docs/plugin-api.md 1.11, "One link path: the record". Null when the record
+     * cannot be asked or no longer lists it.
+     */
+    private suspend fun currentDownload(
+        source: String,
+        externalId: String,
+        picked: (dev.droidtop.library.UpdateSources.Download) -> Boolean,
+    ): dev.droidtop.library.UpdateSources.Download? {
         val before = savedRecord(source, externalId)?.record?.downloads.orEmpty()
-        val picked = before.firstOrNull { it.url == expired } ?: run {
+        val was = before.firstOrNull(picked) ?: run {
             Log.w(TAG, "update $source/$externalId: the expired link is in no saved record, so it cannot be asked for again")
             return null
         }
         val fresh = record(source, externalId).takeIf { it.failure == null }?.record ?: return null
-        return dev.droidtop.library.RecordMirrors.sameIn(picked, before, fresh.downloads)?.url?.takeIf { it != expired }
+        return dev.droidtop.library.RecordMirrors.sameIn(was, before, fresh.downloads)
     }
 
     /**
@@ -703,7 +715,8 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
     /**
      * A split release, fetched part by part and placed as one Downloads job: a part with a page opens in droidtop's web
      * view, where the person starts it as for any link (#599), and a part with a token goes to the source's `download`
-     * job. Nothing is placed until every part is in hand; one that brings nothing stops it all, saying which.
+     * job. Nothing is placed until every part is in hand; one that brings nothing stops it all, saying which. A part whose
+     * link has expired is asked of the source again, from its record, once.
      */
     override suspend fun downloadParts(
         source: String,
@@ -717,7 +730,8 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         val (record, entry) = providers().firstOrNull { (_, e) -> e.id == source } ?: return "The source $source is not installed or not running"
         val label = entry.label ?: record.manifest.label
         val (placement, name) = placementFor(label, gameName, version, newest).getOrElse { return it.message ?: "The update has nowhere to go" }
-        val gathered = UpdateLinks.gatherParts(app, record, parts, onStatus) { link, which ->
+        val again = suspend { currentDownload(source, externalId) { it.parts == parts }?.parts }
+        val gathered = UpdateLinks.gatherParts(app, record, parts, onStatus, again) { link, which ->
             onStatus("$which: asking $label")
             val args = JSONObject().put("source", source).put("id", externalId).put("link", link).apply { version?.let { put("version", it) } }
             val result = PluginViews.runJob(app, record, POINT, "download", args, "Download $name ($which)", onStatus)

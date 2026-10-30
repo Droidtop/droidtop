@@ -35,13 +35,16 @@ object UpdateLinks {
      * 1.10, `download` `parts`): a part with a page opens in droidtop's web view, where the person starts it as for any
      * link (#599), and a part with a token goes to [byToken], the source's own job, given the token and which part it is.
      * The one path the update record page and a source's item page both take. Nothing is placed until every part is in
-     * hand: one that brings nothing fails it all, saying which. The files come back joined ([joined]).
+     * hand: one that brings nothing fails it all, saying which. The files come back joined ([joined]). A part whose page
+     * says its link has expired is asked of the source again through [again], the same release's parts in the record
+     * asked again (docs/plugin-api.md 1.11, "One link path: the record"), once.
      */
     suspend fun gatherParts(
         context: android.content.Context,
         record: dev.droidtop.pluginhost.PluginRecord,
         parts: List<dev.droidtop.library.UpdateSources.Download.Part>,
         onStatus: (String) -> Unit,
+        again: (suspend () -> List<dev.droidtop.library.UpdateSources.Download.Part>?)? = null,
         byToken: suspend (link: String, which: String) -> List<AcquireDownloadDescriptor>,
     ): Result<List<AcquireDownloadDescriptor>> {
         val gathered = mutableListOf<AcquireDownloadDescriptor>()
@@ -49,8 +52,14 @@ object UpdateLinks {
             val which = "Part ${index + 1} of ${parts.size}"
             val url = part.url
             val got = if (url != null) {
-                onStatus("$which: start the download on the page that opens")
-                descriptorsFor(dev.droidtop.pluginhost.PluginWebAccount.openForDownloads(context, record, url, 1))
+                onStatus("$which: opening the link from ${record.manifest.label}")
+                val refresh = again?.let { ask ->
+                    {
+                        onStatus("$which: that link had expired. Asking ${record.manifest.label} for a current one")
+                        kotlinx.coroutines.runBlocking { ask() }?.let { partAgain(parts, index, it) }
+                    }
+                }
+                descriptorsFor(dev.droidtop.pluginhost.PluginWebAccount.openForDownloads(context, record, url, 1, refresh))
             } else {
                 byToken(part.link.orEmpty(), which)
             }
@@ -58,6 +67,20 @@ object UpdateLinks {
             gathered += got
         }
         return Result.success(joined(gathered))
+    }
+
+    /**
+     * Part [index]'s address in [fresh], the same release's parts in the record asked again: null when the release now
+     * has a different number of parts (the source changed it, so which part is which is not known) or the address is
+     * the one that expired. Pure.
+     */
+    fun partAgain(
+        parts: List<dev.droidtop.library.UpdateSources.Download.Part>,
+        index: Int,
+        fresh: List<dev.droidtop.library.UpdateSources.Download.Part>,
+    ): String? {
+        if (fresh.size != parts.size) return null
+        return fresh[index].url?.takeIf { it != parts[index].url }
     }
 
     /**
