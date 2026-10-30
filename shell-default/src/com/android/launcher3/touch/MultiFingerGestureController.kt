@@ -4,7 +4,6 @@ import android.view.MotionEvent
 import android.view.ViewConfiguration
 import com.android.launcher3.AbstractFloatingView
 import com.android.launcher3.Launcher
-import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherState
 import com.android.launcher3.MotionEventsUtils
 import com.android.launcher3.util.TouchController
@@ -44,12 +43,7 @@ class MultiFingerGestureController(private val mLauncher: Launcher) : TouchContr
                 val dy = midY(ev) - mStartMidY
                 val dSpan = span(ev) - mStartSpan
                 // Which slot it is: StandardGestures, the one rule, tested in :runtime-common.
-                val slot = when (StandardGestures.twoFinger(dy, dSpan, mThreshold) ?: return false) {
-                    StandardGestures.Slot.PINCH_IN -> LauncherPrefs.GESTURE_PINCH_IN_ACTION
-                    StandardGestures.Slot.PINCH_OUT -> LauncherPrefs.GESTURE_PINCH_OUT_ACTION
-                    StandardGestures.Slot.TWO_FINGER_DOWN -> LauncherPrefs.GESTURE_TWO_FINGER_DOWN_ACTION
-                    StandardGestures.Slot.TWO_FINGER_UP -> LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION
-                }
+                val slot = GestureSlot.of(StandardGestures.twoFinger(dy, dSpan, mThreshold) ?: return false).pref
                 mTracking = false
                 return HomeActions.runSlot(mLauncher, slot)
             }
@@ -74,11 +68,7 @@ class MultiFingerGestureController(private val mLauncher: Launcher) : TouchContr
     private fun span(ev: MotionEvent) = hypot(ev.getX(0) - ev.getX(1), ev.getY(0) - ev.getY(1))
 
     private companion object {
-        val SLOTS = listOf(
-            LauncherPrefs.GESTURE_TWO_FINGER_DOWN_ACTION,
-            LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION,
-            LauncherPrefs.GESTURE_PINCH_IN_ACTION,
-            LauncherPrefs.GESTURE_PINCH_OUT_ACTION,
-        )
+        /** The two-finger slots: every one [StandardGestures] can recognise. */
+        val SLOTS = StandardGestures.Slot.entries.map { GestureSlot.of(it).pref }
     }
 }

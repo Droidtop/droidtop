@@ -240,16 +240,9 @@ object LauncherImport {
 
     /** Everything that is not an item: gestures, hidden apps, drawer tabs and titles, icon pack, labels. */
     private fun applySettings(context: Context, plan: ImportPlan) {
-        val slots = mapOf(
-            "DOUBLE_TAP" to LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION,
-            "SWIPE_DOWN" to LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION,
-            "TWO_FINGER_DOWN" to LauncherPrefs.GESTURE_TWO_FINGER_DOWN_ACTION,
-            "TWO_FINGER_UP" to LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION,
-            "PINCH_IN" to LauncherPrefs.GESTURE_PINCH_IN_ACTION,
-            "PINCH_OUT" to LauncherPrefs.GESTURE_PINCH_OUT_ACTION,
-            "HOME_BUTTON" to LauncherPrefs.GESTURE_HOME_BUTTON_ACTION,
-        )
-        for ((slot, action) in plan.gestures) slots[slot]?.let { HomeActions.setSlot(context, it, action) }
+        for ((slot, action) in plan.gestures) {
+            com.android.launcher3.touch.GestureSlot.byName(slot)?.let { HomeActions.setSlot(context, it.pref, action) }
+        }
         if (plan.hiddenApps.isNotEmpty()) {
             HiddenAppsRepository.setHiddenComponents(context, HiddenAppsRepository.getHiddenComponents(context) + plan.hiddenApps)
         }
