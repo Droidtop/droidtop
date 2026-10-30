@@ -114,6 +114,10 @@ include(":stores")
 // a plugin call site hands it plain values, never a database handle.
 include(":plugin-host")
 
+// The sandbox library's program-tree binding (docs/SPEC.md 5b, Droidtop/tracker#584): the broker listener Wine's
+// processes attach to, with libsbx_child.so and sbx-exec. No dependency on droidtop's other modules.
+include(":sandbox-host")
+
 // Test-only certificate builder for the plugin, catalog and revocation signature tests.
 include(":test-pki")
 

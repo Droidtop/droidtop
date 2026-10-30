@@ -7264,6 +7264,27 @@ sandbox lane on Droidtop/tracker#584); 1, the managed-prefix registry and the mo
 2, the layer and the read-only game folder in the decider; 3, the kernel-driver discard and the Drivers tab, with
 `Start=4` set when the layer copies `system.reg` up, so a placeholdered driver is never loadable for even one boot.
 
+**Piece 0, the binding (2026-10-28).** The sandbox library is pinned at v0.1.7 (`vendor/sandbox`), the first release
+with the multi-client listener (`sbx_broker_listen`), the preload attach (`libsbx_child.so`) and brokered exec
+(`sbx-exec`). `:sandbox-host` is the program-tree binding: it builds the library as its own CMake project and packages
+`libsbx_child.so` and `sbx-exec` (as `libsbx_exec.so`, written beside the shared libraries so Android installs it in
+`nativeLibraryDir`, the one place an app may run a file from) for arm64-v8a and x86_64, and `:plugin-host` builds only
+its own `droidtoppy` target, so the library's shared pieces are packaged once. `SandboxHost` starts one listener per
+tree, its socket in droidtop's own files folder and its token random per launch, and gives the environment
+libsbx_child.so attaches from (`SBX_BROKER`, `SBX_TOKEN`, `SBX_FLAGS`, `SBX_OWN_OPENS` for the GPU nodes a driver
+opens itself, `SBX_EXEC_HELPER`, `SBX_CHILD_LIBRARY`), with libsbx_child.so put first on LD_PRELOAD and the other
+preloads kept. Piece 0's listener is learning only (`SBX_LOCK_CONTAIN | SBX_LOCK_LOG_SOCKET | SBX_LOCK_LEARN`): its
+decider allows every request and its audit writes each distinct request once to a learn log; it gives no protection.
+A listener reaches Kotlin as a slot number, never as a pointer (Android tags heap pointers, so a pointer can read as a
+negative error).
+Wine's tree runs under it only behind the Developer menu's **Windows games > Learn what Wine reaches** (off by
+default, and off whenever the menu is): `WineSandbox.applyLaunchEnv`, a `droidtop:` hook in
+`BionicProgramLauncherComponent` placed after every other launch hook (the session's environment is laid over the
+launcher's own, so an earlier LD_PRELOAD would be replaced), starts one listener per launch, closes the previous one
+(processes already attached are served until they end), passes the GPU nodes a driver opens itself in
+`SBX_OWN_OPENS`, and keeps the newest five learn logs under droidtop's files, `wine-sandbox`. The row and the log say
+there is no protection while it is on. Winetricks and the other shell commands the runtime runs are not under it.
+
 **Kernel drivers: the read-only half, built ahead of the layer (Droidtop/tracker#607, coordinator 2026-10-29).** The
 list, the approvals and the reporting do not depend on the layer, so they are built first; nothing in this half
 changes a prefix (the owner: no code that edits the prefix's registry before the layer can do it safely).

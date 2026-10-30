@@ -19,6 +19,13 @@ android {
             abiFilters += "arm64-v8a"
             abiFilters += "x86_64"
         }
+        // Only this module's bridge: the sandbox library's libsbx_child.so and sbx-exec are :sandbox-host's
+        // (Droidtop/tracker#584), and two modules packaging one library is a duplicate-path merge error.
+        externalNativeBuild {
+            cmake {
+                targets += "droidtoppy"
+            }
+        }
     }
 
     externalNativeBuild {

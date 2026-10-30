@@ -583,6 +583,22 @@ object DroidtopWideSettings {
                         ),
                     ),
                 ),
+                // Wine's tree under the sandbox broker, learning only (docs/SPEC.md 5b, Droidtop/tracker#584 piece 0).
+                CatalogGroup(
+                    id = "developer_wine_sandbox",
+                    title = "Windows games",
+                    items = listOf(
+                        ToggleItem(
+                            id = "developer_wine_sandbox_learning",
+                            title = "Learn what Wine reaches",
+                            subtitle = "No protection while on: each game launched runs under the sandbox broker in " +
+                                "learning mode, which allows everything and records what a lockdown would refuse, " +
+                                "to droidtop's files, wine-sandbox (the newest five launches)",
+                            current = dev.droidtop.runtime.windows.WineSandbox.learning(context),
+                            onToggle = { ctx, on -> dev.droidtop.runtime.windows.WineSandbox.setLearning(ctx, on) },
+                        ),
+                    ),
+                ),
                 CatalogGroup(
                     id = "developer_menu",
                     title = "Developer menu",

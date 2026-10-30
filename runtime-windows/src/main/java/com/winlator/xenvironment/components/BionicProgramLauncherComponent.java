@@ -385,6 +385,11 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         // person's own Lossless Scaling is installed in droidtop's Steam.
         LsfgVkManager.applyLaunchEnv(context, container, envVars);
 
+        // droidtop: the game's whole tree under the sandbox broker, learning only and behind a Developer menu
+        // switch (Droidtop/tracker#584 piece 0). Last, since it puts libsbx_child.so first on the LD_PRELOAD
+        // every hook above has finished.
+        dev.droidtop.runtime.windows.WineSandbox.applyLaunchEnv(context, envVars);
+
         Log.d("BionicProgramLauncherComponent", "env vars are " + envVars.toString());
 
         String emulator = container.getEmulator();

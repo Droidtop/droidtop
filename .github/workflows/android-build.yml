@@ -231,6 +231,24 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 build-scripts/abi_sets.py app/build/outputs/apk/release/app-universal-release.apk
 
+      - name: Sandbox host libraries packaged
+        # Wine's tree attaches through libsbx_child.so and execs through the
+        # library's helper, both run from nativeLibraryDir (docs/SPEC.md 5b,
+        # Droidtop/tracker#584): each must be in the APK once per ABI. The
+        # helper is an executable named lib*.so, which only this step proves
+        # the packaging picked up.
+        if: ${{ !cancelled() }}
+        run: |
+          set -eu
+          apk=app/build/outputs/apk/release/app-universal-release.apk
+          for abi in arm64-v8a x86_64; do
+            for lib in libdroidtopsbx.so libsbx_child.so libsbx_exec.so; do
+              n=$(unzip -Z1 "$apk" | grep -cx "lib/$abi/$lib" || true)
+              echo "lib/$abi/$lib: $n"
+              [ "$n" = 1 ]
+            done
+          done
+
   publish:
     # A GitHub Release is the "give this to someone to install"
     # mechanism: permanent, one clean download URL, and what the in-app

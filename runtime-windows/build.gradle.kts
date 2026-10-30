@@ -94,6 +94,8 @@ android {
 dependencies {
     implementation(project(":runtime-common"))
     implementation(project(":net-core"))
+    // Wine's process tree under the sandbox broker (docs/SPEC.md 5b, Droidtop/tracker#584).
+    implementation(project(":sandbox-host"))
     // PcGameProvider's LibraryProvider and the store rows of PcLibrary.
     implementation(project(":library-core"))
     implementation(project(":input-mapping"))
