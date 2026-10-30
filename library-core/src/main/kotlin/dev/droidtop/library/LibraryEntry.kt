@@ -2276,15 +2276,20 @@ class Library(
      * actually found to save against (same honest-`null`-vs-throw
      * convention as [toggleFavorite]/[getMetadataForEditing]).
      */
+    /**
+     * Saves [entry]'s edited [metadata] and returns the entry as the list reads it now, for the screen holding the list
+     * to put in place at once (Droidtop/tracker#766: a Sort name was saved, and the list kept the entry it had loaded
+     * until a rescan). Null when [entry]'s kind keeps no metadata.
+     */
     suspend fun saveMetadata(
         entry: LibraryEntry,
         metadata: dev.droidtop.library.consoles.GameMetadataEntity,
-    ): Boolean = withContext(Dispatchers.IO) {
+    ): LibraryEntry? = withContext(Dispatchers.IO) {
         val romProvider = providers
             .filterIsInstance<dev.droidtop.library.consoles.ConsoleRomProvider>()
-            .firstOrNull { entry.kind in it.kinds } ?: return@withContext false
+            .firstOrNull { entry.kind in it.kinds } ?: return@withContext null
         romProvider.saveMetadata(metadata)
-        true
+        romProvider.withMetadata(entry)
     }
 
     // Real, library-wide collections -- unlike favorite/metadata, not

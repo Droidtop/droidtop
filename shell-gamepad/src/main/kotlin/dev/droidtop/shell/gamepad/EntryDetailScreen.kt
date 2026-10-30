@@ -175,6 +175,8 @@ internal fun EntryDetailScreen(
     onLaunch: () -> Unit,
     onClose: () -> Unit,
     onPrimaryFocus: (String?) -> Unit = {},
+    /** The entry after an edit of its metadata, for the list that holds it (Droidtop/tracker#766). */
+    onEntryChanged: (LibraryEntry) -> Unit = {},
 ) {
     val context = LocalContext.current
     val launchFocus = remember { FocusRequester() }
@@ -255,6 +257,7 @@ internal fun EntryDetailScreen(
             entry = entry,
             library = library,
             onDismiss = { editingMetadata = false },
+            onSaved = onEntryChanged,
         )
         return
     }

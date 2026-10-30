@@ -1025,6 +1025,9 @@ class ConsoleRomProvider(
         )
     }
 
+    /** [entry] with what its metadata row says now, as a load of the list reads it ([withScrapedMetadata]). */
+    suspend fun withMetadata(entry: LibraryEntry): LibraryEntry = listOf(entry).withScrapedMetadata(dao).first()
+
     /** Real custom collections list, alphabetical -- droidtop's own equivalent of real ES-DE's `getCustomCollectionSystems`. */
     suspend fun getCollections(): List<CollectionEntity> = dao.getCollections()
 

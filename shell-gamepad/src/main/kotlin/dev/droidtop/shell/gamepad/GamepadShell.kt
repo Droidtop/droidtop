@@ -1349,6 +1349,8 @@ internal fun GamepadShellBody(
                             onLaunch = { onLaunch(entry); nav.back() },
                             onClose = { nav.back() },
                             onPrimaryFocus = { detailPrimaryLabel = it },
+                            // An edited Sort name, title or favourite shows in the list at once, as a favourite's toggle does.
+                            onEntryChanged = { changed -> gameEntries = gameEntries?.map { if (it.id == changed.id) changed else it } },
                         )
                         // Get new games (Droidtop/tracker#612, #621): a page of Updates that opens on what is
                         // new for the person, with Search first, never on a blank search bar; leaving it goes back to

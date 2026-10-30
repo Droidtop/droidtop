@@ -183,7 +183,7 @@ object GameEmulatorChoice {
     /** Stores [id] as [entry]'s own choice (null follows the system), off the main thread; true when it was saved. */
     suspend fun save(library: dev.droidtop.library.Library, entry: dev.droidtop.library.LibraryEntry, id: String?): Boolean {
         val meta = library.getMetadataForEditing(entry) ?: GameMetadataEntity(id = entry.id)
-        return library.saveMetadata(entry, meta.copy(altEmulator = id))
+        return library.saveMetadata(entry, meta.copy(altEmulator = id)) != null
     }
 }
 

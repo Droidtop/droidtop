@@ -69,7 +69,7 @@ import kotlinx.coroutines.launch
  * to surface real output names here, not attempted in this pass.
  */
 @Composable
-internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss: () -> Unit) {
+internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss: () -> Unit, onSaved: (LibraryEntry) -> Unit = {}) {
     // The system back key; the pad's B is the onPad handler below.
     androidx.activity.compose.BackHandler { onDismiss() }
     val scope = rememberCoroutineScope()
@@ -244,7 +244,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             ShellChip("Save", primary = true, onClick = {
                 scope.launch {
-                    library.saveMetadata(entry, current)
+                    library.saveMetadata(entry, current)?.let(onSaved)
                     onDismiss()
                 }
             })
