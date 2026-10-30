@@ -100,8 +100,9 @@ object PluginWebAccount {
         // A check on a site the plugin signs in to also waits for the sign-in: a page past the check but signed out has
         // no download links (Droidtop/tracker#600, owner: "f95zone requires users to be logged in to see links").
         val done = if (account != null) doneCookie(record) else null
-        val result = WebSessionActivity.show(
+        val result = showKept(
             context,
+            record,
             WebSessionRequest(record.manifest.label, mode, url, domains.distinct(), withClearance, done, signInUrl = account?.signInUrl),
         )
         // What the view cleared is kept whether or not the person pressed Done: droidtop's requests to the site send it.
@@ -116,6 +117,20 @@ object PluginWebAccount {
         vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, session.copy(account = name).toJson())
         if (account.grant == GrantState.ASK) PluginGrants.forContext(context).set(record.manifest.id, WebSessions.PERMISSION, GrantState.GRANTED)
         return true
+    }
+
+    /**
+     * The web view for [request], with [record]'s process kept loaded while it is open (Droidtop/tracker#783): the person
+     * may take minutes on the site's page, longer than [PluginProcesses.IDLE_MS], and what they came for goes on in the
+     * plugin afterwards. A plugin with no process running is not started for it.
+     */
+    private fun showKept(context: Context, record: PluginRecord, request: WebSessionRequest): WebSessionResult {
+        val kept = PluginProcesses.keep(record.manifest.id)
+        try {
+            return WebSessionActivity.show(context, request)
+        } finally {
+            if (kept) PluginProcesses.release(context, record.manifest.id)
+        }
     }
 
     /** [stored] with [clearance]'s cookies added for each of [domains] it clears; the stored user agent is not used. */
@@ -152,7 +167,7 @@ object PluginWebAccount {
         val borrowed = shared.keys.filter { stored?.cookies?.get(it).isNullOrBlank() }
         val inUse = DownloadSites.borrow(stored, shared)
         val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, if (inUse != null) domains else emptyList(), inUse, null, maxDownloads = max.coerceIn(1, 16), signInUrl = signInUrl(record))
-        val result = WebSessionActivity.show(context, request)
+        val result = showKept(context, record, request)
         SiteChecks.keep(vault, record.manifest.id, result.session)
         // A shared site's renewed cookies go back to droidtop, never into the plugin's vault.
         result.session?.cookies?.filterKeys { it in borrowed }?.forEach { (domain, header) -> DownloadSites.renew(context, domain, header) }

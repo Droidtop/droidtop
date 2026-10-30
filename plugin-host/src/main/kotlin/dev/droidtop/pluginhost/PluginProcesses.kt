@@ -107,6 +107,20 @@ internal object PluginProcesses {
         return runtime
     }
 
+    /**
+     * Counts one more user of [pluginId]'s process when one is running, without starting one: droidtop's web view open
+     * for the plugin's site keeps it loaded, so the request the person is passing the check for goes on in the process
+     * that met it (Droidtop/tracker#783). Whether it counted; when it did, [release] lets go.
+     */
+    fun keep(pluginId: String): Boolean = synchronized(lock) {
+        val process = byPlugin[pluginId]?.takeIf { it.runtime != null } ?: return false
+        process.users++
+        process.lastUsedMs = System.currentTimeMillis()
+        process.idle?.let { main.removeCallbacks(it) }
+        process.idle = null
+        true
+    }
+
     /** One user of [pluginId]'s process is done with it; the last one starts the idle countdown. */
     fun release(context: Context, pluginId: String) {
         val app = context.applicationContext
