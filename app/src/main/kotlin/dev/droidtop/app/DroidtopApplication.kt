@@ -67,6 +67,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         }
         // Main-thread file, database and network work is logged in debuggable builds, from here on (Droidtop/tracker#729).
         DebugStrictMode.install(this)
+        // The feature steps, before onboarding or What's new reads them (docs/SPEC.md 7b, "Update onboarding").
+        WhatsNew.registerSteps()
         // A restore staged by "Restore droidtop" goes into place before anything opens a database (Droidtop/tracker#625).
         dev.droidtop.app.settings.DroidtopBackup.finishPendingRestore(this)
         // The scan log goes to logcat AND to a file droidtop owns, and
@@ -179,6 +181,10 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 // Every droidtop text field on a screen Android draws no keyboard on gets droidtop's (SPEC 4c).
                 dev.droidtop.shell.gamepad.InWindowKeyboard.attach(activity)
                 if (!activity.isParkedSurface()) AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
+                // The first of droidtop's own screens in front after an update opens What's new (SPEC 7b, "Update onboarding").
+                if (activity is MainActivity || activity is com.android.launcher3.Launcher || activity is CatalogScreenActivity) {
+                    WhatsNew.onShellResumed(activity)
+                }
                 // Another of droidtop's screens over the shell is not a game: coming back from it is not a return (ShellReturn).
                 if (!activity.isParkedSurface() && activity !is MainActivity && activity !is dev.droidtop.runtime.windows.WineGameActivity) {
                     ShellReturn.otherScreenResumed()

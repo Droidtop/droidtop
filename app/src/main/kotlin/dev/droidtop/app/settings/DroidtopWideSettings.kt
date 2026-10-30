@@ -259,6 +259,18 @@ object DroidtopWideSettings {
                                 DeveloperMenu.versionTapped(ctx)?.let { dev.droidtop.library.settings.Notices.flash(it, context = ctx) }
                             },
                         ),
+                        // Every build's changelog, the same text as its release notes (docs/SPEC.md 7b, "Update onboarding").
+                        ActionItem(
+                            id = "pref_global_whats_new",
+                            title = "What's new",
+                            subtitle = "What changed in this version and every one before it",
+                            run = { ctx ->
+                                ctx.startActivity(
+                                    dev.droidtop.app.WhatsNewActivity.intent(ctx, all = true)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            },
+                        ),
                         if (DeveloperMenu.on(context)) {
                             NestedScreenItem(
                                 id = "pref_global_developer",

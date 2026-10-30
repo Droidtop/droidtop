@@ -3855,8 +3855,11 @@ the `ContainerRuntime` interface that already exists (§3):
     always works, the one command from a computer, `adb shell appops set <package> ACCESS_RESTRICTED_SETTINGS allow`
     (copied to the clipboard on the press), and say that installing droidtop through an app store or a session
     installer avoids the block. Pressed while on, it opens that page, where it is turned off again: every
-    grant stays revocable. A Home press that reaches droidtop while the service is off says once, as a flash, that the
-    combos are off and where to turn them on, so the person learns it before they are in a game. Whether a vendor's
+    grant stays revocable. The one-time explanation is the first update-onboarding step (7b, "Update onboarding", `home_chords`):
+    after the update that brought the combos, right after What's new, "HOME + R2 now opens the Quick Menu over any
+    game..." with Allow, which is the same `turnOn`; it is not shown when the combos are already on. A fresh install
+    has the row in Settings > Controls, and in onboarding's controller step when that step is shown. (A first version flashed it once on a Home press; the step
+    replaces it, one mechanism.) Whether a vendor's
     own service that also filters keys lets HOME through to droidtop's is the console's to show.
   - `HomeChords` (`:runtime-common`, pure, tested) decides each key at once. Nothing stays stuck when a release is
     lost (the owner on the console: "it's possible to bug it so it stops working (maybe inputting too fast)"): a key
@@ -9334,6 +9337,38 @@ merge); re-entering runs that one step and returns.
 The flow asks, in order: what droidtop opens into, what the Home button does, then only the steps
 those answers need (Gaming: the game folders and a look; Desktop: a Linux system and a keyboard),
 the controller when one is attached and unidentified, and a summary that opens the mode.
+
+### Update onboarding (owner, Droidtop/tracker#727, 2026-10-29)
+
+"Let's have an "update onboarding" layer. When an update includes new functionality, the user is onboarded with
+popups. When an update has a changelog (every build should contain a complete changelog in its release notes), it
+displays it."
+
+- **What's new.** Every build carries its changelog (10b, "Every build carries its changelog"): `changelog.json` in
+  the APK's assets, every build's entry newest first, the same text as its release notes. The first time one of
+  droidtop's own screens (the shell's `MainActivity`, Standard's home screen, a place's `CatalogScreenActivity`) comes to the front after an
+  update, `WhatsNewActivity` opens over it with every build newer than the last one the person saw and not newer than
+  the one installed, so builds they skipped are there too (`WhatsNew.since`, tested), read from the APK, never from a
+  hand-kept list or the network. It is drawn in onboarding's scaffold (title, the builds with their Added, Changed
+  and Fixed lines, Done). Done, Back or B closes it, and closing is what marks this version seen (`WhatsNew`,
+  `last_seen_version_code`). A person updating from a build before What's new sees the installed build's entry. It
+  never opens over onboarding or a game, nor before onboarding finished. Settings > About droidtop > What's new
+  opens it with every build's entry, any time.
+- **Feature steps, one registry.** A feature that needs explaining declares a `FeatureStep` in code
+  (`FeatureSteps.register`, at droidtop's start in `WhatsNew.registerSteps`): an id; the changelog fragment it
+  arrived with (the version, named the way the history names it); its place, the catalog screen where the feature
+  lives, or none for an app-wide one; its title and text; its one action with its button label; and whether it
+  still has something to say (`applies`: the HOME combos step says nothing once they are on). Onboarding and update
+  onboarding share it: onboarding's end marks this version and every registered step seen
+  (`markOnboardingComplete`), so a fresh install is told about nothing it was set up with. After an update every
+  step not yet seen shows once, as the shell's confirm card (7k, "Notices": "Not now" on the left with the focus,
+  the action on the right, or "Got it" for a step with no action). App-wide steps follow What's new over it; a
+  place's steps show when its screen opens, in Gaming's settings (`CatalogNavigator`) and Standard's
+  (`CatalogPreferenceBuilder`), after the cursor rests on a linked category as its rows do. A step counts as seen
+  once it is shown, whatever the answer; with no surface to draw on it waits.
+- **The steps today.** `home_chords` (app-wide, Droidtop/tracker#740: "HOME + R2 now opens the Quick Menu over any
+  game..." with Allow), and `download_sites` (Accounts and sources: droidtop's own sign-ins for download sites and
+  the TorBox hand-off). windowcast streams register theirs when Droidtop/tracker#428 lands.
 
 ### The frame every step renders into
 

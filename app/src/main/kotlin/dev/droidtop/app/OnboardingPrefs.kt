@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
 import java.io.File
+import kotlinx.coroutines.launch
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 
 /**
@@ -32,6 +33,13 @@ object GamesRootPrefs {
             // The run is over; nothing is left to resume.
             .remove(OnboardingProgress.KEY)
             .apply()
+        // Set up on this version, with every feature it has: nothing here is new to them after an update
+        // (docs/SPEC.md 7b, "Update onboarding").
+        val app = context.applicationContext
+        dev.droidtop.runtime.util.AppScopes.io.launch {
+            WhatsNew.markCurrentSeen(app)
+            dev.droidtop.library.settings.FeatureSteps.markAllSeen(app)
+        }
     }
 
     /**
