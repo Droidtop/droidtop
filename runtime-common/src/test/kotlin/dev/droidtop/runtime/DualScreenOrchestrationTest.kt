@@ -357,4 +357,22 @@ class DualScreenOrchestrationTest {
     fun `no second display means no user-owned display`() {
         assertEquals(null, DualScreenOrchestration.userAppDisplayId(0, null, false, 10))
     }
+
+    @Test
+    fun `a companion with no shell closes and starts it, in a mode with a shell`() {
+        // Droidtop/tracker#788: after a crash only the companion came back, on display 0, while 4 was the main screen.
+        assertEquals(DualScreenOrchestration.CompanionCheck.START_SHELL, DualScreenOrchestration.companionCheck(0, 4, shellMode = true, shellDisplayId = null))
+        assertEquals(DualScreenOrchestration.CompanionCheck.KEEP, DualScreenOrchestration.companionCheck(0, 4, shellMode = false, shellDisplayId = null))
+    }
+
+    @Test
+    fun `a companion on the main screen with the shell elsewhere is put back`() {
+        assertEquals(DualScreenOrchestration.CompanionCheck.PUT_BACK, DualScreenOrchestration.companionCheck(0, 0, shellMode = true, shellDisplayId = 4))
+    }
+
+    @Test
+    fun `a companion beside the shell stays, and one the shell covers is left to finish itself`() {
+        assertEquals(DualScreenOrchestration.CompanionCheck.KEEP, DualScreenOrchestration.companionCheck(0, 4, shellMode = true, shellDisplayId = 4))
+        assertEquals(DualScreenOrchestration.CompanionCheck.KEEP, DualScreenOrchestration.companionCheck(0, 0, shellMode = true, shellDisplayId = 0))
+    }
 }

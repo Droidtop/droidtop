@@ -82,6 +82,31 @@ object DualScreenOrchestration {
     fun shouldDismissCompanion(showCompanion: Boolean, companionVisible: Boolean): Boolean =
         !showCompanion && companionVisible
 
+    /** What a companion that has just come to the front does about where it is: [companionCheck]. */
+    enum class CompanionCheck {
+        /** It is where it belongs, beside a shell, or droidtop is in a mode with no shell. */
+        KEEP,
+
+        /** No shell is alive: it closes, and the shell is started on the main screen, which places both again. */
+        START_SHELL,
+
+        /** It is on the main screen while the shell is elsewhere (a mix-up after a hotplug): it closes, and the screens are reinitialized. */
+        PUT_BACK,
+    }
+
+    /**
+     * The companion is never the only droidtop screen and never on the main screen (docs/SPEC.md 4c, "The companion
+     * never runs without the shell", Droidtop/tracker#786 S0c, #788). Pure. [shellMode] is whether the mode in use has a
+     * shell activity (Gaming or Desktop, set up); [shellDisplayId] is where a live shell is, null when none is alive.
+     * A shell on the companion's own screen is not decided here: the companion, covered, finishes by itself.
+     */
+    fun companionCheck(companionDisplayId: Int?, mainDisplayId: Int, shellMode: Boolean, shellDisplayId: Int?): CompanionCheck = when {
+        !shellMode -> CompanionCheck.KEEP
+        shellDisplayId == null -> CompanionCheck.START_SHELL
+        companionDisplayId == mainDisplayId && shellDisplayId != companionDisplayId -> CompanionCheck.PUT_BACK
+        else -> CompanionCheck.KEEP
+    }
+
     /**
      * Whether the shell is on the second screen RIGHT NOW. Derived from the
      * display the shell actually occupies, never from a decision flag:

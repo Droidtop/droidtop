@@ -30,7 +30,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.runtime.DualScreenOrchestration
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The user-populatable widgets/info surface for the display the Gaming
@@ -100,28 +105,62 @@ class CompanionActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         dev.droidtop.display.CompanionCover.resumed(displayIdCompat())
-        bringBackShellIfGone()
+        checkPlace()
     }
 
     /**
-     * The companion is never the only droidtop screen (Droidtop/tracker#788). When droidtop died with both screens up,
-     * Android kept this activity and, on the next Home, resumed only it: MainActivity, which owns placing the screens
-     * and their reinit, never started, and the other screen mirrored this one. So a companion resumed with no live
-     * shell while Gaming or Desktop is the mode in use starts the shell (ModeReturn, the way back to the mode in use),
-     * and the shell places both screens as at any start. At most once in [SHELL_RESTORE_MS], so a shell that cannot
-     * start is not started in a loop.
+     * The companion is never the only droidtop screen and never on the main screen (docs/SPEC.md 4c, "The companion
+     * never runs without the shell", Droidtop/tracker#786 S0c, #788). When droidtop died with both screens up, Android
+     * kept this activity and, on the next Home, resumed only it: MainActivity, which places the screens and owns their
+     * reinit, never started, and the other screen mirrored this one. So each time it comes to the front it asks
+     * [DualScreenOrchestration.companionCheck]: with no live shell while Gaming or Desktop is the mode in use, it starts
+     * the shell on the main screen and closes, and the shell starts it again where it belongs; on the main screen while
+     * the shell is elsewhere, it closes and the screens are reinitialized, said in a notice. Each at most once in
+     * [GUARD_MS], so a shell that cannot start, or screens that keep mixing up, are not acted on in a loop. The screen
+     * roles are read off the main thread.
      */
-    private fun bringBackShellIfGone() {
-        if (MainActivity.alive()) return
-        val mode = dev.droidtop.library.settings.Mode.byId(dev.droidtop.library.settings.Modes.lastMode(this))
-        if (mode != dev.droidtop.library.settings.Mode.GAMING && mode != dev.droidtop.library.settings.Mode.DESKTOP) return
-        if (!GamesRootPrefs.isOnboardingComplete(this)) return
-        val now = android.os.SystemClock.elapsedRealtime()
-        if (now - lastShellRestoreMs < SHELL_RESTORE_MS) return
-        lastShellRestoreMs = now
-        android.util.Log.i("droidtop.SecondScreen", "companion resumed with no shell: starting ${mode.id}")
-        runCatching { startActivity(ModeReturn.intent(this)) }
-            .onFailure { android.util.Log.w("droidtop.SecondScreen", "could not start the shell", it) }
+    private fun checkPlace() {
+        val here = displayIdCompat()
+        val app = applicationContext
+        lifecycleScope.launch {
+            val (mainId, shellMode) = withContext(Dispatchers.IO) {
+                val outputs = dev.droidtop.runtime.DisplayOutputRepository(app).currentOutputsSnapshot()
+                val mode = dev.droidtop.library.settings.Mode.byId(dev.droidtop.library.settings.Modes.lastMode(app))
+                val withShell = (mode == dev.droidtop.library.settings.Mode.GAMING || mode == dev.droidtop.library.settings.Mode.DESKTOP) &&
+                    GamesRootPrefs.isOnboardingComplete(app)
+                dev.droidtop.runtime.ScreenRoles.arrangement(app, outputs).mainId to withShell
+            }
+            if (isFinishing || isDestroyed) return@launch
+            val shellDisplay = MainActivity.current()?.let { shell ->
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    shell.display?.displayId
+                } else {
+                    @Suppress("DEPRECATION")
+                    shell.windowManager.defaultDisplay?.displayId
+                }
+            }
+            val check = DualScreenOrchestration.companionCheck(here, mainId, shellMode, shellDisplay)
+            if (check == DualScreenOrchestration.CompanionCheck.KEEP) return@launch
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastGuardMs < GUARD_MS) return@launch
+            lastGuardMs = now
+            when (check) {
+                DualScreenOrchestration.CompanionCheck.START_SHELL -> {
+                    android.util.Log.i("droidtop.SecondScreen", "companion on display $here with no shell: starting the shell on display $mainId, closing")
+                    runCatching {
+                        startActivity(ModeReturn.intent(app), android.app.ActivityOptions.makeBasic().setLaunchDisplayId(mainId).toBundle())
+                    }.onFailure { android.util.Log.w("droidtop.SecondScreen", "could not start the shell", it) }
+                    finish()
+                }
+                DualScreenOrchestration.CompanionCheck.PUT_BACK -> {
+                    android.util.Log.i("droidtop.SecondScreen", "companion on the main screen $here, shell on $shellDisplay: closing, reinitializing")
+                    finish()
+                    MainActivity.current()?.reinitializeDisplays()
+                    dev.droidtop.library.settings.Notices.flash("The screens were mixed up, so droidtop set them up again", context = app)
+                }
+                DualScreenOrchestration.CompanionCheck.KEEP -> Unit
+            }
+        }
     }
 
     // Touch-only, except while Android has made it the top activity: then keys reach this
@@ -199,9 +238,9 @@ class CompanionActivity : AppCompatActivity() {
     companion object {
         const val ACTION_DISMISS = "dev.droidtop.app.action.DISMISS_COMPANION"
 
-        /** How often a companion with no shell may start one (bringBackShellIfGone). */
-        private const val SHELL_RESTORE_MS = 5_000L
-        private var lastShellRestoreMs = -SHELL_RESTORE_MS
+        /** How often a companion may start the shell or reinitialize the screens (checkPlace). */
+        private const val GUARD_MS = 5_000L
+        private var lastGuardMs = -GUARD_MS
 
         /**
          * Whether a companion instance is currently started/visible — read

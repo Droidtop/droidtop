@@ -1016,7 +1016,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         /** The shell instance created last; an older one still alive is the one a relocation left behind. */
         private var live: java.lang.ref.WeakReference<MainActivity>? = null
 
-        /** Whether a shell instance is alive, neither finishing nor destroyed: a companion with none starts one (Droidtop/tracker#788). */
-        fun alive(): Boolean = live?.get()?.let { !it.isFinishing && !it.isDestroyed } == true
+        /** The live shell instance, neither finishing nor destroyed, or null: a companion with none starts one (Droidtop/tracker#788). */
+        fun current(): MainActivity? = live?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }
     }
 }

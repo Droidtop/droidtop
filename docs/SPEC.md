@@ -5833,9 +5833,17 @@ had not moved.
 - **The companion is never the only droidtop screen (Droidtop/tracker#788).** When droidtop died with both
   screens up (the overlay crash of 2026-10-29), Android kept `CompanionActivity`, and the next Home resumed only it:
   `MainActivity`, which owns placing the screens and their reinit, never started, and the other screen mirrored the
-  companion (the owner: "Now we ONLY see the companion, on both screens"). A companion resumed with no live shell while
-  Gaming or Desktop is the mode in use now starts the shell (`ModeReturn`, the way back to the mode in use; at most
-  once in five seconds), and the shell places both screens as at any start.
+  companion (the owner: "Now we ONLY see the companion, on both screens"). **The companion never runs without the
+  shell, and never on the main screen** (Droidtop/tracker#786 slice S0c, plan decided 2026-10-30). Each time
+  `CompanionActivity` comes to the front it asks one pure decision, `DualScreenOrchestration.companionCheck` (tested),
+  with the screen roles read off the main thread:
+  - no live shell while Gaming or Desktop (set up) is the mode in use: it starts the shell (`ModeReturn`) on the main
+    screen of the arrangement and closes, so the shell comes back first and starts the companion where it belongs;
+  - on the main screen while the shell is on another: it closes and the screens are reinitialized
+    (`MainActivity.reinitializeDisplays`), and a notice says "The screens were mixed up, so droidtop set them up
+    again";
+  - covered by the shell on its own screen it finishes by itself, as before; in Standard it stays.
+  Either action at most once in five seconds, so a shell that cannot start is not started in a loop.
 - The companion surfaces enforce the one-display rule themselves
   (`CompanionSurfaceLifetime`, `DualScreenOrchestration.companionSurfaceRetires`,
   tracker#182), because the shell's orchestration runs only while a shell
