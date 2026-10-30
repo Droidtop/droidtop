@@ -253,6 +253,8 @@ internal fun ShellChip(
     selected: Boolean? = null,
     // The chip's own menu on a long press, the one L2 opens on it (Droidtop/tracker#621); null for none.
     onLongClick: (() -> Unit)? = null,
+    // False where the strip draws the chosen tab's plate itself, gliding between tabs ([ViewStrip]).
+    plate: Boolean = true,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -326,7 +328,7 @@ internal fun ShellChip(
                         shape,
                         rest = when {
                             !tab -> MenuTokens.Surface
-                            on -> MenuTokens.SurfaceSelected
+                            on && plate -> MenuTokens.SurfaceSelected
                             else -> Color.Transparent
                         },
                         selectedFill = MenuTokens.Selected,

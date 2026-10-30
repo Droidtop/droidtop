@@ -9,7 +9,20 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import dev.droidtop.ui.shared.Motion
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -41,6 +54,32 @@ internal fun ViewStrip(
 ) {
     val window = LocalShellWindow.current
     val shoulderGlyphs = window.showsShoulderGlyphs()
+    // The chosen tab's plate is one shape behind the chips that glides from tab to tab as the view changes
+    // (DroidDeck's sliding selection pill, Droidtop/tracker#363), rather than a plate each chip turns on and off. It
+    // follows the strip's own scroll at once and moves over Motion's focus time only when the chosen tab changes.
+    val plateColor = MenuTokens.SurfaceSelected
+    val plateX = remember { Animatable(0f) }
+    val plateWidth = remember { Animatable(0f) }
+    var plateShown by remember { mutableStateOf(false) }
+    var plateFor by remember { mutableStateOf(-1) }
+    val chosen by remember(state, active) {
+        derivedStateOf { state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == active }?.let { it.offset.toFloat() to it.size.toFloat() } }
+    }
+    LaunchedEffect(chosen, active) {
+        val (x, width) = chosen ?: run {
+            plateShown = false
+            return@LaunchedEffect
+        }
+        if (!plateShown || plateFor == active || !Motion.enabled) {
+            plateX.snapTo(x)
+            plateWidth.snapTo(width)
+        } else {
+            launch { plateX.animateTo(x, Motion.focus()) }
+            launch { plateWidth.animateTo(width, Motion.focus()) }
+        }
+        plateShown = true
+        plateFor = active
+    }
     // The strip runs along the top edge, where the status cluster floats:
     // it ends short of the cluster so R1 is never under the clock
     // (Droidtop/tracker#292). The cluster's width already holds its margins.
@@ -57,7 +96,20 @@ internal fun ViewStrip(
             contentPadding = PaddingValues(vertical = Space.Xs),
             horizontalArrangement = Arrangement.spacedBy(Space.Sm),
             // The end the strip can scroll to fades, so a chip cut at the edge says there is more (Droidtop/tracker#661).
-            modifier = Modifier.weight(1f, fill = false).fadeWhileMoreSideways(state),
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .drawBehind {
+                    if (!plateShown) return@drawBehind
+                    val inset = Space.Xs.toPx()
+                    val height = size.height - inset * 2
+                    drawRoundRect(
+                        plateColor,
+                        topLeft = Offset(plateX.value, inset),
+                        size = Size(plateWidth.value, height),
+                        cornerRadius = CornerRadius(height / 2, height / 2),
+                    )
+                }
+                .fadeWhileMoreSideways(state),
         ) {
             items(count = labels.size, key = { "chip:$it" }) { index ->
                 ShellChip(
@@ -67,6 +119,7 @@ internal fun ViewStrip(
                     selected = focused == index,
                     onClick = { onSelect(index) },
                     onLongClick = onLongPress?.let { { it(index) } },
+                    plate = false,
                 )
             }
         }
