@@ -607,6 +607,19 @@ object DroidtopWideSettings {
                         ),
                     ),
                 ),
+                // Per-app volume and EQ's open questions, answered on a device (Droidtop/tracker#836, slice 0).
+                CatalogGroup(
+                    id = "developer_audio",
+                    title = "Sound",
+                    items = listOf(
+                        dev.droidtop.library.settings.AsyncActionItem(
+                            id = "developer_audio_probe",
+                            title = "Probe per-app audio",
+                            subtitle = "Play a game first. Saves Android's audio dumps and dips each app for 4 s",
+                            run = { ctx, _ -> AudioProbe.run(ctx).lineSequence().last() },
+                        ),
+                    ),
+                ),
                 // Wine's tree under the sandbox broker, learning only (docs/SPEC.md 5b, Droidtop/tracker#584 piece 0).
                 CatalogGroup(
                     id = "developer_wine_sandbox",

@@ -9599,6 +9599,15 @@ catalog (no second settings system):
   debug builds** (from Updates), on a debug build **Debug: force a
   crash**, and **Matching > Record match answers** (Droidtop/tracker#318: see
   "Calibrating name matching from recorded answers" under 7).
+- **Sound > Probe per-app audio** (Droidtop/tracker#836, slice 0 of per-app volume and EQ). It answers that design's
+  device questions before anything is built on them, and runs only when pressed (`AudioProbe`):
+  - whether the build has DynamicsProcessing;
+  - `dumpsys audio` and AudioFlinger's dump, through the elevated shell (which holds DUMP), saved as parser fixtures
+    to droidtop's own files (`Android/data/<package>/files/audio-probe`);
+  - for each started session, whether droidtop may attach DynamicsProcessing to another app's session, with a 12 dB
+    dip for four seconds to hear it, and AudioFlinger's dump while attached to read the fast-path flags; then it
+    releases the effect.
+  The summary goes to the log under `droidtop.AudioProbe`.
 - **Technical rows stay on their own page, shown only while it is on:**
   a plugin's **Advanced** group (its id, origin, archive digest and the
   containment check), **Plugin messages**, every **Technical details** row
