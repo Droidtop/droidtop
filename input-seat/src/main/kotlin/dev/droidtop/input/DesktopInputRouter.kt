@@ -174,6 +174,10 @@ class DesktopInputRouter {
     fun onMotionEvent(event: MotionEvent): Boolean {
         if (seat == null) return false
         return when {
+            // A finger first, whatever else the device says it is: the emulator's touchscreen reports itself as a
+            // touchscreen and a stylus (source 0x5002), and the stylus branch below took two fingers as one pointer,
+            // so a two-finger tap or scroll only moved the cursor (Droidtop/tracker#684, rig 2638).
+            isFingerTouch(event.isFromSource(InputDevice.SOURCE_TOUCHSCREEN), event.getToolType(0)) -> onTouch(event)
             event.isFromSource(InputDevice.SOURCE_MOUSE_RELATIVE) -> onRelativePointer(event)
             event.isFromSource(InputDevice.SOURCE_MOUSE) ||
                 event.isFromSource(InputDevice.SOURCE_STYLUS) -> onAbsolutePointer(event)
@@ -182,6 +186,10 @@ class DesktopInputRouter {
             else -> false
         }
     }
+
+    /** Whether a pointer event is a finger on a touch screen, by its first pointer's tool. Pure. */
+    internal fun isFingerTouch(fromTouchscreen: Boolean, toolType: Int): Boolean =
+        fromTouchscreen && (toolType == MotionEvent.TOOL_TYPE_FINGER || toolType == MotionEvent.TOOL_TYPE_UNKNOWN)
 
     /**
      * Direct touch: the finger *is* the cursor, through [DirectTouchGestures]: a tap clicks, a finger moved past the

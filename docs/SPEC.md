@@ -8305,6 +8305,11 @@ the pointer (`DirectTouchGestures`, pure and tested):
 - a finger held still for the long-press time is a right click: context menus, the terminal's paste;
 - two fingers lifted without moving are a right click; two fingers moving scroll, the content following them.
 
+A pointer event is touch by its tool, not only by its device: a finger (or an unknown tool) on a touch screen takes
+these gestures even when the device also calls itself a stylus, as the emulator's touchscreen does (source 0x5002).
+Routed by device first, those two-finger taps and scrolls went down the stylus path as one pointer and only moved the
+cursor (Droidtop/tracker#684, rig 2638). A pen or a mouse keeps its own path.
+
 The thresholds are Android's own for the screen (`ViewConfiguration` touch slop and long-press timeout), not new
 constants. The laptop-style `TrackpadGestureEngine` (6c) is not used here: there one finger moves the pointer by its
 travel without pressing, and dragging is tap-then-drag, while on the surface the pointer jumps to the finger and
