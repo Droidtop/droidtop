@@ -4033,6 +4033,16 @@ the `ContainerRuntime` interface that already exists (§3):
   - **Every decision carries its reason** ("Emulator rule", "Getting hot", "Battery under 15 percent"), shown in Info.
   - **The fan is the person's to set,** Max included, with no forced limit (owner, Q5). Auto may suggest following
     heat, and a manual pick is always honoured. It reaches a device through the device layer (slice 5).
+  - **The standard layer** (slice 3a, `StandardPowerLayer`). Android's Game Mode for the package in front: Saver is
+    battery, Standard is standard, Performance and Max are performance.
+    - **Read-back.** The RP5's Android 13 has no `cmd game list-modes` (console, 2026-10-30), so the mode is read from
+      `dumpsys game` (`GameModeReadBack`), by the mode's name or number near the package's line. Where it reads, a
+      mode Android did not take is "Android ignores this app"; where it doesn't, the command's own answer decides
+      (`GameModeControl.refused`).
+    - **The journal** (`PowerJournal`). Android keeps a package's mode after droidtop exits, so the mode found before
+      droidtop's first change is written to droidtop's own preferences before the change. The game's close puts it
+      back (slice 3b), and so does droidtop's next start when it stopped first: off the main thread, after the
+      elevated shell has had five seconds to connect. A put-back that fails stays journaled for the next try.
 - **In-game overlays: HOME chords (decided 2026-10-29, Droidtop/tracker#740).** The owner: "As for the keyboard
   shortcut: we only care about it working when droidtop is the home, so can we use home + something else?" and
   "Home + r2 gets the quick menu, and home +l2 gives the local contextual menu/companion-style overlay. This gives us

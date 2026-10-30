@@ -88,6 +88,15 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         dev.droidtop.runtime.systemstatus.VolumeControl.watchKidCap(this)
         // Kid's play-time limits: counts play while a game runs and closes it at the limit (SPEC 7f, tracker#421).
         PlayTimeLimiter.install(this)
+        // Game modes droidtop changed and did not put back before it stopped (docs/SPEC.md "Power policy", the journal,
+        // Droidtop/tracker#841): put back first, once the elevated shell has had its moment to connect.
+        val powerApp = this
+        dev.droidtop.runtime.util.AppScopes.io.launch {
+            if (dev.droidtop.runtime.power.PowerJournal.entries(powerApp).isEmpty()) return@launch
+            val shell = dev.droidtop.runtime.tasks.TaskManager.shell
+            runCatching { shell.connect(POWER_RESTORE_WAIT_MS) }
+            runCatching { dev.droidtop.runtime.power.StandardPowerLayer.restoreAll(powerApp, shell) }
+        }
         // Crash notes and crash-loop safe mode (SPEC 10c): after ScanLog so
         // a note can carry its tail, before anything that could crash.
         dev.droidtop.library.diagnostics.CrashRecovery.install(this)
@@ -213,3 +222,6 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
             .build()
     }
 }
+
+/** How long the start-up restore of the power journal waits for the elevated shell's binder. */
+private const val POWER_RESTORE_WAIT_MS = 5_000L
