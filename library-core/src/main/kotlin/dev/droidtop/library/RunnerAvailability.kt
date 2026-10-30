@@ -227,7 +227,8 @@ object RunnerAvailability {
             return RunnerOption(
                 strategy,
                 RunnerState.NEEDS_SETUP,
-                "Install the ${facts.engine.displayName()} plugin",
+                // The same versioned name as the button, so the line under it says which version too.
+                "Install the ${facts.enginehostCoreLabel ?: facts.engine.displayName()} plugin",
                 RunnerAction.INSTALL_ENGINEHOST_PLUGIN,
                 actionLabel = "Get ${facts.enginehostCoreLabel ?: facts.engine.displayName()} support",
             )
@@ -366,6 +367,20 @@ fun GameLaunchStrategy.displayName(engine: GameEngine?): String =
     }
 
 /** How an engine is named to a person, in ONE place. */
+/**
+ * What "Get … support" names (Droidtop/tracker#837; the owner, dev.2778: "The "get support" button should list a
+ * version. Otherwise, users might get confused about some renpy games needing it"): the core's own label when it
+ * already carries a version ("Ren'Py 8.3"), otherwise the engine with the version that will be installed, as
+ * major.minor: the version Enginehost offers, else the game's own. Just the name when no version is known. Pure.
+ */
+fun engineSupportName(engine: String, coreLabel: String?, offeredVersion: String?, gameVersion: String?): String {
+    if (coreLabel != null && coreLabel.any { it.isDigit() }) return coreLabel
+    val version = (offeredVersion ?: gameVersion)?.let { SHORT_VERSION.find(it)?.value }
+    return listOfNotNull(coreLabel ?: engine, version).joinToString(" ")
+}
+
+private val SHORT_VERSION = Regex("\\d+(?:\\.\\d+)?")
+
 fun GameEngine.displayName(): String = when (this) {
     GameEngine.RENPY -> "Ren'Py"
     GameEngine.KIRIKIRI -> "KiriKiri"

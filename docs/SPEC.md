@@ -17614,7 +17614,9 @@ Which cores exist comes from Enginehost itself over its application
 interface (`engines.cores@1`, docs/plugin-api.md 3 A7b), never from a
 list droidtop carries: an installed core serving the game's
 engines-database row at its version makes the row Ready, an installable
-one makes it the "Get … support" step, and a checked catalog with none
+one makes it the "Get … support" step, named with the version it installs ("Get Ren'Py 8.1 support", the core's
+label or Enginehost's offered version, else the game's own, as major.minor; `engineSupportName`, #837: "The "get
+support" button should list a version"), and a checked catalog with none
 makes Enginehost no runner for the game. Kirikiroid2 is not in that first
 group: it opens its own app, not the game. After that group, the engines
 database's `strategies` list only ranks what is already available. The resolved runner and the reason it won are stated on the

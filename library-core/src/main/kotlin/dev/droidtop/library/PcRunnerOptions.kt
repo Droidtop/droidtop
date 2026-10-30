@@ -98,7 +98,11 @@ object PcRunnerOptions {
                     is CoreVerdict.Installable -> false
                     else -> bundleCoverage(context, target, engineVersion)
                 },
-                enginehostCoreLabel = (cores as? CoreVerdict.Installable)?.core?.label,
+                // Named with the version it installs, so a Ren'Py 7 game is never offered a bare "Ren'Py support".
+                enginehostCoreLabel = engine?.let {
+                    val core = (cores as? CoreVerdict.Installable)?.core
+                    engineSupportName(it.displayName(), core?.label, core?.availableVersion, engineVersion)
+                },
                 windowsEnvironmentReady = runtime?.isProvisioned == true,
                 wineRendererWired = RunnerAvailability.WINE_RENDERER_WIRED,
                 linuxContainerAvailable = runtime?.isLinuxContainerAvailable == true,
