@@ -88,6 +88,12 @@ class WirelessDebuggingOps(context: Context) : ElevatedBackend {
         pairedFile.writeText(System.currentTimeMillis().toString())
     }
 
+    /**
+     * Whether Settings is showing a pairing code now: Android advertises the pairing service only while that dialog is
+     * open. The pairing guide asks it to know when to take the code (Droidtop/tracker#363). Blocks up to [timeoutMs].
+     */
+    fun pairingCodeShowing(timeoutMs: Long): Boolean = supported && discoverPort(PAIRING_SERVICE, timeoutMs) != null
+
     /** Forgets the pairing: droidtop's key goes, and Android lists droidtop until the person removes it there. */
     fun forget() {
         runCatching { manager.disconnect() }

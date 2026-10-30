@@ -31,8 +31,10 @@ object WirelessPairing {
     fun start(context: Context): String {
         if (!canNotify(context)) return "Allow droidtop's notifications first: the code is typed into one"
         notify(context, "Pair with wireless debugging", "In Wireless debugging, tap Pair device with pairing code, then reply here with the six digits", withReply = true)
-        return if (openDeveloperOptions(context)) "Reply to droidtop's notification with the code"
-        else "Turn on Developer options first: Settings > About > tap Build number seven times"
+        if (!openDeveloperOptions(context)) return "Turn on Developer options first: Settings > About > tap Build number seven times"
+        // Over Settings, a guide the pad can reach takes the code too (Droidtop/tracker#363).
+        return if (PairingGuide.show(context)) "Type the code into droidtop's guide over Settings, or reply to its notification"
+        else "Reply to droidtop's notification with the code"
     }
 
     /**
@@ -44,6 +46,11 @@ object WirelessPairing {
             .putExtra(":settings:fragment_args_key", "toggle_adb_wireless")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching { context.startActivity(intent) }.isSuccess
+    }
+
+    /** Paired some other way than the notification (the guide): the notification says so instead of asking. */
+    fun paired(context: Context) {
+        notify(context.applicationContext, "Paired with wireless debugging", "droidtop can now use it while Wireless debugging is on", withReply = false)
     }
 
     private fun canNotify(context: Context): Boolean =
@@ -88,7 +95,10 @@ object WirelessPairing {
             Thread {
                 try {
                     runCatching { ElevatedAccessHost.wireless(app).pair(code) }
-                        .onSuccess { notify(app, "Paired with wireless debugging", "droidtop can now use it while Wireless debugging is on", withReply = false) }
+                        .onSuccess {
+                            paired(app)
+                            PairingGuide.hide()
+                        }
                         .onFailure { notify(app, "Pair with wireless debugging", (it.message ?: "Pairing failed") + ". Reply with a new code", withReply = true) }
                 } finally {
                     pending.finish()

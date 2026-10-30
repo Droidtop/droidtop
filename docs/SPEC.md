@@ -4307,6 +4307,13 @@ Nothing else is installed. Android 11 and later; earlier, the row is not drawn.
   device with pairing code" and replies to the notification with the six digits, so Settings stays in front and
   the code stays shown; Shizuku does the same. droidtop finds the pairing service on the device itself
   (`_adb-tls-pairing._tcp`, NsdManager), pairs on its own thread, and says in the same notification how it went.
+  **The pairing guide** (`PairingGuide`, DroidDeck's floating Settings guide, Droidtop/tracker#363): a pad cannot
+  reach the notification shade, so when droidtop may draw over other apps a small window floats over Settings with
+  the three steps and a code field. It takes no focus while the person moves through Settings, so the pad drives
+  Settings; once Settings shows a code (the pairing service is advertised only then,
+  `WirelessDebuggingOps.pairingCodeShowing`) it takes the focus with its field, and gives it back when the dialog
+  closes. Pair calls the same `pair` the notification does: one pairing, two ways to type the code. B or Close
+  ends it; "Paired" stays a moment, and the notification then says it is done. Its colours are the app theme's.
 - **Each use** (`WirelessDebuggingOps`, plugin-host). droidtop finds `_adb-tls-connect._tcp` the same way,
   connects with its key and runs the command. adb's shell stream has no exit status, so the command prints its own
   after it, on a line droidtop reads back. Its state: absent until paired; paired with Android's switch off is
