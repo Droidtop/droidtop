@@ -165,8 +165,8 @@ private fun copyGroups(entry: LibraryEntry, copying: SaveCopying, nowMs: Long, v
         listOf(
             ActionItem(
                 id = "saves_copy_none",
-                title = "This copy has no saves droidtop can see yet",
-                subtitle = "Play it and save once, so droidtop learns where it keeps its saves; then copy another copy's saves over them",
+                title = "No saves found for this copy yet",
+                subtitle = "Play it and save once, so droidtop learns where its saves go; then copy saves here",
             ),
         )
     } else {
@@ -190,7 +190,7 @@ private fun copyGroups(entry: LibraryEntry, copying: SaveCopying, nowMs: Long, v
                 },
             )
         }.ifEmpty {
-            listOf(ActionItem(id = "saves_copy_others_none", title = "No other copy of this game has saves droidtop can see"))
+            listOf(ActionItem(id = "saves_copy_others_none", title = "No other copy has saves yet"))
         }
     }
     val restore = copying.backups.mapIndexed { index, backup ->

@@ -282,7 +282,7 @@ class LibraryTest {
         val local = LibraryEntry(id = "/games/renpy/BW build", title = "BW build", kind = LibraryEntryKind.RENPY)
         val steam = LibraryEntry(id = "steam:1", title = "Bare Witness", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(storeId = "steam:1", installed = false))
         val folders = FoldingProvider(LibraryEntryKind.RENPY, listOf(local))
-        val stores = FoldingProvider(LibraryEntryKind.WINE_PROFILE, listOf(steam))
+        val stores = KeyedProvider("stores", LibraryEntryKind.WINE_PROFILE, listOf(steam))
         val playHistory = FakePlayHistoryStore()
         val favorites = FakeFavoritesStore()
         val links = FakeGameLinksStore()
