@@ -1,6 +1,10 @@
 package dev.droidtop.library.computers
 
 import android.content.Context
+import dev.droidtop.library.stores.SaveChoice
+import dev.droidtop.library.stores.SaveConflict
+import dev.droidtop.library.stores.SaveConflictResolver
+import dev.droidtop.library.stores.SaveSide
 import dev.droidtop.library.stores.SaveSyncPhase
 import dev.droidtop.library.stores.SaveSyncResult
 import dev.droidtop.library.stores.WinePrefixLocation
@@ -17,10 +21,13 @@ import java.util.concurrent.ConcurrentHashMap
  * it ends. The computer says where the game keeps its saves (from the person's
  * own entries or the Ludusavi manifest), droidtop resolves those places in the
  * game's Wine prefix and folder here, and the agent core decides: a side that
- * alone changed wins; when both changed, the person's primary computer, else
- * the newest copy (droidtop-agent docs/DESIGN.md sections 6 and 9). Nothing is
- * asked and nothing is lost: the side that is overwritten keeps its own changed
- * saves as a copy first, here in the computer's archive folder.
+ * alone changed wins. When both changed, nobody wins (the owner, Droidtop/tracker#814:
+ * "for saves, nobody 'wins' ... We ask the user"): the agent moves nothing and
+ * answers `conflict` with each side's device, files and date, the person picks
+ * one through [SaveConflictResolver], and the sync runs again with that
+ * `choice` (droidtop-agent docs/DESIGN.md sections 6 and 9). Nothing is lost:
+ * the side that is overwritten keeps its saves as a copy first, here in the
+ * computer's archive folder.
  */
 object ComputerSaves {
     /** The folder each game was launched from this run, so the sync after it ends knows `<base>`. */
@@ -44,8 +51,10 @@ object ComputerSaves {
         title: String,
         phase: SaveSyncPhase,
         prefix: WinePrefixLocation,
+        resolver: SaveConflictResolver?,
+        localLabel: String? = null,
     ): SaveSyncResult? {
-        val results = Computers.list(context).mapNotNull { one(context, it, entryId, title, phase, prefix) }
+        val results = Computers.list(context).mapNotNull { one(context, it, entryId, title, phase, prefix, resolver, localLabel) }
         if (results.isEmpty()) return null
         return SaveSyncResult(
             line = results.joinToString("; ") { it.line },
@@ -59,8 +68,8 @@ object ComputerSaves {
 
     /**
      * What leaving the saves in the cloud folder did. When the computer's own
-     * saves changed too, the newest (or the primary computer's) copy wins there
-     * and the other is kept as a copy; a refusal in the folder says so.
+     * saves changed too, it overwrites nothing: it keeps this device's set as a
+     * copy and the next live sync asks; a refusal in the folder says so.
      */
     private fun posted(computer: Computer, reply: JSONObject?, phase: SaveSyncPhase): SaveSyncResult? = when {
         reply == null -> null
@@ -80,18 +89,27 @@ object ComputerSaves {
         title: String,
         phase: SaveSyncPhase,
         prefix: WinePrefixLocation,
+        resolver: SaveConflictResolver?,
+        localLabel: String?,
     ): SaveSyncResult? {
         val dir = Computers.stateDir(context, computer)
         val key = fileKey(entryId)
-        fun args() = JSONObject()
+        fun args(choice: SaveChoice? = null) = JSONObject()
             .put("game", JSONObject().put("key", entryId).put("title", title))
             .put("prefix", File(prefix.prefixDir, "drive_c").absolutePath)
             .put("user", prefix.user)
             .put("baseline", File(dir, "saves/$key.json").absolutePath)
             .put("archive", File(dir, "archive/$key").absolutePath)
-            .put("primary", computer.primary)
             .apply { bases[entryId]?.let { put("base", it) } }
-        val reply = Computers.call(context, computer, "sync_saves", args())
+            .apply { choice?.let { put("choice", if (it == SaveChoice.LOCAL) "here" else "there") } }
+        var reply = Computers.call(context, computer, "sync_saves", args())
+        // Both sides changed: nothing moved, and the person picks. "Decide later", or no screen to ask on, changes nothing.
+        if (reply.optString("outcome") == "conflict") {
+            val choice = conflictOf(reply, computer.name, localLabel)?.let { resolver?.resolve(title, it) }
+                ?: return SaveSyncResult("Saves differ between this device and ${computer.name}. Choose which to keep", unresolved = true)
+                    .also { Computers.noteSync(context, computer.id, it.line) }
+            reply = Computers.call(context, computer, "sync_saves", args(choice))
+        }
         val result = when {
             // Away from the computer after playing: the saves wait in the person's cloud folder, when one is set.
             reply.has("unreachable") && phase != SaveSyncPhase.BEFORE_LAUNCH && ComputerShare.folder(context) != null ->
@@ -107,10 +125,10 @@ object ComputerSaves {
                     // Both sides had changed: the other side's saves were kept as its own copy.
                     val kept = reply.optBoolean("kept")
                     if (reply.optString("from") == "there") {
-                        val why = if (kept) " (${if (computer.primary) "your primary computer" else "newer"}; this device's are kept as a copy)" else ""
+                        val why = if (kept) " (this device's are kept as a copy)" else ""
                         SaveSyncResult("Saves: $files from ${computer.name}$why", downloaded = files, removed = removed)
                     } else {
-                        val why = if (kept) " (newer here; ${computer.name} kept its own as a copy)" else ""
+                        val why = if (kept) " (${computer.name} kept its own as a copy)" else ""
                         SaveSyncResult("Saves: $files sent to ${computer.name}$why", uploaded = files, removed = removed)
                     }
                 }
@@ -120,5 +138,20 @@ object ComputerSaves {
         }
         result?.let { Computers.noteSync(context, computer.id, it.line) }
         return result
+    }
+
+    /**
+     * The question for a `conflict` answer: this device's set ([localLabel] when it is more than this device's, a
+     * store's cloud copy too) against [computer]'s, each with its device, files and newest file's date. Null when the
+     * answer is not one. Pure.
+     */
+    fun conflictOf(reply: JSONObject, computer: String, localLabel: String? = null): SaveConflict? {
+        if (reply.optString("outcome") != "conflict") return null
+        fun side(o: JSONObject?, fallback: String) = o?.let {
+            SaveSide(it.optLong("newest_ms"), it.optInt("files"), 0L, it.optString("device").ifBlank { fallback })
+        }
+        val here = side(reply.optJSONObject("here"), "This device") ?: return null
+        val there = side(reply.optJSONObject("there"), computer) ?: return null
+        return SaveConflict(localLabel?.let { here.copy(device = it) } ?: here, there, computer, computer = true, kept = true)
     }
 }

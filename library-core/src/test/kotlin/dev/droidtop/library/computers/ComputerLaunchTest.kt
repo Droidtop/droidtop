@@ -10,8 +10,8 @@ import org.junit.Test
 
 /** Starting a game on a computer: the words for each answer of the computer's agent, and which computer is asked (docs/SPEC.md 7o). */
 class ComputerLaunchTest {
-    private fun pc(name: String, primary: Boolean = false, lastSyncMs: Long = 0) =
-        Computer(id = name.padEnd(64, '0'), name = name, addresses = emptyList(), pairedAtMs = 0, primary = primary, lastSyncMs = lastSyncMs)
+    private fun pc(name: String, lastSyncMs: Long = 0) =
+        Computer(id = name.padEnd(64, '0'), name = name, addresses = emptyList(), pairedAtMs = 0, lastSyncMs = lastSyncMs)
 
     private fun say(reply: String, key: String = "steam:400") = ComputerLaunch.describe(JSONObject(reply), "DESKTOP", "Portal", "Retroid", key)
 
@@ -47,9 +47,9 @@ class ComputerLaunchTest {
     }
 
     @Test
-    fun `the primary computer is asked first, then the most recent`() {
-        val ordered = ComputerLaunch.order(listOf(pc("old", lastSyncMs = 1), pc("new", lastSyncMs = 9), pc("main", primary = true, lastSyncMs = 0)))
-        assertEquals(listOf("main", "new", "old"), ordered.map { it.name })
+    fun `the computer met most recently is asked first`() {
+        val ordered = ComputerLaunch.order(listOf(pc("old", lastSyncMs = 1), pc("new", lastSyncMs = 9), pc("never", lastSyncMs = 0)))
+        assertEquals(listOf("new", "old", "never"), ordered.map { it.name })
     }
 
     @Test

@@ -48,4 +48,21 @@
     <string name="guide_notes">Notes</string>
     <string name="guide_notes_none">None yet</string>
     <string name="guide_notes_title">Notes for %1$s</string>
+    <string name="saves_differ">Saves differ</string>
+    <string name="saves_differ_cloud">Cloud saves differ</string>
+    <string name="saves_decide_later">Decide later</string>
+    <string name="saves_changes_nothing">Changes nothing</string>
+    <string name="saves_keep_here">Keep this device\'s saves</string>
+    <string name="saves_keep_cloud">Keep the saves in %1$s</string>
+    <string name="saves_keep_computer">Keep the saves on %1$s</string>
+    <string name="saves_replaces_cloud">Replaces the saves in %1$s · %2$s</string>
+    <string name="saves_replaces_computer">Replaces the saves on %1$s · %2$s</string>
+    <string name="saves_replaces_here">Replaces the saves on this device · %1$s</string>
+    <string name="saves_kept_copy">The replaced saves are kept as a copy</string>
+    <string name="saves_no_date">No date</string>
+    <string name="saves_newer">Newer</string>
+    <plurals name="saves_files">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
 </resources>

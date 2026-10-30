@@ -33,8 +33,6 @@ data class Computer(
     /** Which way the last session reached it: [Computers.PATH_LAN], [Computers.PATH_WIREGUARD] or [Computers.PATH_RENDEZVOUS]. */
     val lastPath: String? = null,
     val lastPathMs: Long = 0L,
-    /** The person's primary computer: its saves win when both sides changed (at most one). */
-    val primary: Boolean = false,
     /** Its games that are not on this device are shown in the library ("Show this computer's games"). */
     val showGames: Boolean = false,
     /** Its other applications are shown in Apps ("Show this computer's apps"). */
@@ -141,12 +139,6 @@ object Computers {
 
     fun setAppsShown(context: Context, on: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_APPS, on).apply()
-    }
-
-    /** Makes [id] the primary computer, or none with null: the newest saves win then. */
-    @Synchronized
-    fun setPrimary(context: Context, id: String?) {
-        write(context, devices(context).map { it.copy(primary = it.id == id && !it.handheld) })
     }
 
     /**
@@ -268,7 +260,6 @@ object Computers {
         .put("disco", c.disco ?: JSONObject.NULL)
         .put("lastPath", c.lastPath ?: JSONObject.NULL)
         .put("lastPathMs", c.lastPathMs)
-        .put("primary", c.primary)
         .put("showGames", c.showGames)
         .put("showApps", c.showApps)
         .put("kind", c.kind)
@@ -289,7 +280,6 @@ object Computers {
             disco = text("disco"),
             lastPath = text("lastPath"),
             lastPathMs = o.optLong("lastPathMs"),
-            primary = o.optBoolean("primary"),
             showGames = o.optBoolean("showGames"),
             showApps = o.optBoolean("showApps"),
             kind = if (o.optString("kind") == KIND_HANDHELD) KIND_HANDHELD else KIND_COMPUTER,

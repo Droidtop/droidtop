@@ -48,9 +48,8 @@ object ComputerLaunch {
         val streamAddress: String? = null,
     )
 
-    /** The computers to ask for a game, in order: the primary one first, then the one met most recently. */
-    fun order(computers: List<Computer>): List<Computer> =
-        computers.sortedWith(compareByDescending<Computer> { it.primary }.thenByDescending { it.lastSyncMs })
+    /** The computers to ask for a game, in order: the one met most recently first. */
+    fun order(computers: List<Computer>): List<Computer> = computers.sortedByDescending { it.lastSyncMs }
 
     /** The words for one agent reply to `launch_game` for the game [key]. */
     fun describe(reply: JSONObject, computer: String, game: String, handheld: String, key: String): Outcome {

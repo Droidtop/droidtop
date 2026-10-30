@@ -20689,8 +20689,9 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   are not paired directly through the devices they share.
 - **Paired computers** (`Computers`, `:net-core`) are kept in
   `files/agent/computers.json`. Each computer has a folder,
-  `files/agent/<id>/`, for its save baselines and kept copies. One of them
-  may be the primary computer ("Prefer this computer's saves").
+  `files/agent/<id>/`, for its save baselines and kept copies. There is no
+  primary computer: the "Prefer this computer's saves" setting is gone, and
+  an old `primary` field in the file is ignored (Droidtop/tracker#814).
   `Computers.call` is the one way to reach a computer: it fills in this
   device's key and name, the computer's id and its known addresses, and
   remembers the address that answered.
@@ -20776,12 +20777,16 @@ Pythia (bi0shacker001/pythia) is a game manager for the computer. It does droidt
 
 ### Saves
 
-- **One launch seam, two save sources.** `StoreSaves.sync` keeps a game
+- **One launch seam, two save sources.** `StoreSaves.sync` syncs a game
   whose store keeps its saves in the store's cloud (Steam Cloud, 7g
-  "Stores"). Any other game goes to `ComputerSaves`. A game is never synced
-  both ways, so the two never fight over the same files (owner decision
-  pending; this is the default). The job after a game ends ("Saves: <game>"
-  in Downloads) runs for both.
+  "Stores") with that cloud first, then with the paired computers
+  (`ComputerSaves`); any other game goes to the computers only. After the
+  store's sync this device holds the store's copy, so a computer whose copy
+  differs is asked about like any other difference, with this device's side
+  named "This device and <store>" (Droidtop/tracker#814). A store sync that
+  failed or waits for the person's pick leaves the computers for the next
+  sync. The job after a game ends ("Saves: <game>" in Downloads) runs for
+  both.
 - **Where the saves are** is the computer's answer, in Ludusavi's template
   vocabulary (`<winAppData>/Game/*.sav`). The agent takes it from, in order:
   the person's own entries (`droidtop-agent saves add`), their Ludusavi
@@ -20791,18 +20796,21 @@ Pythia (bi0shacker001/pythia) is a game manager for the computer. It does droidt
   `prefix_roots`, the same layout as `SaveLayout.windowsDirs`), and `<base>`
   as the game's folder. The core refuses any file name outside those
   templates, on both sides.
-- **The rule: the newest copy wins** (owner, 2026-10-10: "newest copy wins
-  isn't the worst idea. We keep the newest copy from EACH device, and an
-  archive if possible. We can also set a primary desktop and primary device
-  to prefer saves from"). It lives in the agent core. A baseline per
+- **The rule: nobody wins, the person is asked** (owner, 2026-10-30,
+  Droidtop/tracker#814: "for saves, nobody 'wins', because we don't want the
+  user to lose saves. We ask the user"; it replaces 2026-10-10's newest copy
+  wins and the primary device). It lives in the agent core. A baseline per
   computer and game holds the files as they were after the last sync.
   - If only one side changed, it wins, deletions included.
   - If both changed, or a first sync finds different files on each side,
-    the preferred side wins. That is this device's primary computer
-    (Settings > Computers > a computer > "Prefer this computer's saves"), or
-    the computer's primary handheld (set on the computer). Otherwise the set
-    whose newest file is newer wins. Nothing is asked: Steam Cloud keeps its
-    own "Saves differ" dialog, computers do not.
+    nothing moves: the agent answers `conflict` with each side's device,
+    file count and newest file's date. The Gaming shell asks "Saves differ"
+    (the same dialog as Steam Cloud's "Cloud saves differ", with "Decide
+    later" first and focused), and the sync runs again with the pick as
+    `choice`. "Decide later", or a launch from a shell with no dialog,
+    changes nothing and says "Saves differ between this device and <computer>.
+    Choose which to keep"; the next sync asks again.
+  - A side with no files takes the other's set without a question.
   - The baseline moves file by file, so a sync cut short is finished by the
     next one rather than being read as a change on both sides.
   - Files are written beside their target, checked against their SHA-256,
@@ -21059,8 +21067,8 @@ controls how we handle steam games. Simplifies stuff".
 - **What pressing it does.** Steam Link installed? Else the store page of
   `com.valvesoftware.steamlink` opens (droidtop installs nothing). Then the
   paired computers that list the game as installed (the library file the sync
-  keeps, `ComputerLibrary.computersWith`) are asked in turn, the primary
-  computer first, then the one met most recently; a computer that does not
+  keeps, `ComputerLibrary.computersWith`) are asked in turn, the one met
+  most recently first; a computer that does not
   answer is skipped for the next, and any other answer ends the asking. On
   `started`, Steam Link is launched and the row says to choose that computer
   and Start Playing.

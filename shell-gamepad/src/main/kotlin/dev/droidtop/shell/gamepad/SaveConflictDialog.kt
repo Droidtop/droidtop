@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.stores.SaveChoice
 import dev.droidtop.library.stores.SaveConflict
@@ -41,8 +42,11 @@ internal fun SaveConflictHost() {
 }
 
 /**
- * "Cloud saves differ": this device's saves and the cloud's, each with when it
- * last changed and how many files, the newer one marked. "Decide later" comes
+ * "Cloud saves differ" (a store's cloud) or "Saves differ" (a paired computer,
+ * Droidtop/tracker#814: "for saves, nobody 'wins' ... We ask the user"): this
+ * device's saves and the other side's, each with its device when known, when it
+ * last changed and how many files, the newer one marked. When the replaced side
+ * is kept as a copy ([SaveConflict.kept]), the dialog says so. "Decide later" comes
  * first and has the focus, so a mashed A changes nothing (the design
  * language's modal rule, Droidtop/tracker#663); each side is one labelled
  * action in the danger colour that says what it replaces, chosen with one
@@ -63,21 +67,26 @@ internal fun SaveConflictDialog(gameTitle: String, conflict: SaveConflict, onAns
             },
         )
     }
+    val noDate = stringResource(R.string.saves_no_date)
+    val newerWord = stringResource(R.string.saves_newer)
     fun describe(side: SaveSide, newer: Boolean): String {
         val whenText = if (side.timestampMs > 0) {
             DateUtils.formatDateTime(context, side.timestampMs, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_MONTH)
         } else {
-            "No date"
+            noDate
         }
-        val files = "${side.files} ${if (side.files == 1) "file" else "files"}"
-        return listOfNotNull(whenText, files, "Newer".takeIf { newer }).joinToString(" · ")
+        val files = context.resources.getQuantityString(R.plurals.saves_files, side.files, side.files)
+        return listOfNotNull(side.device, whenText, files, newerWord.takeIf { newer }).joinToString(" · ")
     }
+    val title = stringResource(if (conflict.computer) R.string.saves_differ else R.string.saves_differ_cloud)
+    val local = describe(conflict.local, newerIsLocal)
+    val other = describe(conflict.cloud, !newerIsLocal)
     ShellDialog(onDismissRequest = { onAnswer(null) }) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(560.dp)),
-            focusLabel = "Cloud saves differ",
-            title = "Cloud saves differ",
+            focusLabel = title,
+            title = title,
             onPad = { pad ->
                 when (pad.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> {
@@ -93,19 +102,28 @@ internal fun SaveConflictDialog(gameTitle: String, conflict: SaveConflict, onAns
             },
         ) {
             Text(gameTitle, style = TypeRole.supporting, color = MenuTokens.OnSurfaceMuted)
+            if (conflict.kept) Text(stringResource(R.string.saves_kept_copy), style = TypeRole.supporting, color = MenuTokens.OnSurfaceMuted)
             // Both sides are one-way, so the way out is the safe choice: first, on its own, focused.
             DialogChoices(
                 groups = listOf(
-                    listOf(DialogChoice("Decide later", "Changes nothing")),
+                    listOf(DialogChoice(stringResource(R.string.saves_decide_later), stringResource(R.string.saves_changes_nothing))),
                     listOf(
                         DialogChoice(
-                            "Keep this device's saves",
-                            "Replaces the saves in ${conflict.cloudLabel} · ${describe(conflict.local, newerIsLocal)}",
+                            stringResource(R.string.saves_keep_here),
+                            if (conflict.computer) {
+                                stringResource(R.string.saves_replaces_computer, conflict.cloudLabel, local)
+                            } else {
+                                stringResource(R.string.saves_replaces_cloud, conflict.cloudLabel, local)
+                            },
                             danger = true,
                         ),
                         DialogChoice(
-                            "Keep the saves in ${conflict.cloudLabel}",
-                            "Replaces the saves on this device · ${describe(conflict.cloud, !newerIsLocal)}",
+                            if (conflict.computer) {
+                                stringResource(R.string.saves_keep_computer, conflict.cloudLabel)
+                            } else {
+                                stringResource(R.string.saves_keep_cloud, conflict.cloudLabel)
+                            },
+                            stringResource(R.string.saves_replaces_here, other),
                             danger = true,
                         ),
                     ),

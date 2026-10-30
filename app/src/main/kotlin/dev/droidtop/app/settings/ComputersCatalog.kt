@@ -359,13 +359,6 @@ object ComputersCatalog {
                         current = computer.showApps,
                         onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setShown(ctx, computer.id, apps = on) }.also { refreshLibrary(ctx) } },
                     ),
-                    ToggleItem(
-                        id = "computer_primary",
-                        title = "Prefer this computer's saves",
-                        subtitle = "When a game's saves changed here and on ${computer.name}, its copy wins even when this device's is newer. Otherwise the newest copy wins. Either way the other copy is kept",
-                        current = computer.primary,
-                        onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setPrimary(ctx, if (on) computer.id else null) } },
-                    ),
                 ),
             ),
             CatalogGroup(

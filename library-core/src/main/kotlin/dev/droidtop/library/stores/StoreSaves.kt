@@ -20,9 +20,12 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Cloud saves of a store's games (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313),
  * and the same seam for the person's paired computers (docs/SPEC.md 7o,
  * [dev.droidtop.library.computers.ComputerSaves]): one launch path, two save
- * sources, and a game whose store keeps its saves is left to the store.
+ * sources.
  * A store that keeps a game's saves in its own cloud (Steam Cloud) syncs them
- * into the game's Wine prefix before the game starts and back after it ends.
+ * into the game's Wine prefix before the game starts and back after it ends,
+ * and the paired computers are synced after it, so the store's copy and the
+ * agent's are compared too; a difference is asked, never decided
+ * (Droidtop/tracker#814).
  * The store knows the cloud; where the prefix is comes from the Windows
  * runtime through [WinePrefixLocator], an interface so the store never
  * depends on a runtime's classes (the runtime is being moved out of
@@ -41,11 +44,21 @@ fun interface WinePrefixLocator {
 /** When a sync runs: before a game starts, after it ends, or because the person asked. */
 enum class SaveSyncPhase { BEFORE_LAUNCH, AFTER_EXIT, MANUAL }
 
-/** One side of a conflict: when it last changed, and how much is on it. */
-data class SaveSide(val timestampMs: Long, val files: Int, val bytes: Long)
+/** One side of a conflict: when it last changed, how much is on it, and the device it is on when that is known. */
+data class SaveSide(val timestampMs: Long, val files: Int, val bytes: Long, val device: String? = null)
 
-/** Both sides changed since they last matched; the person picks which one wins. */
-data class SaveConflict(val local: SaveSide, val cloud: SaveSide, val cloudLabel: String = "Cloud")
+/**
+ * Both sides changed since they last matched; the person picks which one wins (the owner, Droidtop/tracker#814: "for
+ * saves, nobody 'wins' ... We ask the user"). [cloudLabel] names the other side: a store's cloud, or a paired computer
+ * when [computer]. [kept]: the side that is replaced is kept as a copy that can be brought back.
+ */
+data class SaveConflict(
+    val local: SaveSide,
+    val cloud: SaveSide,
+    val cloudLabel: String = "Cloud",
+    val computer: Boolean = false,
+    val kept: Boolean = false,
+)
 
 enum class SaveChoice { LOCAL, CLOUD }
 
@@ -123,19 +136,37 @@ object StoreSaves {
      */
     suspend fun sync(context: Context, entryId: String, title: String, phase: SaveSyncPhase): SaveSyncResult? = withContext(Dispatchers.IO) {
         val store = StoreLibraries.forKey(entryId)?.takeIf { it.hasCloudSaves }
-        if (store == null) {
-            // No store cloud for this game: the paired computers, when there are any.
-            if (Computers.list(context).isEmpty()) return@withContext null
-            val prefix = prefixOf(context, entryId) ?: return@withContext null
-            return@withContext runCatching { ComputerSaves.sync(context, entryId, title, phase, prefix) }
-                .onFailure { Log.w(TAG, "Computer save sync failed for $entryId", it) }
-                .getOrElse { SaveSyncResult("Saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
-        }
+        val hasComputers = Computers.list(context).isNotEmpty()
+        if (store == null && !hasComputers) return@withContext null
         val prefix = prefixOf(context, entryId) ?: return@withContext null
-        runCatching { store.syncSaves(context, entryId.substringAfter(':'), phase, prefix, title, resolver) }
-            .onFailure { Log.w(TAG, "Cloud save sync failed for $entryId", it) }
-            .getOrElse { SaveSyncResult("Cloud saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
-            ?.also { result -> if (!result.unresolved) record(context, entryId, failed = result.failed) }
+        val fromStore = store?.let {
+            runCatching { it.syncSaves(context, entryId.substringAfter(':'), phase, prefix, title, resolver) }
+                .onFailure { e -> Log.w(TAG, "Cloud save sync failed for $entryId", e) }
+                .getOrElse { e -> SaveSyncResult("Cloud saves: ${e.message ?: e.javaClass.simpleName}", failed = true) }
+                ?.also { result -> if (!result.unresolved) record(context, entryId, failed = result.failed) }
+        }
+        // The paired computers, after the store's cloud: this device then holds the store's copy, so a computer whose
+        // copy differs is the same question, with this device's side named as the store's too (Droidtop/tracker#814).
+        // A store sync that failed or waits for the person's pick leaves the computers for the next sync.
+        if (!hasComputers || fromStore?.failed == true || fromStore?.unresolved == true) return@withContext fromStore
+        val localLabel = if (store != null && fromStore != null) "This device and ${store.label}" else null
+        val fromComputers = runCatching { ComputerSaves.sync(context, entryId, title, phase, prefix, resolver, localLabel) }
+            .onFailure { Log.w(TAG, "Computer save sync failed for $entryId", it) }
+            .getOrElse { SaveSyncResult("Saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
+        merged(fromStore, fromComputers)
+    }
+
+    /** Both syncs' results as one line and one result; null when neither did anything. Pure. */
+    internal fun merged(a: SaveSyncResult?, b: SaveSyncResult?): SaveSyncResult? {
+        if (a == null || b == null) return a ?: b
+        return SaveSyncResult(
+            line = "${a.line}; ${b.line}",
+            uploaded = a.uploaded + b.uploaded,
+            downloaded = a.downloaded + b.downloaded,
+            removed = a.removed + b.removed,
+            failed = a.failed || b.failed,
+            unresolved = a.unresolved || b.unresolved,
+        )
     }
 
     /** Where [entryId]'s saves are synced: the folder droidtop gives Enginehost for it, else the Wine runtime's prefix. */
