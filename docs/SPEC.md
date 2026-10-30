@@ -18828,9 +18828,12 @@ new screen cannot pass with a private palette. (Measured 2026-09-24: 53 colour l
 a hundred named colours and 273 `.dp` literals in the shell against 19 uses of `Space`, so the
 contract is the file and not yet the screens.)
 
-**Where it lives.** One file, `shell-gamepad/.../DesignTokens.kt`, in that module because it is
-the one both the Gaming shell and `:app` can see — a token half the chrome cannot reach is not
-a system. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
+**Where it lives.** One file, `ui-shared/.../DesignTokens.kt` (package `dev.droidtop.shell.gamepad`, unchanged),
+in `:ui-shared` since Droidtop/tracker#827 F1b so every mode's shell, not only Gaming and `:app`, reads the same
+tokens — a token half the chrome cannot reach is not a system. The theme palette they read (`GamingTheme`,
+`GamingPalette`), the motion tokens (`FocusLook`) and the window (`ShellWindow`, `ProvideShellCanvas`) moved with it,
+public; `currentShellWindow()`, which reads the pad from the input pipeline, stays in `:shell-gamepad` until that
+pipeline moves. It carries `Space` (the step scale), `Measure.bodyMaxWidth` (the readable line),
 `TypeRole` naming the job of each role with `DroidtopTypography` behind it, `MenuTokens` as the
 shell's palette and row measures, and `ChromeColors` as the colour source for chrome outside
 the shell. `DroidtopTheme` supplies the colour

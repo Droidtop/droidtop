@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
-import dev.droidtop.shell.gamepad.input.ControllerLayouts
 
 /**
  * The one place the Gaming shell asks "how much room is there, and is
@@ -47,7 +46,7 @@ data class ShellWindow(
     val heightDp: Int,
     /**
      * Whether a real, non-virtual gamepad or joystick is registered with
-     * Android right now -- [ControllerLayouts.attachedControllers], the one
+     * Android right now -- `ControllerLayouts.attachedControllers`, the one
      * gamepad-detection rule droidtop has. A Retroid console's own face
      * buttons and sticks ARE such a device: they show up exactly like an
      * external pad would, which is what [touchFirst] uses them for.
@@ -110,7 +109,7 @@ data class ShellWindow(
      * theme's own thin `<helpsystem>` legend -- sized and positioned for
      * a legend, not for 48dp touch targets, so they visually overlapped
      * the system carousel it sits above (docs/SPEC.md 7j). [padPresent]
-     * is [ControllerLayouts.attachedControllers], the one existing
+     * is `ControllerLayouts.attachedControllers`, the one existing
      * gamepad-detection rule; a console's own buttons answer it exactly
      * like an external pad would, so this reuses that answer instead of
      * guessing again from geometry.
@@ -422,21 +421,5 @@ fun ProvideShellCanvas(content: @Composable () -> Unit) {
         LocalDensity provides Density(target, density.fontScale),
         LocalTouchTarget provides touchTarget,
         content = content,
-    )
-}
-
-/**
- * Reads the live configuration and whether a pad is attached ([ControllerLayouts.padPresent]). Recomposes on
- * rotation, which is what makes one screen serve both orientations, and when a pad comes or goes.
- */
-@Composable
-fun currentShellWindow(): ShellWindow {
-    val configuration = LocalConfiguration.current
-    val padPresent by ControllerLayouts.padPresent.collectAsState()
-    return ShellWindow(
-        widthDp = configuration.screenWidthDp,
-        heightDp = configuration.screenHeightDp,
-        padPresent = padPresent,
-        minTouchTarget = LocalTouchTarget.current,
     )
 }

@@ -41,6 +41,9 @@ dependencies {
     // The text-entry slab (Slab, SlabView) that TextEntry hosts (docs/SPEC.md 4c, Droidtop/tracker#485 S7).
     api(project(":input-keyboard"))
     implementation(libs.androidx.core.ktx)
+    // The design tokens and the theme palette (docs/SPEC.md, Droidtop/tracker#827 F1b): GamingTheme holds the palette
+    // for its host's lifecycle.
+    implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)

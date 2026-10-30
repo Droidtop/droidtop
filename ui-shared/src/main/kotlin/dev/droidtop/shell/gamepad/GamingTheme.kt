@@ -75,25 +75,25 @@ import dev.droidtop.shell.gamepad.theme.ThemePrefs as ShellThemePrefs
  * main thread only ever reads the finished palette.
  */
 @Immutable
-class GamingPalette internal constructor(
+class GamingPalette(
     val colors: GamingThemeColors,
-    internal val bodyFamily: FontFamily?,
-    internal val displayFamily: FontFamily?,
-    internal val textureBrush: Brush?,
+    val bodyFamily: FontFamily?,
+    val displayFamily: FontFamily?,
+    val textureBrush: Brush?,
     /** The theme's UI font has no lower case (its small letters are drawn as capitals): see [withFamilies]. */
-    internal val bodyFamilyCapsOnly: Boolean = false,
+    val bodyFamilyCapsOnly: Boolean = false,
     /**
      * The theme's views (`system`, `gamelist`) that draw their own clock or system status: on those the shell's
      * floating cluster yields (docs/SPEC.md 7k2, Droidtop/tracker#658).
      */
-    internal val ownStatusViews: Set<String> = emptySet(),
+    val ownStatusViews: Set<String> = emptySet(),
     /**
      * High contrast is on (droidtop's own Accessibility setting, or Android's high-contrast text): text and the
      * notice colours hold 7:1, the ring is 4dp, there is no texture or art behind text (docs/SPEC.md 7k).
      */
-    internal val highContrast: Boolean = false,
+    val highContrast: Boolean = false,
     /** Labels drawn in a theme's capitals are drawn as written ([labelCase]); always so under [highContrast]. */
-    internal val sentenceCase: Boolean = false,
+    val sentenceCase: Boolean = false,
 ) {
     val ground = Color(colors.ground)
     val overlaySurface = Color(colors.overlaySurface)
@@ -195,7 +195,7 @@ class GamingPalette internal constructor(
  * a URL, a plugin's name or a version into capitals, so the roles that carry data keep droidtop's own face
  * (Droidtop/tracker#532). Pure, for the tests.
  */
-internal fun isCapsOnlyFont(width: (Char) -> Float): Boolean =
+fun isCapsOnlyFont(width: (Char) -> Float): Boolean =
     ('a'..'z').all { width(it) == width(it.uppercaseChar()) } && width('i') != width('m')
 
 /**
@@ -203,7 +203,7 @@ internal fun isCapsOnlyFont(width: (Char) -> Float): Boolean =
  * to the data roles (a row's name, its value, prose) too unless it is [capsOnly]: then those keep droidtop's own face, so
  * data is never shown in capitals the person did not write.
  */
-internal fun Typography.withFamilies(body: FontFamily?, display: FontFamily?, capsOnly: Boolean = false): Typography {
+fun Typography.withFamilies(body: FontFamily?, display: FontFamily?, capsOnly: Boolean = false): Typography {
     if (body == null && display == null) return this
     fun TextStyle.inFamily(family: FontFamily?) = if (family == null) this else copy(fontFamily = family)
     val data = if (capsOnly) null else body
@@ -244,16 +244,16 @@ object GamingTheme {
     /** What a Gaming surface draws with right now: the theme's palette while one is on screen, droidtop's own otherwise. */
     val palette: GamingPalette get() = if (holders > 0) current else GamingPalette.defaultFor(appearanceLight)
 
-    internal fun setAppearance(light: Boolean) {
+    fun setAppearance(light: Boolean) {
         if (appearanceLight != light) appearanceLight = light
     }
 
-    internal fun acquire() {
+    fun acquire() {
         holders++
         dev.droidtop.library.theme.RoleTokens.checkSoon()
     }
 
-    internal fun release() {
+    fun release() {
         if (holders > 0) holders--
         dev.droidtop.library.theme.RoleTokens.checkSoon()
     }
@@ -288,7 +288,7 @@ object GamingTheme {
     }
 
     /** Recomputes the palette off the main thread and publishes it. Cheap when the key is cached. */
-    internal suspend fun refresh(context: Context) {
+    suspend fun refresh(context: Context) {
         val app = context.applicationContext
         val next = withContext(Dispatchers.Default) {
             // droidtop's own palette's notices and scheme too: Default is drawn whenever no theme is held.

@@ -70,7 +70,7 @@ The owner approved the menus and visual-language proposal as recommended ("I gue
 its standing form. Two corrections apply: Enginehost keeps its own full UI in this language (decision 8 overruled), and
 a selected ES-DE theme's colours drive droidtop's chrome, azure being only the fallback (decision 9 corrected:
 "do we still grant accents and stuff from the selected retro theme?"). droidtop implements it in
-`GamingThemeColors.DEFAULT` and `shell-gamepad/.../DesignTokens.kt`; Enginehost in its own tokens, same values.
+`GamingThemeColors.DEFAULT` and `ui-shared/.../DesignTokens.kt`; Enginehost in its own tokens, same values.
 
 ### Ten rules
 1. One shell: every menu is an overlay or a page in the same frame (header, body, hint bar); nothing swaps the look.
