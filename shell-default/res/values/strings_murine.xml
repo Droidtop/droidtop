@@ -136,6 +136,10 @@
     <string name="home_action_app_missing">That app is not installed any more</string>
     <string name="home_action_pick_app">Choose an app</string>
     <string name="item_customize">Customize</string>
+    <string name="taskbar_show">Show taskbar</string>
+    <string name="taskbar_apps">Apps</string>
+    <string name="taskbar_recents">Recents</string>
+    <string name="taskbar_hide">Hide</string>
     <string name="mode_menu_settings">Modes and settings</string>
     <string name="mode_menu_reinit_displays">Reinitialize displays</string>
     <string name="mode_menu_close_all">Close all apps</string>

@@ -73,6 +73,11 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
     override fun initPreference(preference: Preference, info: DisplayController.Info): Boolean {
         val isGoogleSmartspaceAvailable = kotlin.lazy { SmartspaceMode.isGoogleSmartspaceAvailable(requireContext()) }
         var isTablet = InvariantDeviceProfile.INSTANCE.get(requireContext()).deviceType == InvariantDeviceProfile.TYPE_TABLET;
+        // The gesture slots' rows, from the one table of slots (GestureSlot).
+        com.android.launcher3.touch.GestureSlot.bySettingKey(preference.key)?.let { slot ->
+            bindGestureAction(preference as RadioGroupPreference, slot.pref)
+            return true
+        }
         when (preference.key) {
             RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY -> {
                 if (Flags.oneGridSpecs()) {
@@ -157,41 +162,6 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
                     addIcon?.isEnabled = !(newValue as Boolean)
                     true
                 }
-                return true
-            }
-            DOUBLE_TAP_ACTION -> {
-                preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION)
-                return true
-            }
-            SWIPE_DOWN_ACTION -> {
-                preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION)
-                return true
-            }
-            TWO_FINGER_DOWN_ACTION -> {
-                preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_TWO_FINGER_DOWN_ACTION)
-                return true
-            }
-            TWO_FINGER_UP_ACTION -> {
-                preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION)
-                return true
-            }
-            PINCH_IN_ACTION -> {
-                preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_PINCH_IN_ACTION)
-                return true
-            }
-            PINCH_OUT_ACTION -> {
-                preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_PINCH_OUT_ACTION)
-                return true
-            }
-            HOME_BUTTON_ACTION -> {
-                preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_HOME_BUTTON_ACTION)
                 return true
             }
             SMARTSPACE_MODE -> {

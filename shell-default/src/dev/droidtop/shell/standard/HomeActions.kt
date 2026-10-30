@@ -39,7 +39,7 @@ object HomeActions {
     fun slotAction(context: Context, slot: ConstantItem<GestureAction>): HomeAction? = when (val action = slot.get(context)) {
         GestureAction.NONE -> null
         GestureAction.LAUNCH_APP -> slotApp(context, slot)?.let { HomeAction.Launch(it) }
-        else -> HomeAction.Droidtop(action.name)
+        else -> HomeAction.Droidtop(action.id)
     }
 
     /** Sets a slot to [action]; null sets it to nothing. */
@@ -47,7 +47,7 @@ object HomeActions {
         val (value, app) = when (action) {
             null -> GestureAction.NONE to null
             is HomeAction.Launch -> GestureAction.LAUNCH_APP to action.component
-            is HomeAction.Droidtop -> (gestureAction(action.action) ?: GestureAction.NONE) to null
+            is HomeAction.Droidtop -> (droidtopAction(action.action) ?: GestureAction.NONE) to null
         }
         LauncherPrefs.get(context).put(appItem(slot), app.orEmpty())
         LauncherPrefs.get(context).put(slot, value)
@@ -62,17 +62,18 @@ object HomeActions {
     /** Runs [action]. Returns whether the gesture should be consumed. */
     fun run(launcher: Launcher, action: HomeAction?): Boolean = when (action) {
         null -> false
-        is HomeAction.Droidtop -> gestureAction(action.action)?.perform(launcher) ?: false
-        is HomeAction.Launch -> {
-            launch(launcher, action.component)
-            true
-        }
+        is HomeAction.Droidtop -> droidtopAction(action.action)?.perform(launcher) ?: false
+        is HomeAction.Launch -> GestureAction.LAUNCH_APP.perform(launcher, action.component)
     }
 
-    private fun gestureAction(name: String): GestureAction? =
-        GestureAction.entries.firstOrNull { it.name == name && it != GestureAction.LAUNCH_APP }
+    /** The droidtop action a saved id names. Opening an app is a [HomeAction.Launch], never a bare id. */
+    private fun droidtopAction(id: String): GestureAction? = GestureAction.byId(id)?.takeIf { it != GestureAction.LAUNCH_APP }
 
-    private fun launch(launcher: Launcher, component: String) {
+    /**
+     * Starts [component] through `LauncherApps` (a launcher activity only, never an arbitrary intent); says so when the
+     * app is gone. Always consumes the gesture.
+     */
+    fun launchApp(launcher: Launcher, component: String): Boolean {
         val name = ComponentName.unflattenFromString(component)
         try {
             requireNotNull(name)
@@ -81,12 +82,13 @@ object HomeActions {
             Log.w(TAG, "could not start $component", e)
             Notices.flash(launcher.getString(R.string.home_action_app_missing), tone = NoticeTone.Caution, context = launcher)
         }
+        return true
     }
 
     /** What [action] is called, for a setting's summary and a menu. */
     fun label(context: Context, action: HomeAction?): String = when (action) {
         null -> GestureAction.NONE.getDisplayName(context)
-        is HomeAction.Droidtop -> gestureAction(action.action)?.getDisplayName(context) ?: GestureAction.NONE.getDisplayName(context)
+        is HomeAction.Droidtop -> droidtopAction(action.action)?.getDisplayName(context) ?: GestureAction.NONE.getDisplayName(context)
         is HomeAction.Launch -> context.getString(R.string.home_action_open_app, appLabel(context, action.component))
     }
 
@@ -137,7 +139,7 @@ object HomeActions {
         val currentIndex = when (current) {
             null -> GestureAction.NONE.ordinal
             is HomeAction.Launch -> GestureAction.LAUNCH_APP.ordinal
-            is HomeAction.Droidtop -> gestureAction(current.action)?.ordinal ?: GestureAction.NONE.ordinal
+            is HomeAction.Droidtop -> droidtopAction(current.action)?.ordinal ?: GestureAction.NONE.ordinal
         }
         RadioListDialog.show(
             context = context,
@@ -154,7 +156,7 @@ object HomeActions {
                 when (val action = actions[i]) {
                     GestureAction.NONE -> onPick(null)
                     GestureAction.LAUNCH_APP -> pickApp(context, title) { onPick(HomeAction.Launch(it)) }
-                    else -> onPick(HomeAction.Droidtop(action.name))
+                    else -> onPick(HomeAction.Droidtop(action.id))
                 }
             },
         )

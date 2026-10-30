@@ -37,6 +37,7 @@ import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherPrefChangeListener
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherSettings
+import com.android.launcher3.R
 import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.util.Executors
 import dev.droidtop.library.settings.Mode
@@ -48,7 +49,7 @@ import dev.droidtop.library.settings.TaskbarPolicy
  * 2c "Taskbar on large screens", Droidtop/tracker#88): a strip along the
  * bottom of every such display, above whatever app is up, with the launcher's
  * pinned apps, the apps opened since it started, an Apps button that opens
- * the drawer, and Recents.
+ * the drawer, and Recents. A dot marks an app that is still running.
  *
  * Upstream Launcher3's taskbar is quickstep code that the system binds to
  * its own recents component, which a third-party home cannot host, so this is
@@ -64,9 +65,13 @@ import dev.droidtop.library.settings.TaskbarPolicy
  * screens. Reachable by touch, and by the D-pad: the Meta key or the pad's
  * Mode button moves focus into the strip, the D-pad and A act on it, B or
  * Back hands focus back to the app.
+ *
+ * Window events arrive on the main thread; what one means (an activity or not, a home app or not, whether droidtop is
+ * Home, which apps still run) is worked out on Launcher3's helper thread, and the bar is redrawn only when what it
+ * shows changed (Droidtop/tracker#771).
  */
 class StandardTaskbar(private val service: AccessibilityService) {
-    private class Entry(
+    private data class Entry(
         val label: String,
         val icon: Bitmap?,
         val component: ComponentName,
@@ -82,12 +87,23 @@ class StandardTaskbar(private val service: AccessibilityService) {
     private var openKeys: List<String> = emptyList()
     private val openEntries = HashMap<String, Entry>()
     private var appInFront = false
+    private var droidtopIsHome = false
+    /** The packages still running, as of the last app switch: the dot, and which opened apps stay listed. */
+    private var running: Set<String> = emptySet()
     private var desktopInFront = false
     private var collapsed = false
     private var focusedDisplay: Int? = null
 
     private val prefListener = LauncherPrefChangeListener { key ->
         if (key == LauncherPrefs.TASKBAR_ENABLED.sharedPrefKey) main.post { applyServiceInfo(); renderAll() }
+    }
+
+    // The installed home apps, read once and again only after a package is added, removed or changed.
+    @Volatile private var homeCache: Set<String>? = null
+    private val packagesChanged = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            homeCache = null
+        }
     }
 
     private val displayListener = object : DisplayManager.DisplayListener {
@@ -101,6 +117,15 @@ class StandardTaskbar(private val service: AccessibilityService) {
     fun attach() {
         LauncherPrefs.get(service).addListener(prefListener, LauncherPrefs.TASKBAR_ENABLED)
         displays.registerDisplayListener(displayListener, main)
+        service.registerReceiver(
+            packagesChanged,
+            android.content.IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_CHANGED)
+                addDataScheme("package")
+            },
+        )
         applyServiceInfo()
         refreshPinned()
     }
@@ -108,6 +133,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
     fun detach() {
         LauncherPrefs.get(service).removeListener(prefListener, LauncherPrefs.TASKBAR_ENABLED)
         displays.unregisterDisplayListener(displayListener)
+        runCatching { service.unregisterReceiver(packagesChanged) }
         bars.values.forEach { it.remove() }
         bars.clear()
     }
@@ -129,23 +155,62 @@ class StandardTaskbar(private val service: AccessibilityService) {
         if (!enabled || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         val cls = event.className?.toString() ?: return
+        val opened = openKeys
+        Executors.UI_HELPER_EXECUTOR.execute { onSwitch(pkg, cls, opened) }
+    }
+
+    /** What a window coming to the front means, worked out off the main thread; the bar's state changes on it. */
+    private fun onSwitch(pkg: String, cls: String, opened: List<String>) {
         // Only an Activity coming to the front is an app switch; dialogs, popups,
         // the keyboard and our own overlay report window changes too.
         if (!isActivity(pkg, cls)) return
-        // droidtop's Desktop session owns the keyboard while it is in front: Meta is the session's Super (SPEC 6b).
-        desktopInFront = pkg == service.packageName && Modes.lastMode(service) == Mode.DESKTOP.id
-        if (pkg == service.packageName || pkg in homePackages()) {
-            appInFront = false
-        } else if (pkg != SYSTEM_UI) {
-            appInFront = true
-            val launch = service.packageManager.getLaunchIntentForPackage(pkg)?.component
-            if (launch != null) {
-                openKeys = TaskbarPolicy.withOpened(openKeys, pkg)
-                if (pkg !in openEntries) loadOpenEntry(pkg, launch)
+        val home = pkg == service.packageName || pkg in homePackages()
+        val launch = if (!home && pkg != SYSTEM_UI) service.packageManager.getLaunchIntentForPackage(pkg)?.component else null
+        val isHome = HomeRolePrefs.isDroidtopHome(service)
+        val desktop = pkg == service.packageName && Modes.lastMode(service) == Mode.DESKTOP.id
+        val alive = runningPackages(opened + pkg)
+        main.post {
+            // droidtop's Desktop session owns the keyboard while it is in front: Meta is the session's Super (SPEC 6b).
+            desktopInFront = desktop
+            droidtopIsHome = isHome
+            val wasInFront = appInFront
+            if (home) {
+                appInFront = false
+            } else if (pkg != SYSTEM_UI) {
+                appInFront = true
+                if (launch != null) {
+                    openKeys = TaskbarPolicy.withOpened(openKeys, pkg)
+                    if (pkg !in openEntries) loadOpenEntry(pkg, launch)
+                }
             }
+            // An opened app that is no longer running leaves the bar.
+            running = alive
+            openKeys = openKeys.filter { it in alive || it == pkg }
+            openEntries.keys.retainAll(openKeys.toSet())
+            // The pinned apps change only on the home screen: read them again on the way out of it.
+            if (appInFront && !wasInFront) refreshPinned() else renderAll()
         }
-        refreshPinned()
-        renderAll()
+    }
+
+    /**
+     * Which of [candidates] are still running. Android's task list when droidtop can read it (More controls); without
+     * it Android tells another app only that an app was force-stopped, so an app that closed by itself counts as
+     * running until it is opened again or long-pressed off the bar (docs/SPEC.md 2c). Off the main thread.
+     */
+    private fun runningPackages(candidates: List<String>): Set<String> {
+        val snapshot = runCatching {
+            kotlinx.coroutines.runBlocking { dev.droidtop.runtime.tasks.TaskManager.snapshotWithin(service, RUNNING_MAX_AGE_MS) }
+        }.getOrNull()
+        if (snapshot?.fidelity == dev.droidtop.runtime.tasks.Fidelity.EXACT) {
+            return snapshot.apps.mapTo(HashSet()) { it.packageName }
+        }
+        return candidates.filterTo(HashSet()) { !isStopped(it) }
+    }
+
+    private fun isStopped(pkg: String): Boolean = try {
+        service.packageManager.getApplicationInfo(pkg, 0).flags and android.content.pm.ApplicationInfo.FLAG_STOPPED != 0
+    } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+        true
     }
 
     /**
@@ -182,10 +247,10 @@ class StandardTaskbar(private val service: AccessibilityService) {
         false
     }
 
-    private fun homePackages(): Set<String> {
+    private fun homePackages(): Set<String> = homeCache ?: run {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        return service.packageManager.queryIntentActivities(home, 0).map { it.activityInfo.packageName }.toSet()
-    }
+        service.packageManager.queryIntentActivities(home, 0).map { it.activityInfo.packageName }.toSet()
+    }.also { homeCache = it }
 
     /** The launcher's hotseat apps, read from its own model, so pinned is one list on the home screen and here. */
     private fun refreshPinned() {
@@ -236,7 +301,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
 
     private fun renderAll() {
         val wanted = HashMap<Int, Display>()
-        if (enabled && appInFront && HomeRolePrefs.isDroidtopHome(service)) {
+        if (enabled && appInFront && droidtopIsHome) {
             for (display in displays.displays) {
                 if (display.state == Display.STATE_OFF) continue
                 if (display.flags and Display.FLAG_PRIVATE != 0) continue
@@ -251,7 +316,6 @@ class StandardTaskbar(private val service: AccessibilityService) {
         }
         bars.keys.filter { it !in wanted }.forEach { bars.remove(it)?.remove() }
         focusedDisplay?.let { if (it !in wanted) focusedDisplay = null }
-        val running = openKeys.toSet()
         val open = openKeys.mapNotNull { openEntries[it] }.filter { entry -> pinned.none { it.key == entry.key } }
         for ((id, display) in wanted) {
             val bar = bars.getOrPut(id) { TaskbarWindow(display) }
@@ -308,14 +372,19 @@ class StandardTaskbar(private val service: AccessibilityService) {
             title = "droidtop taskbar"
         }
         private var added = false
+        private var drawn: List<Any>? = null
 
         fun show(pinned: List<Entry>, open: List<Entry>, running: Set<String>, collapsed: Boolean) {
+            // Nothing the bar shows changed (a display's refresh rate, a dialog in the same app): nothing is rebuilt.
+            val state = listOf(pinned, open, running, collapsed)
+            if (added && state == drawn) return
+            drawn = state
             root.removeAllViews()
             if (collapsed) {
                 params.width = ViewGroup.LayoutParams.WRAP_CONTENT
                 params.gravity = Gravity.BOTTOM or Gravity.END
                 root.setBackgroundColor(BAR_COLOR)
-                root.addView(textButton("Show taskbar") {
+                root.addView(textButton(windowContext.getString(R.string.taskbar_show)) {
                     this@StandardTaskbar.collapsed = false
                     renderAll()
                 })
@@ -331,6 +400,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
             } catch (e: Exception) {
                 Log.w(TAG, "Could not draw the taskbar on display $displayId", e)
                 added = false
+                drawn = null
             }
         }
 
@@ -360,7 +430,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(8), dp(4), dp(8), dp(4))
             }
-            bar.addView(textButton("Apps") { openDrawer(displayId) })
+            bar.addView(textButton(windowContext.getString(R.string.taskbar_apps)) { openDrawer(displayId) })
             val apps = LinearLayout(windowContext).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -369,7 +439,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
             if (pinned.isNotEmpty() && open.isNotEmpty()) apps.addView(divider())
             open.forEach { entry ->
                 apps.addView(
-                    appButton(entry, running = true) {
+                    appButton(entry, entry.key in running) {
                         openKeys = TaskbarPolicy.without(openKeys, entry.key)
                         openEntries.remove(entry.key)
                         renderAll()
@@ -381,10 +451,10 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 addView(apps)
             }
             bar.addView(scroller, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            bar.addView(textButton("Recents") {
+            bar.addView(textButton(windowContext.getString(R.string.taskbar_recents)) {
                 service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
             })
-            bar.addView(textButton("Hide") {
+            bar.addView(textButton(windowContext.getString(R.string.taskbar_hide)) {
                 this@StandardTaskbar.collapsed = true
                 endFocus()
                 renderAll()
@@ -496,6 +566,8 @@ class StandardTaskbar(private val service: AccessibilityService) {
     private companion object {
         const val TAG = "StandardTaskbar"
         const val ICON_DP = 32
+        // How old a read of the running apps may be at an app switch: switches in a burst share one read.
+        const val RUNNING_MAX_AGE_MS = 2_000L
         const val SYSTEM_UI = "com.android.systemui"
         const val BAR_COLOR = 0xE61F2124.toInt()
         const val TEXT_COLOR = 0xFFFFFFFF.toInt()
