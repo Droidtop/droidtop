@@ -268,7 +268,10 @@ internal fun ShellChip(
         !enabled -> MenuTokens.OnSurfaceDisabled
         // The launch fill is held to contrast against the text ink (GamingThemeMapping).
         large && filled -> MenuTokens.OnSurface
-        filled || ring -> MenuTokens.OnSelected
+        ring -> MenuTokens.OnSelected
+        // At rest a filled chip is the accent, so its text is the accent's ink: the selected ink is picked against
+        // the selected fill, and a theme whose two differ drew Play's word in its own fill (Droidtop/tracker#820).
+        filled -> MenuTokens.OnAccent
         else -> MenuTokens.OnSurface
     }
     Text(
