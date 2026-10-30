@@ -113,36 +113,15 @@ object BackButtonMenu {
                     Mode.GAMING -> add(Choice(Mode.GAMING.label, mode) { launchAppMode(context, Mode.GAMING) })
                 }
             }
-            add(Choice(SETTINGS_ITEM, null) { openGlobalSettings(context) })
-            add(Choice(REINIT_DISPLAYS_ITEM, null) { reinitializeDisplays(context) })
-            add(Choice(CLEAR_ALL_APPS_ITEM, null) { ClearAllApps.open(context) })
+            // Names the screen it opens: Global settings is where the modes live.
+            add(Choice(context.getString(com.android.launcher3.R.string.mode_menu_settings), null) { openGlobalSettings(context) })
+            // The hard display reinit, findable without the double tap of Home nobody is told about (reinitializeDisplays).
+            add(Choice(context.getString(com.android.launcher3.R.string.mode_menu_reinit_displays), null) { reinitializeDisplays(context) })
+            // The task manager's Clear all apps (docs/SPEC.md "The task manager", tracker#252): the way out of a stuck
+            // app, in the one menu every mode and the home screen's long-press open.
+            add(Choice(context.getString(com.android.launcher3.R.string.mode_menu_close_all), null) { ClearAllApps.open(context) })
         }
     }
-
-    /** Names the screen it opens: Global settings is where the modes live. */
-    private const val SETTINGS_ITEM = "Modes and settings"
-
-    /**
-     * Confirmed live on a real dual-screen console (2026-09-25): an addon
-     * display can go empty -- and so mirror the built-in panel -- through
-     * a door the pre-launch cover (LaunchDisplay.coverVacatedDisplays)
-     * does not watch: an app that was on it exits on its own, with
-     * droidtop's own shell never losing foreground on ITS display, so
-     * nothing re-runs the role orchestration. The HARD reinit
-     * (EXTRA_DISPLAY_REINIT_FORCE) already fixes this once it runs -- it
-     * was reachable only by double-tapping Home, a gesture nobody is told
-     * exists. Naming it here, in the one menu already reachable from every
-     * mode (see the class doc), is the fix: no new detection, no new
-     * shortcut plumbing, just making the existing recovery findable.
-     */
-    private const val REINIT_DISPLAYS_ITEM = "Reinitialize displays"
-
-    /**
-     * Standard's route to the task manager's Clear all apps (docs/SPEC.md "The task manager",
-     * tracker#252): this is the one menu every mode and the home screen's long-press already open,
-     * so the way out of a stuck app is findable without a gesture nobody is told about.
-     */
-    private const val CLEAR_ALL_APPS_ITEM = "Close all apps"
 
     /**
      * Re-sends the existing HARD display reinit
