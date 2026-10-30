@@ -19,7 +19,6 @@ import android.view.WindowManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.TextView
-import android.widget.Toast
 import dev.droidtop.library.computers.ComputerLaunch
 import dev.windowcast.AudioPlayer
 import dev.windowcast.ConnectRequest
@@ -89,8 +88,7 @@ class RemoteStreamActivity : Activity() {
             intent?.getStringExtra(ComputerLaunch.EXTRA_WINDOW),
         )
         if (asked == null) {
-            Toast.makeText(this, "No computer to show a window of", Toast.LENGTH_LONG).show()
-            finish()
+            end("No computer to show a window of")
             return
         }
         request = asked
@@ -102,7 +100,6 @@ class RemoteStreamActivity : Activity() {
         }
         status = TextView(this).apply {
             setTextColor(android.graphics.Color.WHITE)
-            setBackgroundColor(0x99000000.toInt())
             setPadding(24, 16, 24, 16)
             textSize = 16f
         }
@@ -292,11 +289,15 @@ class RemoteStreamActivity : Activity() {
         status.visibility = View.VISIBLE
     }
 
-    /** Leaves the screen, saying why. */
+    /** Says why the screen is over, and leaves when the person has read it. */
     private fun end(message: String) {
         if (isFinishing) return
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        finish()
+        dialog?.dismiss()
+        dialog = AlertDialog.Builder(this)
+            .setMessage(message)
+            .setPositiveButton("OK") { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
     }
 
     private fun send(input: Input) {
