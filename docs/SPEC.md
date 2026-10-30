@@ -3866,8 +3866,9 @@ the `ContainerRuntime` interface that already exists (§3):
     pressed again ends what its lost release left behind, a HOME with no HOME event for five seconds counts as let
     go, and the state is forgotten when the filter goes off; a test feeds thousands of fast, interleaved sequences with
     lost releases and checks each comes back to idle. Each decision on HOME or a chord button is logged under
-    `droidtop.input`. The Quick Menu over a game has the shell's rail, its Game section included (it had none, so
-    tabs were missing), and the overlay's window takes the shell's text scale and canvas density for its display. HOME down is held; R2, L2 or Start while
+    `droidtop.input`. The Quick Menu over a game stays the shell's own, with no Game section (the owner: "You shouldn't
+    be adding to the quick menu"; the game's controls are HOME + L2), and the overlay's window takes the shell's text
+    scale and canvas density for its display. HOME down is held; R2, L2 or Start while
     it is held raises `OverlayRequest(kind, displayId)` on `OverlayRequests.requests`, and both keys are eaten, the
     button through its release. A second request of the same kind while it is open is the UI's to close it. Every
     other key goes on untouched, with no delay.

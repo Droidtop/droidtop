@@ -122,10 +122,6 @@ internal object InGameOverlays {
             when (request.kind) {
                 OverlayRequest.Kind.QUICK_MENU -> QuickMenuStandalone(
                     library = library,
-                    // Over the running game the rail has its Game section, as in the shell (Droidtop/tracker#740:
-                    // the owner saw a rail with tabs missing).
-                    runningEntry = runningEntry,
-                    onRestart = { entry -> open(GameLaunchActivity.intentFor(app, entry.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                     // Start swaps to the left menu, as it does in Gaming.
                     onOpenStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
                     onDismiss = { close() },
