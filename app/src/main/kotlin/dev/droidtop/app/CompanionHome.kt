@@ -325,7 +325,13 @@ private fun FocusedGameCard(entry: LibraryEntry) {
         }
         // The existing update tracking (docs/SPEC.md 7g), never a second check.
         entry.availableUpdate?.let { latest ->
-            Text(stringResource(R.string.companion_home_update_available, latest), style = MaterialTheme.typography.bodyMedium, color = colors.tertiary)
+            // Opens the one Updates list, as the companion's other update line does (Droidtop/tracker#792).
+            Text(
+                stringResource(R.string.companion_home_update_available, latest),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.tertiary,
+                modifier = Modifier.clickable { openUpdates(context) },
+            )
         }
         entry.description?.let { description ->
             Text(description, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -416,12 +422,7 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     // Opens the one Updates list, where each has its Update and there is Update all (Droidtop/tracker#792).
-                    modifier = Modifier.clickable {
-                        context.startActivity(
-                            PlaceLinks.intent(context, dev.droidtop.library.settings.Place.UPDATES)
-                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                        )
-                    },
+                    modifier = Modifier.clickable { openUpdates(context) },
                 )
             }
         }
@@ -497,4 +498,11 @@ internal fun CompanionSystemSection(layout: CompanionHomeLayout) {
             if (nav != null) PillRow { CompanionPill("All controls") { nav.openTab(CompanionTab.SYSTEM) } }
         }
     }
+}
+
+/** The one Updates list, from a companion line that says something has an update (Droidtop/tracker#792). */
+private fun openUpdates(context: android.content.Context) {
+    context.startActivity(
+        PlaceLinks.intent(context, dev.droidtop.library.settings.Place.UPDATES).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
 }

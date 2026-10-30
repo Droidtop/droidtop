@@ -150,7 +150,12 @@ object UpdateChecks {
         if (!isStale(last, now)) return
         if (AppSelfUpdate.unmeteredOnly(app) && isMetered(app)) return
         lastStartedMs = now
-        dev.droidtop.runtime.util.AppScopes.io.launch { checkAll(app) {} }
+        dev.droidtop.runtime.util.AppScopes.io.launch {
+            checkAll(app) {}
+            // What the person set to install by itself does so now, as after a scheduled check; droidtop's own install
+            // waits for a press or the schedule, since a place that shows updates can be over a game.
+            applyPolicies(app, includeDroidtop = false)
+        }
     }
 
     /** Whether a check that ended (or started) at [lastMs] is too old to show at [nowMs]. Pure. */
@@ -175,10 +180,22 @@ object UpdateChecks {
         )
         if (!due) return@withContext
         checkAll(app) {}
+        notifyAsking(app, applyPolicies(app, includeDroidtop = true))
+    }
+
+    /**
+     * Each kind's policy over what the last check found: a kind set to install automatically installs in the
+     * background, and the rest is counted to be asked about, which is returned. A plugin update that asks for new
+     * access installs, and that access stays off until the person approves it on the plugin's page ("Wants new
+     * access"). droidtop itself only with [includeDroidtop], and never while a game runs: its install ends in
+     * Android's own confirmation, which would cover the game (Droidtop/tracker#792).
+     */
+    private suspend fun applyPolicies(app: Context, includeDroidtop: Boolean): Int {
         var asking = 0
         if (AppSelfUpdate.newerSeenVersionName(app) != null) {
             // Installing droidtop always ends in Android's own confirmation; Install automatically fetches it first.
-            if (UpdateKinds.policy(app, UpdateKinds.Kind.DROIDTOP) == UpdateKinds.Policy.AUTO) UpdateNow.start(app) else asking++
+            val auto = UpdateKinds.policy(app, UpdateKinds.Kind.DROIDTOP) == UpdateKinds.Policy.AUTO
+            if (auto && includeDroidtop && dev.droidtop.library.LaunchDisplay.running.value == null) UpdateNow.start(app) else asking++
         }
         val plugins = PluginCatalog.offersFor(
             PluginStore.installed(app), PluginCatalog.listings(app), UserOriginKeys.load(UserOriginKeys.storeFile(app)),
@@ -202,7 +219,7 @@ object UpdateChecks {
                 asking += apps.size
             }
         }
-        notifyAsking(app, asking)
+        return asking
     }
 
     /**

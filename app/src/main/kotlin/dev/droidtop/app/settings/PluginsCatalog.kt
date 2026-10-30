@@ -194,14 +194,17 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                     )
                     return@buildList
                 }
+                // A newer version is counted and shown whatever the row's one state word is: "Wants new access" outranks
+                // "Update available", and on the console F95's update showed nowhere on this list (Droidtop/tracker#792).
+                val newer = installed.associate { record -> record.manifest.id to PluginCatalog.offerFor(listings, record, userKeys)?.release?.version }
                 val cards = installed.map { record ->
                     val grants = grantStore.read(record.manifest.id)
-                    val update = PluginCatalog.offerFor(listings, record, userKeys) != null
+                    val update = newer[record.manifest.id]
                     val runtimeNeed = PluginRuntimeNeeds.missing(context, record.manifest)
                     val waiting = resolution.waiting[record.manifest.id]
-                    Triple(record, pluginState(record, grants, runtimeNeed, update, waiting), pluginCard(context, record, userKeys, catalogNames, waiting, grants, runtimeNeed, updateAvailable = update))
+                    Triple(record, pluginState(record, grants, runtimeNeed, update != null, waiting), pluginCard(context, record, userKeys, catalogNames, waiting, grants, runtimeNeed, newerVersion = update))
                 }
-                val updates = cards.count { (_, state, _) -> state == "Update available" || state == "Needs an update" }
+                val updates = newer.values.count { it != null }
                 // Droidtop/tracker#513: what needs the person first, and the list narrowed to it.
                 // The updates are in the one Updates list, with Update all there (docs/SPEC.md 10b, Droidtop/tracker#570);
                 // this page points at it rather than keeping a second Update all.
@@ -240,7 +243,9 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                     )
                 }
                 val kind = pluginKind.takeIf { it in kinds } ?: ALL_KINDS
-                val shown = cards.filter { (record, state, _) -> pluginFilter.keeps(state) && (kind == ALL_KINDS || kindOf(record) == kind) }
+                val shown = cards.filter { (record, state, _) ->
+                    pluginFilter.keeps(state, newer[record.manifest.id] != null) && (kind == ALL_KINDS || kindOf(record) == kind)
+                }
                 if (shown.isEmpty()) {
                     add(ActionItem(id = "plugins_filter_none", title = "No plugin ${pluginFilter.none}"))
                 }
@@ -419,10 +424,10 @@ internal enum class PluginListFilter(val label: String, val none: String) {
     UPDATES("Updates", "has an update"),
     OFF("Off", "is off");
 
-    fun keeps(state: String): Boolean = when (this) {
+    fun keeps(state: String, hasUpdate: Boolean): Boolean = when (this) {
         ALL -> true
         NEEDS_APPROVAL -> state == "Needs approval" || state == "Wants new access"
-        UPDATES -> state == "Update available" || state == "Needs an update"
+        UPDATES -> hasUpdate || state == "Needs an update"
         OFF -> state == "Off" || state == "Stopped" || state == "Denied"
     }
 }
@@ -473,7 +478,7 @@ internal fun AppSettingsCatalogs.pluginCard(
     waiting: List<dev.droidtop.pluginhost.RequiredApi>?,
     grants: PluginGrants.Snapshot,
     runtimeNeed: RuntimeNeed?,
-    updateAvailable: Boolean = false,
+    newerVersion: String? = null,
 ): NestedScreenItem {
     val m = record.manifest
     val enabledPoints = when (record.trust) {
@@ -484,14 +489,15 @@ internal fun AppSettingsCatalogs.pluginCard(
         }
         else -> emptySet()
     }
-    val state = pluginState(record, grants, runtimeNeed, updateAvailable, waiting)
+    val state = pluginState(record, grants, runtimeNeed, newerVersion != null, waiting)
     return NestedScreenItem(
         id = "plugin_${m.id}",
         title = m.label,
         // What it is, in its own line; its trust and access are the chip and its page's header (#514), never stitched on.
         subtitle = m.presentation.summary ?: pluginSummary(m, enabledPoints),
         inline = pluginDetailScreen(m.id, m.label, m.presentation.summary),
-        valueLabel = { "$state · v${m.version}" },
+        // The installed version, and the newer one whenever a catalog has it (Droidtop/tracker#792).
+        valueLabel = { "$state · v${m.version}" + (newerVersion?.let { " → $it" } ?: "") },
         // An app's plugin is trusted by its app's signature, not an origin key (Droidtop/tracker#547).
         chip = if (m.kind == PluginKind.APP_INTERFACE) {
             if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) null else dev.droidtop.library.settings.RowTag.UNOFFICIAL

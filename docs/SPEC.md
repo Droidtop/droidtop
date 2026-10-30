@@ -18748,11 +18748,16 @@ menu still list every `listed` place.
   Settings > About read what the last check fetched, so after a daily check they could be a day behind. Opening any of
   them now checks again when the last check is more than 15 minutes old (`UpdateChecks.refreshIfStale`; not on a
   metered network when the person asked for Wi-Fi only), the check runs as the one job, and the list re-reads its
-  plugin and app sections when it ends. **Where Updates is reached:** the Quick Menu's Downloads tab; Settings > About
+  plugin and app sections when it ends. A kind set to install automatically then installs, as after the scheduled
+  check (`UpdateChecks.applyPolicies`, the one policy step), except droidtop itself: a place that shows updates can be
+  over a game, so droidtop's own install waits for its press or the schedule, and the schedule does not start it
+  while a game runs (`LaunchDisplay.running`), since it ends in Android's confirmation over the screen. **Where Updates is reached:** the Quick Menu's Downloads tab; Settings > About
   droidtop > Updates, whose value says when droidtop has a newer build ("droidtop 0.2.0-dev.2700 is out"; it was a
-  group of its own under System, now in About, one row); a plugin's page (its version and Update); the plugin list's
-  "N updates" row; the companion Home's "updates available" line, which opens it; and the "updates are ready"
-  notification. A plugin or core whose update asks for a new permission gets that permission only when the person
+  group of its own under System, now in About, one row); a plugin's page (its version and Update), in Settings and
+  as its panel in the Quick Menu and on the companion; the plugin list's "N updates" row, each row's value naming the
+  newer version ("Running · v0.6.1 → 0.7.1") whatever its one state word is, since "Wants new access" outranks
+  "Update available" and hid F95zone's update on the console; the companion's "updates available" lines (Home's
+  count and the Now card's "Update available"), which open it; and the "updates are ready" notification. A plugin or core whose update asks for a new permission gets that permission only when the person
   approves it ("Wants new access"), even when plugins install automatically; holding the whole update back until then
   is the Plugins lane's.
   **Each kind asks or installs** (`UpdateKinds`, in Update settings): "Ask before installing" lists the update and

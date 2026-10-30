@@ -237,7 +237,7 @@ object PluginPanels {
         val tiles: suspend (Context) -> List<CatalogGroup> = { ctx ->
             withContext(Dispatchers.IO) { listOfNotNull(PluginManagedApp.noticeGroup(ctx, record, surface)) } + tileGroups(ctx, panel, onReplyScreen)
         }
-        val more: List<CatalogGroup> = if (withMore) moreGroups(record) else emptyList()
+        val more: List<CatalogGroup> = if (withMore) moreGroups(context, record) else emptyList()
         val id = "plugin_panel_${panel.pluginId}_$surface"
         val entry = panel.entry
         // The companion draws a plugin's `companion.tab` facets where it has them (Droidtop/tracker#602): about the
@@ -335,10 +335,28 @@ object PluginPanels {
         return listOf(CatalogGroup(id = "plugin_panel_${panel.pluginId}_tiles", title = null, items = items))
     }
 
-    /** The ways from a panel into the plugin's other pages: its settings, its own app and the app it manages. */
-    private fun moreGroups(record: PluginRecord): List<CatalogGroup> {
+    /**
+     * The ways from a panel into the plugin's other pages: its settings, its own app and the app it manages. First its
+     * version, and a newer one from a catalog with the press that installs it (Droidtop/tracker#792: the companion's page
+     * showed neither). Reads the catalogs as last fetched, never the network.
+     */
+    private fun moreGroups(context: Context, record: PluginRecord): List<CatalogGroup> {
         val m = record.manifest
+        val userKeys = dev.droidtop.pluginhost.UserOriginKeys.load(dev.droidtop.pluginhost.UserOriginKeys.storeFile(context))
+        val offer = PluginCatalog.offerFor(PluginCatalog.listings(context), record, userKeys)
         val items = buildList<CatalogItem> {
+            if (offer == null) {
+                add(ActionItem(id = "plugin_panel_${m.id}_version", title = "Version", value = m.version))
+            } else {
+                add(
+                    AsyncActionItem(
+                        id = "plugin_panel_${m.id}_update",
+                        title = "Update to ${offer.release.version}",
+                        subtitle = "Installed: ${m.version}",
+                        run = { ctx, onStatus -> PluginCatalog.installOutcome(ctx, offer.plugin, offer.release, onStatus).line },
+                    ),
+                )
+            }
             if (PluginSettingsRows.has(record)) {
                 add(NestedScreenItem(id = "plugin_panel_${m.id}_settings", title = "Settings", inline = PluginSettingsRows.screenFor(record)))
             }
