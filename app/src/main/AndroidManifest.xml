@@ -931,6 +931,12 @@
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
 
+        <!-- Container backups on a schedule (docs/SPEC.md 3d), one daily job while any is on. -->
+        <service
+            android:name="dev.droidtop.app.ContainerBackupJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
         <!-- Every kind of update, checked on droidtop's own schedule (docs/SPEC.md 10b, Droidtop/tracker#570). -->
         <service
             android:name="dev.droidtop.app.update.UpdateCheckJobService"

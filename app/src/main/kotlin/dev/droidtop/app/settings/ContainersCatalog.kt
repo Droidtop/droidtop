@@ -10,6 +10,7 @@ import android.hardware.usb.UsbManager
 import android.net.VpnService
 import android.provider.Settings
 import dev.droidtop.app.ContainerPrograms
+import dev.droidtop.app.ContainerBackups
 import dev.droidtop.app.ContainerRuntimeFactory
 import dev.droidtop.app.DesktopSessionService
 import dev.droidtop.app.DesktopSessionState
@@ -441,7 +442,7 @@ object ContainersCatalog {
             groups += CatalogGroup(id = "exports", title = "In the desktop's menus", items = exportItems(context, runtime, info))
             groups += CatalogGroup(id = "commands", title = "Commands in the desktop's terminal", items = commandItems(context, info))
         }
-        groups += CatalogGroup(id = "backup", title = "Backup", items = backupItems(runtime, info, running))
+        groups += CatalogGroup(id = "backup", title = "Backup", items = backupItems(runtime, info, running) + scheduleItems(context, runtime, info))
         val others = runCatching { runtime.listContainers() }.getOrDefault(emptyList()).map { it.displayName }
         groups += CatalogGroup(id = "copy", title = "Copy", items = copyItems(runtime, info, running, others))
         groups += CatalogGroup(id = "delete", title = null, items = listOf(deleteItem(info, runtime, running)))
@@ -504,6 +505,43 @@ object ContainersCatalog {
                         }
                         "Restored."
                     }.getOrElse { "Not restored: ${FailureText.of("Containers", it)}" }
+                },
+            ),
+        )
+    }
+
+    /**
+     * Backups on a schedule (docs/SPEC.md 3d "Backups on a schedule", Droidtop/tracker#808): how often, where they go,
+     * and what the last run did. Shown whether or not it runs now: a running container is skipped, not stopped.
+     */
+    private suspend fun scheduleItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
+        if (runtime.dataBackupUnavailableReason != null) return emptyList()
+        val id = info.container.id
+        val (frequency, folder, last) = withContext(Dispatchers.IO) {
+            Triple(ContainerBackups.frequency(context, id), ContainerBackups.folder(context, id), ContainerBackups.lastResult(context, id))
+        }
+        return listOf(
+            ChoiceItem(
+                id = "container_backup_schedule",
+                title = "Back up on a schedule",
+                subtitle = last ?: "While charging; skipped while it runs",
+                options = ContainerBackups.Frequency.entries.map { ChoiceOption(it.id, it.label) },
+                current = frequency.id,
+                onSelect = { ctx, value ->
+                    val app = ctx.applicationContext
+                    dev.droidtop.runtime.util.AppScopes.io.launch {
+                        ContainerBackups.setFrequency(app, id, ContainerBackups.Frequency.fromId(value))
+                    }
+                },
+            ),
+            FolderPickItem(
+                id = "container_backup_folder",
+                title = "Where scheduled backups go",
+                subtitle = folder?.let { android.provider.DocumentsContract.getTreeDocumentId(it).substringAfter(':').ifEmpty { "The folder you picked" } }
+                    ?: "No folder yet: scheduled backups wait for one",
+                onPicked = { ctx, uri ->
+                    withContext(Dispatchers.IO) { ContainerBackups.setFolder(ctx, id, uri) }
+                    null
                 },
             ),
         )

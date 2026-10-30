@@ -3407,6 +3407,20 @@ the `ContainerRuntime` interface that already exists (§3):
     devices); a copy of the desktop's own gets a sibling's init, and its
     provisioning plan stays with the original. A failed copy is deleted
     whole, through the same guarded root delete as Delete (`RootfsDelete`).
+  **Backups on a schedule (Droidtop/tracker#808, slice B1).** A
+  container's Backup group has "Back up on a schedule": Off (the
+  default), Every day or Every week, and "Where scheduled backups go", a
+  folder the person picks once (so it can be an SD card or synced
+  storage). One system job a day (`ContainerBackups`, JobScheduler, no new
+  library), only while charging and with the battery not low, makes every
+  backup that is due, as "Back up its data" makes one: the whole
+  container, named for it and the time (`Debian-2026-10-30-0214.tar`). A
+  backup needs the container stopped, so a running one is skipped and the
+  row says so ("Skipped: it was running. Next try tomorrow"); droidtop
+  never stops a container for this. The row's line is the last run's
+  result. A failed write leaves no file. Incremental backups, holding only
+  what changed since the last one with a manifest so restore removes what
+  was deleted, are slice B2 on #808.
   **What it can reach (Droidtop/tracker#787 slice 1, #750 part 2).** A
   container's page opens with "What it can reach", one line a kind, in
   plain words: Files (its home: its own, the shared home folder or the
