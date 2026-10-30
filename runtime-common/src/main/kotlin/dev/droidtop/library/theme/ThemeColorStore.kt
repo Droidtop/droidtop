@@ -103,12 +103,16 @@ object ThemeColorStore {
             if (key in ReadingPrefs.PALETTE_KEYS || key in AppearancePrefs.OUTSIDE_GAMING_KEYS) refreshSoon(app, force = false)
         }.also { CatalogPrefs.prefs(app).registerOnSharedPreferenceChangeListener(it) }
         // A new wallpaper's colours (Device colours, Droidtop/tracker#844); the system palette itself arrives with the
-        // configuration change below, which looks again too.
-        runCatching {
-            app.getSystemService(android.app.WallpaperManager::class.java)?.addOnColorsChangedListener(
-                { _, _ -> refreshSoon(app, force = false) },
-                android.os.Handler(android.os.Looper.getMainLooper()),
-            )
+        // configuration change below, which looks again too. The listener is Android 8.1's (API 27; minSdk is 26).
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            try {
+                app.getSystemService(android.app.WallpaperManager::class.java)?.addOnColorsChangedListener(
+                    WallpaperColoursListener { refreshSoon(app, force = false) },
+                    android.os.Handler(android.os.Looper.getMainLooper()),
+                )
+            } catch (e: Exception) {
+                // No wallpaper service: the configuration change still looks again.
+            }
         }
         app.registerComponentCallbacks(object : android.content.ComponentCallbacks {
             override fun onConfigurationChanged(newConfig: android.content.res.Configuration) = refreshSoon(app, force = false)
@@ -179,4 +183,14 @@ object ThemeColorStore {
     private fun highTextContrast(context: Context): Boolean =
         runCatching { android.provider.Settings.Secure.getInt(context.contentResolver, "high_text_contrast_enabled", 0) == 1 }
             .getOrDefault(false)
+}
+
+/**
+ * The wallpaper colour listener as a class of its own because its interface is Android 8.1's and droidtop's minSdk is
+ * 26: built only under the SDK_INT >= O_MR1 check in [ThemeColorStore.install] (build-scripts/class_load_api_allowlist.txt).
+ * A lambda there is compiled into a class that implements the interface, which the class-load API gate refuses.
+ */
+@androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.O_MR1)
+internal class WallpaperColoursListener(private val changed: () -> Unit) : android.app.WallpaperManager.OnColorsChangedListener {
+    override fun onColorsChanged(colors: android.app.WallpaperColors?, which: Int) = changed()
 }
