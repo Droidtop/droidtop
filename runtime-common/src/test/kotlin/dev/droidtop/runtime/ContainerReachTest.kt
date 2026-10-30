@@ -14,7 +14,7 @@ class ContainerReachTest {
     ) = ContainerReach.lines(ContainerReach.Settings(mounts, sockets, microphone, devices, servesVpn)).associate { it.kind to it.what }
 
     @Test
-    fun `a new container: its own home, shared storage, windows, sound, no microphone, no devices, the device's network`() {
+    fun `a new container has its own home, shared storage, windows, sound, no microphone, no devices, the device's network`() {
         assertEquals(
             mapOf(
                 "Files" to "Its own home, the device's shared storage",
