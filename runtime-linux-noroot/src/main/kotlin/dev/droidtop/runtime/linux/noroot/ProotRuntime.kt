@@ -11,6 +11,7 @@ import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerDiskUsage
 import dev.droidtop.runtime.ContainerExecResult
+import dev.droidtop.runtime.ContainerLook
 import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerUser
 import dev.droidtop.runtime.EnvironmentMounts
@@ -316,6 +317,22 @@ class ProotRuntime(
         Unit
     }
 
+    /** Kept in the container's own config, beside its sockets (docs/SPEC.md 3d "Scale and theme"). */
+    override suspend fun look(container: Container): ContainerLook = withContext(Dispatchers.IO) { readLookSync(container.id) }
+
+    override suspend fun setLook(container: Container, look: ContainerLook) = withContext(Dispatchers.IO) {
+        val config = readConfig(container.id)
+        config[KEY_LOOK_SCALE] = look.scale.toString()
+        config[KEY_LOOK_THEME] = look.followTheme.toString()
+        configOf(container.id).outputStream().use { config.store(it, "droidtop proot container") }
+        Unit
+    }
+
+    private fun readLookSync(name: String): ContainerLook {
+        val config = runCatching { readConfig(name) }.getOrNull() ?: return ContainerLook()
+        return ContainerLook.decode("scale=${config.getProperty(KEY_LOOK_SCALE).orEmpty()}\ntheme=${config.getProperty(KEY_LOOK_THEME).orEmpty()}")
+    }
+
     /** Real now (Droidtop/tracker#95): see [HostAudioServer]. */
     override val audioSharingUnavailableReason: String? = null
 
@@ -616,7 +633,7 @@ class ProotRuntime(
         val guestEnvironment = LinkedHashMap<String, String>().apply {
             putAll(baseGuestEnvironment)
             val swaySocketName = if (sessionSockets.waylandShared) ContainerLayout.findSwayIpcSocket(socketsDir)?.name else null
-            putAll(ContainerLayout.clientEnvironment(waylandSocketName, sessionSockets.audioShared, swaySocketName))
+            putAll(ContainerLayout.clientEnvironment(waylandSocketName, sessionSockets.audioShared, swaySocketName, readLookSync(containerId)))
             putAll(env)
             putAll(marker)
         }
@@ -876,6 +893,8 @@ class ProotRuntime(
         private const val KEY_DAEMONS = "provision.daemons"
         private const val KEY_SOCKET_WAYLAND = "socket.wayland"
         private const val KEY_SOCKET_AUDIO = "socket.audio"
+        private const val KEY_LOOK_SCALE = "look.scale"
+        private const val KEY_LOOK_THEME = "look.theme"
 
         private const val CHECK_TOKEN = "droidtop-proot-ok"
         private const val CHECK_TIMEOUT_S = 30L

@@ -3409,7 +3409,32 @@ the `ContainerRuntime` interface that already exists (§3):
   carries droidtop's VPN). `ContainerReach` builds them from the same
   settings the rows below write, so the summary cannot say what the rows
   do not; each later slice of #787 (clipboard, network, GPU, scale and
-  theme, keyboard and pad) adds its line here.
+  theme, keyboard and pad) adds its line here. The lines are kinds of
+  access only: scale and theme (slice 5) are how its programs look, not
+  what it reaches, and add none. The slices are built in the order 1, 5,
+  4, 6, 3, 2 (lane, 2026-10-30).
+  **Scale and theme (Droidtop/tracker#787 slice 5).** A container's page
+  has "Scale and theme". Scale is its programs' size against the
+  desktop's own scale, which the compositor already applies to every
+  window: As the desktop (the default), 75%, 125%, 150% or 200%. Away
+  from the default it sets `QT_SCALE_FACTOR` and `GDK_DPI_SCALE` for every
+  program droidtop starts in it (`ContainerLayout.scaleEnvironment`).
+  GTK's `GDK_SCALE` takes whole numbers only and the compositor's scale
+  already covers that, so GTK follows through its text size. "Light or
+  dark as droidtop", on by default, gives its GTK programs droidtop's
+  Light or dark (2b "Desktop appearance"); off, they keep the image's own
+  look. Both are kept beside the container's other settings
+  (`ContainerLook`: proot's config, droidspaces' `<name>.look`), copied
+  with it and deleted with it, and apply to programs started after the
+  change.
+  **Clipboard per container (Droidtop/tracker#787 slice 2, owner
+  2026-10-30: "A sounds good").** Every container's windows share one
+  compositor, and the clipboard is the core protocol's `wl_data_device`,
+  which any focused client can use, so no compositor setting can keep it
+  from one container. A container whose clipboard is off reaches the
+  compositor through a filtering Wayland proxy droidtop runs, which drops
+  `wl_data_device_manager` and `zwp_primary_selection_device_manager_v1`
+  from that client's registry, its Xwayland included.
   **Resource usage (Droidtop/tracker#757 slice 3).** A running
   container's page has "Memory and processor" under Storage used: the
   memory its processes hold (their resident sets, summed) and their share

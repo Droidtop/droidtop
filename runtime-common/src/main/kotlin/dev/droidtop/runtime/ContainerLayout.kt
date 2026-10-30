@@ -171,7 +171,12 @@ object ContainerLayout {
      * clocks and file times inside the desktop are local time rather than
      * a stock image's UTC.
      */
-    fun clientEnvironment(waylandSocketName: String?, audioShared: Boolean = true, swaySocketName: String? = null): Map<String, String> = buildMap {
+    fun clientEnvironment(
+        waylandSocketName: String?,
+        audioShared: Boolean = true,
+        swaySocketName: String? = null,
+        look: ContainerLook = ContainerLook(),
+    ): Map<String, String> = buildMap {
         put("XDG_RUNTIME_DIR", SOCKET_DIR)
         put("TZ", posixTimeZone(ZoneId.systemDefault()))
         put("XDG_DATA_DIRS", "/usr/local/share:/usr/share:${ContainerLauncher.DATA_DIR}")
@@ -197,8 +202,22 @@ object ContainerLayout {
         // With audio sharing off, or no bridge running, nothing listens
         // there either -- to a program that is the same as no PulseAudio.
         if (audioShared) put("PULSE_SERVER", "$SOCKET_DIR/$AUDIO_SOCKET")
-        // GTK apps dark or light as droidtop is (docs/SPEC.md 2b "Desktop appearance", Droidtop/tracker#694).
-        putAll(DesktopAppearance.environment(DesktopAppearance.dark))
+        // GTK apps dark or light as droidtop is (docs/SPEC.md 2b "Desktop appearance", Droidtop/tracker#694), unless the
+        // container keeps its image's own look (3d "Scale and theme", Droidtop/tracker#787).
+        if (look.followTheme) putAll(DesktopAppearance.environment(DesktopAppearance.dark))
+        putAll(scaleEnvironment(look.scale))
+    }
+
+    /**
+     * A container's programs at [scale] against the desktop (docs/SPEC.md 3d "Scale and theme"). The compositor
+     * already scales every window by the desktop's scale, so this is on top of it: Qt by `QT_SCALE_FACTOR`, GTK by
+     * `GDK_DPI_SCALE` (its text and the layout that follows it; `GDK_SCALE` takes whole numbers only, which the
+     * compositor's scale already covers). At 1 nothing is set, so a program's own settings stand. Pure.
+     */
+    fun scaleEnvironment(scale: Float): Map<String, String> {
+        if (scale == 1f) return emptyMap()
+        val value = scale.toString()
+        return mapOf("QT_SCALE_FACTOR" to value, "GDK_DPI_SCALE" to value)
     }
 
     /**
