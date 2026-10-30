@@ -19,8 +19,7 @@ class UpdateRowInPlaceTest {
         library = { error("the library is asked for only when the update's screen is opened") },
         entryId = "/games/30 Year Old Virgin 0.37",
         title = "30 Year Old Virgin",
-        installed = "Installed: v0.37",
-        available = "Available: v0.38",
+        step = "v0.37 → v0.38",
     )
 
     @Test
@@ -33,9 +32,9 @@ class UpdateRowInPlaceTest {
     }
 
     @Test
-    fun `the row says both versions, the one on offer in the value column`() {
+    fun `the row says both versions, installed first, in the one row line`() {
         val nested = row as NestedScreenItem
-        assertTrue(nested.subtitle!!.startsWith("Installed: v0.37"))
+        assertTrue(nested.subtitle!!.startsWith("v0.37 → v0.38 · from its source"))
         // The value column's line; the label needs no context, but a JVM test has no Android to give it one.
         assertTrue(nested.valueLabel != null)
     }

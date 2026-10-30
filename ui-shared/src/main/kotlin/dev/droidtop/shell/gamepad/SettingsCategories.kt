@@ -117,6 +117,19 @@ fun settingsCategories(
 }.let { built ->
     // A stable sort: a label the order does not name keeps its place after the ones it does.
     if (order.isEmpty()) built else built.sortedBy { category -> order.indexOf(category.label).takeIf { it >= 0 } ?: Int.MAX_VALUE }
+}.let(::uniqueKeys)
+
+/**
+ * Every category's key unique, as the column's LazyColumn needs (Droidtop/tracker#837: two rows for one game, a linked
+ * copy, gave two link entries the same key and killed droidtop when they were drawn). The first keeps its key; a later
+ * one with the same key gets its place among them, so the keys stay stable as long as the rows do. Pure.
+ */
+internal fun uniqueKeys(categories: List<SettingsCategory>): List<SettingsCategory> {
+    val seen = HashMap<String, Int>()
+    return categories.map { category ->
+        val n = seen.merge(category.key, 1, Int::plus) ?: 1
+        if (n == 1) category else category.copy(key = "${category.key}#$n")
+    }
 }
 
 /**

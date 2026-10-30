@@ -463,25 +463,15 @@ internal fun GamepadShellBody(
     // Quick Menu stacked on top of Gaming.
     // The left menu (Start; docs/SPEC.md 7j "Gaming controls") closes for
     // the same reason.
-    // The game screen of a Windows game sends Back here with openQuickMenu set (OwnGameScreens): the
-    // menu opens on its Game section, since the game is running.
+    // Coming back from a running game (Back from droidtop's own game screen, HOME or a wake while one runs) sets
+    // openQuickMenu: with the game still running that opens its sheet, Resume first (Droidtop/tracker#740: what can
+    // be done with the game is L2's, not R2's); with none, the Quick Menu as before.
     LaunchedEffect(deepLinkToken) {
-        overlays.quickMenuOpen = openQuickMenu
+        val gameRunning = dev.droidtop.library.LaunchDisplay.running.value != null
+        overlays.runningGameOpen = openQuickMenu && gameRunning
+        overlays.quickMenuOpen = openQuickMenu && !gameRunning
         overlays.leftMenuOpen = false
-        Log.i("droidtop.ReturnToGame", "deep link $deepLinkToken applied: quickMenu=$openQuickMenu")
-    }
-    // Updates is the Quick Menu's Downloads tab (owner, 2026-10-29, Droidtop/tracker#749): every way into the Updates
-    // section (a notification, Home's More card, a link from a place) opens the Quick Menu there instead, over the
-    // section the person was on.
-    var lastSection by remember { mutableStateOf(nav.section) }
-    LaunchedEffect(nav.section) {
-        if (nav.section == GamingSection.UPDATES) {
-            nav.openSection(lastSection.takeIf { it != GamingSection.UPDATES } ?: GamingSection.DOWNLOADS)
-            overlays.quickMenuStart = QuickSection.DOWNLOADS
-            overlays.quickMenuOpen = true
-        } else {
-            lastSection = nav.section
-        }
+        Log.i("droidtop.ReturnToGame", "deep link $deepLinkToken applied: quickMenu=$openQuickMenu gameRunning=$gameRunning")
     }
     // The face-button layout of the pad in use (SPEC 7b, "Console and controller detection"),
     // followed live because a handheld's own toggle can flip it while this shell stays in front.
@@ -737,13 +727,18 @@ internal fun GamepadShellBody(
         },
     )
 
-    // The Quick Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82):
-    // which entry the running session (LaunchDisplay.running) is for,
-    // resolved when a menu is open. The left menu's Resume row reads the
-    // same answer (docs/SPEC.md 7j). A game that ended unseen ends the
+    // L2 on the running game leads with its sheet (Droidtop/tracker#740): Resume and Restart launch the shell's one way,
+    // and a console game's search opens Gaming's.
+    val runningGameHost = remember(library) {
+        RunningGameHost(library, { entry -> onLaunch(entry) }, { id, name -> overlays.systemSearch = id to name })
+    }
+
+    // Which entry the running session (LaunchDisplay.running) is for,
+    // resolved when a menu is open: the left menu's Resume row (docs/SPEC.md
+    // 7j) and the Quick Menu's plugin panels read it. A game that ended unseen ends the
     // session in SessionMonitor, which this follows, so a menu never
     // offers a dead launch.
-    val sideMenuOpen = overlays.quickMenuOpen || overlays.leftMenuOpen
+    val sideMenuOpen = overlays.quickMenuOpen || overlays.leftMenuOpen || overlays.runningGameOpen
     val runningSession by dev.droidtop.library.LaunchDisplay.running.collectAsState()
     val runningEntry = remember(sideMenuOpen, runningSession, gameEntries, appEntries) {
         if (!sideMenuOpen) {
@@ -755,57 +750,10 @@ internal fun GamepadShellBody(
         }
     }
 
-    // What the last Quit to Library actually did, for the row's subtitle
-    // (Droidtop/tracker#82). Null until a quit runs: the row then reads
-    // "Ends <game>", and a real quit replaces it with the outcome, so a
-    // quit that left the emulator alive is shown honestly instead of being
-    // reported as a success. Held outside the `if` so it survives the sheet
-    // closing; reset whenever the running game changes.
-    var quitOutcome by remember { mutableStateOf<dev.droidtop.library.QuitResult?>(null) }
-    LaunchedEffect(runningEntry?.id) { quitOutcome = null }
     if (overlays.quickMenuOpen) {
         QuickMenu(
             runningEntry = runningEntry,
-            library = library,
             startSection = overlays.quickMenuStart,
-            // The same launch path every entry already goes through
-            // (console ROM, PC and engine games alike) -- relaunching the
-            // entry is what "resume" already means for the planned
-            // Recents tab (docs/SPEC.md, "Recents (decided 2026-08-30)"),
-            // reused here rather than a second resume mechanism.
-            quitOutcome = quitOutcome,
-            onResume = { entry ->
-                overlays.quickMenuOpen = false
-                onLaunch(entry)
-            },
-            onSearchSystem = { id, name ->
-                overlays.quickMenuOpen = false
-                overlays.systemSearch = id to name
-            },
-            onQuit = { entry, restart ->
-                // The sheet stays open until the game really ended, so a
-                // quit that could not end it shows its reason in the row.
-                scope.launch {
-                    // The one quit path (Library.quitRunning); it clears the running-game state only on a
-                    // confirmed end, and anything short of that is shown in the row's subtitle.
-                    val outcome = library.quitRunning(context, entry)
-                    quitOutcome = outcome
-                    if (outcome is dev.droidtop.library.QuitResult.Ended) {
-                        overlays.quickMenuOpen = false
-                        // Restart (the Quick Menu's Game section): start the
-                        // entry again, but only now that it really ended.
-                        if (restart) onLaunch(entry)
-                    }
-                }
-            },
-            // Kill: force-stopped at once (Library.killRunning); its outcome shows in the row like Quit's.
-            onKill = { entry ->
-                scope.launch {
-                    val outcome = library.killRunning(context, entry)
-                    quitOutcome = outcome
-                    if (outcome is dev.droidtop.library.QuitResult.Ended) overlays.quickMenuOpen = false
-                }
-            },
             onOpenLeftMenu = {
                 overlays.quickMenuOpen = false
                 overlays.leftMenuOpen = true
@@ -876,6 +824,45 @@ internal fun GamepadShellBody(
             settingsRoot = remember(uiMode) { gamingSettingsRoot(menuSectionsFor(uiMode).filter { it.isPlace }.mapNotNull { it.placeScreenId }.toSet()) },
             onDismiss = { overlays.globalSearchOpen = false },
         )
+    }
+    if (overlays.runningGameOpen) {
+        // The running game's sheet on coming back to it; Game options opens the game's own menu, as over the game.
+        val entry = runningEntry
+        var optionsOpen by remember(entry?.id) { mutableStateOf(false) }
+        val close = { overlays.runningGameOpen = false }
+        if (entry == null) {
+            LaunchedEffect(runningSession) { if (runningSession == null) close() }
+        } else {
+            androidx.compose.runtime.CompositionLocalProvider(LocalRunningGameHost provides runningGameHost) {
+                if (optionsOpen) {
+                    GameOptionsOfRunningGame {
+                        dev.droidtop.shell.gamepad.hosted.RunningGameOptions(
+                            library = library,
+                            entry = entry,
+                            onResume = {
+                                close()
+                                onLaunch(entry)
+                            },
+                            onOpenDownloads = {
+                                close()
+                                nav.openSection(GamingSection.DOWNLOADS)
+                            },
+                            onClose = close,
+                        )
+                    }
+                } else {
+                    RunningGameSheet(
+                        entry = entry,
+                        onResume = {
+                            close()
+                            onLaunch(entry)
+                        },
+                        onGameOptions = { optionsOpen = true },
+                        onDismiss = close,
+                    )
+                }
+            }
+        }
     }
     overlays.systemSearch?.let { (systemId, systemName) ->
         // One system's search (docs/SPEC.md 12a, "One search: where it opens"): its games, matched in memory over the
@@ -1022,6 +1009,7 @@ internal fun GamepadShellBody(
         showHints = GamingPrefs.showHints(context),
         touchFirst = shellWindow.touchFirst,
         claim = helpRowClaim,
+        padDriving = dev.droidtop.shell.gamepad.input.PadModality.showsFocus,
     )
     androidx.compose.runtime.CompositionLocalProvider(
         LocalShellWindow provides shellWindow,
@@ -1030,6 +1018,7 @@ internal fun GamepadShellBody(
         LocalFocusedHints provides focusedHints,
         LocalShellMenus provides shellMenus,
         LocalHelpRowSlotReport provides { slot -> helpRowSlotReport = currentScreenKey to slot },
+        LocalRunningGameHost provides runningGameHost,
     ) {
     Column(
         modifier = Modifier
@@ -1371,6 +1360,8 @@ internal fun GamepadShellBody(
                         // something here too, for the reason Settings' is.
                         shownSection.placeScreenId != null -> {
                             canGoBack = true
+                            // Downloads and Updates' Get games row opens the one search here, over the place (Droidtop/tracker#825).
+                            var getGamesOpen by remember { mutableStateOf(false) }
                             // Every registered store's Open library and holding rows, built in or plugged in,
                             // and Game sources' Wine shortcuts and Imported rows: PC Games, filtered.
                             val storeLibraries = remember {
@@ -1390,8 +1381,13 @@ internal fun GamepadShellBody(
                                     put(PcSource.IMPORTED_ITEM_ID, openGames { pcGames.showImported() })
                                     // Get games' Get new games row opens the search here, in place.
                                     put(dev.droidtop.library.integrations.GetGamesEntry.UPDATES_ROW_ID) { nav.openSection(GamingSection.NEW_GAMES) }
+                                    // Downloads and Updates' "Updates · N available" row opens the Updates place, the one page; as a
+                                    // link of its own it was a second Updates entry in the place's column (Droidtop/tracker#837).
+                                    put(dev.droidtop.library.integrations.PluginJobsScreen.UPDATES_LINK_ID) { nav.openSection(GamingSection.UPDATES) }
+                                    put(dev.droidtop.library.integrations.GetGamesEntry.SEARCH_ROW_ID) { getGamesOpen = true }
                                 }
                             }
+                            if (getGamesOpen) GetGamesSearch { getGamesOpen = false }
                             PlaceCatalogView(
                                 screenId = shownSection.placeScreenId.orEmpty(),
                                 // A page of another place goes back to that place (Updates to Downloads and Updates).
@@ -1832,8 +1828,9 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
  */
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
-    // The listed places; Kiosk and Kid hide them all, since they manage the device. Updates, with Get new games, is a
-    // page of Downloads and Updates (Place.listed); Plugins, Social and Game sources are elsewhere (offLeftMenu).
+    // The listed places; Kiosk and Kid hide them all, since they manage the device. Updates and Get new games are pages
+    // of Downloads and Updates (Place.listed, Droidtop/tracker#792); Plugins, Social and Game sources are elsewhere
+    // (offLeftMenu).
     val places = GamingSection.entries.filter { it.place?.listed == true && !it.offLeftMenu && !mode.hidesSettings }
     // Home leads, then PC Games (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
     val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy {
@@ -2375,14 +2372,17 @@ internal class LaunchProblems {
 
 /**
  * The shell's own overlays and which is open (Droidtop/tracker#763: held together): the Quick Menu (hold Select) and
- * the section it opens on when something asked for one ([quickMenuStart], Downloads for a link to Updates, cleared on
- * close); the left menu (Start, docs/SPEC.md 7j); the one search over the library, apps, sources and settings; and one
- * system's search, by its id and name, from the Quick Menu's Game section.
+ * the section it opens on when something asked for one ([quickMenuStart], Downloads for the status cluster's activity spot,
+ * cleared on close); the left menu (Start, docs/SPEC.md 7j); the one search over the library, apps, sources and settings; and one
+ * system's search, by its id and name, from the running console game's sheet; and that sheet itself, on coming back
+ * to the game ([runningGameOpen]).
  */
 @androidx.compose.runtime.Stable
 internal class ShellOverlays {
     var quickMenuOpen by mutableStateOf(false)
     var quickMenuStart by mutableStateOf<QuickSection?>(null)
+    // The running game's sheet, opened on coming back to the game (Droidtop/tracker#740).
+    var runningGameOpen by mutableStateOf(false)
     var leftMenuOpen by mutableStateOf(false)
     var globalSearchOpen by mutableStateOf(false)
     var systemSearch by mutableStateOf<Pair<String, String>?>(null)

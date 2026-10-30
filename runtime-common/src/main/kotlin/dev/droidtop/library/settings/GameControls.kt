@@ -3,7 +3,7 @@ package dev.droidtop.library.settings
 /**
  * The controls for a running game, and the one decision "does this row ask first" (docs/SPEC.md "The companion's
  * tabs" and "Quick Menu: a branching panel", Droidtop/tracker#414). Pure state: the companion's Game tab and the
- * Quick Menu's Game section both read it, so turning Ask before stopping off changes both the same way.
+ * running game's L2 sheet both read it, so turning Ask before stopping off changes both the same way.
  */
 enum class GameRow { RESUME, QUIT, RESTART, KILL, EMULATOR, OVERLAY, PERFORMANCE_MODE, SCREENSHOT }
 
@@ -93,10 +93,4 @@ object GameControls {
 
     /** Stop on an Apps row, Clear all, Stop foreground app: Ask before stopping, or Kid. */
     fun asksStop(mode: UiMode, ask: AskFirst): Boolean = ask.beforeStopping || ControlAccess.rules(mode).alwaysAsk
-
-    /**
-     * The Quick Menu's way of asking: a first A arms the row and a second runs it. [armed] is whether the row is
-     * armed now; true means this press only arms it.
-     */
-    fun needsSecondPress(row: GameRow, armed: Boolean, mode: UiMode, ask: AskFirst): Boolean = asks(row, mode, ask) && !armed
 }

@@ -1489,7 +1489,7 @@ the information means and can use it beyond drawing (filters, updates, linking, 
 | `metadata` | `title?`, `version?`, `developer?`, `publisher?`, `engine?` (an engines-database id), `status?` (`ongoing`, `completed`, `onhold`, `abandoned`), `released?` (`YYYY-MM-DD`), `updated?` (epoch ms), `rating?` (0 to 1), `votes?`, `tags?` (at most 64 of 40 characters), `genres?` (at most 16) | `info` and `badge` facets on the game page, list rows and capsules; the PC Games filters and sorts (Release status, Tags, Rating, Developer, Genre); `version` is what an update is compared with (docs/SPEC.md 7g) |
 | `description` | `overview?`, `changelog?` | `text` facets: the game page's About, the record page's Overview and Changelog |
 | `image` | as `media` | Filed by role; only for a role the game has no picture for, unless the person chose this source's art |
-| `download` | `entries: [{section, host, label, url?, link?, size?, version?, kind?, systems?, parts?}]`, at most 200. `parts` (2026-10-29): `[{label, url?, link?, size?}]`, at most 100, the pieces of one split release on one host; the entry is one row ("4 parts, 12 GB"), and picking it fetches every part in one Downloads job and joins and unpacks them as droidtop's split-set path does (multi-volume RAR, numbered 7-Zip and ZIP parts), never one row per part. `version` lets one item offer several versions; an entry without one is the item's `metadata.version`. `kind`: `page` (default: opened in droidtop's web view, where the person starts the download), `file`, `torrent`, `magnet`. `link` is a token only the plugin's `download` job understands. `systems` (2026-10-23, Droidtop/tracker#617): the systems the link is for, of `windows`, `linux`, `mac`, `android`; without it droidtop reads them from `section` ("Win/Linux" is Windows and Linux), and an entry naming none is for any system | A `list` of `action` entries on the record page's Downloads tab, grouped by section and then host. When the links differ by system, a System row comes first (the one last picked for that source, else Windows, then Linux) and only the picked system's links show; the ones for any system follow under "Extras" (a heading naming a walkthrough, a patch, a save file and the like) or "Other", each with its `section` as its description, so a plugin puts what a link is ("Walkthrough") in `section`; Android picked, droidtop says "This will not be trackable by us. Windows or Linux is recommended." The picker and the notice are droidtop's, drawn from `systems`: no facet filters another, and no plugin words droidtop's notice. Picking one goes through droidtop's Downloads and the download engine and places the result (a new game, or a new version folder, docs/SPEC.md 7g). Kept, so nothing is fetched again to download (Droidtop/tracker#599) |
+| `download` | `entries: [{section, host, label, url?, link?, size?, version?, kind?, systems?, parts?}]`, at most 200. `parts` (2026-10-29): `[{label, url?, link?, size?}]`, at most 100, the pieces of one split release on one host; the entry is one row ("4 parts, 12 GB"), and picking it fetches every part in one Downloads job and joins and unpacks them as droidtop's split-set path does (multi-volume RAR, numbered 7-Zip and ZIP parts), never one row per part. `version` lets one item offer several versions; an entry without one is the item's `metadata.version`. `kind`: `page` (default: opened in droidtop's web view, where the person starts the download), `file`, `torrent`, `magnet`. `link` is a token only the plugin's `download` job understands. `systems` (2026-10-23, Droidtop/tracker#617): the systems the link is for, of `windows`, `linux`, `mac`, `android`; without it droidtop reads them from `section` ("Win/Linux" is Windows and Linux), and an entry naming none is for any system. A mirror is one entry however many systems it covers: droidtop keeps one entry per address (or per section, host and `link` without one), holding every system any copy named (Droidtop/tracker#838) | A `list` of `action` entries on the record page's Downloads tab, grouped by section and then host. When the links differ by system, a System row comes first (the one last picked for that source, else Windows, then Linux) and only the picked system's links show; the ones for any system follow under "Extras" (a heading naming a walkthrough, a patch, a save file and the like) or "Other", each with its `section` as its description, so a plugin puts what a link is ("Walkthrough") in `section`; Android picked, droidtop says "This will not be trackable by us. Windows or Linux is recommended." The picker and the notice are droidtop's, drawn from `systems`: no facet filters another, and no plugin words droidtop's notice. Picking one goes through droidtop's Downloads and the download engine and places the result (a new game, or a new version folder, docs/SPEC.md 7g). Kept, so nothing is fetched again to download (Droidtop/tracker#599) |
 | `links` | `entries: [link]`, at most 32 | `link` facets: the game page's Links, Open the source's page |
 | `store` | `store`, `url`, `price?` (a decimal string), `currency?` (ISO 4217), `owned?`, `free?`, `onSale?` | An `info` and a `link`: where to get the game, the Wishlist shelf. Only store and source plugins may give it, under the guards in "Store information" below |
 | `update` | `version?`, `url?`, `gone?` | A `badge` and an `info`: the Update available badge and shelf, Updates, the record page's version line |
@@ -3835,6 +3835,25 @@ area, which reaches the same catalog screens from every mode:
 - per interface: "Provided by" (§2.3).
 
 There is no second place.
+
+**Decided (Droidtop/tracker#830 R0; SPEC "Permissions").** The
+grant UI follows Android's permission UI as a whole:
+- the moment-of-use sheet asks "Allow <Plugin> to <do this>?" with the plugin's
+  quoted reason and the risk, choices Allow and Don't allow, a separate
+  "Don't ask again" checkbox that makes Don't allow stick, B for Not now;
+- a plugin's Permissions page is sorted into Allowed and Not allowed (Not allowed
+  holds both "Ask every time" and "Don't allow"), plus a group for what it adds,
+  each row with its last use;
+- the one Permissions page's Allowed tab sorts By plugin or By permission (Android's
+  Permission manager: every holder of a group, "2 of 5 plugins allowed");
+- its Recent use tab is the last 7 days of dangerous and critical use from the
+  audit (§4.6), Android's privacy dashboard;
+- a plugin not called for the set time (30 days by default) has its dangerous and critical grants set back
+  to "Ask every time", quietly, listed under Removed while unused. This is on by
+  default and can be turned off for all plugins and per plugin.
+
+These are views of the same grants; there is still no second place where a
+grant is kept.
 
 ### 4.5 How trust tiers and permissions interact
 

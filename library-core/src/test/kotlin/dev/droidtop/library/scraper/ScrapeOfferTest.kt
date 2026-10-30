@@ -33,7 +33,7 @@ class ScrapeOfferTest {
 
     @After
     fun restoreStarter() {
-        ScrapeOffer.starter = { LibraryScrapeJob.start(it, "Scrape all systems") }
+        ScrapeOffer.starter = { LibraryScrapeJob.start(it, "Scrape all systems", auto = true) }
     }
 
     @Test
@@ -84,5 +84,15 @@ class ScrapeOfferTest {
         ScrapeOffer.set(context, ScrapeOffer.Answer.ASK)
         ScrapeOffer.walkFinished(context, 40)
         assertTrue(ScrapeOffer.pending.value)
+    }
+
+    @Test
+    fun aWalkWithTheSameGamesStartsNoSecondScrape() {
+        ScrapeOffer.set(context, ScrapeOffer.Answer.FETCH)
+        ScrapeOffer.walkFinished(context, 40)
+        ScrapeOffer.walkFinished(context, 40)
+        assertEquals("the index ran again with nothing new (tracker 834)", 1, started)
+        ScrapeOffer.walkFinished(context, 42)
+        assertEquals(2, started)
     }
 }

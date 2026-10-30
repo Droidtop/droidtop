@@ -6,8 +6,16 @@ import dev.droidtop.app.update.AppSelfUpdate
 import dev.droidtop.library.settings.FeatureStep
 import dev.droidtop.library.settings.FeatureSteps
 import dev.droidtop.runtime.util.AppScopes
+import dev.droidtop.runtime.ShellPlacement
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** One build's changelog entry: its version, and its lines under Added, Changed and Fixed, in that order. */
@@ -23,7 +31,8 @@ internal class ChangelogBuild(
  * build's entry, newest first, the same text as its release notes. So a person who skipped builds sees every one
  * since the version they had, without the network.
  *
- * The first time one of droidtop's own screens comes to the front after an update, [WhatsNewActivity] opens over it
+ * The first time one of droidtop's own screens is in front after an update, and the shell is placed for good
+ * ([ShellPlacement.settled]), [WhatsNewActivity] opens over it
  * with the builds newer than the last one the person saw, then the app-wide [FeatureSteps]. A fresh install sees
  * neither: onboarding marks this version and every step seen (OnboardingPrefs).
  */
@@ -76,16 +85,27 @@ object WhatsNew {
     internal fun lastSeen(context: Context): Long? =
         prefs(context).takeIf { it.contains(KEY_LAST_SEEN) }?.getLong(KEY_LAST_SEEN, 0L)
 
+    /** The droidtop screen in front now (set on resume, cleared on pause), which What's new opens over. */
+    private val front = MutableStateFlow<WeakReference<Activity>?>(null)
+
     /**
-     * Called as one of droidtop's own screens comes to the front ([activity]): the first time in this process, after
-     * an update, it opens [WhatsNewActivity]. Not over onboarding or a game, and not before onboarding finished: a
-     * first run is the setup, not an update.
+     * Whether What's new may open over [screen] now: not while it is going away, and over the shell only once the screen
+     * placement said the shell stays where it is ([settled], Droidtop/tracker#824). Before that, the placement could still
+     * start the shell again on another screen, over What's new: on the console it did, 0.4 s after What's new opened, and
+     * the person never saw it. Standard and droidtop's other screens are never moved. Pure.
+     */
+    internal fun mayOpen(screenAlive: Boolean, isShell: Boolean, settled: Boolean): Boolean = screenAlive && (!isShell || settled)
+
+    /**
+     * Called as one of droidtop's own screens comes to the front ([activity]): the first time in this process, after an
+     * update, What's new opens over the screen in front once [mayOpen] says so, an event rather than a wait. Not over
+     * onboarding or a game, and not before onboarding finished: a first run is the setup, not an update. The version
+     * counts as seen only when the person closes it, so leaving it any other way shows it again at the next start.
      */
     fun onShellResumed(activity: Activity) {
+        front.value = WeakReference(activity)
         if (!checked.compareAndSet(false, true)) return
         val app = activity.applicationContext
-        // Opened from the screen in front, in its task, so closing it lands back there.
-        val from = java.lang.ref.WeakReference(activity)
         AppScopes.io.launch {
             if (!GamesRootPrefs.isOnboardingComplete(app)) {
                 // Onboarding marks this version seen when it finishes; check again at the next start.
@@ -99,16 +119,20 @@ object WhatsNew {
                 markCurrentSeen(app)
                 return@launch
             }
-            AppScopes.main.launch {
-                val screen = from.get()?.takeUnless { it.isFinishing || it.isDestroyed }
-                if (screen != null) {
-                    screen.startActivity(WhatsNewActivity.intent(screen, all = false))
-                } else {
-                    // The screen went away meanwhile: the next one in front asks again.
-                    checked.set(false)
-                }
+            // The screen in front, once it may be opened over: the shell placed, or another of droidtop's screens.
+            val screen = combine(front, ShellPlacement.settled) { ref, settled ->
+                ref?.get()?.takeIf { mayOpen(!it.isFinishing && !it.isDestroyed, it is MainActivity, settled) }
+            }.filterNotNull().first()
+            withContext(Dispatchers.Main) {
+                // Opened from the screen in front, in its task, so closing it lands back there.
+                screen.startActivity(WhatsNewActivity.intent(screen, all = false))
             }
         }
+    }
+
+    /** [activity] left the front: What's new does not open over it. */
+    fun onScreenPaused(activity: Activity) {
+        if (front.value?.get() === activity) front.value = null
     }
 
     /** The steps droidtop registers, at its start (DroidtopApplication), before onboarding or What's new reads them. */

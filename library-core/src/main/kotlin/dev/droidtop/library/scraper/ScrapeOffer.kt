@@ -51,7 +51,9 @@ object ScrapeOffer {
     val pending: StateFlow<Boolean> get() = pendingState
 
     /** How a scrape is started; a test swaps it. */
-    internal var starter: (Context) -> Unit = { LibraryScrapeJob.start(it, "Scrape all systems") }
+    // Automatic (the person's "Fetch automatically"): it fills gaps, joins a scrape already running, and does not ask
+    // again about games whose last answer stands (Droidtop/tracker#834).
+    internal var starter: (Context) -> Unit = { LibraryScrapeJob.start(it, "Scrape all systems", auto = true) }
 
     fun current(context: Context): Answer {
         val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_ANSWER, null)
@@ -74,9 +76,21 @@ object ScrapeOffer {
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_PENDING, true).apply()
                 pendingState.value = true
             }
-            Action.START -> starter(context)
+            // A walk that found the same number of games as the one that last started a scrape changed nothing to
+            // fetch for (Droidtop/tracker#834: the index ran every minute or two and each run started the pass again).
+            Action.START -> if (sameAsLastStart(context, gameCount)) Unit else starter(context)
             Action.NOTHING -> Unit
         }
+    }
+
+    private const val KEY_LAST_COUNT = "droidtop_scrape_offer_last_count"
+
+    /** Whether the walk that last started a scrape had [gameCount] games too; records [gameCount] when it did not. */
+    private fun sameAsLastStart(context: Context, gameCount: Int): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getInt(KEY_LAST_COUNT, -1) == gameCount) return true
+        prefs.edit().putInt(KEY_LAST_COUNT, gameCount).apply()
+        return false
     }
 
     /** Raises a question left unanswered by an earlier process. Reads preferences, so call it off the main thread. */

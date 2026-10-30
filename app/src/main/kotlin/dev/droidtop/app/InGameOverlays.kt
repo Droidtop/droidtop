@@ -23,6 +23,7 @@ import dev.droidtop.shell.gamepad.LocalInGameOverlay
 import dev.droidtop.shell.gamepad.hosted.AppInFrontStandalone
 import dev.droidtop.shell.gamepad.hosted.GameOptionsStandalone
 import dev.droidtop.shell.gamepad.hosted.LeftMenuStandalone
+import dev.droidtop.shell.gamepad.hosted.MenuPickerStandalone
 import dev.droidtop.shell.gamepad.hosted.QuickMenuStandalone
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.library.settings.Mode
@@ -122,7 +123,6 @@ internal object InGameOverlays {
         val (view, lifecycle) = overlayView(windowContext, request.displayId) {
             when (request.kind) {
                 OverlayRequest.Kind.QUICK_MENU -> QuickMenuStandalone(
-                    library = library,
                     // Start swaps to the left menu, as it does in Gaming.
                     onOpenStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
                     onDismiss = { close() },
@@ -147,10 +147,27 @@ internal object InGameOverlays {
                         entry = entry,
                         // The game never left: Play is closing the overlay.
                         onResume = { close() },
+                        // Restart, once the game really ended: the one launch path, as the shell's.
+                        onLaunch = { scope.launch { runCatching { library.launch(it) }.onFailure { e -> Log.w(TAG, "restart of ${it.title} failed", e) } } },
                         onOpenDownloads = { open(PlaceLinks.intent(app, Place.DOWNLOADS)) },
                         onDismiss = { close() },
                     )
                 }
+                OverlayRequest.Kind.PICKER -> MenuPickerStandalone(
+                    contextTitle = when {
+                        gameInFront -> "This game"
+                        front == app.packageName -> "This screen"
+                        else -> "This app"
+                    },
+                    onQuickMenu = { swap(request.copy(kind = OverlayRequest.Kind.QUICK_MENU)) },
+                    onContextMenu = { swap(request.copy(kind = OverlayRequest.Kind.CONTEXT_MENU)) },
+                    onStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
+                    onSwitchMode = {
+                        close()
+                        runCatching { dev.droidtop.shell.standard.ModeSwitcher.open(app) }.onFailure { Log.w(TAG, "mode switcher did not open", it) }
+                    },
+                    onDismiss = { close() },
+                )
                 OverlayRequest.Kind.LEFT_MENU -> LeftMenuStandalone(
                     gamingSections = gamingInUse,
                     runningTitle = runningEntry?.let { dev.droidtop.library.GameNaming.displayName(it.title) },
@@ -271,11 +288,20 @@ internal object InGameOverlays {
                 .putExtra(BackButtonMenu.EXTRA_GAMING_START_SECTION, section)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+    /**
+     * Takes the overlay down and hands the pad back to what is under it (Droidtop/tracker#740: after the overlays the
+     * D-pad no longer reached RetroArch). In order: the composition first, while its window is still attached, so every
+     * focusable sub-window it opened (a sheet's Popup) is removed and none is left holding window focus; then the window
+     * itself, at once rather than on the next traversal; then the lifecycle. The window that has focus afterwards is
+     * logged, so a console log shows whether anything of droidtop's still holds the pad.
+     */
     private fun close() {
         val open = shown ?: return
         shown = null
         OverlayRequests.open = false
+        runCatching { open.view.disposeComposition() }.onFailure { Log.w(TAG, "${open.kind}: composition not disposed", it) }
+        runCatching { open.windowManager.removeViewImmediate(open.view) }.onFailure { Log.w(TAG, "${open.kind}: window not removed", it) }
         open.lifecycle.currentState = Lifecycle.State.DESTROYED
-        runCatching { open.windowManager.removeView(open.view) }
+        Log.i(TAG, "${open.kind} closed; window attached=${open.view.isAttachedToWindow}")
     }
 }

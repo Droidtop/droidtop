@@ -203,19 +203,9 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
      */
     public static ArrayList<OptionItem> getOptions(Launcher launcher) {
         ArrayList<OptionItem> options = new ArrayList<>();
-        // droidtop patch (not upstream): the mode switcher, where a person
-        // looking at the home screen's own menu will look for it. Its only
-        // other route from here was a long-press of Back, which nothing on
-        // screen names and BlueStacks never delivers (rig,
-        // dq-coordinator-24, finding 3).
-        options.add(new OptionItem(launcher,
-                R.string.droidtop_modes_option,
-                R.drawable.ic_apps,
-                IGNORE,
-                v -> {
-                    dev.droidtop.shell.standard.BackButtonMenu.show(Launcher.getLauncher(v.getContext()));
-                    return true;
-                }));
+        // droidtop patch (not upstream): no mode switcher row. Long-press HOME is Mobile's one route to it (owner,
+        // 2026-10-30, Droidtop/tracker#827: "Long pressing HOME is what gets the mode switcher. Why do we need other
+        // routes, we've made the home button the sole controller").
         // droidtop patch: the library's games grid, whatever modes are on
         // (with Gaming on, the droidtop icon opens Gaming instead).
         options.add(new OptionItem(launcher,

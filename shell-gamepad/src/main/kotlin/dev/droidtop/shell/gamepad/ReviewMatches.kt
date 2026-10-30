@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -249,16 +251,22 @@ internal fun ReviewMatches(onDismiss: () -> Unit) {
                 color = MenuTokens.OnSurface,
                 fontWeight = FontWeight.SemiBold,
             )
-            ReviewTabs(tab, all)
+            ReviewTabs(tab, all) { picked -> moveTab(MatchQueue.Tab.entries.indexOf(picked) - MatchQueue.Tab.entries.indexOf(tab)) }
             when {
                 cards == null -> MenuRow(title = "Reading the queue...")
                 card == null -> MenuRow(title = "Nothing waits in ${TAB_NAMES.getValue(tab)}")
                 else -> {
-                    Text(
-                        "${cardIndex.coerceAtMost(inTab.size - 1) + 1} of ${inTab.size}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MenuTokens.OnSurfaceMuted,
-                    )
+                    // Previous and Next as taps too: Left and Right step the cards on a pad, and a person with no pad
+                    // must reach every card (Droidtop/tracker#839).
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        StepLabel("Previous", enabled = cardIndex > 0) { moveCard(-1) }
+                        Text(
+                            "${cardIndex.coerceAtMost(inTab.size - 1) + 1} of ${inTab.size}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MenuTokens.OnSurfaceMuted,
+                        )
+                        StepLabel("Next", enabled = cardIndex < inTab.size - 1) { moveCard(1) }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         LocalSide(card, entries, Modifier.weight(0.4f))
                         Column(Modifier.weight(0.6f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -289,9 +297,9 @@ internal fun ReviewMatches(onDismiss: () -> Unit) {
     }
 }
 
-/** The three tabs with their counts; the open one in the accent. */
+/** The three tabs with their counts; the open one in the accent. A tap opens one, as L1 and R1 step them. */
 @Composable
-private fun ReviewTabs(open: MatchQueue.Tab, cards: List<MatchQueue.Card>) {
+private fun ReviewTabs(open: MatchQueue.Tab, cards: List<MatchQueue.Card>, onPick: (MatchQueue.Tab) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
         MatchQueue.Tab.entries.forEach { t ->
             val count = cards.filter { it.tab == t }.sumOf { it.items.size }
@@ -300,9 +308,21 @@ private fun ReviewTabs(open: MatchQueue.Tab, cards: List<MatchQueue.Card>) {
                 style = MaterialTheme.typography.labelLarge,
                 color = if (t == open) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
                 fontWeight = if (t == open) FontWeight.SemiBold else FontWeight.Normal,
+                modifier = Modifier.heightIn(min = 48.dp).padRow { onPick(t) }.padding(horizontal = 4.dp, vertical = 12.dp),
             )
         }
     }
+}
+
+/** A step between cards as a tap: muted when there is nowhere to step. */
+@Composable
+private fun StepLabel(label: String, enabled: Boolean, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelLarge,
+        color = if (enabled) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
+        modifier = Modifier.heightIn(min = 48.dp).padRow { if (enabled) onClick() }.padding(horizontal = 4.dp, vertical = 12.dp),
+    )
 }
 
 /** The game as it is on disk: its folder or file name, the title and version read from it, and how many share the card. */

@@ -24,6 +24,9 @@ enum class Place(val screenId: String, val title: String, val listed: Boolean = 
     STORES(STORES_SCREEN, "Game sources"),
     SOCIAL(SOCIAL_SCREEN, "Social"),
     DOWNLOADS(DOWNLOADS_SCREEN, "Downloads and Updates"),
+    // A page of Downloads and Updates, reached by its "Updates · N available" row there, never a row of its own (the owner,
+    // 2026-10-30, Droidtop/tracker#792: "An updates link should be in the Downloads and Updates tab. Not there directly,
+    // but a shortcut").
     UPDATES(UPDATES_SCREEN, "Updates", listed = false),
     PLUGINS(PLUGINS_SCREEN, "Plugins"),
     ;

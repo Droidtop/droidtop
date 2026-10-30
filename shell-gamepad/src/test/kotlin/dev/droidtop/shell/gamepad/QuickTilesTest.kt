@@ -248,11 +248,12 @@ class QuickTilesTest {
     }
 
     @Test
-    fun `the rail shows Game only while a game runs and Plugins only with tiles`() {
-        val bare = QuickTiles.visibleSections(gameRunning = false, hasPlugins = false)
-        assertFalse(QuickSection.GAME in bare)
+    fun `the rail has no Game section and shows Plugins only with tiles`() {
+        val bare = QuickTiles.visibleSections(hasPlugins = false)
+        // What can be done with the running game is L2's (Droidtop/tracker#740).
+        assertTrue(QuickSection.entries.none { it.panel == dev.droidtop.library.settings.ControlPanel.GAME })
         assertFalse(QuickSection.PLUGINS in bare)
-        val full = QuickTiles.visibleSections(gameRunning = true, hasPlugins = true)
+        val full = QuickTiles.visibleSections(hasPlugins = true)
         assertEquals(QuickSection.entries, full)
         // Get games is a contextual action, never a rail section.
         assertTrue(QuickSection.entries.none { it.label.contains("Get games", ignoreCase = true) })
@@ -261,19 +262,19 @@ class QuickTilesTest {
     @Test
     fun `Social is a section of the rail, gone where its place does not open`() {
         // Owner, 2026-10-24: "Game sources go into the qam, as does social" (Droidtop/tracker#644).
-        assertTrue(QuickSection.SOCIAL in QuickTiles.visibleSections(gameRunning = false, hasPlugins = false))
-        assertFalse(QuickSection.SOCIAL in QuickTiles.visibleSections(gameRunning = false, hasPlugins = false, hasSocial = false))
+        assertTrue(QuickSection.SOCIAL in QuickTiles.visibleSections(hasPlugins = false))
+        assertFalse(QuickSection.SOCIAL in QuickTiles.visibleSections(hasPlugins = false, hasSocial = false))
         assertEquals("Social", QuickSection.SOCIAL.label)
         // Guest keeps the owner's friends private.
-        assertFalse(QuickSection.SOCIAL in QuickTiles.visibleSections(true, true, mode = dev.droidtop.library.settings.UiMode.GUEST))
+        assertFalse(QuickSection.SOCIAL in QuickTiles.visibleSections(true, mode = dev.droidtop.library.settings.UiMode.GUEST))
     }
 
     @Test
     fun `Kid and Kiosk sections come from ControlAccess and match Full's, without the restriction's own items`() {
         for (mode in listOf(dev.droidtop.library.settings.UiMode.KID, dev.droidtop.library.settings.UiMode.KIOSK)) {
             assertEquals(
-                QuickTiles.visibleSections(gameRunning = true, hasPlugins = true),
-                QuickTiles.visibleSections(gameRunning = true, hasPlugins = true, mode = mode),
+                QuickTiles.visibleSections(hasPlugins = true),
+                QuickTiles.visibleSections(hasPlugins = true, mode = mode),
             )
         }
         val groups = listOf(
@@ -292,21 +293,20 @@ class QuickTilesTest {
     }
 
     @Test
-    fun `the menu opens on the game, else notifications when granted, else system`() {
-        assertEquals(QuickSection.GAME, QuickTiles.initialSection(gameRunning = true, notificationsGranted = false))
-        assertEquals(QuickSection.NOTIFICATIONS, QuickTiles.initialSection(gameRunning = false, notificationsGranted = true))
-        assertEquals(QuickSection.SYSTEM, QuickTiles.initialSection(gameRunning = false, notificationsGranted = false))
+    fun `the menu opens on notifications when granted, else system`() {
+        assertEquals(QuickSection.NOTIFICATIONS, QuickTiles.initialSection(notificationsGranted = true))
+        assertEquals(QuickSection.SYSTEM, QuickTiles.initialSection(notificationsGranted = false))
     }
 
     @Test
     fun `L1 and R1 step the rail and wrap at its ends`() {
-        val visible = QuickTiles.visibleSections(gameRunning = false, hasPlugins = false)
+        val visible = QuickTiles.visibleSections(hasPlugins = false)
         assertEquals(QuickSection.NOTIFICATIONS, QuickTiles.stepSection(visible, QuickSection.APPS, +1))
         assertEquals(QuickSection.APPS, QuickTiles.stepSection(visible, QuickSection.NOTIFICATIONS, -1))
         assertEquals(visible.first(), QuickTiles.stepSection(visible, visible.last(), +1))
         assertEquals(visible.last(), QuickTiles.stepSection(visible, visible.first(), -1))
-        // A section that left the rail (the game ended) lands on the first one.
-        assertEquals(visible.first(), QuickTiles.stepSection(visible, QuickSection.GAME, +1))
+        // A section that left the rail (its last plugin removed) lands on the first one.
+        assertEquals(visible.first(), QuickTiles.stepSection(visible, QuickSection.PLUGINS, +1))
     }
 
     @Test

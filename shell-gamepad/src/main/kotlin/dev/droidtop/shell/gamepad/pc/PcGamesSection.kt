@@ -781,7 +781,6 @@ internal fun PcGamesSection(
     // next one at once.
     var backdropArt by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(focusedEntry?.id) { focusedEntry?.let { backdropArt = it.backdropArt() } }
-    PreloadBackdrops(remember(currentList, state.itemIndex) { neighbourBackdrops(currentList, state.itemIndex) })
 
     // The strip: one chip per tab ([pcStripTabs]). Home has no strip; B from a
     // grid view or Collections returns to Overview.
@@ -936,6 +935,18 @@ internal fun PcGamesSection(
     val rowStates = remember { mutableMapOf<String, LazyListState>() }
     fun rowState(id: String) = rowStates.getOrPut(id) { LazyListState() }
     fun gridColumns(): Int = (gridState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.column } ?: 0) + 1
+    // On the shelves the ones above and below too, and in the grid the rows above and below (Droidtop/tracker#782).
+    PreloadBackdrops(
+        remember(currentList, shelves, state.onShelves, state.shelfIndex, state.itemIndex) {
+            if (state.onShelves) {
+                shelfNeighbourBackdrops(shelves.map { it.entries }, state.shelfIndex, state.itemIndex, landing = { other ->
+                    shelves.getOrNull(other)?.let { state.shelfItems[it.id] } ?: 0
+                })
+            } else {
+                neighbourBackdrops(currentList, state.itemIndex, columns = gridColumns())
+            }
+        },
+    )
 
     // The selection is always on screen: a strip, a shelf or the grid centres
     // it, eased on the first press and linear while a direction is held; the
@@ -1210,7 +1221,7 @@ internal fun PcGamesSection(
                                     state.homeCard = index
                                 }
                             },
-                            // Every way into Updates opens the Quick Menu's Downloads tab, where the jobs are (Droidtop/tracker#749).
+                            // The activity spot opens Updates, its own page (Droidtop/tracker#792).
                             onActivity = { onOpenSection(GamingSection.UPDATES) },
                             onBell = onOpenQuickMenu,
                             onFriends = { onOpenSection(GamingSection.SOCIAL) },

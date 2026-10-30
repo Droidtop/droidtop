@@ -12,6 +12,12 @@ object GetGamesEntry {
     /** The search's heading over matches from the download sources, and Updates' row for them (Droidtop/tracker#612, #621). */
     const val NEW_GAMES = "Get new games"
 
+    /**
+     * Downloads and Updates' one Get games row (owner, 2026-10-30, Droidtop/tracker#825: "We want a single get games
+     * section"): Gaming opens the search in place; elsewhere it opens over the screen in front.
+     */
+    const val SEARCH_ROW_ID = "get_games_search"
+
     /** Updates' Get new games row: Gaming opens the search in place; elsewhere it opens Gaming on it. */
     const val UPDATES_ROW_ID = "updates_get_new_games"
 

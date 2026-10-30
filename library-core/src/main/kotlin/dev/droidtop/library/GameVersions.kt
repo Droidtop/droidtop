@@ -135,6 +135,16 @@ object GameUpdates {
     fun installedLabel(installed: String?): String =
         "Installed: " + (installed?.trim()?.takeIf { it.isNotEmpty() }?.let(::shown) ?: "unknown")
 
+    /**
+     * The two versions as one step, installed first: "v0.37 → v0.38", the Updates page's rows (Droidtop/tracker#792).
+     * Always in this order, so which is which is never a guess (#639); an unknown installed version says so.
+     */
+    fun step(installed: String?, available: String): String {
+        val from = installed?.trim()?.takeIf { it.isNotEmpty() }?.let(::shown) ?: "unknown"
+        val to = if (available == NEWER_BUILD) "a newer build" else shown(available)
+        return "$from → $to"
+    }
+
     /** A version as droidtop writes it: one that starts with a digit gets its `v`, a name ("Final") does not. */
     private fun shown(version: String): String {
         val bare = normalize(version)

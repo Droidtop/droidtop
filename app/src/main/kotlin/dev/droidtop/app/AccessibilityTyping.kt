@@ -41,6 +41,18 @@ class TypingAccessibilityService : AccessibilityService() {
     /** Standard's taskbar (docs/SPEC.md 2c "Taskbar on large screens"), hosted here: droidtop has one service. */
     private var taskbar: dev.droidtop.shell.standard.StandardTaskbar? = null
 
+    /**
+     * Android's accessibility button (the service asks for it: flagRequestAccessibilityButton): the touch route to
+     * droidtop's menus over any app, the pad's being the HOME chords (Droidtop/tracker#839; the owner: "We should
+     * probably add an accessibility button that lets the user pick what menu to open"). A tap opens the picker.
+     */
+    private val menuButton = object : android.accessibilityservice.AccessibilityButtonController.AccessibilityButtonCallback() {
+        override fun onClicked(controller: android.accessibilityservice.AccessibilityButtonController) {
+            android.util.Log.i("droidtop.input", "accessibility button: menu picker")
+            HomeOverlayKeys.raise(dev.droidtop.runtime.overlay.OverlayRequest.Kind.PICKER)
+        }
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         dev.droidtop.runtime.keyboard.AccessibilityHost.service = this
@@ -48,6 +60,7 @@ class TypingAccessibilityService : AccessibilityService() {
         AccessibilityPointer.connect(this)
         HomeOverlayKeys.connect(this)
         taskbar = dev.droidtop.shell.standard.StandardTaskbar(this).also { it.attach() }
+        accessibilityButtonController.registerAccessibilityButtonCallback(menuButton)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -65,6 +78,7 @@ class TypingAccessibilityService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: Intent?): Boolean {
+        accessibilityButtonController.unregisterAccessibilityButtonCallback(menuButton)
         dev.droidtop.runtime.keyboard.AccessibilityHost.service = null
         taskbar?.detach()
         taskbar = null

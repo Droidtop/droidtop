@@ -337,6 +337,34 @@ class PluginJobsCenterTest {
     }
 
     @Test
+    fun aJobThatCannotPauseComesBackFromARestartEndedSoItsKindRunsAgain() = runBlocking {
+        // Droidtop/tracker#837: the update check, running when a self-update restarted droidtop, came back paused with
+        // no Resume, and Check now joined it and waited for ever.
+        PluginJobsCenter.nativeDispatcher = Dispatchers.Default
+        val hold = CompletableDeferred<Unit>()
+        val runs = java.util.concurrent.atomic.AtomicInteger(0)
+        PluginJobsCenter.registerNative("test_native_check") { _, _, _ -> runs.incrementAndGet(); hold.await(); "checked" }
+        val id = PluginJobsCenter.startNative(null, "test_native_check", "Check for updates", pausable = false)!!
+        withTimeout(5_000) { while (runs.get() < 1) kotlinx.coroutines.delay(10) }
+        val stored = PluginJobsCenter.encodeEntries(listOf(PluginJobsCenter.find(id)!!))
+        PluginJobsCenter.cancel(id)
+
+        PluginJobsCenter.restore(PluginJobsCenter.decodeEntries(stored))
+        val back = PluginJobsCenter.find(id)!!
+        assertTrue(back.done)
+        assertFalse(back.paused)
+        assertEquals(JobState.FAILED, back.state)
+        assertEquals(PluginJobsCenter.STOPPED_BY_RESTART, back.result?.error)
+
+        // Asking for the check again starts a new one rather than joining the old.
+        val again = PluginJobsCenter.startNative(null, "test_native_check", "Check for updates", pausable = false)!!
+        assertTrue(again != id)
+        withTimeout(5_000) { while (runs.get() < 2) kotlinx.coroutines.delay(10) }
+        hold.complete(Unit)
+        PluginJobsCenter.cancel(again)
+    }
+
+    @Test
     fun startingTheSameNativeJobTwiceIsOneJob() = runBlocking {
         PluginJobsCenter.nativeDispatcher = Dispatchers.Default
         val hold = CompletableDeferred<Unit>()

@@ -74,7 +74,9 @@ internal fun AppsTab(onDismiss: () -> Unit) {
     // Row 0 is Clear all apps, then one row per app.
     val index = focusIndex.coerceIn(0, apps.size)
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    // Asked each frame until the window is attached: one early request was lost in the Quick Menu over a game,
+    // and the first D-pad press only gave the section focus (Droidtop/tracker#820).
+    LaunchedEffect(Unit) { requestFocusWhenAttached(focusRequester, "Quick Menu Running apps") }
     LaunchedEffect(Unit) { TaskManager.watch(context) }
 
     Column(

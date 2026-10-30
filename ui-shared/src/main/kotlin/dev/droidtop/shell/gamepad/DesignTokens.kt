@@ -550,6 +550,8 @@ object MenuTokens {
     /** A chosen chip or tab, drawn solid, and the label on it. */
     val Selected: Color get() = GamingTheme.palette.selected
     val OnSelected: Color get() = GamingTheme.palette.onSelected
+    /** Text on the accent fill (a primary chip at rest), picked against the accent itself. */
+    val OnAccent: Color get() = GamingTheme.palette.onAccent
     /** Under text laid over artwork: the gradient's dark end. */
     val Scrim: Color get() = GamingTheme.palette.scrim
 

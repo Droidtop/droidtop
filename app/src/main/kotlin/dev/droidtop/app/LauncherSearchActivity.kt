@@ -42,6 +42,16 @@ class LauncherSearchActivity : ComponentActivity() {
             }
         }
         val games = library.backgroundScanState(LibraryKinds.GAMES)
+        // Get games, outside Gaming (Downloads and Updates' row, Droidtop/tracker#825): the same one search Gaming opens,
+        // with the source filter and what the sources feature.
+        if (intent?.getBooleanExtra(EXTRA_GET_GAMES, false) == true) {
+            setContent {
+                dev.droidtop.app.ui.DroidtopTheme {
+                    dev.droidtop.shell.gamepad.GetGamesSearch(onDismiss = { finish() })
+                }
+            }
+            return
+        }
         val initialText = intent?.getStringExtra(LauncherSearch.EXTRA_TEXT).orEmpty()
         setContent {
             dev.droidtop.app.ui.DroidtopTheme {
@@ -77,5 +87,15 @@ class LauncherSearchActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    companion object {
+        private const val EXTRA_GET_GAMES = "dev.droidtop.app.extra.GET_GAMES"
+
+        /** Get games over whatever is in front: the one search, opened on what the sources feature. */
+        fun getGamesIntent(context: android.content.Context): android.content.Intent =
+            android.content.Intent(context, LauncherSearchActivity::class.java)
+                .putExtra(EXTRA_GET_GAMES, true)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }

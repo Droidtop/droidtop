@@ -66,7 +66,7 @@ object ItemPageFacets {
             cover = (images.firstOrNull { it.role == "cover" } ?: images.firstOrNull())?.url,
             overview = about?.overview,
             changelog = about?.changelog,
-            downloads = downloads.mapNotNull { d ->
+            downloads = distinctDownloads(downloads.mapNotNull { d ->
                 val url = d.url?.takeIf { it.startsWith("https://") }
                 val parts = d.parts.mapNotNull { p ->
                     val partUrl = p.url?.takeIf { it.startsWith("https://") }
@@ -74,9 +74,29 @@ object ItemPageFacets {
                 }
                 if (url == null && d.link.isNullOrBlank() && parts.isEmpty()) return@mapNotNull null
                 UpdateSources.Download(section = d.section, host = d.host, label = d.label, link = d.link.orEmpty(), url = url, systems = d.systems, parts = parts)
-            },
+            }),
             controls = controls(facets),
         )
+    }
+
+    /**
+     * [downloads] with each mirror once (Droidtop/tracker#838; the owner: "links are duplicated. Links that are marked
+     * 'windows/linux' are presented twice under that title"). A download is one link however many systems it covers:
+     * entries with the same address, or with no address and the same section, host and token, are one, holding every
+     * system any of them named. The first keeps its place. Pure.
+     */
+    fun distinctDownloads(downloads: List<UpdateSources.Download>): List<UpdateSources.Download> {
+        val merged = LinkedHashMap<String, UpdateSources.Download>()
+        for (d in downloads) {
+            val key = when {
+                d.url != null -> "url:${d.url}"
+                d.link.isNotBlank() -> "link:${d.section}\u0000${d.host.lowercase()}\u0000${d.link}"
+                else -> "parts:" + d.parts.joinToString("\u0000") { it.url ?: it.link.orEmpty() }
+            }
+            val seen = merged[key]
+            merged[key] = if (seen == null) d else seen.copy(systems = (seen.systems + d.systems).distinct())
+        }
+        return merged.values.toList()
     }
 
     /**

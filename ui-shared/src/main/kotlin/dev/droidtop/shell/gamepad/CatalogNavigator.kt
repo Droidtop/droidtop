@@ -228,6 +228,9 @@ fun CatalogNavigator(
     var confirmArmedId by remember { mutableStateOf<String?>(null) }
     var editingText by remember { mutableStateOf<TextInputItem?>(null) }
     var pickingChoice by remember { mutableStateOf<ChoiceItem?>(null) }
+    // A row that asks first (its confirmTitle), waiting in the one confirmation, Cancel first (Droidtop/tracker#835): it
+    // replaced the second A on the row, where only pressing again or leaving the page ended the question.
+    var confirming by remember { mutableStateOf<CatalogItem?>(null) }
     // Y's Info sheet: the selected row's whole text. Rows show their
     // name and value; this is where the rest of it is.
     var infoRow by remember { mutableStateOf<CatalogItem?>(null) }
@@ -277,7 +280,9 @@ fun CatalogNavigator(
     }
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val fillsPage = hostWidth >= screenWidth * PAGE_WIDTH_FRACTION
-    val categoryMode = fillsPage && categories.size >= MIN_SETTINGS_CATEGORIES
+    // A page drawn as a strip of views (Updates) is never cut into a column: its views are its groups (Droidtop/tracker#837,
+    // where Updates as a place drew each source row as a column entry of its own).
+    val categoryMode = fillsPage && categories.size >= MIN_SETTINGS_CATEGORIES && root.layout != dev.droidtop.library.settings.CatalogLayout.STRIP
     // Side by side only on a landscape window: held upright the two take turns, however wide the
     // window is (a 1080x1920 tablet is 720dp wide, which once put the column beside the pane).
     val twoPane = categoryMode && hostWidth >= TWO_PANE_MIN_WIDTH && !LocalShellWindow.current.portrait
@@ -292,6 +297,11 @@ fun CatalogNavigator(
     // What the pane shows: a pushed screen, else the category's linked
     // screen, else the root's own rows.
     val screen: CatalogScreen = if (depth > 0) stack.last() else category?.let { linkScreen(it) } ?: root
+    // A page drawn as a strip of views (CatalogLayout.STRIP, docs/SPEC.md 7k "Page anatomy"): its header and bar, then
+    // one of its groups at a time, each group a view named by its title on the shell's view strip, L1 and R1 stepping
+    // them (Updates' kinds with their counts, Droidtop/tracker#792).
+    val strip = screen.layout == dev.droidtop.library.settings.CatalogLayout.STRIP
+    var stripIndex by remember(screen.id) { mutableStateOf(0) }
     // Tagged with the screen they belong to: right after a push or a pop
     // the list must not treat the previous screen's rows as this one's.
     val paneLoaded by produceState<Pair<CatalogScreen, List<CatalogGroup>>?>(null, screen, version, refreshKey) {
@@ -319,7 +329,7 @@ fun CatalogNavigator(
             value = true
         }
     }
-    val groups = remember(screen, rootGroups, paneLoaded, category?.key, loadingShown) {
+    val loadedGroups = remember(screen, rootGroups, paneLoaded, category?.key, loadingShown) {
         when {
             // A category's screen is built after the column's cursor has rested on it; until then the pane says so
             // instead of standing blank (rig, build 1715: a store row showed nothing until Right or a tap).
@@ -330,6 +340,16 @@ fun CatalogNavigator(
             category != null -> rootGroups.orEmpty().filter { it.id in category.groupIds }
                 .map { if (it.title == category.label || category.groupIds.size == 1) it.copy(title = null) else it }
             else -> rootGroups ?: if (loadingShown) loadingGroups(root.title) else emptyList()
+        }
+    }
+    // A strip's views are its groups after the page's own header and bar.
+    val stripViews = if (strip) loadedGroups.filter { it.id != dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID } else emptyList()
+    val groups = remember(loadedGroups, strip, stripIndex) {
+        if (!strip || stripViews.isEmpty()) {
+            loadedGroups
+        } else {
+            val shown = stripViews[stripIndex.coerceIn(0, stripViews.lastIndex)]
+            loadedGroups.filter { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID } + shown.copy(title = null)
         }
     }
     val rows = remember(groups, showSearch, depth, categoryMode) {
@@ -481,6 +501,17 @@ fun CatalogNavigator(
         scope.launch { listState.scrollToItem(0) }
     }
 
+    // L1/R1 step a strip page's views, never wrapping, as on every strip (docs/SPEC.md 7j, "Gaming controls").
+    if (strip && !categoryMode && stripViews.size > 1) {
+        OwnShoulders { step ->
+            val next = menuStep(stripIndex.coerceIn(0, stripViews.lastIndex), stripViews.size, step)
+            if (next != stripIndex) {
+                EsDeNavigationSounds.play(UiSound.TAB)
+                stripIndex = next
+            }
+        }
+    }
+
     // L1/R1 step the categories from anywhere on the page, never wrapping, as they step a strip elsewhere (proposal
     // 6.H, Droidtop/tracker#644 slice 4).
     if (categoryMode) {
@@ -565,7 +596,7 @@ fun CatalogNavigator(
             }
             is DocumentPickItem -> {
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
-                    confirmArmedId = item.id
+                    confirming = item
                     return
                 }
                 confirmArmedId = null
@@ -594,7 +625,7 @@ fun CatalogNavigator(
                 // A fact or a state: A promises nothing on it, and does nothing (Droidtop/tracker#587).
                 if (item.inert) return
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
-                    confirmArmedId = item.id
+                    confirming = item
                     return
                 }
                 confirmArmedId = null
@@ -608,7 +639,7 @@ fun CatalogNavigator(
                     return
                 }
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
-                    confirmArmedId = item.id
+                    confirming = item
                     return
                 }
                 confirmArmedId = null
@@ -762,6 +793,19 @@ fun CatalogNavigator(
         return
     }
 
+    confirming?.let { item ->
+        ConfirmDialog(
+            question = item.confirmText ?: item.title,
+            action = item.title,
+            onConfirm = {
+                confirming = null
+                // Marked as the yes, then pressed: the row's own path runs it as it always did.
+                confirmArmedId = item.id
+                activate(item)
+            },
+            onCancel = { confirming = null },
+        )
+    }
     infoRow?.let { item ->
         CatalogInfoSheet(item = item, status = statusById[item.id], onDismiss = { infoRow = null })
     }
@@ -1027,6 +1071,18 @@ fun CatalogNavigator(
         val edge = LocalShellWindow.current.edgePadding
         CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
             when {
+                !categoryMode && strip && stripViews.size > 1 -> Column(Modifier.fillMaxSize()) {
+                    ViewStrip(
+                        labels = stripViews.map { it.title.orEmpty() },
+                        active = stripIndex.coerceIn(0, stripViews.lastIndex),
+                        focused = null,
+                        pill = null,
+                        onSelect = { stripIndex = it },
+                        onClearPill = {},
+                        modifier = Modifier.padding(top = MenuTokens.SectionListTopGap),
+                    )
+                    pane(Modifier.weight(1f).fillMaxWidth(), edge)
+                }
                 !categoryMode -> pane(Modifier.fillMaxSize(), edge)
                 twoPane -> Row(Modifier.fillMaxSize()) {
                     column(Modifier.fillMaxHeight().width(SettingsLayout.columnWidth(hostWidth)))
@@ -1516,10 +1572,22 @@ private fun CatalogRowView(
     val toggle = item as? ToggleItem
     val slider = item as? SliderItem
     val value = if (toggle != null) null else catalogRowValue(item, context)
+    // A text or search field is an input box, never a settings row reading "not set" (owner, 2026-10-30,
+    // Droidtop/tracker#825: "why "not set"? It's not a freeform search bar?"). A sends it to the same edit as before.
+    if (item is TextInputItem && !locked && !confirmArmed) {
+        CatalogInputBox(
+            title = item.title,
+            text = status ?: value?.takeIf { it.isNotEmpty() },
+            hint = if (item.search) "Type to search" else "Type here",
+            selected = isSelected,
+            onClick = onClick,
+        )
+        return
+    }
     val placeholder = status == null && value == null && item is TextInputItem
     MenuRow(
         title = if (confirmArmed) "${item.title}: ${PressWords.again} to confirm" else item.title,
-        value = if (locked) "Read it first" else status ?: value ?: if (placeholder) (if ((item as? TextInputItem)?.search == true) "Type to search" else "not set") else null,
+        value = if (locked) "Read it first" else status ?: value ?: if (placeholder) "Type here" else null,
         chip = item.chip?.label,
         // A state with a tone (a plugin's Allowed / Ask first / Blocked) is a chip in that tone (tracker#519).
         valueChip = status == null && !locked && (item as? ChoiceItem)?.toned == true,
@@ -1561,6 +1629,32 @@ private fun CatalogRowView(
         progressParts = item.progressParts,
         statusMark = item.statusMark,
     )
+}
+
+/** A [TextInputItem] drawn as what it is: its name over a box holding its text, or a dim hint while it is empty. */
+@Composable
+private fun CatalogInputBox(title: String, text: String?, hint: String, selected: Boolean, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Text(title, style = MaterialTheme.typography.labelLarge, color = MenuTokens.OnSurfaceMuted)
+        Box(
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .fillMaxWidth()
+                .clip(Corners.Crisp)
+                .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
+                .focusRing(selected && PadModality.showsFocus, Corners.Crisp)
+                .padRow(onClick = onClick)
+                .padding(12.dp),
+        ) {
+            Text(
+                text ?: hint,
+                color = if (text == null) MenuTokens.Placeholder else MenuTokens.OnSurface,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 private const val CONFIRM_CANCEL = "cancel"
@@ -1947,8 +2041,10 @@ private fun SettingsSearchOverlay(
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(MenuTokens.Accent),
+                // Android's keyboard only where droidtop raises one with focus (Droidtop/tracker#832).
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     imeAction = androidx.compose.ui.text.input.ImeAction.Search,
+                    showKeyboardOnFocus = raisesKeyboardWithFocus,
                 ),
                 modifier = Modifier
                     .weight(1f)

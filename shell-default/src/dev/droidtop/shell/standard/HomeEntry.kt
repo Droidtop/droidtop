@@ -8,6 +8,7 @@ import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
 import dev.droidtop.library.theme.ThemeSafeMode
 import dev.droidtop.runtime.HomeDisplays
+import dev.droidtop.runtime.ShellPlacement
 
 /**
  * The one Home decision (docs/SPEC.md 2c, Droidtop/tracker#771), for both of droidtop's HOME activities: Standard's
@@ -70,8 +71,17 @@ internal object HomeEntry {
         val redirect = BackButtonMenu.appModeIntent(activity, target)
             .putExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, true)
         if (doubleTap) redirect.putExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE, true)
-        Log.i(TAG, "HOME on display $here: to $target (double tap $doubleTap)")
-        activity.startActivity(redirect)
+        // Started where it belongs, once: on the default display and then moved by the screen placement, it was started
+        // twice, and the second start covered what the first opened (Droidtop/tracker#824).
+        val present = activity.getSystemService(android.hardware.display.DisplayManager::class.java)
+            ?.displays?.map { it.displayId }?.toSet().orEmpty()
+        val shellOn = ShellPlacement.launchDisplay(HomeDisplays.shellDisplayId, ShellPlacement.remembered(activity), present, here)
+        Log.i(TAG, "HOME on display $here: to $target on display ${shellOn ?: here} (double tap $doubleTap)")
+        val placed = shellOn != null && runCatching {
+            activity.startActivity(redirect, android.app.ActivityOptions.makeBasic().setLaunchDisplayId(shellOn).toBundle())
+        }.onFailure { Log.w(TAG, "HOME: display $shellOn refused the shell, starting it here", it) }.isSuccess
+        // A refused display leaves it to the screen placement, as before.
+        if (!placed) activity.startActivity(redirect)
         return Route.HANDLED
     }
 

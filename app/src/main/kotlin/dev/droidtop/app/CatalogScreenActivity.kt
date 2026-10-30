@@ -61,14 +61,6 @@ class CatalogScreenActivity : AppCompatActivity() {
             finish()
             return
         }
-        // Updates is the Quick Menu's Downloads tab (owner, 2026-10-29, Droidtop/tracker#749), outside Gaming as in it: every
-        // link to it here (a notification with Gaming not in use, droidtop's icon shortcut) opens the Quick Menu there.
-        if (place == Place.UPDATES) {
-            startActivity(QuickMenuActivity.intent(this, dev.droidtop.shell.gamepad.QuickSection.DOWNLOADS))
-            returnToStandard = false
-            finish()
-            return
-        }
         val screen = screenId?.let { SettingsScreenRegistry.get(it, intent?.getStringExtra(CatalogScreenLink.EXTRA_DEEP_LINK)) }
         if (screen == null) {
             android.util.Log.w("droidtop.Screen", "No catalog screen registered as '$screenId'")

@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
  * the text of a filter no view stands for, cleared by [onClearPill].
  */
 @Composable
-internal fun ViewStrip(
+fun ViewStrip(
     labels: List<String>,
     active: Int,
     focused: Int?,

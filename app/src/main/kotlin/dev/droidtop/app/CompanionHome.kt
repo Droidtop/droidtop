@@ -365,15 +365,13 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
     val context = LocalContext.current
     val jobs by PluginJobsCenter.entries().collectAsState()
     val active = remember(jobs) { jobs.filter { !it.done } }
-    val entries by CompanionState.libraryEntries.collectAsState()
-    // Grouped off the main thread: an update is on the game, not on a scanned entry (Droidtop/tracker#571 row 32).
-    val updates by produceState(emptyList<dev.droidtop.library.LibraryEntry>(), entries) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { dev.droidtop.library.GameUpdates.waiting(entries) }
-    }
-    if (active.isEmpty() && updates.isEmpty()) return
+    // Everything the Updates page lists, not only games: the one count every entry to it reads (Droidtop/tracker#792).
+    val updates by dev.droidtop.library.settings.UpdatesWaiting.count.collectAsState()
+    LaunchedEffect(Unit) { dev.droidtop.library.settings.UpdatesWaiting.refresh?.invoke(context) }
+    if (active.isEmpty() && updates == 0) return
     val summary = listOfNotNull(
         active.size.takeIf { it > 0 }?.let { "$it running" },
-        updates.size.takeIf { it > 0 }?.let { if (it == 1) "1 update" else "$it updates" },
+        updates.takeIf { it > 0 }?.let { if (it == 1) "1 update" else "$it updates" },
     ).joinToString("  ·  ")
     CompanionHomeSectionFrame(CompanionHomeSection.ACTIVITY, layout, summary = summary) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -412,11 +410,9 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
                     }
                 }
             }
-            if (updates.isNotEmpty()) {
+            if (updates > 0) {
                 Text(
-                    (if (updates.size == 1) "Update available: " else "${updates.size} updates available: ") +
-                        updates.take(MAX_UPDATE_TITLES).joinToString(", ") { it.title } +
-                        if (updates.size > MAX_UPDATE_TITLES) ", …" else "",
+                    "Updates · " + dev.droidtop.library.settings.UpdatesWaiting.line(updates),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.tertiary,
                     maxLines = 2,
@@ -430,7 +426,6 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
 }
 
 private const val MAX_JOB_ROWS = 4
-private const val MAX_UPDATE_TITLES = 3
 
 /**
  * Social at a glance: unread conversations and friends who are in a game, from the same rows the Social tab

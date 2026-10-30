@@ -151,4 +151,34 @@ class LibraryScrapeJobTest {
         // Second of two systems, half done: 50% + (50% * 1/2).
         assertTrue(percents.contains(75))
     }
+
+    @Test
+    fun `an automatic ask joins a scrape that already covers it (tracker 834)`() {
+        val everything = emptyMap<String, String>()
+        val pc = mapOf("pc_only" to "1")
+        val pcAuto = mapOf("pc_only" to "1", "auto" to "1")
+        val snes = mapOf("system" to "snes")
+        assertTrue(LibraryScrapeJob.covers(everything, pcAuto))
+        assertTrue(LibraryScrapeJob.covers(everything, snes))
+        assertTrue(LibraryScrapeJob.covers(pc, pcAuto))
+        assertTrue(LibraryScrapeJob.covers(snes, mapOf("system" to "snes", "auto" to "1")))
+        assertEquals(false, LibraryScrapeJob.covers(pc, mapOf("auto" to "1")))
+        assertEquals(false, LibraryScrapeJob.covers(snes, pcAuto))
+        assertEquals(false, LibraryScrapeJob.covers(mapOf("pc_only" to "1", "pc_ids" to "a"), pcAuto))
+    }
+
+    @Test
+    fun `no picture is fetched without an address (tracker 834)`() {
+        assertTrue(PcScraper.isAddress("https://lutris.net/media/x.jpg"))
+        assertEquals(false, PcScraper.isAddress("null"))
+        assertEquals(false, PcScraper.isAddress(""))
+        assertEquals(false, PcScraper.isAddress(null))
+    }
+
+    @Test
+    fun `a Lutris result whose cover is null has no cover (tracker 834)`() {
+        val found = LutrisScraperClient.parse(org.json.JSONObject("""{"results":[{"name":"Charmed","slug":"charmed","coverart":null}]}"""))
+        val result = (found as ScrapeLookup.Found).value.single()
+        assertNull(result.coverUrl)
+    }
 }

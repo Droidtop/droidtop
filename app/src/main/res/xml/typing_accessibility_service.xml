@@ -10,11 +10,13 @@
      (canPerformGestures, AccessibilityPointer). The fourth, while droidtop is the default home only, is the HOME
      chords that open droidtop's menus over a game (canRequestFilterKeyEvents, HomeOverlayKeys, Droidtop/tracker#740).
      It is also Standard's: the taskbar's overlay window and keys (StandardTaskbar) and the gesture actions
-     (lock screen, Recents), through AccessibilityHost. Those had a second service of their own, deleted in #740. -->
+     (lock screen, Recents), through AccessibilityHost. Those had a second service of their own, deleted in #740.
+     The fifth is Android's accessibility button (flagRequestAccessibilityButton): the touch route to the menus the
+     HOME chords open, through a small picker (Droidtop/tracker#839). -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeViewFocused|typeViewClicked|typeWindowStateChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows|flagRequestAccessibilityButton"
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="true"
     android:canTakeScreenshot="true"

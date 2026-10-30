@@ -93,19 +93,45 @@ object LibraryScrapeJob {
         // The automatic pass, which only fills what is missing (Droidtop/tracker#318 §7.2).
         auto: Boolean = false,
         onFinished: (String) -> Unit = {},
-    ): String? = PluginJobsCenter.startNative(
-        context = context,
-        kind = KIND,
-        title = title,
-        args = buildMap {
+    ): String? {
+        val args = buildMap {
             systemId?.let { put(ARG_SYSTEM, it) }
             folder?.let { put(ARG_FOLDER, it.absolutePath) }
             if (pcOnly || pcIds != null) put(ARG_PC_ONLY, "1")
             pcIds?.let { put(ARG_PC_IDS, it.joinToString("\n")) }
             if (auto) put(ARG_AUTO, "1")
-        },
-        onComplete = { result -> onFinished(if (result.ok) result.values["summary"] ?: "Done" else (result.error ?: "Failed")) },
-    )
+        }
+        // An automatic ask while a scrape already covers it joins that one: two passes over the same games at once
+        // asked each game twice and pulled the activity ring between their two numbers (Droidtop/tracker#834).
+        if (auto) {
+            PluginJobsCenter.entries().value
+                .firstOrNull { it.nativeKind == KIND && !it.done && PluginJobsCenter.argsOf(it.jobId)?.let { running -> covers(running, args) } == true }
+                ?.let { return it.jobId }
+        }
+        return PluginJobsCenter.startNative(
+            context = context,
+            kind = KIND,
+            title = title,
+            args = args,
+            onComplete = { result -> onFinished(if (result.ok) result.values["summary"] ?: "Done" else (result.error ?: "Failed")) },
+        )
+    }
+
+    /**
+     * Whether a scrape running with [running] already scrapes everything one with [asked] would: the whole library
+     * covers anything; the PC and engine games cover a PC-only ask; one system covers the same system. Pure.
+     */
+    internal fun covers(running: Map<String, String>, asked: Map<String, String>): Boolean {
+        val wholeLibrary = running[ARG_SYSTEM] == null && running[ARG_FOLDER] == null && running[ARG_PC_ONLY] == null
+        val pcLibrary = running[ARG_PC_ONLY] == "1" && running[ARG_PC_IDS] == null
+        val askedPc = asked[ARG_PC_ONLY] == "1"
+        return when {
+            wholeLibrary -> true
+            pcLibrary -> askedPc
+            else -> !askedPc && running[ARG_SYSTEM] != null && running[ARG_SYSTEM] == asked[ARG_SYSTEM] &&
+                (running[ARG_FOLDER] == null || running[ARG_FOLDER] == asked[ARG_FOLDER])
+        }
+    }
 
     private suspend fun execute(
         context: Context,

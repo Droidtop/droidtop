@@ -17,7 +17,7 @@ class SettingsPlaceLinksTest {
         assertFalse("Plugins is in the Quick Menu, not the left menu: Settings is a way in", Place.ID_PLUGINS in hidden)
         assertFalse(Place.ID_SOCIAL in hidden)
         assertFalse(Place.ID_STORES in hidden)
-        assertTrue("Updates is a page of Downloads and Updates, which the menu lists", Place.ID_UPDATES in hidden)
+        assertTrue("Updates is a row of the left menu (Droidtop/tracker#792)", Place.ID_UPDATES in hidden)
     }
 
     @Test

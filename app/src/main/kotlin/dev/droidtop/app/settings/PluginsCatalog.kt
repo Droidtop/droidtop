@@ -1607,7 +1607,7 @@ internal fun AppSettingsCatalogs.pluginPermissionGroups(context: Context, plugin
     }
     // "Where it appears" (docs/plugin-api.md 1.9): one switch per mode the plugin has a place in; off takes every
     // contribution of this plugin out of that mode, and nowhere else.
-    val modeLabels = mapOf(PluginModes.GAMING to "Gaming", PluginModes.STANDARD to "Android home screen", PluginModes.DESKTOP to "Desktop")
+    val modeLabels = mapOf(PluginModes.GAMING to "Gaming", PluginModes.STANDARD to "Mobile", PluginModes.DESKTOP to "Desktop")
     val modeItems = PluginModes.modesOf(record.manifest).map { mode ->
         ToggleItem(
             id = "plugin_${pluginId}_mode_$mode",

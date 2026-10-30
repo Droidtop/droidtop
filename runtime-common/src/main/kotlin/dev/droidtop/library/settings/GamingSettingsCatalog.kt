@@ -65,7 +65,9 @@ object GamingSettingsCatalog {
     const val ID_DEFAULT_SECTION = "pref_gaming_default_section"
     const val ID_SHOW_HINTS = "pref_gaming_show_hints"
     const val ID_ANIMATIONS = "pref_gaming_animations"
-    const val ID_NAVIGATION_SOUNDS = "pref_gaming_navigation_sounds"
+    /** The switch Navigation sounds was before it was a volume: read once, so a person who turned it off stays at 0. */
+    private const val ID_NAVIGATION_SOUNDS_SWITCH = "pref_gaming_navigation_sounds"
+    const val ID_NAVIGATION_SOUNDS = "pref_gaming_navigation_sounds_volume"
     const val ID_SCRAPER = "pref_gaming_scraper"
     const val ID_ACCOUNTS_AND_SOURCES = "pref_gaming_accounts_and_sources"
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
@@ -196,7 +198,7 @@ object GamingSettingsCatalog {
             items = listOf(
                 NestedScreenItem(
                     id = ID_GLOBAL_SETTINGS,
-                    title = "Global settings",
+                    title = "Settings",
                     subtitle = "Home screen and modes",
                     registryId = "global_settings",
                     icon = CatalogIcon.GLOBAL,
@@ -989,11 +991,10 @@ object GamingSettingsCatalog {
                 ),
                 SubScreenItem(
                     id = ID_STANDARD_SETTINGS,
-                    // The title of the page this opens (SettingsActivity's
-                    // label, and the Standard home's own long-press menu
-                    // item): one name for one page (UI pass 2026-09-24, M8).
-                    title = "Home settings",
-                    subtitle = "Standard mode's home screen, icons and app drawer",
+                    // Named for its mode, as Desktop's row beside it is; the page it opens is titled Settings
+                    // (Droidtop/tracker#827 F0: "Home settings" is renamed Settings).
+                    title = "Mobile mode",
+                    subtitle = "Mobile mode's home screen, icons and app drawer",
                     fragmentClassName = "app.murinelauncher.settings.SettingsRootFragment",
                     icon = CatalogIcon.STANDARD,
                 ),
@@ -1044,22 +1045,29 @@ object GamingSettingsCatalog {
     fun animationsOn(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(ID_ANIMATIONS, true)
 
     /**
-     * The one switch for the shell's interface sounds (docs/SPEC.md "Interface sounds"): every cue role,
-     * whether the theme or droidtop's own set supplies it. Off, nothing the shell's chrome does makes a
-     * sound; a game's own audio is not touched.
+     * The interface sounds' own volume (docs/SPEC.md "Interface sounds"; owner, 2026-10-30, Droidtop/tracker#836:
+     * "navigation sounds should get their own volume"): every cue role, whether the theme or droidtop's own set
+     * supplies it, at this level of the media volume; 0 is off, as the switch it replaced was. In Settings and in the
+     * Audio controls the Quick Menu and the companion draw. A game's own audio is not touched.
      */
-    private fun navigationSoundsItem(context: Context) = ToggleItem(
+    fun navigationSoundsItem(context: Context) = SliderItem(
         id = ID_NAVIGATION_SOUNDS,
         title = "Navigation sounds",
         subtitle = "Sounds for moving, choosing, going back, menus and launching, the theme's where it has any",
-        current = navigationSoundsOn(context),
-        onToggle = { ctx, value ->
-            CatalogPrefs.prefs(ctx).edit().putBoolean(ID_NAVIGATION_SOUNDS, value).apply()
-        },
+        min = 0,
+        max = NAVIGATION_SOUNDS_MAX,
+        current = navigationSoundsVolume(context),
+        onChange = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putInt(ID_NAVIGATION_SOUNDS, value).apply() },
     )
 
-    /** The Navigation sounds switch's value: on unless the person turned it off. */
-    fun navigationSoundsOn(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(ID_NAVIGATION_SOUNDS, true)
+    /** The interface sounds' volume, 0 to [NAVIGATION_SOUNDS_MAX]; one who had turned the old switch off starts at 0. */
+    fun navigationSoundsVolume(context: Context): Int {
+        val prefs = CatalogPrefs.prefs(context)
+        return prefs.getInt(ID_NAVIGATION_SOUNDS, if (prefs.getBoolean(ID_NAVIGATION_SOUNDS_SWITCH, true)) NAVIGATION_SOUNDS_DEFAULT else 0)
+    }
+
+    const val NAVIGATION_SOUNDS_MAX = 100
+    private const val NAVIGATION_SOUNDS_DEFAULT = 70
 
     /**
      * What each screen is for (docs/SPEC.md 4c, ScreenRoles; Droidtop/tracker#776): one row per screen other than the one
@@ -1178,7 +1186,7 @@ object GamingSettingsCatalog {
     /** The names of plugin panels last offered as tab choices, so a bar's summary can name them without reading manifests. */
     @Volatile private var companionPluginTabNames: Map<String, String> = emptyMap()
 
-    private val COMPANION_MODE_NAMES = mapOf("GAMING" to "Gaming", "STANDARD" to "Standard", "DESKTOP" to "Desktop")
+    private val COMPANION_MODE_NAMES = mapOf("GAMING" to "Gaming", "STANDARD" to "Mobile", "DESKTOP" to "Desktop")
 
     /**
      * The Companion group (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): the bar's tabs and the
@@ -1727,7 +1735,7 @@ object GamingSettingsCatalog {
         return ChoiceItem(
             id = ID_ICON_PACK,
             title = "Icon pack",
-            subtitle = "App icons in Apps and on the Android home screen",
+            subtitle = "App icons in Apps and on Mobile's home screen",
             options = packs.map { (pack, label) -> ChoiceOption(pack, label) },
             current = source.selected(context),
             onSelect = { ctx, pack -> source.select(ctx, pack) },
