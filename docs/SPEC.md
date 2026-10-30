@@ -17187,7 +17187,10 @@ own games, in droidtop's own treatment:
   and scaled up under the scrim, so it is soft by construction and costs one
   small bitmap; the games two either side of the cursor are **preloaded**
   with the very same request (`PreloadBackdrops`, `neighbourBackdrops`), so
-  a step finds the next one in the memory cache. No disk work from the
+  a step finds the next one in the memory cache. Every way the cursor can go is read ahead (owner, 2026-10-30,
+  Droidtop/tracker#782, #632: "Should probably read ahead on these"): on the shelves also the game Up and Down land on,
+  the place last kept on that shelf or its first game, with its neighbours (`shelfNeighbourBackdrops`), so moving
+  between the hero shelf and a shelf of posters no longer waits on a decode; in the grid the rows above and below. No disk work from the
   composition: the art is a URI the entry already carries and Coil decodes
   it off the main thread. Colours are theme tokens only (`MenuTokens.Ground`);
   the crossfade is `Motion.AmbientFadeMs`, ambient rather than demanding.
