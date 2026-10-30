@@ -27,13 +27,10 @@
   file, redo this merge rather than dropping one half.
 
   com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher (below)
-  is the interesting one for droidtop's multi-display goals: Launcher3
-  already ships a SECONDARY_HOME-category Activity - Android's own
-  mechanism for a launcher to provide a home screen on a secondary
-  Display (see docs/SPEC.md §4's DisplayManager/Presentation model). The
-  droidtop-specific multi-display patch work is extending/wiring this
-  existing Activity to our DisplayOutput model, not building multi-display
-  support from nothing.
+  is Launcher3's own home screen for a secondary display. It does not claim
+  SECONDARY_HOME: :display's SecondaryDisplayActivity is droidtop's one
+  holder of that category and hands off to this activity while Standard is
+  the mode in use (docs/SPEC.md section 4c).
 -->
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android"
