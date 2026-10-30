@@ -8699,12 +8699,22 @@ key code or an edge.
   uses what ES-DE builds a carousel with, SLOW (500 ms, then every 200 ms),
   or MEDIUM when the theme sets `fastScrolling` (CarouselComponent.h:225,
   :1765), so a held run never outpaces its camera (Droidtop/tracker#782).
-  The carousel's camera follows ES-DE's `onCursorChanged`: every move
-  restarts a 400 ms ease-out from where the camera is; the release after a
-  held run restarts it once over what is left (200 to 400 ms,
-  `esDeCarouselAnimMs`); and the selected colours are drawn on the cursor's
-  entry only once the camera is within one entry of it
-  (CarouselComponent.h:1233), so outline and zoom arrive together.
+  The carousel's camera follows ES-DE's `onCursorChanged`: a move from
+  rest starts a 400 ms ease-out; the release after a held run restarts it
+  once over what is left (200 to 400 ms, `esDeCarouselAnimMs`); and the
+  selected colours are drawn on the cursor's entry only once the camera is
+  within one entry of it (CarouselComponent.h:1233). Everything that marks
+  the selection (the selected colours, the zoom and opacity, the system
+  view's sliding elements) is drawn from that one camera, never from the
+  cursor, so there is one timer on screen. **One deviation from ES-DE, for
+  quick presses.** ES-DE restarts a full 400 ms slide on a press made while
+  the camera is still moving; at 120 to 150 ms between taps the camera
+  then trails and lands 400 ms after the last tap, which the owner reported
+  on the RP5 (Droidtop/tracker#782): "moves "stack"... the outline moves,
+  but the highlight waits for me to be finished moving". droidtop
+  retargets such a press in 200 ms over what is left, so the camera stays
+  within about a fifth of an item of the cursor and settles 200 ms after
+  the last press (`EsDeCarouselTimingTest`).
 - **Menus never wrap.** Real ES-DE's menus are `LIST_NEVER_LOOP`
   (`ComponentList.cpp:17`): the cursor stops at both ends, held or not, so
   a held direction can never spin round a menu (`menuStep`). A themed

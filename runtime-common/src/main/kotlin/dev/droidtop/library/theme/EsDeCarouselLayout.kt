@@ -143,10 +143,18 @@ data class EsDeCarouselConfig(
  * How long a carousel's camera takes to reach the cursor, ES-DE's own rule (CarouselComponent::onCursorChanged,
  * Droidtop/tracker#782): 400 ms, unless the cursor is moving by the pad ([scrollVelocity] is the held direction, 1
  * or -1) and the camera does not start a whole item away. Then it is the distance left times 1.5 of 400 ms,
- * clamped to 200 to 400. A press made mid-flight is more than one item away and takes the full 400 ms; the release
- * after a held run restarts the camera over what is left, so it settles in a short slide. Pure.
+ * clamped to 200 to 400. The release after a held run restarts the camera over what is left, so it settles in a
+ * short slide.
+ *
+ * One deviation, for quick presses ([retarget]: a move made while the camera is still sliding). ES-DE gives that
+ * press the full 400 ms, since the camera starts more than an item away, so at the owner's 120 to 150 ms between taps
+ * every press restarts a 400 ms slide and the camera lands only 400 ms after the last one (the owner on the RP5:
+ * "moves "stack"... the outline moves, but the highlight waits for me to be finished moving"). droidtop gives it the
+ * shortest slide, 200 ms over whatever is left: an ease-out of 200 ms covers about 86% of the way in 125 ms, so the
+ * camera stays within about a fifth of an item of the cursor and settles 200 ms after the last press. Pure.
  */
-fun esDeCarouselAnimMs(startPos: Float, endPos: Float, scrollVelocity: Int): Int {
+fun esDeCarouselAnimMs(startPos: Float, endPos: Float, scrollVelocity: Int, retarget: Boolean = false): Int {
+    if (retarget) return 200
     val timeDiff = when (scrollVelocity) {
         1 -> endPos - startPos
         -1 -> startPos - endPos

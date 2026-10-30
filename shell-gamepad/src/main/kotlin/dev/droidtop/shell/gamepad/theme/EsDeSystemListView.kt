@@ -588,6 +588,11 @@ private fun EsDeCarousel(
 
     // CarouselComponent::onCursorChanged: each cursor move, and the release after a held run, restarts the camera
     // from where it is towards the cursor, eased out, for as long as esDeCarouselAnimMs says (Droidtop/tracker#782).
+    // A move made while the camera is still sliding (a quick tap, a held run) retargets it in a short slide, so the
+    // camera keeps pace with the cursor; that is droidtop's one deviation from ES-DE, see esDeCarouselAnimMs.
+    // Whether the camera is sliding is kept here rather than read from the Animatable: a new move cancels the old
+    // slide before the next one starts.
+    val camSliding = remember { booleanArrayOf(false) }
     LaunchedEffect(focusedIndex, stoppedTick, config.instantItemTransitions) {
         val startPos = camOffset.value
         val target = shortestCamOffsetStep(startPos, focusedIndex, items.size)
@@ -596,13 +601,16 @@ private fun EsDeCarousel(
             return@LaunchedEffect
         }
         if (target == startPos) return@LaunchedEffect
+        val retarget = camSliding[0]
+        camSliding[0] = true
         camOffset.animateTo(
             targetValue = target,
             animationSpec = tween(
-                durationMillis = esDeCarouselAnimMs(startPos, target, scrollVelocity),
+                durationMillis = esDeCarouselAnimMs(startPos, target, scrollVelocity, retarget),
                 easing = Easing { t -> 1f - (1f - t) * (1f - t) },
             ),
         )
+        camSliding[0] = false
     }
 
     // Real ES-DE input architecture: the CAROUSEL is the focus/input
