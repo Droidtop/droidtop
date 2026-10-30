@@ -520,7 +520,30 @@ object ContainersCatalog {
         val (frequency, folder, last) = withContext(Dispatchers.IO) {
             Triple(ContainerBackups.frequency(context, id), ContainerBackups.folder(context, id), ContainerBackups.lastResult(context, id))
         }
-        return listOf(
+        // Restoring a point of the schedule's chain (slice B2): any file in its folder, the chain worked out from it.
+        val restore = if (folder != null && !info.running) {
+            DocumentPickItem(
+                id = "container_backup_restore_point",
+                title = "Restore from a scheduled backup",
+                subtitle = "Pick one in its folder: droidtop puts the container back as it was then",
+                mimeType = "*/*",
+                onPicked = { ctx, uri ->
+                    val name = withContext(Dispatchers.IO) {
+                        ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                            ?.use { if (it.moveToFirst()) it.getString(0) else null }
+                    }
+                    if (name == null) {
+                        "That file can't be read"
+                    } else {
+                        runCatching { withContext(Dispatchers.IO) { ContainerBackups.restore(ctx, runtime, info, name) } }
+                            .getOrElse { "Not restored: ${FailureText.of("Containers", it)}" }
+                    }
+                },
+            )
+        } else {
+            null
+        }
+        return listOfNotNull(
             ChoiceItem(
                 id = "container_backup_schedule",
                 title = "Back up on a schedule",
@@ -544,6 +567,7 @@ object ContainersCatalog {
                     null
                 },
             ),
+            restore,
         )
     }
 

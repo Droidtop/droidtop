@@ -421,6 +421,23 @@ class DroidSpacesRuntime(
         RootArchive.export(container.rootfsPath, out)
     }
 
+    private fun archiver(container: Container) =
+        dev.droidtop.runtime.IncrementalArchiver(container.rootfsPath, RootIncrementTools(java.io.File(context.cacheDir, "backup-scratch")))
+
+    override suspend fun exportIncrement(container: Container, minutes: Long, archive: java.io.OutputStream, manifest: java.io.OutputStream) {
+        RootProcess.run(binaryPath, "--name=${container.id}", "stop")
+        withContext(Dispatchers.IO) { archiver(container).exportChanged(minutes, archive, manifest) }
+    }
+
+    override suspend fun applyIncrement(container: Container, archive: java.io.InputStream) {
+        RootProcess.run(binaryPath, "--name=${container.id}", "stop")
+        withContext(Dispatchers.IO) { archiver(container).apply(archive) }
+    }
+
+    override suspend fun pruneToManifest(container: Container, manifest: String) {
+        withContext(Dispatchers.IO) { archiver(container).pruneTo(manifest) }
+    }
+
     /**
      * Replaces the container's tree with the archive on [input], as proot's restore does: unpacked beside it first,
      * checked to be a container's filesystem, then swapped in, with the old tree put back if the swap fails. As root,

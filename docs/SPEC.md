@@ -3418,9 +3418,23 @@ the `ContainerRuntime` interface that already exists (§3):
   backup needs the container stopped, so a running one is skipped and the
   row says so ("Skipped: it was running. Next try tomorrow"); droidtop
   never stops a container for this. The row's line is the last run's
-  result. A failed write leaves no file. Incremental backups, holding only
-  what changed since the last one with a manifest so restore removes what
-  was deleted, are slice B2 on #808.
+  result. A failed write leaves no file.
+  **Increments (slice B2).** The first scheduled backup is full; the next
+  six are increments, then a full one again. An increment is two files:
+  `<name>-<when>-changes.tar`, the files changed since the backup before
+  (toybox `find -mmin`, with a minute's margin, then `tar -T`
+  `--no-recursion`), and `<name>-<when>-changes.manifest`, every path in
+  the container ("d ./path" for a directory, "f ./path" for the rest), so
+  a restore also removes what was deleted and makes empty directories
+  that came back. `BackupIncrements` (runtime-common, pure and tested)
+  holds the commands and the manifest's sums; `IncrementalArchiver` runs
+  them through each backend's tools, as droidtop itself on proot and as
+  root on droidspaces. After a full backup is written, every chain but the
+  newest two is deleted, manifests included, so the folder holds at most
+  two weeks of daily backups. **Restore from a scheduled backup** (stopped
+  containers only) takes any file in the folder: the full backup at or
+  before it, then each increment up to it, then the tree made to match
+  that point's manifest.
   **What it can reach (Droidtop/tracker#787 slice 1, #750 part 2).** A
   container's page opens with "What it can reach", one line a kind, in
   plain words: Files (its home: its own, the shared home folder or the

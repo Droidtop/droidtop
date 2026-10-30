@@ -314,6 +314,21 @@ interface ContainerRuntime {
         error(dataBackupUnavailableReason ?: "not supported")
 
     /**
+     * An increment of [container]'s data (docs/SPEC.md 3d "Backups on a schedule", Droidtop/tracker#808): the entries
+     * changed in the last [minutes] to [archive], and the manifest of every path to [manifest]. Stopped containers only.
+     */
+    suspend fun exportIncrement(container: Container, minutes: Long, archive: java.io.OutputStream, manifest: java.io.OutputStream): Unit =
+        error(dataBackupUnavailableReason ?: "not supported")
+
+    /** Unpacks one increment's [archive] over [container]'s data. Stopped containers only. */
+    suspend fun applyIncrement(container: Container, archive: java.io.InputStream): Unit =
+        error(dataBackupUnavailableReason ?: "not supported")
+
+    /** Makes [container]'s data hold exactly what [manifest] lists, after its increments are unpacked. */
+    suspend fun pruneToManifest(container: Container, manifest: String): Unit =
+        error(dataBackupUnavailableReason ?: "not supported")
+
+    /**
      * Why this backend cannot copy a container; null when it can (Droidtop/tracker#757, #758). proot copies its
      * rootfs directory as the app, droidspaces as root.
      */

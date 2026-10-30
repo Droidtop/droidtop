@@ -140,6 +140,50 @@ internal object ContainerArchive {
         }
     }
 
+    /** [prepareForTar] over the whole of [rootfs], for an increment's find and tar (Droidtop/tracker#808). */
+    fun prepare(rootfs: File) = prepareForTar(rootfs, rootfs, mutableListOf())
+
+    /**
+     * Toybox run as droidtop itself over a proot rootfs, for incremental backups (docs/SPEC.md 3d "Backups on a
+     * schedule"): everything in it is droidtop's own.
+     */
+    class Tools(private val scratchDir: File, private val errorLog: File) : dev.droidtop.runtime.IncrementTools {
+        override fun run(argv: List<String>): String {
+            val process = ProcessBuilder(argv).redirectError(errorLog).start()
+            val out = process.inputStream.bufferedReader().readText()
+            // find exits non-zero over an entry it can't read but still lists the rest, which is what a manifest wants.
+            process.waitFor()
+            return out
+        }
+
+        override fun pipeOut(argv: List<String>, out: OutputStream) {
+            val process = ProcessBuilder(argv).redirectError(errorLog).start()
+            process.inputStream.use { it.copyTo(out) }
+            out.flush()
+            check(process.waitFor() == 0) { "tar failed: ${errorLog.readText().trim().take(400)}" }
+        }
+
+        override fun pipeIn(argv: List<String>, input: InputStream) {
+            val process = ProcessBuilder(argv).redirectError(errorLog).redirectOutput(File("/dev/null")).start()
+            try {
+                process.outputStream.use { input.copyTo(it) }
+            } catch (e: IOException) {
+                // tar stopped reading: its own message says why
+            }
+            check(process.waitFor() == 0) { "tar failed: ${errorLog.readText().trim().take(400)}" }
+        }
+
+        override fun remove(paths: List<String>) {
+            paths.forEach { File(it).delete() }
+        }
+
+        override fun makeDirectories(paths: List<String>) {
+            paths.forEach { File(it).mkdirs() }
+        }
+
+        override fun scratchFile(): File = File.createTempFile("increment", ".lst", scratchDir.apply { mkdirs() })
+    }
+
     /** A rootfs has these; an archive without them is not one, whatever it is. */
     fun looksLikeRootfs(dir: File): Boolean = File(dir, "etc").isDirectory && File(dir, "usr").isDirectory
 }

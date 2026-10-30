@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,5 +25,39 @@ class ContainerBackupsTest {
         assertTrue(name.startsWith("MyDebian-"))
         assertTrue(name.endsWith(".tar"))
         assertTrue(ContainerBackups.fileName("!!", 0L).startsWith("container-"))
+    }
+
+    private val names = listOf(
+        "Debian-2026-10-01-0200.tar",
+        "Debian-2026-10-02-0200-changes.tar", "Debian-2026-10-02-0200-changes.manifest",
+        "Debian-2026-10-03-0200-changes.tar",
+        "Debian-2026-10-08-0200.tar",
+        "Debian-2026-10-09-0200-changes.tar",
+        "Debian-2026-10-15-0200.tar",
+        "Other-2026-10-01-0200.tar",
+        "notes.txt",
+    )
+
+    @Test
+    fun `the folder's backups of one container, oldest first, manifests and others left out`() {
+        val points = ContainerBackups.points("Debian", names)
+        assertEquals(7, points.size)
+        assertTrue(points.first().full)
+        assertFalse(points[1].full)
+    }
+
+    @Test
+    fun `restoring a point takes the full backup before it and each increment up to it`() {
+        val points = ContainerBackups.points("Debian", names)
+        val chosen = points.first { it.stamp == "2026-10-03-0200" }
+        assertEquals(listOf("2026-10-01-0200", "2026-10-02-0200", "2026-10-03-0200"), ContainerBackups.chain(points, chosen).map { it.stamp })
+        val later = points.first { it.stamp == "2026-10-09-0200" }
+        assertEquals(listOf("2026-10-08-0200", "2026-10-09-0200"), ContainerBackups.chain(points, later).map { it.stamp })
+    }
+
+    @Test
+    fun `after a third full backup the oldest chain goes`() {
+        val stale = ContainerBackups.stale(ContainerBackups.points("Debian", names)).map { it.stamp }
+        assertEquals(listOf("2026-10-01-0200", "2026-10-02-0200", "2026-10-03-0200"), stale)
     }
 }

@@ -368,6 +368,32 @@ class ProotRuntime(
         log.line("exported ${container.id}")
     }
 
+    private fun archiver(containerId: String): dev.droidtop.runtime.IncrementalArchiver {
+        val rootfs = rootfsOf(containerId)
+        return dev.droidtop.runtime.IncrementalArchiver(rootfs.absolutePath, ContainerArchive.Tools(File(containerDir(containerId), "backup-scratch"), backupLog()))
+    }
+
+    override suspend fun exportIncrement(container: Container, minutes: Long, archive: java.io.OutputStream, manifest: java.io.OutputStream) {
+        stopProcess(container.id)
+        withContext(Dispatchers.IO) {
+            ContainerArchive.prepare(rootfsOf(container.id))
+            archiver(container.id).exportChanged(minutes, archive, manifest)
+        }
+        log.line("exported an increment of ${container.id}")
+    }
+
+    override suspend fun applyIncrement(container: Container, archive: InputStream) {
+        stopProcess(container.id)
+        withContext(Dispatchers.IO) { archiver(container.id).apply(archive) }
+    }
+
+    override suspend fun pruneToManifest(container: Container, manifest: String) {
+        withContext(Dispatchers.IO) {
+            ContainerArchive.prepare(rootfsOf(container.id))
+            archiver(container.id).pruneTo(manifest)
+        }
+    }
+
     override suspend fun importData(container: Container, input: InputStream) {
         stopProcess(container.id)
         withContext(Dispatchers.IO) {

@@ -65,11 +65,53 @@ object ContainerBackups {
     internal fun due(frequency: Frequency, lastMs: Long, nowMs: Long): Boolean =
         frequency != Frequency.OFF && nowMs - lastMs >= frequency.intervalMs - frequency.intervalMs / 10
 
-    /** The file one backup is saved as: the container's name and when. Pure. */
-    internal fun fileName(displayName: String, atMs: Long): String {
-        val name = displayName.filter { it.isLetterOrDigit() || it == '-' || it == '_' }.ifEmpty { "container" }
-        val stamp = SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.ROOT).format(Date(atMs))
-        return "$name-$stamp.tar"
+    /** The name every file of [displayName]'s backups starts with. Pure. */
+    internal fun baseName(displayName: String): String = displayName.filter { it.isLetterOrDigit() || it == '-' || it == '_' }.ifEmpty { "container" }
+
+    private fun stamp(atMs: Long): String = SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.ROOT).format(Date(atMs))
+
+    /** A full backup's file: the container's name and when. Pure. */
+    internal fun fileName(displayName: String, atMs: Long): String = "${baseName(displayName)}-${stamp(atMs)}.tar"
+
+    /** An increment's archive and its manifest (docs/SPEC.md 3d, slice B2). Pure. */
+    internal fun incrementNames(displayName: String, atMs: Long): Pair<String, String> {
+        val base = "${baseName(displayName)}-${stamp(atMs)}"
+        return "$base$INCREMENT_SUFFIX" to "$base$MANIFEST_SUFFIX"
+    }
+
+    const val INCREMENT_SUFFIX = "-changes.tar"
+    const val MANIFEST_SUFFIX = "-changes.manifest"
+
+    /** One backup in the folder, by its file's name: when, and whether it is a full one or an increment. */
+    data class Point(val name: String, val stamp: String, val full: Boolean)
+
+    /** The backups of [base] among [names], oldest first. Pure. */
+    internal fun points(base: String, names: List<String>): List<Point> = names.mapNotNull { name ->
+        if (!name.startsWith("$base-")) return@mapNotNull null
+        val rest = name.removePrefix("$base-")
+        when {
+            rest.endsWith(INCREMENT_SUFFIX) -> Point(name, rest.removeSuffix(INCREMENT_SUFFIX), full = false)
+            rest.endsWith(".tar") -> Point(name, rest.removeSuffix(".tar"), full = true)
+            else -> null
+        }
+    }.filter { STAMP.matches(it.stamp) }.sortedBy { it.stamp }
+
+    private val STAMP = Regex("""\d{4}-\d{2}-\d{2}-\d{4}""")
+
+    /** What restoring [chosen] takes: the full backup at or before it, then each increment after that up to it. Pure. */
+    internal fun chain(points: List<Point>, chosen: Point): List<Point> {
+        val upTo = points.filter { it.stamp <= chosen.stamp }
+        val start = upTo.indexOfLast { it.full }
+        require(start >= 0) { "No full backup before it in the folder" }
+        return upTo.drop(start)
+    }
+
+    /** The files to delete once a new full backup is written: every chain but the newest two. Pure. */
+    internal fun stale(points: List<Point>): List<Point> {
+        val fulls = points.filter { it.full }
+        if (fulls.size <= 2) return emptyList()
+        val keepFrom = fulls[fulls.size - 2].stamp
+        return points.filter { it.stamp < keepFrom }
     }
 
     /**
@@ -115,6 +157,30 @@ object ContainerBackups {
         }
     }
 
+    private fun parentOf(tree: Uri): Uri? =
+        runCatching { DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree)) }.getOrNull()
+
+    /** The folder's files by name. A content query: IO only. */
+    private fun list(context: Context, tree: Uri): Map<String, Uri> {
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        val found = HashMap<String, Uri>()
+        context.contentResolver.query(
+            children,
+            arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+            null, null, null,
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                found[cursor.getString(1)] = DocumentsContract.buildDocumentUriUsingTree(tree, cursor.getString(0))
+            }
+        }
+        return found
+    }
+
+    /**
+     * One scheduled backup: a full one first and after [dev.droidtop.runtime.BackupIncrements.INCREMENTS_PER_CHAIN]
+     * increments, an increment (what changed since the last backup, and the manifest) otherwise. After a full one, the
+     * chains before the newest two go.
+     */
     private suspend fun save(
         context: Context,
         runtime: dev.droidtop.runtime.ContainerRuntime,
@@ -123,20 +189,72 @@ object ContainerBackups {
         now: Long,
     ): String {
         val resolver = context.contentResolver
-        val parent = runCatching { DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree)) }.getOrNull()
-            ?: return "Not saved: the folder can't be reached. Pick it again"
-        val file = runCatching { DocumentsContract.createDocument(resolver, parent, "application/x-tar", fileName(info.displayName, now)) }.getOrNull()
-            ?: return "Not saved: the folder can't be written to. Pick it again"
+        val id = info.container.id
+        val parent = parentOf(tree) ?: return "Not saved: the folder can't be reached. Pick it again"
+        val last = lastSaved(context, id)
+        val increments = prefs(context).getInt("$id.increments", 0)
+        val full = last == 0L || increments >= dev.droidtop.runtime.BackupIncrements.INCREMENTS_PER_CHAIN
+        val made = ArrayList<Uri>()
+        fun create(mime: String, name: String): Uri =
+            DocumentsContract.createDocument(resolver, parent, mime, name)?.also { made += it } ?: error("the folder can't be written to. Pick it again")
         return runCatching {
-            resolver.openOutputStream(file, "wt")!!.use { runtime.exportData(info.container, it) }
-            prefs(context).edit().putLong("${info.container.id}.saved", now).apply()
-            "Saved " + SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()).format(Date(now))
+            if (full) {
+                val file = create("application/x-tar", fileName(info.displayName, now))
+                resolver.openOutputStream(file, "wt")!!.use { runtime.exportData(info.container, it) }
+            } else {
+                val (archiveName, manifestName) = incrementNames(info.displayName, now)
+                val archive = create("application/x-tar", archiveName)
+                val manifest = create("text/plain", manifestName)
+                val minutes = (now - last) / 60_000L
+                resolver.openOutputStream(archive, "wt")!!.use { a ->
+                    resolver.openOutputStream(manifest, "wt")!!.use { m -> runtime.exportIncrement(info.container, minutes, a, m) }
+                }
+            }
+            prefs(context).edit().putLong("$id.saved", now).putInt("$id.increments", if (full) 0 else increments + 1).apply()
+            if (full) prune(context, tree, info.displayName)
+            (if (full) "Saved in full " else "Saved the changes ") + SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()).format(Date(now))
         }.getOrElse {
-            Log.w(TAG, "Scheduled backup of ${info.container.id} failed", it)
+            Log.w(TAG, "Scheduled backup of $id failed", it)
             // A half-written archive that looks like a backup is worse than none.
-            runCatching { DocumentsContract.deleteDocument(resolver, file) }
+            made.forEach { uri -> runCatching { DocumentsContract.deleteDocument(resolver, uri) } }
             "Not saved: ${it.message ?: "it failed"}"
         }
+    }
+
+    /** Deletes every chain but the newest two, with their manifests. */
+    private fun prune(context: Context, tree: Uri, displayName: String) {
+        val files = runCatching { list(context, tree) }.getOrDefault(emptyMap())
+        val base = baseName(displayName)
+        stale(points(base, files.keys.toList())).forEach { point ->
+            val names = if (point.full) listOf(point.name) else listOf(point.name, "$base-${point.stamp}$MANIFEST_SUFFIX")
+            names.forEach { name -> files[name]?.let { runCatching { DocumentsContract.deleteDocument(context.contentResolver, it) } } }
+        }
+    }
+
+    /**
+     * Restores [container] to the backup named [chosenName] in its folder: the full backup before it, then each
+     * increment up to it, then the tree made to hold exactly what that point's manifest lists. Stopped containers only.
+     */
+    suspend fun restore(context: Context, runtime: dev.droidtop.runtime.ContainerRuntime, info: dev.droidtop.runtime.ContainerInfo, chosenName: String): String {
+        val tree = folder(context, info.container.id) ?: return "Pick the folder scheduled backups go to first"
+        val files = list(context, tree)
+        val base = baseName(info.displayName)
+        val all = points(base, files.keys.toList())
+        val chosen = all.firstOrNull { it.name == chosenName } ?: return "That file isn't one of this container's scheduled backups"
+        val steps = runCatching { chain(all, chosen) }.getOrElse { return it.message ?: "No full backup before it" }
+        val resolver = context.contentResolver
+        for (step in steps) {
+            val uri = files.getValue(step.name)
+            resolver.openInputStream(uri)!!.use { input ->
+                if (step.full) runtime.importData(info.container, input) else runtime.applyIncrement(info.container, input)
+            }
+        }
+        if (!chosen.full) {
+            val manifest = files["$base-${chosen.stamp}$MANIFEST_SUFFIX"]?.let { uri -> resolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } }
+                ?: return "Restored, but its manifest is missing, so files deleted since the full backup are still there"
+            runtime.pruneToManifest(info.container, manifest)
+        }
+        return "Restored to " + chosen.stamp
     }
 }
 
