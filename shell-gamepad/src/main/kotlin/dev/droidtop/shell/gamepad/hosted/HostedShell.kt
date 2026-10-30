@@ -48,7 +48,6 @@ import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuSectionLabel
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.QuickMenu
-import dev.droidtop.shell.gamepad.QuickSection
 import dev.droidtop.shell.gamepad.currentShellWindow
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
@@ -342,8 +341,6 @@ fun QuickMenuStandalone(
     library: Library,
     onOpenStartMenu: () -> Unit,
     onDismiss: () -> Unit,
-    // The tab it opens on (Updates links open Downloads, Droidtop/tracker#749); null for the menu's own choice.
-    startSection: QuickSection? = null,
 ) {
     val context = LocalContext.current
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
@@ -364,7 +361,6 @@ fun QuickMenuStandalone(
                 place == null || place in Place.reachable(UiModePrefs.get(context))
             },
             onDismiss = onDismiss,
-            startSection = startSection,
         )
     }
 }

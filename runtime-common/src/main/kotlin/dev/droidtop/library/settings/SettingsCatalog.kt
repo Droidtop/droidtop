@@ -303,6 +303,8 @@ class AsyncActionItem(
     override val chip: RowTag? = null,
     /** One status glyph beside the title, as [ActionItem.statusMark]. */
     override val statusMark: StatusMark? = null,
+    /** The thing's own picture (a plugin's icon, a game's art), as [CatalogItem.iconFile]. */
+    override val iconFile: String? = null,
     val run: suspend (Context, onStatus: (String) -> Unit) -> String,
 ) : CatalogItem
 

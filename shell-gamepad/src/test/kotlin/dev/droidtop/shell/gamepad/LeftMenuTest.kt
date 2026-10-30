@@ -34,6 +34,7 @@ class LeftMenuTest {
             listOf(
                 GamingSection.HOME, GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS,
                 GamingSection.DOWNLOADS,
+                GamingSection.UPDATES,
                 GamingSection.SETTINGS,
             ),
             menuSectionsFor(UiMode.FULL),
@@ -41,15 +42,20 @@ class LeftMenuTest {
     }
 
     @Test
-    fun `Updates and Get new games are pages of Downloads and Updates, not rows of their own`() {
-        // Owner, 2026-10-24: "Updates should be in the Downloads and Updates menu" (Droidtop/tracker#639).
+    fun `Updates is a row of its own, and Get new games a page of Downloads and Updates`() {
+        // Owner, 2026-10-30 (Droidtop/tracker#792): one first-class Updates page, reached from the left menu with a
+        // badge; this replaces 2026-10-24's "Updates should be in the Downloads and Updates menu" (#639).
         assertFalse(GamingSection.NEW_GAMES in menuSectionsFor(UiMode.FULL))
-        assertFalse(GamingSection.UPDATES in menuSectionsFor(UiMode.FULL))
+        assertTrue(GamingSection.UPDATES in menuSectionsFor(UiMode.FULL))
         val downloads = all.single { it.section == GamingSection.DOWNLOADS }
         assertEquals("Downloads and Updates", downloads.label)
         assertTrue(downloads.isAt(GamingSection.NEW_GAMES))
-        assertTrue(downloads.isAt(GamingSection.UPDATES))
-        assertEquals(listOf(downloads), all.filter { it.isAt(GamingSection.UPDATES) })
+        assertEquals(listOf(all.single { it.section == GamingSection.UPDATES }), all.filter { it.isAt(GamingSection.UPDATES) })
+    }
+
+    @Test
+    fun `Updates carries a dot while anything has a newer version`() {
+        assertEquals(mapOf(GamingSection.UPDATES to Attention.Dot), leftMenuAttention(emptyList(), needYou = 0, updates = 3))
     }
 
     @Test

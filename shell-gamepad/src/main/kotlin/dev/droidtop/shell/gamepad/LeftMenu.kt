@@ -122,7 +122,9 @@ internal sealed interface Attention {
  * negative when it does not know) get on together. Social's unread dot is on the Quick Menu's rail, where Social is.
  * Read while the menu is open, never polled. Pure.
  */
-internal fun leftMenuAttention(running: List<Float>, needYou: Int): Map<GamingSection, Attention> = buildMap {
+internal fun leftMenuAttention(running: List<Float>, needYou: Int, updates: Int = 0): Map<GamingSection, Attention> = buildMap {
+    // Updates' dot while anything has a newer version (Droidtop/tracker#792): the page says how many.
+    if (updates > 0) put(GamingSection.UPDATES, Attention.Dot)
     when {
         needYou > 0 -> put(GamingSection.DOWNLOADS, Attention.Dot)
         running.isNotEmpty() -> {
@@ -180,7 +182,14 @@ internal fun LeftMenu(
     val rowCount = rowsAbove + entries.size
     // What is waiting, for the dots: read while the menu is open, never polled.
     val jobs by PluginJobsCenter.entries().collectAsState()
+    val updates by dev.droidtop.library.settings.UpdatesWaiting.count.collectAsState()
+    val menuContext = androidx.compose.ui.platform.LocalContext.current
+    // Counted again when the menu opens (off the main thread), so the dot is not left from before a check.
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { dev.droidtop.library.settings.UpdatesWaiting.refresh?.invoke(menuContext) }
+    }
     val attention = leftMenuAttention(
+        updates = updates,
         running = jobs.filter { !it.done && !it.paused }.map { if (it.percent >= 0) it.percent / 100f else -1f },
         needYou = jobs.count { job ->
             job.state == dev.droidtop.pluginhost.JobState.FAILED ||

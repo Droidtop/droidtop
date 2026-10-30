@@ -24,7 +24,8 @@ enum class Place(val screenId: String, val title: String, val listed: Boolean = 
     STORES(STORES_SCREEN, "Game sources"),
     SOCIAL(SOCIAL_SCREEN, "Social"),
     DOWNLOADS(DOWNLOADS_SCREEN, "Downloads and Updates"),
-    UPDATES(UPDATES_SCREEN, "Updates", listed = false),
+    // A place of its own in the lists (the owner, 2026-10-30, Droidtop/tracker#792), no longer a page of Downloads and Updates.
+    UPDATES(UPDATES_SCREEN, "Updates"),
     PLUGINS(PLUGINS_SCREEN, "Plugins"),
     ;
 

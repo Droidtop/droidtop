@@ -293,6 +293,11 @@ fun CatalogNavigator(
     // What the pane shows: a pushed screen, else the category's linked
     // screen, else the root's own rows.
     val screen: CatalogScreen = if (depth > 0) stack.last() else category?.let { linkScreen(it) } ?: root
+    // A page drawn as a strip of views (CatalogLayout.STRIP, docs/SPEC.md 7k "Page anatomy"): its header and bar, then
+    // one of its groups at a time, each group a view named by its title on the shell's view strip, L1 and R1 stepping
+    // them (Updates' kinds with their counts, Droidtop/tracker#792).
+    val strip = screen.layout == dev.droidtop.library.settings.CatalogLayout.STRIP
+    var stripIndex by remember(screen.id) { mutableStateOf(0) }
     // Tagged with the screen they belong to: right after a push or a pop
     // the list must not treat the previous screen's rows as this one's.
     val paneLoaded by produceState<Pair<CatalogScreen, List<CatalogGroup>>?>(null, screen, version, refreshKey) {
@@ -320,7 +325,7 @@ fun CatalogNavigator(
             value = true
         }
     }
-    val groups = remember(screen, rootGroups, paneLoaded, category?.key, loadingShown) {
+    val loadedGroups = remember(screen, rootGroups, paneLoaded, category?.key, loadingShown) {
         when {
             // A category's screen is built after the column's cursor has rested on it; until then the pane says so
             // instead of standing blank (rig, build 1715: a store row showed nothing until Right or a tap).
@@ -331,6 +336,16 @@ fun CatalogNavigator(
             category != null -> rootGroups.orEmpty().filter { it.id in category.groupIds }
                 .map { if (it.title == category.label || category.groupIds.size == 1) it.copy(title = null) else it }
             else -> rootGroups ?: if (loadingShown) loadingGroups(root.title) else emptyList()
+        }
+    }
+    // A strip's views are its groups after the page's own header and bar.
+    val stripViews = if (strip) loadedGroups.filter { it.id != dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID } else emptyList()
+    val groups = remember(loadedGroups, strip, stripIndex) {
+        if (!strip || stripViews.isEmpty()) {
+            loadedGroups
+        } else {
+            val shown = stripViews[stripIndex.coerceIn(0, stripViews.lastIndex)]
+            loadedGroups.filter { it.id == dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID } + shown.copy(title = null)
         }
     }
     val rows = remember(groups, showSearch, depth, categoryMode) {
@@ -480,6 +495,17 @@ fun CatalogNavigator(
         selectionByDepth[0] = 0
         scrollByDepth.clear()
         scope.launch { listState.scrollToItem(0) }
+    }
+
+    // L1/R1 step a strip page's views, never wrapping, as on every strip (docs/SPEC.md 7j, "Gaming controls").
+    if (strip && !categoryMode && stripViews.size > 1) {
+        OwnShoulders { step ->
+            val next = menuStep(stripIndex.coerceIn(0, stripViews.lastIndex), stripViews.size, step)
+            if (next != stripIndex) {
+                EsDeNavigationSounds.play(UiSound.TAB)
+                stripIndex = next
+            }
+        }
     }
 
     // L1/R1 step the categories from anywhere on the page, never wrapping, as they step a strip elsewhere (proposal
@@ -1028,6 +1054,18 @@ fun CatalogNavigator(
         val edge = LocalShellWindow.current.edgePadding
         CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
             when {
+                !categoryMode && strip && stripViews.size > 1 -> Column(Modifier.fillMaxSize()) {
+                    ViewStrip(
+                        labels = stripViews.map { it.title.orEmpty() },
+                        active = stripIndex.coerceIn(0, stripViews.lastIndex),
+                        focused = null,
+                        pill = null,
+                        onSelect = { stripIndex = it },
+                        onClearPill = {},
+                        modifier = Modifier.padding(top = MenuTokens.SectionListTopGap),
+                    )
+                    pane(Modifier.weight(1f).fillMaxWidth(), edge)
+                }
                 !categoryMode -> pane(Modifier.fillMaxSize(), edge)
                 twoPane -> Row(Modifier.fillMaxSize()) {
                     column(Modifier.fillMaxHeight().width(SettingsLayout.columnWidth(hostWidth)))

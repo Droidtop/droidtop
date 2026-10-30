@@ -19008,7 +19008,8 @@ menu still list every `listed` place.
   the 2026-10-24 placement of #639 where Updates was this place's first row: "This is supposed to be a tab like the
   steam downloads tab, with actually initializing updates and stuff handled in the QAM. Is that not what was settled
   on? I defer a lot for UX stuff, I'm just confused", then, on the coordinator's proposal, "Yes, the new organization
-  you just proposed is what I want"). In order: the one **jobs list** (Current, Paused and Completed, each job with its
+  you just proposed is what I want"). In order: the **Updates** shortcut row, "Updates · N available", which opens
+  the Updates page (owner, 2026-10-30, Droidtop/tracker#792: "Not there directly, but a shortcut"); the one **jobs list** (Current, Paused and Completed, each job with its
   bar, time left and Pause, Resume or Cancel); **Get games** (every source plugin's row, then Add a game, Get new games
   in Gaming, and Get apps; moved from Game sources and from Updates); **Sources** (`StoresCatalog.sourcesGroups`): each
   signed-in store and each game folder, one row each opening its page, with one status glyph from the host set (a
@@ -19058,21 +19059,33 @@ menu still list every `listed` place.
   list ends with a **Download rules** row that opens that screen.
   The name stays the one the rest of the app already uses. Theme downloads
   and update installs are not yet jobs in that list; folding them in is open.
-- **Updates are checked for and started in the Quick Menu's Downloads tab** (owner, 2026-10-29, Droidtop/tracker#749,
-  quoted above; `UpdatesPage.quickMenuScreen`, registered as `PluginJobsScreen.QUICK_MENU_ID`). In order: Check now,
-  Update all with its count, every game, plugin and app with an update (A starts it; Y is its Info, and a folder game's
-  row opens its record with the changelog), then the running and recent jobs (the jobs list's own rows), then Update
-  settings. A started update is a job, so it shows there and in Downloads and Updates alike. Every way to Updates opens
-  it: in Gaming the Updates section (a notification, Home's More card, a link) opens the Quick Menu on Downloads over the
-  section the person was on; elsewhere the `updates` screen is the same rows from the same builder. Not built yet: a
-  plugin's changelog on Y, which needs the plugin catalog's releases to carry one.
+- **Updates are checked for and started on the Updates page** (owner, 2026-10-30, Droidtop/tracker#792, replacing
+  2026-10-29's #749, which put the list in the Quick Menu's Downloads tab). That tab (`UpdatesPage.quickMenuScreen`,
+  registered as `PluginJobsScreen.QUICK_MENU_ID`) is now the shortcut row "Updates · N available", which opens the
+  page, then the running and recent jobs. A started update is a job, so it shows there and in Downloads and Updates
+  alike. Not built yet: a plugin's changelog, which needs the plugin catalog's releases to carry one.
 - **Updates** (`updates`) is **one list, never tabs** (decided 2026-10-16, Droidtop/tracker#570; the owner: "the
   updates menu is fucky, it has a tab that just always shows up to date. WE don't have an option to ask the user if
   they want to install an update (that's an issue), so it will never know about an update, taht tab is useless.
   Updates should be a single tab"). It was a group per kind plus droidtop's settings and Android apps, at least
   three groups and so three tabs in Gaming's category column; the "droidtop" tab read a version only the check at
   process start recorded, which a launcher's process seldom runs, so it said "Up to date" whatever Check now found.
-  Now it is one group (`UpdatesPage`), in this order:
+  Now it is one page (`UpdatesPage`), first-class since 2026-10-30 (Droidtop/tracker#792; the owner: "We need a
+  cleaner and more uniform updates page that covers everything (plugins, games, etc)"). The page's header says when
+  the last check ran (or why droidtop's own check failed), its bar holds **Check now** and **Update all**, and its
+  views go on the strip (`CatalogLayout.STRIP`, L1/R1): All, then one per kind that has any, each with its count
+  ("All · 5", "Plugins · 2", "Games · 1", "Apps · 1", "droidtop · 1"). Every row is the same shape whatever it updates:
+  its icon or cover, its name, one line "installed → available · size · from where" ("v0.37 → v0.38 · 12 MB ·
+  from the F95zone catalog"; `GameUpdates.step`, "unknown → v0.38" when the version here is not known, "a newer
+  build" when neither is), and one value that is its state: **Update**, **Updating** (with the moving bar),
+  **Waiting** (queued by Update all) or **Failed · Retry**. A folder game whose source names a newer version opens
+  that source's record in place (its downloads and its changelog); the other kinds have no changelog to show yet,
+  so their rows have none. **One count** (`UpdatesWaiting`) is what every way in says: the left menu's Updates row
+  (a row of its own again, with a dot while any wait), the "Updates · N available" row heading Downloads and
+  Updates and the Quick Menu's Downloads tab (the owner, 2026-10-30: "An updates link should be in the Downloads and
+  Updates tab. Not there directly, but a shortcut"), and the companion's Home. The page publishes it each time it
+  reads the kinds; the first of those ways in after the process starts reads them off the main thread. What the
+  page does, in that order:
   - **Check now**, saying when the last check ran and, when droidtop's own check failed, why; its value is how many
     have an update, or "Up to date" only after a check that worked, "Check failed" or "Not checked". It asks every
     kind: droidtop's build (recorded, never installed here), every plugin catalog, the trusted plugin repositories
@@ -19122,7 +19135,7 @@ menu still list every `listed` place.
   stop what the game uses, and droidtop's install ends in Android's confirmation over the screen, so while
   `LaunchDisplay.running` holds a game the policy step waits and runs once when the game ends; a scheduled pass's
   wait keeps its droidtop install and its notification. "Only on Wi-Fi" already holds every check and install to an
-  unmetered network, and a capsule's top-left corner already marks a game with an update. **Where Updates is reached:** the Quick Menu's Downloads tab; Settings > About
+  unmetered network, and a capsule's top-left corner already marks a game with an update. **Where Updates is reached:** its page, from the left menu, the companion, or the shortcut row in the Quick Menu's Downloads tab and in Downloads and Updates; Settings > About
   droidtop > Updates, whose value says when droidtop has a newer build ("droidtop 0.2.0-dev.2700 is out"; it was a
   group of its own under System, now in About, one row); a plugin's page (its version and Update), in Settings and
   as its panel in the Quick Menu and on the companion; the plugin list's "N updates" row, each row's value naming the
@@ -19192,10 +19205,10 @@ whatever the mode (with Gaming off, Desktop or nothing). Now:
   place when Gaming is the mode in use (`Place.opensInGaming`: the last mode
   is Gaming and Gaming is on), else the host. Message notifications and the
   plugin-repository update notification use it.
-- **Updates** is the Quick Menu's Downloads tab in every mode (owner, 2026-10-29, Droidtop/tracker#749). In Gaming the
-  section redirects there; outside it the host, asked for the Updates place by any link (a notification with Gaming
-  not in use, droidtop's icon shortcut), opens `QuickMenuActivity` on Downloads (`QuickMenuActivity.intent`, the tab
-  named by `QuickSection`) instead of a page of its own.
+- **Updates** is its own page in every mode (owner, 2026-10-30, Droidtop/tracker#792, replacing 2026-10-29's
+  #749, which made it the Quick Menu's Downloads tab and redirected every link there). Gaming opens it as a place,
+  the host opens it as a screen; the Quick Menu's Downloads tab and Downloads and Updates head with a shortcut row to
+  it, "Updates · N available", rather than the list itself.
 
 ### Social: one place for every provider (decided 2026-10-08, Droidtop/tracker#327)
 

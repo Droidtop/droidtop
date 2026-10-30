@@ -400,7 +400,7 @@ internal object StoresCatalog {
                         inline = addGameScreen(),
                         icon = CatalogIcon.LIBRARY,
                     ),
-                    // Get new games and Get apps were Updates' rows; updates moved to the Quick Menu, and getting things is
+                    // Get new games and Get apps were Updates' rows; updates have their own page, and getting things is
                     // this place's (owner, 2026-10-29, Droidtop/tracker#749).
                     UpdatesPage.getNewGamesRow(context),
                     NestedScreenItem(

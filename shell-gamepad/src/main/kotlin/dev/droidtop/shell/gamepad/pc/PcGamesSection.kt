@@ -1210,7 +1210,7 @@ internal fun PcGamesSection(
                                     state.homeCard = index
                                 }
                             },
-                            // Every way into Updates opens the Quick Menu's Downloads tab, where the jobs are (Droidtop/tracker#749).
+                            // The activity spot opens Updates, its own page (Droidtop/tracker#792).
                             onActivity = { onOpenSection(GamingSection.UPDATES) },
                             onBell = onOpenQuickMenu,
                             onFriends = { onOpenSection(GamingSection.SOCIAL) },

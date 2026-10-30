@@ -7,7 +7,6 @@ import dev.droidtop.app.LibraryCore
 import dev.droidtop.app.update.AppSelfUpdate
 import dev.droidtop.app.update.UpdateChecks
 import dev.droidtop.app.update.UpdateKinds
-import dev.droidtop.app.update.UpdateDownload
 import dev.droidtop.app.update.UpdateNow
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.LibraryGrouping
@@ -18,6 +17,12 @@ import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.integrations.PluginCatalog
 import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.settings.ActionItem
+import dev.droidtop.library.settings.ButtonRole
+import dev.droidtop.library.settings.CatalogLayout
+import dev.droidtop.library.settings.CatalogPage
+import dev.droidtop.library.settings.PageButton
+import dev.droidtop.library.settings.PageHeader
+import dev.droidtop.library.settings.UpdatesWaiting
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
@@ -40,14 +45,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Updates: one list of everything that has a newer version, each with Update, and Update all above them (docs/SPEC.md
- * 10b "The Updates page", Droidtop/tracker#570). The owner, 2026-10-16: "the updates menu is fucky, it has a tab that
- * just always shows up to date. ... Updates should be a single tab".
- *
- * It is one group, so no surface draws it as tabs. Its rows: Check now (when the last check ran, or why it failed),
- * Update all, then one row per update (droidtop, plugins, Android apps, store games, games whose source names a newer
- * version), then the settings and Get apps. With nothing to update it says so once, after a check that worked. It
- * reads only what checks already recorded; Check now is what asks.
+ * Updates: one first-class page for everything that has a newer version (docs/SPEC.md 10b "The Updates page",
+ * Droidtop/tracker#792; the owner, 2026-10-30: "We need a cleaner and more uniform updates page that covers everything
+ * (plugins, games, etc)"). Its header says when droidtop last checked; its bar is Check now and Update all; its views,
+ * on the shell's strip (L1 and R1), are All and each kind that has updates, each with its count. Every update is one
+ * row of one shape: its picture, its name, "installed → available · size · from where", and its state in the value
+ * column (Update, Updating, Waiting, Failed · Retry), A starting it. It reads only what checks already recorded; Check
+ * now is what asks. The page is its own: the Quick Menu's Downloads and Updates tab, the left menu (with its badge) and
+ * the companion reach it, each saying how many are waiting ([UpdatesWaiting]); none draws its rows.
  */
 object UpdatesPage {
     /** Install debug builds: for finding faults in droidtop itself, so it is in the Developer menu (docs/SPEC.md 7, "Developer menu"). */
@@ -71,35 +76,32 @@ object UpdatesPage {
     }
 
     /**
-     * The Quick Menu's Downloads tab (owner, 2026-10-29, Droidtop/tracker#749: "This is supposed to be a tab like the
-     * steam downloads tab, with actually initializing updates and stuff handled in the QAM"): Check now, Update all,
-     * every game and plugin with an update, then the running and recent jobs, then Update settings. A started update is
-     * a job, so it shows here and in Downloads and Updates alike.
+     * The Quick Menu's Downloads tab (Droidtop/tracker#749): the running and recent jobs, under one row that opens
+     * Updates and says how many are waiting (the owner, 2026-10-30: "An updates link should be in the Downloads and
+     * Updates tab. Not there directly, but a shortcut"). The updates themselves are only on their page.
      */
-    fun quickMenuScreen() = screen(PluginJobsScreen.QUICK_MENU_ID, "Downloads")
-
-    /**
-     * The same, for a link to Updates where no Quick Menu is drawn (a notification opened outside Gaming, Settings in
-     * Standard or Desktop): one builder, so the two never differ.
-     */
-    fun screen() = screen(AppSettingsCatalogs.SCREEN_UPDATES, "Updates")
-
-    private fun screen(id: String, title: String) = CatalogScreen(
-        id = id,
-        title = title,
-        subtitle = "What has a newer version, and what is downloading",
-        needsNetwork = true,
-        // Off the main thread as a whole: the rows read preferences and what the slow kinds last read.
+    fun quickMenuScreen() = CatalogScreen(
+        id = PluginJobsScreen.QUICK_MENU_ID,
+        title = "Downloads",
+        subtitle = "What is downloading, and the way to Updates",
         groups = { context ->
-            withContext(Dispatchers.IO) {
-                listOf(CatalogGroup(id = "updates", title = null, items = rows(context))) +
-                    PluginJobsScreen.jobGroups() +
-                    CatalogGroup(id = "updates_more", title = null, items = listOf(settingsRow()))
-            }
+            UpdatesWaiting.refresh?.invoke(context)
+            listOf(PluginJobsScreen.updatesGroup()) + PluginJobsScreen.jobGroups()
         },
-        // Live (Droidtop/tracker#748, the owner: "It not auto-refreshing is a ux bug"): a kind that finished reading,
-        // an update that started or finished, a job that moved, each rebuilds the rows at once, so no row waits for a
-        // whole Update all.
+        live = kotlinx.coroutines.flow.merge(UpdatesWaiting.count, dev.droidtop.pluginhost.PluginJobsCenter.entries()),
+    )
+
+    /** The page, wherever it is opened: the left menu's Updates, a notification, Settings, the Quick Menu's row. */
+    fun screen() = CatalogScreen(
+        id = AppSettingsCatalogs.SCREEN_UPDATES,
+        title = "Updates",
+        subtitle = "What has a newer version",
+        needsNetwork = true,
+        layout = CatalogLayout.STRIP,
+        // Off the main thread as a whole: the rows read preferences and what the slow kinds last read.
+        groups = { context -> withContext(Dispatchers.IO) { page(context).asGroups() } },
+        // Live (Droidtop/tracker#748): a kind that finished reading, an update that started or ended, each rebuilds
+        // the rows at once.
         live = kotlinx.coroutines.flow.merge(changes, dev.droidtop.pluginhost.PluginJobsCenter.entries()),
     )
 
@@ -113,7 +115,7 @@ object UpdatesPage {
     /**
      * Get new games, in Gaming only: the page is Gaming's, which opens it in place by the row's id; in another mode the
      * row is not listed, since it would open Gaming over that mode (Droidtop/tracker#639). Under Downloads and Updates'
-     * Get games since updates moved to the Quick Menu (Droidtop/tracker#749).
+     * Get games (Droidtop/tracker#749).
      */
     fun getNewGamesRow(context: Context): CatalogItem? {
         if (Modes.lastMode(context) != Mode.GAMING.id) return null
@@ -132,23 +134,74 @@ object UpdatesPage {
         )
     }
 
-    /** One update: its row, and what Update all does for it (null where it opens a page instead of installing). */
-    private class Update(val row: CatalogItem, val apply: (suspend (Context, (String) -> Unit) -> String)?)
+    /** The kinds the page's strip names after All, in this order. */
+    internal enum class Kind(val label: String) { DROIDTOP("droidtop"), PLUGINS("Plugins"), APPS("Apps"), GAMES("Games") }
+
+    /** Where one update stands, the value its row shows: one model for every kind. */
+    internal enum class State(val label: String) {
+        AVAILABLE("Update"),
+        DOWNLOADING("Updating"),
+        WAITING("Waiting"),
+        FAILED("Failed · Retry"),
+    }
+
+    /** One row's state from what the page knows: running, queued by Update all, failed last time, else available. Pure. */
+    internal fun stateOf(id: String, busy: Set<String>, waiting: Set<String>, failed: Set<String>): State = when (id) {
+        in busy -> State.DOWNLOADING
+        in waiting -> State.WAITING
+        in failed -> State.FAILED
+        else -> State.AVAILABLE
+    }
+
+    /** A row's one line: the version step, the size, where it comes from. Pure. */
+    internal fun line(step: String, sizeBytes: Long?, from: String?): String = listOfNotNull(
+        step,
+        sizeBytes?.takeIf { it > 0 }?.let(ValueFormat::size),
+        from?.trim()?.takeIf { it.isNotEmpty() }?.let { "from $it" },
+    ).joinToString(" · ")
+
+    /** The strip's views: All with every update, then each kind that has any, each titled with its count. Pure. */
+    internal fun viewTitles(counts: Map<Kind, Int>): List<Pair<Kind?, String>> =
+        listOf<Pair<Kind?, String>>(null to "All · ${counts.values.sum()}") +
+            Kind.entries.filter { (counts[it] ?: 0) > 0 }.map { it to "${it.label} · ${counts[it]}" }
+
+    /** How an update ended: its line, and whether it worked (a failed one is drawn as Failed · Retry). */
+    private class Done(val line: String, val ok: Boolean)
+
+    /**
+     * One update. [install] runs it (Update, Retry and Update all); null for a row that opens a page instead (a folder
+     * game's source) or explains why it cannot be installed ([own] draws those).
+     */
+    private class Update(
+        val kind: Kind,
+        val id: String,
+        val title: String,
+        val step: String,
+        val sizeBytes: Long? = null,
+        val from: String? = null,
+        val iconFile: String? = null,
+        val install: (suspend (Context, (String) -> Unit) -> String)? = null,
+        val own: CatalogItem? = null,
+    )
 
     /**
      * Where the rows come from. The quick ones (droidtop's own build, the library's games) are read each time the rows
      * are; the slow ones (the plugin catalogs, the package manager's apps) are read in the background and kept, so the
-     * page shows at once and a slow section fills in its own rows when it is ready (Droidtop/tracker#748: the page took
-     * about 10 s to show anything).
+     * page shows at once and a slow section fills in its own rows when it is ready (Droidtop/tracker#748).
      */
-    private enum class Section(val checking: String) { PLUGINS("Checking your plugins"), APPS("Checking your apps") }
+    private enum class Section(val kind: Kind, val checking: String) {
+        PLUGINS(Kind.PLUGINS, "Checking your plugins"),
+        APPS(Kind.APPS, "Checking your apps"),
+    }
 
-    /** Each slow section's last rows and when they were read. */
+    /** Each slow section's last updates and when they were read. */
     private val kept = ConcurrentHashMap<Section, Pair<Long, List<Update>>>()
     private val reading: MutableSet<Section> = ConcurrentHashMap.newKeySet()
 
-    /** The rows being updated now, by row id: drawn as Updating with the moving bar until their update returns. */
+    /** Rows updating now, queued by Update all, and whose last update failed, by row id. */
     private val busy: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val waiting: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val failed: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val changes = MutableStateFlow(0)
     private val scope = dev.droidtop.runtime.util.AppScopes.io
 
@@ -160,102 +213,137 @@ object UpdatesPage {
         val app = context.applicationContext
         scope.launch {
             try {
-                val rows = when (section) {
+                val found = when (section) {
                     Section.PLUGINS -> plugins(app)
                     Section.APPS -> apps(app)
                 }
-                kept[section] = System.currentTimeMillis() to rows
+                kept[section] = System.currentTimeMillis() to found
             } catch (e: Exception) {
                 android.util.Log.w("droidtop.Updates", "reading ${section.name.lowercase()} failed: ${e.message}")
             } finally {
                 reading.remove(section)
                 changes.value++
+                publishCount(app)
             }
         }
     }
 
     /**
-     * [install] for the row [id] of [section]: the row says Updating with the moving bar while it runs, and once it
-     * returns its section is read again, so the row goes (or says what is left) at once.
+     * [install] for the row [id]: Updating while it runs, Failed · Retry if it did not work, and once it returns its
+     * section is read again, so the row goes (or says what is left) at once.
      */
     private fun tracked(
         id: String,
         section: Section?,
-        install: suspend (Context, (String) -> Unit) -> String,
+        install: suspend (Context, (String) -> Unit) -> Done,
     ): suspend (Context, (String) -> Unit) -> String = { ctx, onStatus ->
+        waiting.remove(id)
+        failed.remove(id)
         busy.add(id)
         changes.value++
         try {
-            install(ctx, onStatus)
+            val done = runCatching { install(ctx, onStatus) }.getOrElse { Done(it.message ?: "it failed", ok = false) }
+            if (!done.ok) failed.add(id)
+            done.line
         } finally {
             busy.remove(id)
             if (section != null) refresh(ctx, section, force = true) else changes.value++
         }
     }
 
-    /** [update]'s row as drawn now: Updating, with the bar, while its update runs (show, then say: Droidtop/tracker#738). */
-    private fun shown(update: Update): CatalogItem {
-        val row = update.row
-        if (row.id !in busy) return row
-        return ActionItem(id = row.id, title = row.title, subtitle = row.subtitle, value = "Updating", progress = -1f)
-    }
-
-    private suspend fun rows(context: Context): List<CatalogItem> {
-        // Opening the list checks again when the last check is old, so it shows what is out now (Droidtop/tracker#792).
-        UpdateChecks.refreshIfStale(context)
-        // A section read before the last check ended is read again: the check fetched newer catalogs.
+    /** Every update known now, and the slow sections still being read. */
+    private fun collect(context: Context): Pair<List<Update>, List<Section>> {
         val checkedAt = UpdateChecks.lastCheck(context) ?: 0L
+        // A section read before the last check ended is read again: the check fetched newer catalogs.
         Section.entries.forEach { refresh(context, it, force = (kept[it]?.first ?: 0L) < checkedAt) }
         val slow = Section.entries.associateWith { kept[it]?.second }
         val updates = droidtop(context) + slow[Section.PLUGINS].orEmpty() + slow[Section.APPS].orEmpty() + games(context)
-        // A section not read yet is one row of its own, loading; the rest of the page does not wait for it.
-        val checking = Section.entries.filter { slow[it] == null }.map { section ->
-            ActionItem(id = "updates_checking_${section.name.lowercase()}", title = section.checking, progress = -1f)
-        }
+        return updates to Section.entries.filter { slow[it] == null }
+    }
+
+    /** Lists the updates and publishes how many there are ([UpdatesWaiting]), for an entry drawn before the page. */
+    fun publishCount(context: Context) {
+        UpdatesWaiting.publish(collect(context).first.size)
+    }
+
+    /** One update's row: the one shape for every kind. */
+    private fun rowOf(update: Update): CatalogItem {
+        update.own?.let { return it }
+        val state = stateOf(update.id, busy, waiting, failed)
+        return AsyncActionItem(
+            id = update.id,
+            title = update.title,
+            subtitle = line(update.step, update.sizeBytes, update.from),
+            value = state.label,
+            iconFile = update.iconFile,
+            run = update.install ?: { _, _ -> "" },
+        ).let { row -> if (state == State.DOWNLOADING) ActionItem(id = row.id, title = row.title, subtitle = row.subtitle, value = row.value, progress = -1f) else row }
+    }
+
+    private suspend fun page(context: Context): CatalogPage {
+        // Opening the page checks again when the last check is old, so it shows what is out now (Droidtop/tracker#792).
+        UpdateChecks.refreshIfStale(context)
+        val (updates, unread) = collect(context)
+        UpdatesWaiting.publish(updates.size)
         val failure = AppSelfUpdate.lastFailure(context)
         val checked = UpdateChecks.lastCheck(context)
         val lastLine = checked?.let { "Last checked " + ValueFormat.ago(System.currentTimeMillis(), it).replaceFirstChar { c -> c.lowercase() } }
-        return buildList {
-            add(
-                AsyncActionItem(
-                    id = "updates_check",
-                    title = "Check now",
-                    subtitle = listOfNotNull(lastLine ?: "Not checked yet", failure?.let { "The last check of droidtop failed: $it" })
-                        .joinToString(". "),
-                    value = when {
-                        updates.isNotEmpty() -> "${updates.size} to update"
-                        checked == null -> "Not checked"
-                        failure != null -> "Check failed"
-                        else -> "Up to date"
-                    },
-                    run = { ctx, onStatus ->
-                        UpdateChecks.checkAll(ctx, onStatus).also { Section.entries.forEach { refresh(ctx, it, force = true) } }
-                    },
-                ),
-            )
-            val installable = updates.mapNotNull { it.apply }
-            if (installable.size > 1) {
-                add(
-                    AsyncActionItem(
-                        id = "updates_all",
-                        title = "Update all",
-                        subtitle = "Each update downloads and installs the way its own Update does, one after another",
-                        value = installable.size.toString(),
-                        // Each update is the row's own (tracked), so each row changes as its own update starts and ends.
-                        run = { ctx, onStatus -> installable.map { it(ctx, onStatus) }.joinToString(". ") },
-                    ),
-                )
-            }
-            if (updates.isEmpty() && checked != null && failure == null) {
-                add(TextBlockItem(id = "updates_none", text = "Everything is up to date."))
-            }
-            updates.forEach { add(shown(it)) }
-            addAll(checking)
+        val installable = updates.mapNotNull { update -> update.install?.let { update.id to it } }
+        val checkingRows = unread.associate { section ->
+            section.kind to ActionItem(id = "updates_checking_${section.name.lowercase()}", title = section.checking, progress = -1f)
         }
+        val counts = updates.groupingBy { it.kind }.eachCount()
+        val views = viewTitles(counts).map { (kind, title) ->
+            val shown = updates.filter { kind == null || it.kind == kind }
+            CatalogGroup(
+                id = "updates_view_${kind?.name?.lowercase() ?: "all"}",
+                title = title,
+                items = buildList {
+                    if (kind == null && updates.isEmpty() && checked != null && failure == null && unread.isEmpty()) {
+                        add(TextBlockItem(id = "updates_none", text = "Everything is up to date."))
+                    }
+                    shown.forEach { add(rowOf(it)) }
+                    checkingRows.filterKeys { kind == null || it == kind }.values.forEach(::add)
+                    if (kind == null) add(settingsRow())
+                },
+            )
+        }
+        return CatalogPage(
+            header = PageHeader(
+                title = "Updates",
+                byline = listOfNotNull(lastLine ?: "Not checked yet", failure?.let { "The last check of droidtop failed: $it" }).joinToString(". "),
+            ),
+            buttons = listOf(
+                PageButton(id = "updates_check", label = "Check now", role = ButtonRole.PRIMARY) { ctx ->
+                    scope.launch {
+                        val said = UpdateChecks.checkAll(ctx) { }
+                        Section.entries.forEach { refresh(ctx, it, force = true) }
+                        dev.droidtop.library.settings.Notices.flash(said.ifBlank { "Checked" }, context = ctx)
+                    }
+                },
+                PageButton(
+                    id = "updates_all",
+                    label = "Update all",
+                    enabled = installable.isNotEmpty(),
+                    disabledReason = "Nothing to update",
+                ) { ctx ->
+                    // Each update is the row's own (tracked): the rest wait, each row changes as its own starts and ends.
+                    waiting.addAll(installable.map { it.first })
+                    changes.value++
+                    scope.launch {
+                        val said = try {
+                            installable.map { (_, install) -> install(ctx) { } }.filter { it.isNotBlank() }.joinToString(". ")
+                        } finally {
+                            waiting.removeAll(installable.map { it.first }.toSet())
+                            changes.value++
+                        }
+                        dev.droidtop.library.settings.Notices.flash(said.ifBlank { "Updated" }, context = ctx)
+                    }
+                },
+            ),
+            groups = views,
+        )
     }
-
-    // Every row names both versions in words, the available one in the value column (Droidtop/tracker#639).
-    private fun available(version: String): String = GameUpdates.availableLabel(version)
 
     // Gaming's section name for Get new games (GamingSection is internal to the shell; its names are the deep link's).
     private const val GAMING_NEW_GAMES = "NEW_GAMES"
@@ -263,18 +351,18 @@ object UpdatesPage {
     /** droidtop itself, while a check has seen a newer build: Update installs it (Android asks). */
     private fun droidtop(context: Context): List<Update> {
         val newer = AppSelfUpdate.newerSeenVersionName(context) ?: return emptyList()
-        val updating = UpdateDownload.liveLine()
-        val install = tracked("updates_droidtop", null) { ctx, onStatus -> UpdateNow.startAndAwait(ctx, onStatus) }
+        val id = "updates_droidtop"
         return listOf(
             Update(
-                AsyncActionItem(
-                    id = "updates_droidtop",
-                    title = "droidtop",
-                    subtitle = "${GameUpdates.installedLabel(AppSelfUpdate.installedVersionName(context))}. Android asks you to confirm the install",
-                    value = updating ?: available(newer),
-                    run = install,
-                ),
-                install,
+                kind = Kind.DROIDTOP,
+                id = id,
+                title = "droidtop",
+                step = GameUpdates.step(AppSelfUpdate.installedVersionName(context), newer),
+                from = "droidtop's releases",
+                install = tracked(id, null) { ctx, onStatus ->
+                    val said = UpdateNow.startAndAwait(ctx, onStatus)
+                    Done(said, ok = AppSelfUpdate.lastFailure(ctx) == null)
+                },
             ),
         )
     }
@@ -284,19 +372,19 @@ object UpdatesPage {
         val installed = PluginStore.installed(context)
         val offers = PluginCatalog.offersFor(installed, PluginCatalog.listings(context), UserOriginKeys.load(UserOriginKeys.storeFile(context)))
         return offers.map { (record, offer) ->
-            val install = tracked("updates_plugin_${record.manifest.id}", Section.PLUGINS) { ctx, onStatus ->
-                val outcome = PluginCatalog.installOutcome(ctx, offer.plugin, offer.release) { status -> onStatus("${record.manifest.label}: $status") }
-                "${record.manifest.label}: ${outcome.line}"
-            }
+            val id = "updates_plugin_${record.manifest.id}"
             Update(
-                AsyncActionItem(
-                    id = "updates_plugin_${record.manifest.id}",
-                    title = record.manifest.label,
-                    subtitle = "${GameUpdates.installedLabel(record.manifest.version)}. Plugin" + if (offer.source.official) "" else ", unofficial, from ${offer.source.name}",
-                    value = available(offer.release.version),
-                    run = install,
-                ),
-                install,
+                kind = Kind.PLUGINS,
+                id = id,
+                title = record.manifest.label,
+                step = GameUpdates.step(record.manifest.version, offer.release.version),
+                sizeBytes = offer.release.bundle.size,
+                from = if (offer.source.official) "droidtop's catalog" else "${offer.source.name}, unofficial",
+                iconFile = PluginStore.iconFile(context, record),
+                install = tracked(id, Section.PLUGINS) { ctx, onStatus ->
+                    val outcome = PluginCatalog.installOutcome(ctx, offer.plugin, offer.release) { status -> onStatus("${record.manifest.label}: $status") }
+                    Done("${record.manifest.label}: ${outcome.line}", outcome.installed)
+                },
             )
         }
     }
@@ -309,44 +397,45 @@ object UpdatesPage {
         return states.take(MAX_APP_ROWS).map { state ->
             when (state) {
                 is AppCatalogs.UpdateState.Available -> {
-                    val install = tracked("updates_app_${state.offer.id}", Section.APPS) { ctx, onStatus -> updateApp(ctx, state, onStatus) }
+                    val id = "updates_app_${state.offer.id}"
                     Update(
-                        AsyncActionItem(
-                            id = "updates_app_${state.offer.id}",
-                            title = state.offer.name,
-                            subtitle = "${GameUpdates.installedLabel(state.installed.versionName ?: state.installed.versionCode.toString())}. App, from ${state.offer.source ?: state.pluginLabel}",
-                            value = available(state.offer.version),
-                            run = install,
-                        ),
-                        install,
+                        kind = Kind.APPS,
+                        id = id,
+                        title = state.offer.name,
+                        step = GameUpdates.step(state.installed.versionName ?: state.installed.versionCode.toString(), state.offer.version),
+                        from = state.offer.source ?: state.pluginLabel,
+                        install = tracked(id, Section.APPS) { ctx, onStatus -> updateApp(ctx, state, onStatus) },
                     )
                 }
                 // Android would refuse it, so it is said, not offered: Update explains instead of failing at install.
                 is AppCatalogs.UpdateState.KeyDiffers -> Update(
-                    AsyncActionItem(
+                    kind = Kind.APPS,
+                    id = "updates_app_${state.offer.id}",
+                    title = state.offer.name,
+                    step = state.offer.version,
+                    own = AsyncActionItem(
                         id = "updates_app_${state.offer.id}",
                         title = state.offer.name,
                         subtitle = "${state.offer.version} from ${state.offer.source ?: state.pluginLabel} is signed by a different key than the installed app",
                         value = "Different key",
                         run = { _, _ -> "Android refuses an update signed by a different key. Uninstall the app first to install this version" },
                     ),
-                    null,
                 )
             }
         }
     }
 
-    private suspend fun updateApp(context: Context, state: AppCatalogs.UpdateState.Available, onStatus: (String) -> Unit): String {
+    private suspend fun updateApp(context: Context, state: AppCatalogs.UpdateState.Available, onStatus: (String) -> Unit): Done {
         val record = AppCatalogs.providers(context).firstOrNull { it.manifest.id == state.pluginId }
-            ?: return "${state.offer.name}: ${state.pluginLabel} is no longer installed or allowed"
+            ?: return Done("${state.offer.name}: ${state.pluginLabel} is no longer installed or allowed", ok = false)
         val result = AppCatalogs.install(context, record, state.offer.id, state.offer.versionCode, state.offer.name, onStatus)
-        return if (result.ok) result.values["summary"] ?: "${state.offer.name} updated" else "${state.offer.name}: ${result.error ?: "it failed"}"
+        return if (result.ok) Done(result.values["summary"] ?: "${state.offer.name} updated", ok = true) else Done("${state.offer.name}: ${result.error ?: "it failed"}", ok = false)
     }
 
     /**
      * Games with a newer version: a store game its store named one for (Update starts the store's download in place, as
-     * the automatic updates do), and a folder game whose linked source names one (Update opens its page, where the
-     * source's Get is; droidtop does not replace a folder's files by itself).
+     * the automatic updates do), and a folder game whose linked source names one (its row opens the source's own
+     * screen, with its downloads and changelog; droidtop does not replace a folder's files by itself).
      */
     private fun games(context: Context): List<Update> {
         val published = LibraryCore.library(context).backgroundScanState(LibraryKinds.GAMES).value ?: return emptyList()
@@ -357,29 +446,40 @@ object UpdatesPage {
             .map { (entry, version, group) ->
                 val pc = entry.pcInfo
                 // What is here: the store's installed build, else the newest version folder of the game.
-                val installed = GameUpdates.installedLabel(pc?.installedVersion ?: group.game.defaultVersion?.version)
+                val installedVersion = pc?.installedVersion ?: group.game.defaultVersion?.version
+                val id = "updates_game_${entry.id}"
                 val path = pc?.installPath
                 if (pc != null && pc.installed && path != null && GameUpdates.forStore(pc) != null) {
                     val key = pc.storeId ?: entry.id
-                    val install = tracked("updates_game_${entry.id}", null) { ctx, _ ->
-                        if (StoreAutoUpdates.startUpdate(ctx, key, entry.title, path, pc.sizeBytes)) {
-                            "${entry.title}: updating. It is listed under Downloads"
-                        } else {
-                            "${entry.title}: no store in this build updates it"
-                        }
-                    }
                     Update(
-                        AsyncActionItem(
-                            id = "updates_game_${entry.id}",
-                            title = entry.title,
-                            subtitle = "$installed. Game, from its store",
-                            value = available(version),
-                            run = install,
-                        ),
-                        install,
+                        kind = Kind.GAMES,
+                        id = id,
+                        title = entry.title,
+                        step = GameUpdates.step(installedVersion, version),
+                        sizeBytes = pc.sizeBytes,
+                        from = "its store",
+                        iconFile = entry.artworkUri?.toString(),
+                        install = tracked(id, null) { ctx, _ ->
+                            if (StoreAutoUpdates.startUpdate(ctx, key, entry.title, path, pc.sizeBytes)) {
+                                Done("${entry.title}: updating. It is listed under Downloads", ok = true)
+                            } else {
+                                Done("${entry.title}: no store in this build updates it", ok = false)
+                            }
+                        },
                     )
                 } else {
-                    Update(sourceUpdateRow({ ctx -> LibraryCore.library(ctx) }, entry.id, entry.title, installed, available(version)), null)
+                    Update(
+                        kind = Kind.GAMES,
+                        id = id,
+                        title = entry.title,
+                        step = GameUpdates.step(installedVersion, version),
+                        own = sourceUpdateRow(
+                            { ctx -> LibraryCore.library(ctx) },
+                            entry.id,
+                            entry.title,
+                            GameUpdates.step(installedVersion, version),
+                        ),
+                    )
                 }
             }
     }
@@ -394,14 +494,14 @@ object UpdatesPage {
         library: (Context) -> dev.droidtop.library.Library,
         entryId: String,
         title: String,
-        installed: String,
-        available: String,
+        step: String,
     ): CatalogItem =
         NestedScreenItem(
             id = "updates_game_$entryId",
             title = title,
-            subtitle = "$installed. Game: its downloads, changelog and Get",
-            valueLabel = { available },
+            // The one row line ("installed → available · from where"), and the state a row that opens a page has.
+            subtitle = line(step, null, "its source: its downloads and changelog"),
+            valueLabel = { "Open" },
             inline = dev.droidtop.shell.gamepad.pc.SourceRecordScreen.forUpdate(library, entryId, title),
         )
 

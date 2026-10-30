@@ -472,19 +472,6 @@ internal fun GamepadShellBody(
         overlays.leftMenuOpen = false
         Log.i("droidtop.ReturnToGame", "deep link $deepLinkToken applied: quickMenu=$openQuickMenu")
     }
-    // Updates is the Quick Menu's Downloads tab (owner, 2026-10-29, Droidtop/tracker#749): every way into the Updates
-    // section (a notification, Home's More card, a link from a place) opens the Quick Menu there instead, over the
-    // section the person was on.
-    var lastSection by remember { mutableStateOf(nav.section) }
-    LaunchedEffect(nav.section) {
-        if (nav.section == GamingSection.UPDATES) {
-            nav.openSection(lastSection.takeIf { it != GamingSection.UPDATES } ?: GamingSection.DOWNLOADS)
-            overlays.quickMenuStart = QuickSection.DOWNLOADS
-            overlays.quickMenuOpen = true
-        } else {
-            lastSection = nav.section
-        }
-    }
     // The face-button layout of the pad in use (SPEC 7b, "Console and controller detection"),
     // followed live because a handheld's own toggle can flip it while this shell stays in front.
     // The check is an in-memory read and is repeated on every destination change, every menu and
@@ -1781,7 +1768,7 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
      * The left menu row that stands for this section: itself, or Downloads and Updates for Updates and Get new games,
      * its pages (Droidtop/tracker#639).
      */
-    val menuSection: GamingSection get() = if (this == NEW_GAMES || this == UPDATES) DOWNLOADS else this
+    val menuSection: GamingSection get() = if (this == NEW_GAMES) DOWNLOADS else this
 
     /**
      * A place that is no row of Gaming's left menu (Droidtop/tracker#644 slice 3). Plugins and Social are sections of
@@ -1838,8 +1825,9 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
  */
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
-    // The listed places; Kiosk and Kid hide them all, since they manage the device. Updates, with Get new games, is a
-    // page of Downloads and Updates (Place.listed); Plugins, Social and Game sources are elsewhere (offLeftMenu).
+    // The listed places; Kiosk and Kid hide them all, since they manage the device. Updates is a row of its own with
+    // its badge (Droidtop/tracker#792); Get new games is a page of Downloads and Updates; Plugins, Social and Game
+    // sources are elsewhere (offLeftMenu).
     val places = GamingSection.entries.filter { it.place?.listed == true && !it.offLeftMenu && !mode.hidesSettings }
     // Home leads, then PC Games (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
     val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy {
@@ -2422,8 +2410,8 @@ internal class LaunchProblems {
 
 /**
  * The shell's own overlays and which is open (Droidtop/tracker#763: held together): the Quick Menu (hold Select) and
- * the section it opens on when something asked for one ([quickMenuStart], Downloads for a link to Updates, cleared on
- * close); the left menu (Start, docs/SPEC.md 7j); the one search over the library, apps, sources and settings; and one
+ * the section it opens on when something asked for one ([quickMenuStart], Downloads for the status cluster's activity spot,
+ * cleared on close); the left menu (Start, docs/SPEC.md 7j); the one search over the library, apps, sources and settings; and one
  * system's search, by its id and name, from the Quick Menu's Game section.
  */
 @androidx.compose.runtime.Stable
