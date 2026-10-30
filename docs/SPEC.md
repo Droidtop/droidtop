@@ -20195,7 +20195,8 @@ offered for undoing. Like "The same game", what belongs to the game
 follows the link: play history and the favourite move to the entry the
 card draws (the local copy, which is what is here) and scraped metadata is
 copied into an empty place; an undo leaves them where they are. Each copy
-keeps its own save rule. Play is the card's, as for any card with several
+keeps its own save rule and its own saves, which the person can copy from
+one copy to another (7o, "Saves between copies"). Play is the card's, as for any card with several
 copies (`CopyChoices`): an installed copy, the one the person chose with
 "Use this copy for this game" first, so the choice is remembered. Store
 ids and links are read with the rest of the library's facts, one batch
@@ -20814,6 +20815,44 @@ to be able to sync between handhelds." And the same day, for this part: "Let's a
   places is searched in the game's Wine prefix by the agent core's own layout (`prefix_roots`).
 - **Searching is bounded and read-only.** A walk never follows a link, goes at most 12 folders deep, and reports at
   most 4096 files; a game with more says so. Nothing here writes, moves or deletes a save.
+
+### Saves between copies (decided 2026-10-29, Droidtop/tracker#745)
+
+The owner, 2026-10-29: "I own bare witness on steam, and also have a
+non-steam copy. We should be able to link the copies, transfer saves, and
+etc". A game with more than one copy (7m, "A store's copy and a local copy";
+also two version folders of one game) can have its saves copied from one
+copy to another, from the Saves screen of the copy that receives them
+(the game page's Saves row, "Saves from this game's other copies"):
+
+- **Where each copy's saves are** is the detected-saves answer above
+  (`SaveDetector`), the one save-location mechanism, so a Ren'Py game's
+  own `game/saves`, Enginehost's save folder and a Wine prefix's
+  `AppData` are found by the same rules. A copy's saves are the files its
+  rule matched in its place with the newest saves (`FoundPlace.paths`,
+  `SaveCopies.sideOf`); nothing else in that folder is ever copied, so a
+  game's own files never move.
+- **Ask first.** Each other copy with saves is a row, "Copy saves from
+  <copy>", saying how many files, how new and where; pressing it asks,
+  naming how many of this copy's save files are replaced. It says when
+  both copies run on one engine; otherwise "droidtop can't tell that these
+  saves fit this copy", and the copy is still the person's to make
+  (engine versions are not known per copy).
+- **Backup.** This copy's save files are copied into droidtop's own files
+  first (`save-backups/`, the newest five per copy kept, as the agent core
+  keeps five). "Put back the saves from <when>" restores them, and removes
+  the files the copy added unless they changed since: a save made after the
+  copy is kept.
+- **The source is only read**, never changed or deleted. Files keep their
+  paths below the save folder, and keep their modified time.
+- **A copy with no saves droidtop can see** has nowhere to copy to: droidtop
+  does not guess a folder from a rule's pattern. The screen says to play it
+  and save once.
+
+The copy is a press on a screen, never automatic: which copy's saves are
+the right ones is the person's call, as in "Removing an older version"
+(7i), where droidtop does not choose between two saves either.
+
 
 ### Library
 

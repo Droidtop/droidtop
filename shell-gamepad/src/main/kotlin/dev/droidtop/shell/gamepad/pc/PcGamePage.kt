@@ -429,7 +429,7 @@ internal fun PcGamePage(
     // What the page learns from outside the library: play time, an emulator's compatibility list and, where a
     // service has them, achievements (docs/SPEC.md 7h, "Game info"). Asked for once when the page opens.
     var infoScreen by remember(entry.id) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
-    val infoRows = dev.droidtop.shell.gamepad.rememberGameInfoRows(entry)
+    val infoRows = dev.droidtop.shell.gamepad.rememberGameInfoRows(entry, copies = siblings)
     // Which program a Windows game runs (docs/SPEC.md 7i, "Which program
     // runs"): the folder is read for this one open game, on IO, and again
     // when the choice sheet closes.

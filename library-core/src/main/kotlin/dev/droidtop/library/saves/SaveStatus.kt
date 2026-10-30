@@ -1,7 +1,14 @@
 package dev.droidtop.library.saves
 
-/** Saves found in one place. */
-data class FoundPlace(val label: String, val folder: String, val files: Int, val bytes: Long, val newestMs: Long)
+/** Saves found in one place. [paths] are the save files themselves, what [SaveCopies] copies and nothing else. */
+data class FoundPlace(
+    val label: String,
+    val folder: String,
+    val files: Int,
+    val bytes: Long,
+    val newestMs: Long,
+    val paths: List<String> = emptyList(),
+)
 
 /**
  * What droidtop knows about one game's saves, in the three honest states the owner asked for (Droidtop/tracker#546,
@@ -51,7 +58,7 @@ object SaveSearch {
                 if (scan.truncated) truncated = true
                 // One entry per folder the files were found in, so "where" is a real folder.
                 for ((root, files) in scan.files.groupBy { it.root }) {
-                    out += FoundPlace(place.label, root.path, files.size, files.sumOf { it.size }, files.maxOf { it.modifiedMs })
+                    out += FoundPlace(place.label, root.path, files.size, files.sumOf { it.size }, files.maxOf { it.modifiedMs }, files.map { it.file.path })
                 }
             }
             return out

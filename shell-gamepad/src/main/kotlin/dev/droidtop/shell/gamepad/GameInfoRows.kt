@@ -13,6 +13,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.displayName
 import dev.droidtop.library.achievements.RaAchievement
 import dev.droidtop.library.achievements.RaProgress
 import dev.droidtop.library.achievements.RaResult
@@ -22,6 +23,7 @@ import dev.droidtop.library.gameinfo.CompatResult
 import dev.droidtop.library.gameinfo.EmulatorCompat
 import dev.droidtop.library.gameinfo.HowLongToBeat
 import dev.droidtop.library.gameinfo.HltbResult
+import dev.droidtop.library.saves.SaveCopies
 import dev.droidtop.library.saves.SaveDetector
 import dev.droidtop.library.saves.SaveLines
 import dev.droidtop.library.saves.SaveReport
@@ -65,13 +67,19 @@ internal const val ACHIEVEMENTS_SIGN_IN = "Show your achievements: sign in to Re
  * which on a handheld is ordinary and says nothing. [enabled] is false for something that is not a game.
  */
 @Composable
-internal fun rememberGameInfoRows(entry: LibraryEntry, enabled: Boolean = true): List<GameInfoRow> {
+internal fun rememberGameInfoRows(
+    entry: LibraryEntry,
+    enabled: Boolean = true,
+    // The game's other copies (docs/SPEC.md 7o, "Saves between copies"): the Saves screen offers their saves.
+    copies: List<LibraryEntry> = emptyList(),
+): List<GameInfoRow> {
     val context = LocalContext.current.applicationContext
     // Back from the guided key setup with a key stored: the rows are asked again, so the sign-in row becomes the
     // achievements. Checked only while that row shows; the key store is read off the main thread.
     var signedIn by remember(entry.id) { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
-    val rows by produceState(emptyList<GameInfoRow>(), entry.id, enabled, signedIn) {
+    val copyIds = copies.map { it.id }
+    val rows by produceState(emptyList<GameInfoRow>(), entry.id, enabled, signedIn, copyIds) {
         if (!enabled) return@produceState
         var achievements = emptyList<GameInfoRow>()
         var playTime = emptyList<GameInfoRow>()
@@ -91,7 +99,7 @@ internal fun rememberGameInfoRows(entry: LibraryEntry, enabled: Boolean = true):
                 value = saves + achievements + playTime + compatibility
             }
             launch {
-                saves = saveRows(context, entry)
+                saves = saveRows(context, entry, copies)
                 value = saves + achievements + playTime + compatibility
             }
         }
@@ -109,23 +117,108 @@ internal fun rememberGameInfoRows(entry: LibraryEntry, enabled: Boolean = true):
  * (docs/SPEC.md 7o "Saves"). Worked out off the main thread when the page opens, never while a list draws. A thing
  * with no saves to speak of (an app) has no row.
  */
-internal suspend fun saveRows(context: Context, entry: LibraryEntry): List<GameInfoRow> {
+internal suspend fun saveRows(context: Context, entry: LibraryEntry, copies: List<LibraryEntry> = emptyList()): List<GameInfoRow> {
     val report = SaveDetector.report(context, entry) ?: return emptyList()
     val now = System.currentTimeMillis()
     val volumes = dev.droidtop.library.saves.StorageVolumeNames.of(context)
+    val others = copies.filter { it.id != entry.id }.mapNotNull { copy ->
+        SaveCopies.sideOf(copy.id, SaveDetector.report(context, copy)?.status)?.let { copy to it }
+    }
+    val copying = if (copies.any { it.id != entry.id }) {
+        val here = SaveCopies.sideOf(entry.id, report.status)
+        // What each copy would replace, asked of the disk here, off the main thread, not when the screen draws.
+        val replaced = withContext(Dispatchers.IO) { others.map { (_, side) -> here?.let { SaveCopies.plan(side, it).replaced.size } ?: 0 } }
+        SaveCopying(here, others.zip(replaced) { (copy, side), count -> SaveCopying.Other(copy, side, count) }, SaveCopies.backups(context, entry.id))
+    } else {
+        null
+    }
     return listOf(
         GameInfoRow(
             title = "Saves",
             value = SaveLines.value(report.status, now),
             subtitle = SaveLines.subtitle(report, now, volumes),
-            screen = savesScreen(entry, report, now, volumes),
+            screen = savesScreen(entry, report, now, volumes, copying),
             chip = "Saves",
         ),
     )
 }
 
+private fun saveFiles(count: Int) = if (count == 1) "1 save file" else "$count save files"
+
+/** What the Saves screen offers between a game's copies: this copy's saves, the other copies' and this copy's backups. */
+internal class SaveCopying(
+    val here: SaveCopies.Side?,
+    val others: List<Other>,
+    val backups: List<SaveCopies.Backup>,
+) {
+    /** Another copy with saves, and how many of this copy's save files copying them would replace. */
+    class Other(val copy: LibraryEntry, val side: SaveCopies.Side, val replaced: Int)
+}
+
+/**
+ * "Saves between copies" (docs/SPEC.md 7o, Droidtop/tracker#745): copy another copy's saves to this one, asked first
+ * with what is replaced, this copy's saves backed up; and put a backup back. The other copy's saves are only read.
+ */
+private fun copyGroups(entry: LibraryEntry, copying: SaveCopying, nowMs: Long, volumes: Map<String, String>): List<CatalogGroup> {
+    val here = copying.here
+    val rows = if (here == null) {
+        listOf(
+            ActionItem(
+                id = "saves_copy_none",
+                title = "This copy has no saves droidtop can see yet",
+                subtitle = "Play it and save once, so droidtop learns where it keeps its saves; then copy another copy's saves over them",
+            ),
+        )
+    } else {
+        copying.others.mapIndexed { index, other ->
+            val copy = other.copy
+            val side = other.side
+            val replaced = other.replaced
+            val from = dev.droidtop.library.originLabel(copy, 2).full
+            val engine = SaveCopies.sameEngine(copy, entry)
+            AsyncActionItem(
+                id = "saves_copy_$index",
+                title = "Copy saves from $from",
+                subtitle = "${saveFiles(side.files.size)}, newest ${SaveLines.ago(side.newestMs, nowMs)}, in ${SaveLines.folder(side.folder.path, volumes, short = true)}",
+                confirmTitle = listOfNotNull(
+                    if (replaced > 0) "Replace ${saveFiles(replaced)} of this copy's? They are backed up first" else "Add these saves to this copy? Its own are backed up first",
+                    if (engine != null) "Both copies run on ${engine.displayName()}." else "droidtop can't tell that these saves fit this copy.",
+                ).joinToString(" "),
+                run = { ctx, _ ->
+                    val copied = SaveCopies.copy(ctx, side, here)
+                    "Copied ${saveFiles(copied)} from $from. This copy's old saves are backed up"
+                },
+            )
+        }.ifEmpty {
+            listOf(ActionItem(id = "saves_copy_others_none", title = "No other copy of this game has saves droidtop can see"))
+        }
+    }
+    val restore = copying.backups.mapIndexed { index, backup ->
+        AsyncActionItem(
+            id = "saves_restore_$index",
+            title = "Put back the saves from ${SaveLines.ago(backup.takenMs, nowMs)}",
+            subtitle = "${saveFiles(backup.files)} backed up before saves were copied here",
+            confirmTitle = "Put this copy's saves back as they were? Saves copied in since are removed; saves made since are kept",
+            run = { _, _ ->
+                val restored = SaveCopies.restore(backup)
+                "Put back ${saveFiles(restored)}"
+            },
+        )
+    }
+    return listOfNotNull(
+        CatalogGroup("saves_copies", "Saves from this game's other copies", rows),
+        CatalogGroup("saves_backups", "Backups", restore).takeIf { restore.isNotEmpty() },
+    )
+}
+
 /** The details of a game's saves, and the two ways the person corrects droidtop. */
-internal fun savesScreen(entry: LibraryEntry, report: SaveReport, nowMs: Long, volumes: Map<String, String> = emptyMap()): CatalogScreen = CatalogScreen(
+internal fun savesScreen(
+    entry: LibraryEntry,
+    report: SaveReport,
+    nowMs: Long,
+    volumes: Map<String, String> = emptyMap(),
+    copying: SaveCopying? = null,
+): CatalogScreen = CatalogScreen(
     id = "saves_${entry.id}",
     title = GameNaming.displayName(entry.title),
     subtitle = SaveLines.value(report.status, nowMs),
@@ -137,6 +230,7 @@ internal fun savesScreen(entry: LibraryEntry, report: SaveReport, nowMs: Long, v
         listOfNotNull(
             CatalogGroup("saves_about", null, listOf(ActionItem(id = "saves_summary", title = SaveLines.value(report.status, nowMs), subtitle = SaveLines.subtitle(report, nowMs, volumes)))),
             CatalogGroup("saves_facts", "Where droidtop looked", facts).takeIf { facts.isNotEmpty() },
+        ) + copying?.let { copyGroups(entry, it, nowMs, volumes) }.orEmpty() + listOfNotNull(
             CatalogGroup(
                 "saves_fix",
                 "Not right?",
