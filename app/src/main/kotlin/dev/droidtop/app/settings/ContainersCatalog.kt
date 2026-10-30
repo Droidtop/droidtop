@@ -936,8 +936,7 @@ object ContainersCatalog {
         return AsyncActionItem(
             id = "container_update_software",
             title = "Update its software",
-            subtitle = "Upgrades what is installed in it with its own package manager (apk, apt, dnf, pacman or zypper). " +
-                "Nothing new is installed",
+            subtitle = "Upgrades what is in it with its own package manager; nothing new is installed",
             confirmTitle = "Upgrade the software in ${info.displayName}? Programs running in it may need restarting afterwards.",
             run = { _, onStatus ->
                 if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart && !info.running) {
