@@ -89,18 +89,18 @@ class ComputerLaunchTest {
     private fun pcAt(vararg addresses: String) = Computer(id = "ab".repeat(32), name = "DESKTOP", addresses = addresses.toList(), pairedAtMs = 0)
 
     @Test
-    fun `the viewer is asked for the computer, its windowcast address and the game's window`() {
-        val extras = ComputerLaunch.viewerExtras(pcAt("192.168.1.20:47610"), null, " Portal 2 ")!!
+    fun `the stream screen is asked for the computer, its windowcast address and the game's window`() {
+        val extras = ComputerLaunch.streamExtras(pcAt("192.168.1.20:47610"), null, " Portal 2 ")!!
         assertEquals("ab".repeat(32), extras[ComputerLaunch.EXTRA_HOST_ID])
         assertEquals("the agent's sync port is not windowcast's", "192.168.1.20:47100", extras[ComputerLaunch.EXTRA_ADDRESS])
         assertEquals("Portal 2", extras[ComputerLaunch.EXTRA_WINDOW])
-        assertNull("no window name is not an empty one", ComputerLaunch.viewerExtras(pcAt("10.0.0.2:47610"), null, "  ")!![ComputerLaunch.EXTRA_WINDOW])
+        assertNull("no window name is not an empty one", ComputerLaunch.streamExtras(pcAt("10.0.0.2:47610"), null, "  ")!![ComputerLaunch.EXTRA_WINDOW])
     }
 
     @Test
     fun `an address the answer gave wins, and a bad one is not used`() {
-        assertEquals("203.0.113.5:5000", ComputerLaunch.viewerExtras(pcAt("192.168.1.20:47610"), "203.0.113.5:5000", "g")!![ComputerLaunch.EXTRA_ADDRESS])
-        assertEquals("192.168.1.20:47100", ComputerLaunch.viewerExtras(pcAt("192.168.1.20:47610"), "not an address", "g")!![ComputerLaunch.EXTRA_ADDRESS])
+        assertEquals("203.0.113.5:5000", ComputerLaunch.streamExtras(pcAt("192.168.1.20:47610"), "203.0.113.5:5000", "g")!![ComputerLaunch.EXTRA_ADDRESS])
+        assertEquals("192.168.1.20:47100", ComputerLaunch.streamExtras(pcAt("192.168.1.20:47610"), "not an address", "g")!![ComputerLaunch.EXTRA_ADDRESS])
         assertEquals("203.0.113.5:5000", say("""{"result":"started","stream":"windowcast","address":"203.0.113.5:5000"}""").streamAddress)
         assertNull(say("""{"result":"started","stream":"windowcast","address":"http://x/y"}""").streamAddress)
     }
@@ -108,11 +108,11 @@ class ComputerLaunchTest {
     @Test
     fun `an IPv6 host is bracketed and a computer with no address names none`() {
         assertEquals("[2001:db8::7]:47100", ComputerLaunch.windowcastAddress(pcAt("[2001:db8::7]:47610"), null))
-        assertNull(ComputerLaunch.viewerExtras(pcAt(), null, "g"))
+        assertNull(ComputerLaunch.streamExtras(pcAt(), null, "g"))
     }
 
     @Test
-    fun `HOST_PORT is what the viewer takes`() {
+    fun `HOST_PORT is what the stream screen takes`() {
         assertTrue(ComputerLaunch.isHostPort("pc.local:47100"))
         assertTrue(ComputerLaunch.isHostPort("[::1]:1"))
         assertFalse(ComputerLaunch.isHostPort("pc:0"))

@@ -4,6 +4,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// windowcast's Android library (docs/SPEC.md 7a): its version is the pin's tag (windowcast.pin), the one place it is written.
+val windowcastVersion: String = file("windowcast.pin").readLines()
+    .first { it.startsWith("tag=") }.removePrefix("tag=").trim().removePrefix("v")
+
 android {
     namespace = "dev.droidtop.app"
     // shell-default (the forked-in Murine Launcher) and its sub-modules
@@ -247,6 +251,8 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.junit)
     implementation(project(":net-core"))
+    // Remote streaming is windowcast's library, fetched by build-scripts/fetch-windowcast-lib.sh against windowcast.pin.
+    implementation("dev.windowcast:windowcast-android:$windowcastVersion")
 
     implementation(project(":runtime-common"))
     implementation(project(":host-bridge"))

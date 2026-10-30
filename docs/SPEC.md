@@ -9238,10 +9238,38 @@ detail.
 `:runtime-remote-stream` (nothing else in droidtop used either).
 
 What droidtop owns is the integration only: `REMOTE_STREAM` entries sit
-with the apps (`LibraryKinds.APPS`) and render like any other entry. No
-code produces one yet; they come from windowcast's own client, and
-launching one hands off to it, the way a console game hands off to its
-emulator. No droidtop module encodes, decodes or transports a stream.
+with the apps (`LibraryKinds.APPS`) and render like any other entry. They
+come from the paired computers' application lists (`ComputerEntriesProvider`).
+No droidtop module encodes, decodes or transports a stream.
+
+**Embedded, not handed off (owner, 2026-10-30, Droidtop/tracker#428: "Let's get
+windowcast embedded in droidtop"; direction of 2026-10-28 and -29).** droidtop
+embeds windowcast's Android library, `windowcast-android-<version>.aar`, and
+uses it for every remote stream; windowcast's own viewer app is the library's
+reference implementation, not droidtop's client. One mechanism, no vendored
+copy: the AAR is built and attached to each Droidtop/windowcast release by its
+"Viewer release" workflow, fetched by `build-scripts/fetch-windowcast-lib.sh`
+against `app/windowcast.pin` (release tag and the AAR's SHA-256, also checked
+against the release's `SHA256SUMS-android-library`) into `app/windowcast-lib/`
+as a local Maven repository that `settings.gradle.kts` reads for the group
+`dev.windowcast`, the way the aria2 engine and the agent library are fetched.
+`:app` depends on it. Changing the version is changing the pin.
+
+`RemoteStreamActivity` (`:app`) is droidtop's stream screen. It makes the same
+calls as the viewer, through the library's types: `SessionHolder` (start,
+replace and end the session), `WantedWindow` (wait for the window a launch
+named), `WatchSet`, `WindowRenderers` (RDP pictures or decoded video),
+`InputAdapter` and `Gamepads` (touch, keys and pads as the host's input) and
+`Letterbox`. It is asked for by `ComputerLaunch` (action
+`dev.droidtop.app.action.REMOTE_STREAM`, extras: the computer's device id, its
+windowcast address and optionally part of a window's title). droidtop has its
+own windowcast identity (`filesDir/windowcast`): a computer it has not paired
+with asks for the PIN its windowcast shows, then connects. Not built, each its
+own item: switching a window's carrier while watching (the library's automatic
+switching is turned off, so a window stays on the carrier it started on), the
+host's pointer, popups and extra windows, the soft keyboard, starting a program
+that is not running, and Desktop mode showing remote windows as ordinary
+windows (Droidtop/tracker#115).
 
 ### No PC-side helper in droidtop
 
@@ -20538,34 +20566,33 @@ docs/DESIGN.md section 17, "Games the host starts").
   (`COMPUTER_GAME`, "On <computer>") whose key is not Steam's asks that
   computer, the one the entry is filed under. A Steam game opened there says
   that Stream with Steam Link is in its menu. An application (`REMOTE_STREAM`)
-  is not asked: launch_host covers the host's games.
+  is not asked: launch_host covers the host's games. It opens the stream screen
+  on its computer, at a window named like the application, and says so; the
+  application must already be open there.
 - **`started` says how to show it.** With `stream: windowcast`, droidtop
-  opens windowcast's viewer (`dev.windowcast.viewer`) on that computer and the
-  game's window, with the viewer's own request (windowcast docs/ANDROID-VIEWER.md,
-  action `dev.windowcast.viewer.action.CONNECT`): the host is the computer's
-  id (the agent and windowcast share one identity on a computer), the window is
-  the game's title, and the address is the one the answer gave
-  (`address`, `HOST:PORT`, which a host that knows where its windowcast listens
-  should send), else the computer's most recent address with windowcast's
-  default port 47100, since the port in the computer's addresses is the
-  agent's. The viewer connects only to a host it has paired with and says so
-  itself otherwise; droidtop never pairs for it. With no address to name, the
-  viewer is opened plainly and the line says to choose the computer there.
-  Pythia answers `windowcast` only while a windowcast host runs on the
-  computer. Without a stream, the line says the game shows on the computer's
-  own screen and nothing here streams it. droidtop streams nothing itself.
+  opens its own stream screen (7a, `RemoteStreamActivity`, a client of
+  windowcast's Android library) on that computer and the game's window: the
+  host is the computer's id (the agent and windowcast share one identity on a
+  computer), the window is the game's title, and the address is the one the
+  answer gave (`address`, `HOST:PORT`, which a host that knows where its
+  windowcast listens should send), else the computer's most recent address
+  with windowcast's default port 47100, since the port in the computer's
+  addresses is the agent's. The screen asks for the PIN windowcast shows when
+  this device has not paired with that computer's windowcast. A computer with
+  no address to name cannot be opened, and the line says so. Pythia answers
+  `windowcast` only while a windowcast host runs on the computer. Without a
+  stream, the line says the game shows on the computer's own screen and
+  nothing here streams it.
 - **Honest states.** The answers and their words are Steam Link's
   (allowed, too old, failed, offline), with one difference. For a key that
   is not Steam's, `unknown_game` also says that only a desktop manager such
   as Pythia starts games other than Steam's: droidtop-agent on its own
   registers no launcher and answers that way. The Android library does not
   report hello features, so the answer is the only signal.
-- **The viewer missing** is said plainly. It is not published yet (windowcast
-  CI builds it), so no store page is offered.
 - **Not built:** the host sending its windowcast address in the answer (an
-  `address` beside `stream`; droidtop-agent and Pythia), so a host whose
-  windowcast does not listen on 47100 is named correctly. Until then a changed
-  port needs the person to open the viewer themselves.
+  `address` beside `stream`; Pythia), so a host whose windowcast does not
+  listen on 47100 is named correctly. Until then such a host is tried on 47100
+  and is not reached.
 
 ### Transports
 

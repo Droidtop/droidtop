@@ -195,6 +195,20 @@
           intent, so no external package needs direct access; the pinned
           shortcut's PendingIntent and widget taps work regardless.
         -->
+        <!-- A computer's windowcast window on this device (docs/SPEC.md 7a): asked for by ComputerLaunch with the
+             computer's device id and windowcast address. It handles its own size changes: a rotation must not drop
+             the session. -->
+        <activity
+            android:name="dev.droidtop.app.RemoteStreamActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+            <intent-filter>
+                <action android:name="dev.droidtop.app.action.REMOTE_STREAM" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name="dev.droidtop.app.GameLaunchActivity"
             android:exported="false"

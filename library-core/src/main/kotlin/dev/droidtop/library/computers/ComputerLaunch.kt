@@ -21,14 +21,13 @@ object ComputerLaunch {
     /** The `stream` of a `started` answer when windowcast shows the game. */
     const val STREAM_WINDOWCAST = "windowcast"
 
-    /** windowcast's Android viewer (`dev.windowcast.viewer`), which opens a named host and window (windowcast docs/ANDROID-VIEWER.md). */
-    const val WINDOWCAST_VIEWER = "dev.windowcast.viewer"
+    /** droidtop's own stream screen (`RemoteStreamActivity` in :app, a client of windowcast's Android library, docs/SPEC.md 7a). */
+    const val ACTION_REMOTE_STREAM = "dev.droidtop.app.action.REMOTE_STREAM"
 
-    /** The viewer's explicit intent: [VIEWER_CONNECT] with the host's device id, its address and, optionally, part of a window's title. */
-    const val VIEWER_CONNECT = "dev.windowcast.viewer.action.CONNECT"
-    const val EXTRA_HOST_ID = "dev.windowcast.viewer.extra.HOST_ID"
-    const val EXTRA_ADDRESS = "dev.windowcast.viewer.extra.ADDRESS"
-    const val EXTRA_WINDOW = "dev.windowcast.viewer.extra.WINDOW"
+    /** What it is asked for: the computer's device id, its windowcast address and, optionally, part of a window's title. */
+    const val EXTRA_HOST_ID = "dev.droidtop.app.extra.HOST_ID"
+    const val EXTRA_ADDRESS = "dev.droidtop.app.extra.ADDRESS"
+    const val EXTRA_WINDOW = "dev.droidtop.app.extra.WINDOW"
 
     /** The port a windowcast host listens on unless its owner changed it (windowcast `app/src/config.rs`, `listen`). */
     const val WINDOWCAST_DEFAULT_PORT = 47100
@@ -38,7 +37,7 @@ object ComputerLaunch {
     /**
      * What one computer said, and the words for it. [definitive] is false when
      * only another computer might do better; [stream] is how the started game
-     * is shown (null: nothing names a viewer, Steam Link for a Steam game).
+     * is shown (null: nothing is shown here, Steam Link for a Steam game).
      */
     data class Outcome(
         val started: Boolean,
@@ -107,7 +106,7 @@ object ComputerLaunch {
             Computers.call(context, pc, "launch_game", JSONObject().put("game", JSONObject().put("key", key).put("title", title)))
         }
 
-    /** Whether [text] is `HOST:PORT` as the viewer takes it: an IPv6 host in brackets, a port from 1 to 65535, nothing else. */
+    /** Whether [text] is `HOST:PORT` as the stream screen takes it: an IPv6 host in brackets, a port from 1 to 65535, nothing else. */
     fun isHostPort(text: String): Boolean = HOST_PORT.matchEntire(text)?.groupValues?.get(2)?.toIntOrNull()?.let { it in 1..65535 } == true
 
     /**
@@ -121,8 +120,8 @@ object ComputerLaunch {
         return "$plain:$WINDOWCAST_DEFAULT_PORT".takeIf { isHostPort(it) }
     }
 
-    /** The extras of the viewer's request for [computer] and the game's [window] title, or null when the computer has no address to name. */
-    fun viewerExtras(computer: Computer, answered: String?, window: String): Map<String, String>? {
+    /** The extras of the stream screen's request for [computer] and the game's [window] title, or null when the computer has no address to name. */
+    fun streamExtras(computer: Computer, answered: String?, window: String): Map<String, String>? {
         val address = windowcastAddress(computer, answered) ?: return null
         return buildMap {
             put(EXTRA_HOST_ID, computer.id)
@@ -132,20 +131,25 @@ object ComputerLaunch {
     }
 
     /**
-     * Opens windowcast's viewer on [computer] for a game it started with `stream: windowcast`, at the game's window, and
-     * returns the line to show after [started]. The viewer connects only to a host it has paired with; if it has not, it
-     * says so itself. With no address to name, the viewer is opened plainly and the person picks the computer there.
-     * The viewer may not be here: this says so rather than offering a store page.
+     * The intent that shows [computer]'s windowcast window on this device: droidtop's own stream screen, asked with
+     * [streamExtras]. Null when the computer has no address to name.
+     */
+    fun streamIntent(context: Context, computer: Computer, answered: String?, window: String): Intent? {
+        val extras = streamExtras(computer, answered, window) ?: return null
+        return Intent(ACTION_REMOTE_STREAM).setPackage(context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .also { intent -> extras.forEach { (k, v) -> intent.putExtra(k, v) } }
+    }
+
+    /**
+     * Shows [computer]'s windowcast window on this device for a game it started with `stream: windowcast`, at the game's
+     * window, and returns the line to show after [started]. The stream screen asks for the PIN when this device has not
+     * paired with that computer's windowcast. A computer with no address to name cannot be opened.
      */
     fun openWindowcast(context: Context, computer: Computer, answered: String?, title: String, started: String): String {
-        val extras = viewerExtras(computer, answered, title)
-        val open = if (extras == null) {
-            context.packageManager.getLaunchIntentForPackage(WINDOWCAST_VIEWER)
-        } else {
-            Intent(VIEWER_CONNECT).setPackage(WINDOWCAST_VIEWER).also { intent -> extras.forEach { (k, v) -> intent.putExtra(k, v) } }
-        }?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return "$started windowcast's viewer isn't on this device to show it."
+        val open = streamIntent(context, computer, answered, title)
+            ?: return "$started ${computer.name} has no address to show it from."
         val failure = runCatching { context.startActivity(open) }.exceptionOrNull()
-            ?: return if (extras != null) "$started Opening ${computer.name} in windowcast." else "$started In windowcast choose ${computer.name}."
-        return "$started windowcast's viewer would not open: ${failure.message}."
+            ?: return "$started Opening ${computer.name} in windowcast."
+        return "$started The stream would not open: ${failure.message}."
     }
 }

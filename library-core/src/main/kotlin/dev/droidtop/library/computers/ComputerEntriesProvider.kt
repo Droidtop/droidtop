@@ -77,10 +77,10 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
      * Nothing here runs it: it is on the computer (docs/SPEC.md 7o, "Starting
      * a game on a computer"). A game that is not Steam's is asked of that
      * computer through [ComputerLaunch]; the program hosting its agent
-     * (Pythia) starts its own games, and windowcast's viewer opens when it
-     * says windowcast shows the game. A Steam game is streamed with the Steam
-     * module's "Stream with Steam Link", in its menu. An application stays
-     * windowcast's (7a), and the person is told which computer has it.
+     * (Pythia) starts its own games, and droidtop's stream screen opens (windowcast's
+     * library) when it says windowcast shows the game. A Steam game is streamed with the Steam
+     * module's "Stream with Steam Link", in its menu. An application opens the
+     * same stream screen on its computer, at a window named like it (7a).
      */
     override suspend fun launch(entry: LibraryEntry) {
         val text = withContext(Dispatchers.IO) { answerFor(entry) }
@@ -93,6 +93,8 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
         val computer = Computers.list(context).firstOrNull { it.id == computerId }
         val name = computer?.name ?: "one of your computers"
         return when {
+            computer != null && entry.kind == LibraryEntryKind.REMOTE_STREAM ->
+                ComputerLaunch.openWindowcast(context, computer, null, entry.title, "${entry.title} is installed on $name; its window is shown if it is open there.")
             computer == null || entry.kind != LibraryEntryKind.COMPUTER_GAME -> "${entry.title} is installed on $name, not on this device"
             key.startsWith("steam:") -> "${entry.title} is installed on $name, not on this device. Stream with Steam Link is in its menu."
             else -> startOn(computer, key, entry.title)

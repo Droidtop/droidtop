@@ -37,6 +37,13 @@ dependencyResolutionManagement {
             forRepository { maven { url = uri(File(settingsDir, "net-core/aria2-engine/repo")) } }
             filter { includeGroup("io.github.bi0shacker001") }
         }
+        // Needed by :app (docs/SPEC.md 7a, "Remote streaming is windowcast's library"): windowcast's Android library,
+        // attached to each Droidtop/windowcast release and put here, checked against app/windowcast.pin, by
+        // build-scripts/fetch-windowcast-lib.sh (CI runs it before Gradle). A local repository that holds only that group.
+        exclusiveContent {
+            forRepository { maven { url = uri(File(settingsDir, "app/windowcast-lib/repo")) } }
+            filter { includeGroup("dev.windowcast") }
+        }
     }
     // gradle/libs.versions.toml is picked up by convention -- do not also
     // declare it via versionCatalogs { create("libs") { from(...) } },

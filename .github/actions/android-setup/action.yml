@@ -319,3 +319,18 @@ runs:
       if: steps.aria2engine-cache.outputs.cache-hit != 'true'
       shell: bash
       run: bash build-scripts/fetch-aria2-engine.sh
+
+    - name: Cache windowcast's Android library
+      id: windowcast-cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: app/windowcast-lib
+        key: windowcast-lib-${{ hashFiles('app/windowcast.pin') }}
+
+    - name: Fetch windowcast's Android library
+      # windowcast-android-<version>.aar, attached to Droidtop/windowcast's release by its "Viewer release"
+      # workflow, checked against its SHA256SUMS-android-library and app/windowcast.pin and laid out as the local
+      # Maven repository settings.gradle.kts reads (docs/SPEC.md 7a).
+      if: steps.windowcast-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash build-scripts/fetch-windowcast-lib.sh

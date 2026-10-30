@@ -38,6 +38,8 @@ runtime-windows/lsfg/
 net-core/agent/
 # The aria2 download engine's AAR as a local Maven repository (build-scripts/fetch-aria2-engine.sh).
 net-core/aria2-engine/
+# windowcast's Android library as a local Maven repository (build-scripts/fetch-windowcast-lib.sh).
+app/windowcast-lib/
 # The SQLite amalgamation droidtop builds for plugins (build-scripts/fetch-sqlite.sh).
 plugin-host/native/sqlite/
 
