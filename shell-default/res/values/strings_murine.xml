@@ -24,7 +24,7 @@
     <string name="pref_category_gaming_title">Gaming mode</string>
     <string name="pref_category_gaming_desc">Settings for Gaming mode</string>
 
-    <string name="pref_global_settings_title">Global settings</string>
+    <string name="pref_global_settings_title">Settings</string>
 
     <string name="pref_subcategory_other_shells">Other modes</string>
     <string name="pref_subcategory_places">droidtop</string>
@@ -140,7 +140,7 @@
     <string name="taskbar_apps">Apps</string>
     <string name="taskbar_recents">Recents</string>
     <string name="taskbar_hide">Hide</string>
-    <string name="mode_menu_settings">Modes and settings</string>
+    <string name="mode_menu_settings">Settings</string>
     <string name="mode_menu_reinit_displays">Reinitialize displays</string>
     <string name="mode_menu_close_all">Close all apps</string>
     <string name="plugin_actions_option">Plugin actions</string>
@@ -248,8 +248,6 @@
     <string name="pref_droidtop_home_screen_desc">Choose whether the Home button opens droidtop\'s own launcher, a launcher you already have, or neither</string>
     <string name="pref_restart_title">Restart</string>
     <string name="pref_restart_summary">Restart the launcher</string>
-    <!-- droidtop: the home screen's long-press menu entry that opens the mode switcher (BackButtonMenu). -->
-    <string name="droidtop_modes_option">droidtop modes</string>
     <string name="droidtop_games_option">droidtop games</string>
     <string name="pref_global_settings_desc">Modes, your home screen and setup</string>
     <!-- droidtop: an open folder's options (Droidtop/tracker#564). -->

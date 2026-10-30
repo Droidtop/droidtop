@@ -196,7 +196,7 @@ object GamingSettingsCatalog {
             items = listOf(
                 NestedScreenItem(
                     id = ID_GLOBAL_SETTINGS,
-                    title = "Global settings",
+                    title = "Settings",
                     subtitle = "Home screen and modes",
                     registryId = "global_settings",
                     icon = CatalogIcon.GLOBAL,
@@ -989,10 +989,9 @@ object GamingSettingsCatalog {
                 ),
                 SubScreenItem(
                     id = ID_STANDARD_SETTINGS,
-                    // The title of the page this opens (SettingsActivity's
-                    // label, and the Standard home's own long-press menu
-                    // item): one name for one page (UI pass 2026-09-24, M8).
-                    title = "Home settings",
+                    // Named for its mode, as Desktop's row beside it is; the page it opens is titled Settings
+                    // (Droidtop/tracker#827 F0: "Home settings" is renamed Settings).
+                    title = "Mobile mode",
                     subtitle = "Mobile mode's home screen, icons and app drawer",
                     fragmentClassName = "app.murinelauncher.settings.SettingsRootFragment",
                     icon = CatalogIcon.STANDARD,

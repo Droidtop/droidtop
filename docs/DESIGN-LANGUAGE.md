@@ -93,6 +93,40 @@ restores the exact item and scroll position; the hint bar stays and shows the ov
 menu and Select sheet one level; Quick Menu section then panel; Settings category then pane; the game page one page with
 tabs.
 
+### Names (Droidtop/tracker#827 F0, 2026-10-30)
+One name per thing, the same in every mode:
+- **Mobile**: the home-screen mode (owner: "We're renaming "standard" to "mobile""). Never "Standard", and "Android"
+  only for the operating system. Its stored id stays `standard`.
+- **Switch mode**: the mode switcher. In Mobile its one route is long-press HOME (owner: "we've made the home button
+  the sole controller").
+- **Settings**: the one settings tree. "Global settings", "All settings", "Home settings" and "Modes and settings"
+  are all Settings now; the duplicate pages go in #827 F4.
+- **Apps**: the app list in every mode. **Item menu**: one item's anchored menu. **Plugins**: managing plugins; a
+  plugin's own panel carries the plugin's name. **Downloads**, **Updates**, **Get games**: one place each.
+
+### One button table
+What each button does, per mode. Every screen binds from this table and nothing else; a hint names only a button the
+table binds there.
+
+| Button | Gaming | Mobile | Desktop |
+|---|---|---|---|
+| A | open or choose | open or choose | droidtop's surfaces: open or choose; else the container |
+| B | back one level | back one level | droidtop's surfaces: back; else the container |
+| X | play the focused game | play the focused game | the container |
+| Y | search | search | the container |
+| L1/R1 | the strip's tabs | home pages; the drawer's tabs when paged | windows and search |
+| L2 | the item menu | the item menu | the container |
+| R2 | Quick Menu | Quick Menu | Quick Menu |
+| Start | the left menu | the left menu (no Switch mode in it) | the Start menu |
+| Select | the bottom sheet | the bottom sheet | the container |
+
+In Desktop, while the Linux desktop has focus, the container owns every button droidtop does not claim (Start, R2,
+L1, R1). Mobile reaches this table in #827 M1, which retires `StandardPad` (where Start opens the switcher and X is a
+long press today).
+
+**The hint bar in Mobile** shows only after a pad button press, and goes again with touch (owner, 2026-10-30: "Show it
+only after a button press"); in Gaming and Desktop it is always shown.
+
 ### Surfaces and depth
 | Level | Use | Fallback colour | Depth |
 |---|---|---|---|

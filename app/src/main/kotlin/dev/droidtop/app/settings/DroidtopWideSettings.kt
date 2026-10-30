@@ -64,7 +64,7 @@ object DroidtopWideSettings {
 
     fun globalScreen() = CatalogScreen(
         id = SCREEN_GLOBAL,
-        title = "Global settings",
+        title = "Settings",
         subtitle = "Home screen and modes",
         // The Gaming settings page draws these groups as sections of its own categories (each group
         // names one) instead of a level of its own; every other surface still opens this screen.
@@ -305,7 +305,7 @@ object DroidtopWideSettings {
                         // mode" (rig, dq-onboard-01).
                         ActionItem(
                             id = "pref_desktop_global_settings",
-                            title = "Global settings",
+                            title = "Settings",
                             subtitle = "Modes, your home screen and setup",
                             run = { ctx -> dev.droidtop.shell.standard.BackButtonMenu.openGlobalSettings(ctx) },
                         ),
@@ -401,7 +401,7 @@ object DroidtopWideSettings {
                         // the rest of Settings is one row away.
                         dev.droidtop.library.settings.NestedScreenItem(
                             id = "pref_desktop_all_settings",
-                            title = "All settings",
+                            title = "Settings",
                             subtitle = "droidtop's other settings: the library, games, display, network and more",
                             registryId = SCREEN_GLOBAL,
                         ),

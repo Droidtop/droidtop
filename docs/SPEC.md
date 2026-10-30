@@ -1057,18 +1057,19 @@ Enginehost's own icon (it currently sets none, per the fallback-icon
 finding above) is that app's own fix, not droidtop's.
 
 **Switching modes is named on every surface (decided 2026-09-25).** The
-mode switcher (`BackButtonMenu`: Android, the modes that are on, and
-"Modes and settings") opens from a long-press of Back anywhere, and by
-name from each surface, because the long press alone is invisible to a
-newcomer and BlueStacks never delivers it: the Android home screen's
-long-press menu ("droidtop modes"), Gaming's Quick Menu, System tab
-("Switch mode"), and the Desktop taskbar ("Modes"). A surface with no
+mode switcher (`BackButtonMenu`: Mobile, the modes that are on, and
+Settings) opens from a long-press of Back anywhere, and by
+name from Gaming's Quick Menu, System tab ("Switch mode"), and the Desktop taskbar ("Modes"). Mobile's home screen
+has no route of its own (owner, 2026-10-30, Droidtop/tracker#827: "Long pressing HOME is what gets the mode switcher.
+Why do we need other routes, we've made the home button the sole controller"): its long-press menu lost its "droidtop
+modes" row, and the left menu Start opens there has no Switch mode. Whether long-press Back, the Quick Menu's row and
+the Desktop taskbar's go too is with the owner; until then they stay and no route is added. A surface with no
 Activity of its own to hand opens it through `ModeSwitcherActivity`. Over Gaming or Desktop, which hide Android's
 bars, the sheet's window hides them too, so it draws as the shell's own
 sheet; over Mobile (Android's home screen) they stay (console
 2026-10-29, Droidtop/tracker#750: Android's status bar showed over it on
 Desktop; one host kept, agreed with the coordinator).
-"Modes and settings" opens Global settings, where each mode is switched on
+Settings (it was "Modes and settings") opens the droidtop-wide Settings page, where each mode is switched on
 and off (Settings runs in a task of its own and every opening from a
 switcher, the home screen menu or the Desktop taskbar starts it fresh, so a
 page left open never answers for the page asked for, and clearing it never

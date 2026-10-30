@@ -1723,7 +1723,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "scraper_backup_pointer",
                             title = "Back up / restore settings",
-                            subtitle = "The settings backup in Global settings includes everything here, " +
+                            subtitle = "The settings backup in Settings includes everything here, " +
                                 "credentials included — one file restores a working configuration",
                             run = { ctx ->
                                 // Component by name, same as OnboardingActivity's
