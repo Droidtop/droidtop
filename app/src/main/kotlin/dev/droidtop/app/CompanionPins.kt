@@ -193,27 +193,18 @@ private fun PinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit
     val lit = tile.on == true
     var status by remember(item) { mutableStateOf<String?>(null) }
     if (item is SliderItem) {
-        var value by remember(item) { mutableIntStateOf(item.current) }
-        val step = QuickTiles.sliderStep(item)
-        val percent = if (item.max > item.min) (value - item.min) * 100 / (item.max - item.min) else 0
-        Column(
-            modifier = modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(colors.surface)
-                .padding(8.dp)
-                .semantics(mergeDescendants = true) { stateDescription = "$percent%" },
-        ) {
-            Text(tile.label, style = MaterialTheme.typography.labelLarge, color = colors.onSurface, maxLines = 2)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                PinStep("−", "Lower ${tile.label.lowercase()}") {
-                    value = (value - step).coerceIn(item.min, item.max); item.onChange(context, value)
-                }
-                Text("$percent%", style = MaterialTheme.typography.titleSmall, color = colors.primary)
-                PinStep("+", "Raise ${tile.label.lowercase()}") {
-                    value = (value + step).coerceIn(item.min, item.max); item.onChange(context, value)
-                }
-            }
-        }
+        // A pinned slider is the one slider row, a drawn track with a step at each end (Droidtop/tracker#786 S2a).
+        val app = context.applicationContext
+        CompanionSliderRow(
+            title = tile.label,
+            value = item.current.toFloat(),
+            range = item.min.toFloat()..item.max.toFloat(),
+            step = QuickTiles.sliderStep(item).toFloat(),
+            writeKey = "catalog:${item.id}",
+            write = { next -> item.onChange(app, kotlin.math.round(next).toInt()) },
+            modifier = modifier.clip(RoundedCornerShape(12.dp)).background(colors.surface),
+            label = { catalogSliderLabel(it, item.min, item.max) },
+        )
         return
     }
     Column(
@@ -400,21 +391,6 @@ internal fun CompanionLowBatteryLine(reading: dev.droidtop.runtime.systemstatus.
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun PinStep(label: String, spoken: String, onClick: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(48.dp)
-            .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = spoken },
-    ) {
-        Text(label, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 

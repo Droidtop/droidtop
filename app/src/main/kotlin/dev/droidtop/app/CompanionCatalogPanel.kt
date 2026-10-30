@@ -15,14 +15,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -276,50 +274,24 @@ private fun RowSubtitle(text: String) {
 }
 
 /** A slider with a step button on each side: the step is the Quick Menu's own ([QuickTiles.sliderStep]). */
+/** A catalog slider: the one slider row, written off the main thread, the catalog re-read after each write lands. */
 @Composable
 private fun CatalogSliderRow(item: SliderItem, onChanged: () -> Unit) {
     val context = LocalContext.current
-    var value by remember(item) { mutableFloatStateOf(item.current.toFloat()) }
-    val step = QuickTiles.sliderStep(item)
-    fun set(next: Int) {
-        val clamped = next.coerceIn(item.min, item.max)
-        value = clamped.toFloat()
-        item.onChange(context, clamped)
-    }
-    val percent = if (item.max > item.min) ((value - item.min) * 100 / (item.max - item.min)).toInt() else 0
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
-        Text(item.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-        if (!item.subtitle.isNullOrBlank()) RowSubtitle(item.subtitle!!)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 56.dp)) {
-            StepButton("−", "Lower ${item.title.lowercase()}") { set(value.toInt() - step); onChanged() }
-            Slider(
-                value = value,
-                onValueChange = { set(it.toInt()) },
-                onValueChangeFinished = onChanged,
-                valueRange = item.min.toFloat()..item.max.toFloat(),
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp)
-                    .semantics { contentDescription = item.title; stateDescription = "$percent%" },
-            )
-            StepButton("+", "Raise ${item.title.lowercase()}") { set(value.toInt() + step); onChanged() }
-        }
-    }
-}
-
-@Composable
-private fun StepButton(label: String, spoken: String, onClick: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(48.dp)
-            .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = spoken },
-    ) {
-        Text(label, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-    }
+    val app = context.applicationContext
+    CompanionSliderRow(
+        title = item.title,
+        subtitle = item.subtitle,
+        value = item.current.toFloat(),
+        range = item.min.toFloat()..item.max.toFloat(),
+        step = QuickTiles.sliderStep(item).toFloat(),
+        writeKey = "catalog:${item.id}",
+        write = { next ->
+            item.onChange(app, kotlin.math.round(next).toInt())
+            withContext(Dispatchers.Main) { onChanged() }
+        },
+        label = { catalogSliderLabel(it, item.min, item.max) },
+    )
 }
 
 @Composable

@@ -166,6 +166,8 @@ shelf, tab strip, chip, badge, button (one primary per surface), progress (ring,
 the fallback chain: hero, else blurred cover, else a generated plate), toast (two lines, never persistent status),
 empty state (glyph, one sentence, one action), keyboard slab, hint bar (one 48 dp bar, up to five hints for the
 focused thing). Used by droidtop, Enginehost and every plugin; a screen that needs something else adds it here first.
+In touch form (the companion) a slider row is a drawn track with a 48 dp step button at each end and its value
+beside its name, written off the main thread with only the newest value kept; there is one, `CompanionSliderRow`.
 
 ### Plugins inherit it
 A plugin supplies content (rows, groups, progress values, tiles, facets, short strings, a tone name, a glyph by name or

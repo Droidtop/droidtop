@@ -5070,7 +5070,14 @@ droidtop 0.2.0-dev.1931).
   they cannot differ. Below it, folded: Display and Sound (the Quick Menu's Display and Audio sections), Power
   (performance mode), Storage (free and total) and Privacy (Android's privacy dashboard,
   `REVIEW_PERMISSION_USAGE`, else its Privacy settings). Connections and Accessibility join when their slices
-  land. A slider has a step button on each side (the Quick Menu's own step) and says its level to TalkBack; a
+  land. **The one slider row** (`CompanionSliderRow`, Droidtop/tracker#786 S2a, decided 2026-10-30): the name and
+  the value on one line, then a drawn track with a step button at each end (a catalog slider's step is the Quick
+  Menu's, `QuickTiles.sliderStep`). A finger drags or taps the track; the value moves at once and the write goes
+  through `LatestWrites` (tested), one background queue where only the newest write per control waits, so a drag asks
+  Android only for where it stops and nothing is written on the main thread. A screen reader hears one node: name,
+  value, range, and Lower and Raise. Every catalog slider, every pinned slider (no longer only − and +), every stream
+  volume and both brightnesses draw it; it replaced five separate sliders. A catalog slider says its number, or a
+  percentage on a 0 to 100 scale, as the shell's Settings does; a
   choice lays its options out under the row; an action that asks first shows the safe answer first. The catalog
   is built off the main thread while the tab shows, again after each change and on a return from another screen
   (a grant), and not at all while the tab is not composed; `PerformanceMonitor.subscribers` counts the surfaces

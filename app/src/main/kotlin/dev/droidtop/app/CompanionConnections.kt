@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,26 +53,23 @@ internal fun CompanionStreamVolumes() {
     }
 }
 
+/** One stream's volume: the one slider row, through [VolumeControl], where Kid's cap holds; read off the main thread. */
 @Composable
 private fun StreamSlider(stream: VolumeControl.Stream) {
     val context = LocalContext.current
-    val max = remember(stream) { VolumeControl.max(context, stream) }
-    var value by remember(stream) { mutableIntStateOf(VolumeControl.get(context, stream)) }
-    fun set(next: Int) {
-        VolumeControl.set(context, stream, next)
-        value = VolumeControl.get(context, stream)
+    val app = context.applicationContext
+    val read by produceState<Pair<Int, Int>?>(null, stream) {
+        value = withContext(Dispatchers.IO) { VolumeControl.get(app, stream) to VolumeControl.max(app, stream) }
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-        Text(stream.label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(0.3f))
-        CompanionPill("−") { set(value - 1) }
-        Slider(
-            value = value.toFloat(),
-            onValueChange = { set(it.toInt()) },
-            valueRange = 0f..max.toFloat().coerceAtLeast(1f),
-            modifier = Modifier.weight(0.7f).semantics { contentDescription = "${stream.label} volume"; stateDescription = "${value * 100 / max.coerceAtLeast(1)}%" },
-        )
-        CompanionPill("+") { set(value + 1) }
-    }
+    val (current, max) = read ?: return
+    CompanionSliderRow(
+        title = stream.label,
+        value = current.toFloat(),
+        range = 0f..max.toFloat().coerceAtLeast(1f),
+        step = 1f,
+        writeKey = "volume:${stream.name}",
+        write = { next -> VolumeControl.set(app, stream, kotlin.math.round(next).toInt()) },
+    )
 }
 
 /**

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -137,13 +136,14 @@ private fun MainBrightness() {
         CompanionNote("Brightness needs Modify system settings: System > Brightness")
         return
     }
-    var value by remember(current) { mutableIntStateOf(current ?: 128) }
-    Text(stringResource(R.string.companion_displays_brightness), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-    Slider(
-        value = value.toFloat(),
-        onValueChange = { value = it.toInt(); DisplayControls.setBrightness(context, value) },
-        valueRange = 0f..255f,
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Main screen brightness"; stateDescription = "${value * 100 / 255}%" },
+    val level = current ?: return
+    CompanionSliderRow(
+        title = stringResource(R.string.companion_displays_brightness),
+        value = level.toFloat(),
+        range = 0f..255f,
+        step = 255f / 20f,
+        writeKey = "brightness:main",
+        write = { next -> DisplayControls.setBrightness(context.applicationContext, kotlin.math.round(next).toInt()) },
     )
 }
 
@@ -151,17 +151,14 @@ private fun MainBrightness() {
 @Composable
 private fun CompanionBrightness() {
     val level by DisplayControls.companionLevel.collectAsState()
-    Text(stringResource(R.string.companion_displays_brightness), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        CompanionPill("−") { DisplayControls.setCompanionLevel(level - 0.1f) }
-        Slider(
-            value = level,
-            onValueChange = { DisplayControls.setCompanionLevel(it) },
-            valueRange = DisplayControls.FLOOR..1f,
-            modifier = Modifier.weight(1f).semantics { contentDescription = "Companion screen brightness"; stateDescription = "${(level * 100).toInt()}%" },
-        )
-        CompanionPill("+") { DisplayControls.setCompanionLevel(level + 0.1f) }
-    }
+    CompanionSliderRow(
+        title = stringResource(R.string.companion_displays_brightness),
+        value = level,
+        range = DisplayControls.FLOOR..1f,
+        step = 0.1f,
+        writeKey = "brightness:companion",
+        write = { next -> DisplayControls.setCompanionLevel(next) },
+    )
 }
 
 private fun readCards(context: Context): List<DisplayCard> {
