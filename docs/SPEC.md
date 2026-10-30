@@ -4130,6 +4130,16 @@ the `ContainerRuntime` interface that already exists (§3):
     use, else the screen host), any other section in Gaming. Available in every mode: Gaming's own sections (Home, the
     libraries, Apps, Settings) are offered only while Gaming is the mode in use (`Place.opensInGaming`), so a row never
     switches the person into a mode they are not using; in Mobile and Desktop it lists Search and the places. R2 in it swaps to the Quick Menu and Start in the Quick Menu to it, as in Gaming.
+  - **The touch route: Android's accessibility button (decided 2026-10-30, Droidtop/tracker#839;** the owner: "we
+    can't ASSUME gamepad presence", then "We should probably add an accessibility button that lets the user pick what
+    menu to open"). droidtop's one accessibility service asks for the button (`flagRequestAccessibilityButton`), so
+    Android shows it, in the navigation bar or floating as the person sets it in Android, whenever that service is on.
+    A tap raises `OverlayRequest.Kind.PICKER` on the display and over the app the chords would use
+    (`HomeOverlayKeys.raise`), and the overlay host draws `MenuPickerStandalone`: Quick Menu, the menu of what is in
+    front (named This game, This app or This screen), Start menu, and Switch mode (`ModeSwitcher`). Each of the first
+    three opens the very overlay its chord opens, swapped in place of the picker; nothing is a copy. It works whether
+    or not droidtop is the default home, unlike the chords, which need the key filter. This is also the mode
+    switcher's touch route over any app.
 - **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
   Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
   navigation and the places things live. The owner's direction: "branch our quick menu out a

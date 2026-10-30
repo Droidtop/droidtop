@@ -35,8 +35,14 @@ what it learned last.
 
 ## Interaction
 - Capture-style mapping: pick the action, then press the input; explicit Unbind.
-- Two-step confirm: a second activation confirms, whether pad or tap; only moving to a
-  different item disarms (droidtop bug, 2026-09-11).
+- Confirm in one question (Droidtop/tracker#835): the question, Cancel first and under the
+  cursor, the action in the danger tone; B, Back or a tap on Cancel backs out. It replaced the
+  two-step "press A again" confirm, which could only be confirmed or left with the whole page.
+- Never assume a gamepad (the owner, 2026-10-30, Droidtop/tracker#839: "we can't ASSUME
+  gamepad presence"): every action, menu and screen has a touch route and a pointer route as
+  well as its pad route, in every mode, Gaming included. A chord or D-pad focus is never the
+  only way in. Over another app the touch route to droidtop's menus is Android's
+  accessibility button, which opens one small picker of the menus the HOME chords open.
 - Settings are for configuration only; actions live on the main screen and in
   in-context menus (ES-DE's pattern, not its bindings).
 - Quick settings panel: status header, sliders, large tiles; the same control surface by

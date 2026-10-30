@@ -23,6 +23,7 @@ import dev.droidtop.shell.gamepad.LocalInGameOverlay
 import dev.droidtop.shell.gamepad.hosted.AppInFrontStandalone
 import dev.droidtop.shell.gamepad.hosted.GameOptionsStandalone
 import dev.droidtop.shell.gamepad.hosted.LeftMenuStandalone
+import dev.droidtop.shell.gamepad.hosted.MenuPickerStandalone
 import dev.droidtop.shell.gamepad.hosted.QuickMenuStandalone
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.library.settings.Mode
@@ -152,6 +153,21 @@ internal object InGameOverlays {
                         onDismiss = { close() },
                     )
                 }
+                OverlayRequest.Kind.PICKER -> MenuPickerStandalone(
+                    contextTitle = when {
+                        gameInFront -> "This game"
+                        front == app.packageName -> "This screen"
+                        else -> "This app"
+                    },
+                    onQuickMenu = { swap(request.copy(kind = OverlayRequest.Kind.QUICK_MENU)) },
+                    onContextMenu = { swap(request.copy(kind = OverlayRequest.Kind.CONTEXT_MENU)) },
+                    onStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
+                    onSwitchMode = {
+                        close()
+                        runCatching { dev.droidtop.shell.standard.ModeSwitcher.open(app) }.onFailure { Log.w(TAG, "mode switcher did not open", it) }
+                    },
+                    onDismiss = { close() },
+                )
                 OverlayRequest.Kind.LEFT_MENU -> LeftMenuStandalone(
                     gamingSections = gamingInUse,
                     runningTitle = runningEntry?.let { dev.droidtop.library.GameNaming.displayName(it.title) },

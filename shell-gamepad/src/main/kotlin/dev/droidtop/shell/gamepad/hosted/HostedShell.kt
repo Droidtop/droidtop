@@ -363,6 +363,35 @@ fun QuickMenuStandalone(
     }
 }
 
+/**
+ * What Android's accessibility button opens (Droidtop/tracker#839; the owner: "We should probably add an accessibility
+ * button that lets the user pick what menu to open"): the touch route to the menus the HOME chords open, for a person
+ * with no pad. Four rows, each opening the same menu its chord does, not a copy: the Quick Menu (HOME + R2), the menu of
+ * what is in front (HOME + L2; [contextTitle] names it), the Start menu (HOME + Start), and the mode switcher.
+ */
+@Composable
+fun MenuPickerStandalone(
+    contextTitle: String,
+    onQuickMenu: () -> Unit,
+    onContextMenu: () -> Unit,
+    onStartMenu: () -> Unit,
+    onSwitchMode: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
+        dev.droidtop.shell.gamepad.ActionSheet(
+            title = "droidtop",
+            rows = listOf(
+                dev.droidtop.shell.gamepad.ActionRow("Quick Menu", "What R2 opens: running apps, notifications, settings", onSelect = onQuickMenu),
+                dev.droidtop.shell.gamepad.ActionRow(contextTitle, "What L2 opens for what is on screen", onSelect = onContextMenu),
+                dev.droidtop.shell.gamepad.ActionRow("Start menu", "What Start opens: droidtop's places and search", onSelect = onStartMenu),
+                dev.droidtop.shell.gamepad.ActionRow("Switch mode", "Gaming, Mobile or Desktop", onSelect = onSwitchMode),
+            ),
+            onDismiss = onDismiss,
+        )
+    }
+}
+
 /** A hosted list sheet's width where the window allows: four hint pills fit on one line. */
 private val HOSTED_SHEET_WIDTH = 520.dp
 

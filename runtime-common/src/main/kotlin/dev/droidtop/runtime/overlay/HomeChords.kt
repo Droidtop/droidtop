@@ -21,6 +21,12 @@ data class OverlayRequest(val kind: Kind, val displayId: Int, val frontPackage: 
 
         /** HOME + Start: the left menu's launcher content. */
         LEFT_MENU,
+
+        /**
+         * Android's accessibility button, the touch route to the three above (Droidtop/tracker#839): a small sheet
+         * that picks one of them, or the mode switcher.
+         */
+        PICKER,
     }
 }
 
