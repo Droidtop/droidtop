@@ -25,6 +25,7 @@ class ModeBoundaryTest {
             """\bBackButtonMenu\.openHome\(""",
             """\bAPP_MAIN_ACTIVITY\b""",
             """SHOW_GAMES"\)""",
+            """\bappModeIntent\(""",
         ).joinToString("|"),
     )
 
@@ -57,10 +58,9 @@ class ModeBoundaryTest {
         "plugin-host/src/main/kotlin/dev/droidtop/pluginhost/PluginBrokers.kt" to (1 to "asks which app is the home screen, starts nothing"),
         "runtime-common/src/main/kotlin/dev/droidtop/runtime/tasks/TaskManager.kt" to (2 to "an ended app leaves the screen by a Home press marked for the mode in use (Modes.EXTRA_MODE_IN_USE); and a query"),
         "shell-default/src/app/murinelauncher/settings/SettingsMiscFragment.kt" to (1 to "Standard's settings ask which app is the home screen"),
-        "shell-default/src/com/android/launcher3/Launcher.java" to (2 to "Standard's Home press, which goes where the person's Home choice says"),
         "shell-default/src/com/android/launcher3/dragndrop/AddItemActivity.java" to (1 to "upstream Launcher3's own home check"),
-        "shell-default/src/dev/droidtop/shell/standard/AlternativeLauncherActivity.kt" to (1 to "the Home press, which goes where the person's Home choice says"),
-        "shell-default/src/dev/droidtop/shell/standard/BackButtonMenu.kt" to (7 to "the mode menu, the person's switch"),
+        "shell-default/src/dev/droidtop/shell/standard/BackButtonMenu.kt" to (6 to "the mode menu, the person's switch"),
+        "shell-default/src/dev/droidtop/shell/standard/HomeEntry.kt" to (1 to "the Home press, which goes where the person's Home choice says"),
         "shell-default/src/dev/droidtop/shell/standard/HomeTrampolineActivity.kt" to (1 to "the Home press, which goes where the person's Home choice says"),
         "shell-default/src/dev/droidtop/shell/standard/StandardTaskbar.kt" to (1 to "Standard's taskbar Home button, the person's press"),
     )

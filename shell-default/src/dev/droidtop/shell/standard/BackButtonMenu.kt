@@ -27,9 +27,6 @@ import dev.droidtop.library.settings.Modes
  * in every mode.
  */
 object BackButtonMenu {
-    private const val APP_MAIN_ACTIVITY = "dev.droidtop.app.MainActivity"
-    private const val STANDARD_LAUNCHER_ACTIVITY = "com.android.launcher3.Launcher"
-    private const val ALTERNATIVE_LAUNCHER_ACTIVITY = "dev.droidtop.shell.standard.AlternativeLauncherActivity"
     private const val GLOBAL_SETTINGS_FRAGMENT = "app.murinelauncher.settings.SettingsGlobalFragment"
     const val EXTRA_MODE = "dev.droidtop.app.EXTRA_MODE"
 
@@ -159,7 +156,7 @@ object BackButtonMenu {
     fun reinitializeDisplays(context: Context) {
         context.startActivity(
             Intent(Intent.ACTION_MAIN).apply {
-                setClassName(context.packageName, APP_MAIN_ACTIVITY)
+                setClassName(context.packageName, StandardComponents.MAIN)
                 putExtra(EXTRA_DISPLAY_REINIT_FORCE, true)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             },
@@ -183,8 +180,8 @@ object BackButtonMenu {
     @JvmStatic
     fun homeIntent(context: Context, implementation: HomeRolePrefs.HomeImplementation): Intent {
         val activityName = when (implementation) {
-            HomeRolePrefs.HomeImplementation.STANDARD -> STANDARD_LAUNCHER_ACTIVITY
-            HomeRolePrefs.HomeImplementation.ALTERNATIVE -> ALTERNATIVE_LAUNCHER_ACTIVITY
+            HomeRolePrefs.HomeImplementation.STANDARD -> StandardComponents.LAUNCHER
+            HomeRolePrefs.HomeImplementation.ALTERNATIVE -> StandardComponents.ALTERNATIVE
             HomeRolePrefs.HomeImplementation.NONE -> null
         }
         if (activityName == null || !HomeRolePrefs.isDroidtopHome(context)) {
@@ -211,14 +208,19 @@ object BackButtonMenu {
 
     private fun launchAppMode(context: Context, mode: Mode) {
         Modes.setLastMode(context, mode)
-        val intent = Intent(Intent.ACTION_MAIN).apply {
-            setClassName(context.packageName, APP_MAIN_ACTIVITY)
-            putExtra(EXTRA_MODE, mode.id)
-            putExtra(EXTRA_DISPLAYS_BACK, true)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
+        context.startActivity(appModeIntent(context, mode.id).putExtra(EXTRA_DISPLAYS_BACK, true))
     }
+
+    /**
+     * The one way Standard starts an app-hosted mode's screen: `:app`'s MainActivity in its own task, on the mode
+     * [modeId] (Droidtop/tracker#771). Callers add their own extras (the display reinit, displays back).
+     */
+    @JvmStatic
+    fun appModeIntent(context: Context, modeId: String): Intent =
+        Intent(Intent.ACTION_MAIN)
+            .setClassName(context.packageName, StandardComponents.MAIN)
+            .putExtra(EXTRA_MODE, modeId)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /** Global settings, on the settings surface every mode shares. */
     @JvmStatic

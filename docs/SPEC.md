@@ -965,11 +965,27 @@ case. When the target IS Standard, the trampoline forwards to
 exactly as before. The double-tap "hard display reinit" detection that used
 to live in `Launcher.onNewIntent`'s own redirect branch moved to the
 trampoline too (a process-lifetime timestamp, since every Home press
-recreates the trampoline fresh); `Launcher.java`'s own three copies of this
-decision (`onCreate`, `onStart`, `onNewIntent`) are unreachable now that it
-no longer holds `CATEGORY_HOME`, and are left in place as a harmless no-op
-safety net rather than removed, since ripping working vendored lifecycle
-code out is its own risk for no behavioural gain.
+recreates the trampoline fresh).
+
+**One Home decision for both HOME activities (2026-10-30, Droidtop/tracker#771).**
+`HomeEntry.route` is the decision, in order: unfinished setup, Home on the
+companion's screen, an explicit "Android", a crash-looping theme (to Gaming),
+the home target's mode with the display reinit (forced on a double tap within
+600 ms, timed once per press before any branch), else Standard.
+`HomeTrampolineActivity` and `AlternativeLauncherActivity` both run it, so
+the Alternative forwarder now escapes a theme crash loop, brings the
+companion back on its screen and does the double-tap reinit as Standard does.
+On Standard each does its own step after `HomeEntry.enterStandard`: the
+trampoline starts `com.android.launcher3.Launcher` marked as the explicit
+"Android" (`EXTRA_MODE=launcher`), and the forwarder starts the other
+launcher. `Launcher.java`'s own three copies of the decision (`onCreate`,
+`onStart`, `onNewIntent`) are deleted. They could disagree: the trampoline's
+Standard forward carried no mode, so Launcher3 ran `Modes.homeTarget` again
+and could send an explicit "Android" back to the default mode. The forwarder
+starts the other launcher a second time on the next frame, as farmerbb/Taskbar's
+HSLActivity does, because some launchers move to their default page only on a
+Home intent that reaches them while already in front. Which ones is not
+recorded here; the second start costs nothing on those that ignore it.
 
 **The cold-start splash shows droidtop's own icon, not the platform's
 (decided 2026-09-26).** The UX review found droidtop's Android 12+
