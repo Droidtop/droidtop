@@ -271,11 +271,20 @@ internal object InGameOverlays {
                 .putExtra(BackButtonMenu.EXTRA_GAMING_START_SECTION, section)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+    /**
+     * Takes the overlay down and hands the pad back to what is under it (Droidtop/tracker#740: after the overlays the
+     * D-pad no longer reached RetroArch). In order: the composition first, while its window is still attached, so every
+     * focusable sub-window it opened (a sheet's Popup) is removed and none is left holding window focus; then the window
+     * itself, at once rather than on the next traversal; then the lifecycle. The window that has focus afterwards is
+     * logged, so a console log shows whether anything of droidtop's still holds the pad.
+     */
     private fun close() {
         val open = shown ?: return
         shown = null
         OverlayRequests.open = false
+        runCatching { open.view.disposeComposition() }.onFailure { Log.w(TAG, "${open.kind}: composition not disposed", it) }
+        runCatching { open.windowManager.removeViewImmediate(open.view) }.onFailure { Log.w(TAG, "${open.kind}: window not removed", it) }
         open.lifecycle.currentState = Lifecycle.State.DESTROYED
-        runCatching { open.windowManager.removeView(open.view) }
+        Log.i(TAG, "${open.kind} closed; window attached=${open.view.isAttachedToWindow}")
     }
 }
