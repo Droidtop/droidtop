@@ -54,7 +54,7 @@ import kotlinx.coroutines.delay
  * Details. Anything but a deliberate press of the proceed button is Cancel, so a mashed A cancels.
  */
 @Composable
-internal fun NoticeDialogHost() {
+fun NoticeDialogHost() {
     val token = remember { Any() }
     DisposableEffect(token) {
         NoticeDialogs.attachHost(token)

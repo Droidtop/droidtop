@@ -303,6 +303,12 @@ fun CatalogNavigator(
         // A screen inside Settings (Accounts and sources) does not repeat a place the left menu has either.
         value = screen to withOfflineNotice(screen, context, withoutPlaceLinks(mergeShortScreens(screen.groups(context)) { it.groups(context) }, placeScreenIds))
     }
+    // A new feature that lives on this screen is explained once it is open, as the shell's confirm card
+    // (docs/SPEC.md 7b, "Update onboarding"). A linked category waits, as its rows do, for the cursor to rest on it.
+    LaunchedEffect(screen.id) {
+        if (depth == 0) delay(PANE_LOAD_SETTLE_MS)
+        dev.droidtop.library.settings.FeatureSteps.showAt(context, screen.id)
+    }
     // A screen still building (the stores' list, a plugin's panel, which asks the plugin when it opens)
     // shows a loading row from the first frame instead of its title on black, after a moment so a fast one
     // does not flash it (Droidtop/tracker#502).
