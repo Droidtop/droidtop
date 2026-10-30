@@ -65,7 +65,9 @@ object GamingSettingsCatalog {
     const val ID_DEFAULT_SECTION = "pref_gaming_default_section"
     const val ID_SHOW_HINTS = "pref_gaming_show_hints"
     const val ID_ANIMATIONS = "pref_gaming_animations"
-    const val ID_NAVIGATION_SOUNDS = "pref_gaming_navigation_sounds"
+    /** The switch Navigation sounds was before it was a volume: read once, so a person who turned it off stays at 0. */
+    private const val ID_NAVIGATION_SOUNDS_SWITCH = "pref_gaming_navigation_sounds"
+    const val ID_NAVIGATION_SOUNDS = "pref_gaming_navigation_sounds_volume"
     const val ID_SCRAPER = "pref_gaming_scraper"
     const val ID_ACCOUNTS_AND_SOURCES = "pref_gaming_accounts_and_sources"
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
@@ -1043,22 +1045,29 @@ object GamingSettingsCatalog {
     fun animationsOn(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(ID_ANIMATIONS, true)
 
     /**
-     * The one switch for the shell's interface sounds (docs/SPEC.md "Interface sounds"): every cue role,
-     * whether the theme or droidtop's own set supplies it. Off, nothing the shell's chrome does makes a
-     * sound; a game's own audio is not touched.
+     * The interface sounds' own volume (docs/SPEC.md "Interface sounds"; owner, 2026-10-30, Droidtop/tracker#836:
+     * "navigation sounds should get their own volume"): every cue role, whether the theme or droidtop's own set
+     * supplies it, at this level of the media volume; 0 is off, as the switch it replaced was. In Settings and in the
+     * Audio controls the Quick Menu and the companion draw. A game's own audio is not touched.
      */
-    private fun navigationSoundsItem(context: Context) = ToggleItem(
+    fun navigationSoundsItem(context: Context) = SliderItem(
         id = ID_NAVIGATION_SOUNDS,
         title = "Navigation sounds",
         subtitle = "Sounds for moving, choosing, going back, menus and launching, the theme's where it has any",
-        current = navigationSoundsOn(context),
-        onToggle = { ctx, value ->
-            CatalogPrefs.prefs(ctx).edit().putBoolean(ID_NAVIGATION_SOUNDS, value).apply()
-        },
+        min = 0,
+        max = NAVIGATION_SOUNDS_MAX,
+        current = navigationSoundsVolume(context),
+        onChange = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putInt(ID_NAVIGATION_SOUNDS, value).apply() },
     )
 
-    /** The Navigation sounds switch's value: on unless the person turned it off. */
-    fun navigationSoundsOn(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(ID_NAVIGATION_SOUNDS, true)
+    /** The interface sounds' volume, 0 to [NAVIGATION_SOUNDS_MAX]; one who had turned the old switch off starts at 0. */
+    fun navigationSoundsVolume(context: Context): Int {
+        val prefs = CatalogPrefs.prefs(context)
+        return prefs.getInt(ID_NAVIGATION_SOUNDS, if (prefs.getBoolean(ID_NAVIGATION_SOUNDS_SWITCH, true)) NAVIGATION_SOUNDS_DEFAULT else 0)
+    }
+
+    const val NAVIGATION_SOUNDS_MAX = 100
+    private const val NAVIGATION_SOUNDS_DEFAULT = 70
 
     /**
      * What each screen is for (docs/SPEC.md 4c, ScreenRoles; Droidtop/tracker#776): one row per screen other than the one

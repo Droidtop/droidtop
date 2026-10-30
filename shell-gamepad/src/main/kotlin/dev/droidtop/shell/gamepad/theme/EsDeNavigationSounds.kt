@@ -79,9 +79,9 @@ fun navigationSoundPaths(theme: EsDeTheme?): Map<String, String> {
  * SoundPool, not MediaPlayer: these are sub-second UI feedback samples
  * fired on every keypress -- SoundPool pre-decodes to PCM in memory and
  * plays with near-zero latency, exactly the job it exists for.
- * [AudioAttributes.USAGE_ASSISTANCE_SONIFICATION] is Android's own
- * category for UI interaction feedback, which is precisely what real
- * ES-DE's navigation sounds are.
+ * They play as [AudioAttributes.USAGE_GAME] at their own volume
+ * ([volume]): heard whatever the ringer is, as the rest of the shell's
+ * sound is (Droidtop/tracker#836).
  *
  * Real, honest simplification: ES-DE gates fast-scroll retriggering on
  * `isPlayingThemeNavigationSound` (GamelistBase's hold-to-fast-scroll
@@ -173,7 +173,10 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
         .setMaxStreams(MAX_STREAMS)
         .setAudioAttributes(
             AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                // Game audio, so the media volume carries them and a muted ringer does not: as sonification the RP5
+                // routed them to the system stream, silent while the ringer was muted (Droidtop/tracker#836). Their
+                // own level is [volume].
+                .setUsage(AudioAttributes.USAGE_GAME)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build(),
         )
@@ -184,7 +187,7 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
                 AudioHandOff.mark("navigation sample $sampleId load complete, status $status (0 is ok)")
             }
             soundPool = it
-            AudioHandOff.mark("SoundPool created (max $MAX_STREAMS streams, sonification usage)")
+            AudioHandOff.mark("SoundPool created (max $MAX_STREAMS streams, game usage)")
         }
 
     /**
@@ -249,10 +252,10 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
     }
 
     /**
-     * Gaming's Navigation sounds switch ([SoundSync]): off, no role plays. Hand-off bookkeeping still
-     * runs, because navigation input is also what brings droidtop's audio back after a launch.
+     * The Navigation sounds volume, 0 to 1 ([SoundSync]; owner, 2026-10-30, Droidtop/tracker#836: "navigation sounds
+     * should get their own volume"): every sample plays at it, and at 0 no role plays. Hand-off bookkeeping still runs.
      */
-    @Volatile var enabled: Boolean = true
+    @Volatile var volume: Float = 0.7f
 
     private val throttle = CueThrottle()
 
@@ -271,7 +274,7 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
             AudioHandOff.reopen("navigation input")
             return
         }
-        if (!enabled) return
+        if (volume <= 0f) return
         if (sound.move && !PadModality.showsFocus) return
         if (!throttle.allow(sound, SystemClock.uptimeMillis())) return
         when (val source = uiSoundSource(sound, soundIdByName.keys, packIdByStem.keys)) {
@@ -287,7 +290,7 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
             AudioHandOff.mark("play $name: skipped, droidtop sounds are silenced")
             return
         }
-        val stream = if (id != null) soundPool?.play(id, 1f, 1f, 1, 0, 1f) else null
+        val stream = if (id != null) soundPool?.play(id, volume, volume, 1, 0, 1f) else null
         if (stream == null || stream == 0) {
             AudioHandOff.mark("play $name: nothing played (${if (id == null) "no sample bound" else "sample $id refused: not loaded yet, or no stream"})")
             return

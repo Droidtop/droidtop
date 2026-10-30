@@ -11877,9 +11877,12 @@ credited in NOTICE.md; the owner approved the download, 2026-10-09), else nothin
 most one cue sounds per 50 ms, the launch cue excepted (`CueThrottle`); the
 direction roles (move, bump, tab, system, slider) are not played for a
 touch-driven move, as Steam plays nothing for a pointer hover; a direction held
-against an end does not keep bumping (`moveCue`). One switch silences every role,
-Settings > Shell behaviour > **Navigation sounds** (on by default;
-`SoundSync` observes it). The bundled set loads into the same SoundPool as the
+against an end does not keep bumping (`moveCue`). Every role plays at one level of its own, **Navigation sounds**
+(0 to 100, 70 by default, 0 is silent; a person who had turned the old switch off starts at 0): in Settings > Shell
+behaviour and in the Audio controls the Quick Menu and the companion draw (owner, 2026-10-30, Droidtop/tracker#836:
+"navigation sounds should get their own volume"). They play as game audio (`USAGE_GAME`) on the media volume: as
+sonification the RP5 routed them to the system stream, silent while the ringer was muted. `SoundSync` observes the
+level. The bundled set loads into the same SoundPool as the
 theme's samples, so the launch hand-off below releases and reloads it too.
 **Toasts** go through one helper (`shellToast`): the toast cue, then Android's
 own toast, kept on purpose because Android draws it above every window, where a
@@ -13048,7 +13051,7 @@ transitions (the `<transitions>` profile selection of "View
 transitions": automatic, a declared profile, builtin-slide, builtin-fade
 or instant) and controller family (the `controller` badge and helpsystem
 glyphs). Each row is offered only when the active theme declares that
-axis, as ES-DE greys them out. Navigation sounds have one on/off row,
+axis, as ES-DE greys them out. Navigation sounds have one volume row,
 Settings > Shell behaviour > Navigation sounds (see "Interface sounds"). The
 two `ThemePrefs` writers that exist with no reader (transitions,
 controller family) are what these rows write, and the renderer reads

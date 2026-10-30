@@ -102,6 +102,8 @@ object QuickTiles {
      */
     val AUDIO_IDS = listOf(
         GamingSettingsCatalog.ID_SYSTEM_VOLUME,
+        // The interface sounds' own volume, beside the media volume (Droidtop/tracker#836).
+        GamingSettingsCatalog.ID_NAVIGATION_SOUNDS,
         GamingSettingsCatalog.ID_AUDIO_OUTPUT,
         GamingSettingsCatalog.ID_SYSTEM_DND,
         GamingSettingsCatalog.ID_SYSTEM_DND_GRANT,
