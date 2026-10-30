@@ -229,12 +229,68 @@ object GamingThemeMapping {
     /**
      * [map], then High contrast when it is on: the colours a palette draws with for one parse of the active theme
      * (docs/SPEC.md 7k). [schemeNamed] is whether the person named the theme's colour scheme: a named scheme is drawn
-     * as the theme wrote it; otherwise the palette follows [light]. The one place both the Gaming palette and the
+     * as the theme wrote it; otherwise the palette follows [light]. [tintAccent], when "Tint themes to my colours" is
+     * on, swaps the theme's accent and highlight ([tint]). The one place both the Gaming palette and the
      * colours outside Gaming ([ThemeColorStore]) are worked out from a theme. Pure.
      */
-    fun resolved(theme: EsDeTheme?, light: Boolean, schemeNamed: Boolean, highContrast: Boolean): GamingThemeColors {
+    fun resolved(theme: EsDeTheme?, light: Boolean, schemeNamed: Boolean, highContrast: Boolean, tintAccent: Int? = null): GamingThemeColors {
         val mapped = map(theme, light = light.takeIf { !schemeNamed })
-        return if (highContrast) highContrast(mapped) else mapped
+        // A tint swaps a theme's accent and highlight; with no theme there is nothing to tint.
+        val tinted = if (tintAccent == null || theme == null) mapped else tint(mapped, tintAccent)
+        return if (highContrast) highContrast(tinted) else tinted
+    }
+
+    /**
+     * "Tint themes to my colours" (docs/SPEC.md 7k, "Colours outside Gaming"; Droidtop/tracker#844): [colors] with only
+     * its accent and highlight swapped for [accent], the active colour source's: the accent (held to 4.5:1 on the
+     * theme's own surfaces by lightness alone), the ink on it, and the focused row, which is the accent at 22 percent.
+     * Every other role, the grounds, surfaces, text, the primary button, typefaces and texture, stays the theme's. Pure.
+     */
+    fun tint(colors: GamingThemeColors, accent: Int): GamingThemeColors {
+        val m = ColorMath
+        val ground = colors.ground
+        val ink = if (m.ratio(m.WHITE, ground) >= m.ratio(m.BLACK, ground)) m.WHITE else m.BLACK
+        val surfaces = listOf(
+            ground, colors.overlaySurface, colors.card, colors.cardFocused, colors.cardInset, colors.hintBar,
+            m.mix(colors.overlaySurface, ink, 0.17),
+        )
+        val held = m.ensure(accent, surfaces, TEXT_FLOOR)
+        // Declared, so a theme that names no colours still draws the tint (its Material scheme from these roles).
+        return colors.copy(accent = held, onAccent = m.pickOn(held), rowFillSelected = m.withAlpha(held, 0x38), declared = true)
+    }
+
+    /**
+     * Android's system palette (Android 12 and later, "Device colours"), as the tones Android publishes for its first
+     * accent and first neutral family: [accent1] and [neutral1] each hold [TONES] in that order (`system_accent1_0`
+     * through `system_accent1_1000`).
+     */
+    data class DevicePalette(val accent1: List<Int>, val neutral1: List<Int>) {
+        fun accent(tone: Int): Int = accent1[TONES.indexOf(tone)]
+
+        fun neutral(tone: Int): Int = neutral1[TONES.indexOf(tone)]
+
+        companion object {
+            /** The tones Android's system palette has, lightest first. */
+            val TONES = listOf(0, 10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000)
+        }
+    }
+
+    /**
+     * The one mapping from Android's system palette to droidtop's roles (docs/SPEC.md 7k, "Colours outside Gaming";
+     * Droidtop/tracker#844), the way Material You lays it out for [light] or dark: the ground and the sheets from the
+     * neutral family (tone 50 and 100 light, 900 and 800 dark), the accent from the accent family (600 light, 200 dark),
+     * and the focused row from the accent's container shade (100 light, 700 dark). Every other role is derived as a
+     * theme's are ([build]): text held to 4.5:1 on every surface, the accent held by lightness alone. Pure.
+     */
+    fun fromDevicePalette(palette: DevicePalette, light: Boolean): GamingThemeColors {
+        val built = build(
+            Declared(
+                ground = palette.neutral(if (light) 50 else 900),
+                surface = palette.neutral(if (light) 100 else 800),
+                accent = palette.accent(if (light) 600 else 200),
+            ),
+        )
+        return built.copy(rowFillSelected = ColorMath.withAlpha(palette.accent(if (light) 100 else 700), 0x99))
     }
 
     /**

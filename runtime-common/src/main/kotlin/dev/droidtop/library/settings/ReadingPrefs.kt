@@ -43,7 +43,8 @@ object ReadingPrefs {
     fun sentenceCase(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(KEY_SENTENCE_CASE, SENTENCE_CASE_DEFAULT)
 
     /** The keys a surface re-reads its palette for. */
-    val PALETTE_KEYS: Set<String> = setOf(KEY_HIGH_CONTRAST, KEY_SENTENCE_CASE, AppearancePrefs.KEY_APPEARANCE)
+    val PALETTE_KEYS: Set<String> =
+        setOf(KEY_HIGH_CONTRAST, KEY_SENTENCE_CASE, AppearancePrefs.KEY_APPEARANCE) + AppearancePrefs.OUTSIDE_GAMING_KEYS
 
     /** A label as a theme's caps style draws it, or as written when sentence case is on. Pure. */
     fun caps(text: String, sentenceCase: Boolean): String = if (sentenceCase) text else text.uppercase()

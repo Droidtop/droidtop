@@ -74,8 +74,8 @@ import dev.droidtop.shell.gamepad.theme.ThemePrefs as ShellThemePrefs
  * only while a Gaming surface is on screen: [GamingTheme] holds it active
  * between its host's start and stop. Everywhere else the tokens read the
  * colours outside Gaming ([OutsideGamingColors], docs/SPEC.md 7k "Colours
- * outside Gaming"): the Gaming theme's colours by default, or the Custom
- * droidtop theme. Desktop holds the whole palette too, unless Custom is chosen.
+ * outside Gaming"): Device colours, the Gaming theme's colours or the Custom
+ * droidtop theme. Desktop holds the whole palette too while the source is the Gaming theme.
  *
  * **Cost.** The theme is parsed and mapped once per (theme, colour
  * scheme, variant, aspect ratio) on a background thread and cached; the
@@ -307,6 +307,8 @@ object GamingTheme {
 
     private data class PaletteKey(
         val theme: String?,
+        /** "Tint themes to my colours": the accent the theme's accent and highlight become, or null (Droidtop/tracker#844). */
+        val tint: Int?,
         val colorScheme: String?,
         val variant: String?,
         val aspectRatio: String?,
@@ -342,8 +344,10 @@ object GamingTheme {
     private fun paletteFor(context: Context): GamingPalette {
         val name = ThemeAssets.activeThemeName(context)
         val metrics = context.resources.displayMetrics
+        val light = dev.droidtop.library.settings.AppearancePrefs.light(context)
         val key = PaletteKey(
             theme = name,
+            tint = dev.droidtop.library.theme.OutsideGamingColors.tintFor(context, light),
             colorScheme = name?.let { LibraryThemePrefs.colorScheme(context, it) },
             variant = name?.let { LibraryThemePrefs.variant(context, it) },
             aspectRatio = name?.let { LibraryThemePrefs.aspectRatio(context, it) },
@@ -351,7 +355,7 @@ object GamingTheme {
             safeMode = ThemeSafeMode.active,
             highContrast = dev.droidtop.library.theme.ThemeColorStore.highContrast(context),
             sentenceCase = dev.droidtop.library.settings.ReadingPrefs.sentenceCase(context),
-            light = dev.droidtop.library.settings.AppearancePrefs.light(context),
+            light = light,
         )
         cache[key]?.let { return it }
         val theme = if (name == null) null else ThemeAssets.loadActiveTheme(context)
@@ -362,7 +366,9 @@ object GamingTheme {
         val sentenceCase = key.sentenceCase || highContrast
         // A colour scheme the person named is drawn as the theme wrote it. Otherwise ThemeAssets loaded the scheme
         // matching the appearance, and a theme with none gets its palette derived for it (docs/SPEC.md 7k, "Light and dark").
-        val colors = GamingThemeMapping.resolved(theme, key.light, schemeNamed = key.colorScheme != null, highContrast = highContrast)
+        val colors = GamingThemeMapping.resolved(
+            theme, key.light, schemeNamed = key.colorScheme != null, highContrast = highContrast, tintAccent = key.tint,
+        )
         val ownStatusViews = GamingThemeMapping.ownStatusViews(theme)
         val palette = when {
             !colors.declared && ownStatusViews.isEmpty() && !highContrast && !sentenceCase -> GamingPalette.defaultFor(key.light)
@@ -447,16 +453,16 @@ object GamingTheme {
  * mode opens; they share one palette.
  *
  * [outsideGaming] is for a surface outside Gaming that wears the Gaming theme
- * (Desktop): it holds the theme only while the colours outside Gaming match
- * it, and draws the Custom droidtop theme when that is chosen (docs/SPEC.md
- * 7k, "Colours outside Gaming").
+ * (Desktop): it holds the theme only while the colour source is the Gaming
+ * theme, and draws Device colours or the Custom droidtop theme when one of
+ * those is chosen (docs/SPEC.md 7k, "Colours outside Gaming").
  */
 @Composable
 fun GamingTheme(outsideGaming: Boolean = false, content: @Composable () -> Unit) {
     val context = LocalContext.current
     val owner = remember(context) { context.findLifecycleOwner() }
-    val custom by OutsideGamingColors.customChosen.collectAsState()
-    val holds = !(outsideGaming && custom)
+    val gamingSource by OutsideGamingColors.gamingThemeSource.collectAsState()
+    val holds = !outsideGaming || gamingSource
     DisposableEffect(owner, holds) {
         if (!holds) {
             onDispose { }

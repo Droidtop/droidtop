@@ -51,6 +51,7 @@ class ThemeColorStoreTest {
             key.copy(aspectRatio = "16:9"),
             key.copy(light = true),
             key.copy(highContrast = true),
+            key.copy(tint = 0xFFA67CFF.toInt()),
         )
         variants.forEach { assertNotEquals(key.encode(), it.encode()) }
         assertEquals(variants.size, variants.map { it.encode() }.toSet().size)

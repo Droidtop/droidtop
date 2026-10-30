@@ -58,38 +58,81 @@ object AppearancePrefs {
     }
 
     /**
-     * Colours outside Gaming (docs/SPEC.md 7k, "Colours outside Gaming"; owner, 2026-10-30, Droidtop/tracker#827): what
-     * Mobile, Desktop, Mobile's taskbar and the shared menus are drawn in. [MATCH_GAMING], the default and droidtop's
-     * recommendation, is the selected Gaming theme's resolved colours; [CUSTOM] is a droidtop-only palette in the accent
-     * [KEY_CUSTOM_ACCENT] names. [dev.droidtop.library.theme.OutsideGamingColors] is the one reader.
+     * The colour source (docs/SPEC.md 7k, "Colours outside Gaming"; owner, 2026-10-30, Droidtop/tracker#827 and #844):
+     * what Mobile, Desktop, Mobile's taskbar and the shared menus are drawn in. [DEVICE] is Android's own system
+     * palette (Android 12 and later); [GAMING_THEME] is the selected Gaming theme's resolved colours; [CUSTOM] is a
+     * droidtop-only palette in the accent [KEY_CUSTOM_ACCENT] names. Nothing stored is [defaultSource].
+     * [dev.droidtop.library.theme.OutsideGamingColors] is the one reader.
+     *
+     * The key and the two values the first version stored ([GAMING_THEME] as "match_gaming", [CUSTOM]) are kept, so a
+     * choice made then still means what it meant.
      */
     const val KEY_OUTSIDE_GAMING = "pref_global_outside_gaming_colours"
-    const val MATCH_GAMING = "match_gaming"
+    const val DEVICE = "device"
+    const val GAMING_THEME = "match_gaming"
     const val CUSTOM = "custom"
 
     /** The Custom droidtop theme's accent, one of [dev.droidtop.library.theme.OutsideGamingColors.ACCENTS] by id. */
     const val KEY_CUSTOM_ACCENT = "pref_global_custom_accent"
 
-    /** The keys the colours outside Gaming are worked out again for. */
-    val OUTSIDE_GAMING_KEYS: Set<String> = setOf(KEY_OUTSIDE_GAMING, KEY_CUSTOM_ACCENT)
+    /**
+     * "Tint themes to my colours" (Droidtop/tracker#844), off by default: the Gaming theme's accent and highlight become
+     * the colour source's, Device or Custom; with Gaming theme as the source it has nothing to tint with.
+     */
+    const val KEY_TINT_THEMES = "pref_global_tint_themes"
 
-    fun outsideGaming(context: Context): String =
-        CatalogPrefs.prefs(context).getString(KEY_OUTSIDE_GAMING, MATCH_GAMING)?.takeIf { it == CUSTOM } ?: MATCH_GAMING
+    /** The keys the colours, outside Gaming and the Gaming palette's tint, are worked out again for. */
+    val OUTSIDE_GAMING_KEYS: Set<String> = setOf(KEY_OUTSIDE_GAMING, KEY_CUSTOM_ACCENT, KEY_TINT_THEMES)
+
+    /** The first Android with a system palette (Android 12, API 31). */
+    const val FIRST_SDK_WITH_PALETTE = 31
+
+    /** The source when none is chosen: Device colours where the device has a system palette, else Gaming theme. Pure. */
+    fun defaultSource(sdkInt: Int, hasPalette: Boolean): String =
+        if (sdkInt >= FIRST_SDK_WITH_PALETTE && hasPalette) DEVICE else GAMING_THEME
+
+    /**
+     * The source [stored] means on this device: one of the three, the default when nothing (or nothing known) is
+     * stored, and Gaming theme for Device colours on a device without a system palette (a backup restored onto an
+     * older one). Pure.
+     */
+    fun sourceOf(stored: String?, sdkInt: Int, hasPalette: Boolean): String {
+        val palette = sdkInt >= FIRST_SDK_WITH_PALETTE && hasPalette
+        return when (stored) {
+            GAMING_THEME -> GAMING_THEME
+            CUSTOM -> CUSTOM
+            DEVICE -> if (palette) DEVICE else GAMING_THEME
+            else -> defaultSource(sdkInt, hasPalette)
+        }
+    }
+
+    /** The colour source in use. Reads a preference and the system palette's presence. */
+    fun colourSource(context: Context): String = sourceOf(
+        CatalogPrefs.prefs(context).getString(KEY_OUTSIDE_GAMING, null),
+        android.os.Build.VERSION.SDK_INT,
+        dev.droidtop.library.theme.OutsideGamingColors.devicePalette(context) != null,
+    )
 
     fun customAccent(context: Context): String? = CatalogPrefs.prefs(context).getString(KEY_CUSTOM_ACCENT, null)
 
-    /** The Settings row that chooses where the colours outside Gaming come from. */
-    fun outsideGamingItem(context: Context): ChoiceItem = ChoiceItem(
-        id = KEY_OUTSIDE_GAMING,
-        title = words(R.string.appearance_colours_outside_gaming),
-        subtitle = words(R.string.appearance_colours_outside_gaming_explained),
-        options = listOf(
-            ChoiceOption(MATCH_GAMING, words(R.string.appearance_match_the_gaming_theme)),
-            ChoiceOption(CUSTOM, words(R.string.appearance_custom_droidtop_theme)),
-        ),
-        current = outsideGaming(context),
-        onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(KEY_OUTSIDE_GAMING, value).apply() },
-    )
+    fun tintThemes(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(KEY_TINT_THEMES, false)
+
+    /** The Settings row that chooses the colour source; Device colours only where there is a system palette. */
+    fun colourSourceItem(context: Context): ChoiceItem {
+        val palette = dev.droidtop.library.theme.OutsideGamingColors.devicePalette(context) != null
+        return ChoiceItem(
+            id = KEY_OUTSIDE_GAMING,
+            title = words(R.string.appearance_colour_source),
+            subtitle = words(R.string.appearance_colour_source_explained),
+            options = listOfNotNull(
+                if (palette) ChoiceOption(DEVICE, words(R.string.appearance_device_colours)) else null,
+                ChoiceOption(GAMING_THEME, words(R.string.appearance_gaming_theme)),
+                ChoiceOption(CUSTOM, words(R.string.appearance_custom_droidtop_theme)),
+            ),
+            current = colourSource(context),
+            onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(KEY_OUTSIDE_GAMING, value).apply() },
+        )
+    }
 
     /** The Settings row that picks the Custom droidtop theme's accent. */
     fun customAccentItem(context: Context): ChoiceItem = ChoiceItem(
@@ -99,6 +142,21 @@ object AppearancePrefs {
         options = dev.droidtop.library.theme.OutsideGamingColors.ACCENTS.map { ChoiceOption(it.id, words(it.label)) },
         current = dev.droidtop.library.theme.OutsideGamingColors.accentOf(customAccent(context)).id,
         onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(KEY_CUSTOM_ACCENT, value).apply() },
+    )
+
+    /**
+     * The Settings row for "Tint themes to my colours". Its explanation warns that art with colours drawn into it can
+     * look off; with Gaming theme as the source it says instead that it has nothing to tint with, and does nothing.
+     */
+    fun tintThemesItem(context: Context): ToggleItem = ToggleItem(
+        id = KEY_TINT_THEMES,
+        title = words(R.string.appearance_tint_themes),
+        subtitle = words(
+            if (colourSource(context) == GAMING_THEME) R.string.appearance_tint_themes_off_with_gaming_theme
+            else R.string.appearance_tint_themes_explained,
+        ),
+        current = tintThemes(context),
+        onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_TINT_THEMES, on).apply() },
     )
 
     /** The label [schemeLabels] gives [scheme], else [scheme] itself; null stays null. Pure, for tests. */

@@ -38,4 +38,28 @@ class AppearancePrefsTest {
     fun `automatic names no scheme`() {
         assertNull(AppearancePrefs.schemeLabel(null, mapOf("a" to "A")))
     }
+
+    @Test
+    fun `the colour source defaults to device colours only where there is a system palette`() {
+        assertEquals(AppearancePrefs.DEVICE, AppearancePrefs.defaultSource(sdkInt = 31, hasPalette = true))
+        assertEquals(AppearancePrefs.DEVICE, AppearancePrefs.defaultSource(sdkInt = 35, hasPalette = true))
+        assertEquals(AppearancePrefs.GAMING_THEME, AppearancePrefs.defaultSource(sdkInt = 31, hasPalette = false))
+        assertEquals(AppearancePrefs.GAMING_THEME, AppearancePrefs.defaultSource(sdkInt = 30, hasPalette = true))
+        assertEquals(AppearancePrefs.GAMING_THEME, AppearancePrefs.defaultSource(sdkInt = 26, hasPalette = false))
+    }
+
+    @Test
+    fun `the first version's stored choices keep their meaning`() {
+        assertEquals(AppearancePrefs.GAMING_THEME, AppearancePrefs.sourceOf("match_gaming", sdkInt = 34, hasPalette = true))
+        assertEquals(AppearancePrefs.CUSTOM, AppearancePrefs.sourceOf("custom", sdkInt = 34, hasPalette = true))
+        assertEquals(AppearancePrefs.CUSTOM, AppearancePrefs.sourceOf("custom", sdkInt = 29, hasPalette = false))
+    }
+
+    @Test
+    fun `nothing stored is the default and device colours need a palette`() {
+        assertEquals(AppearancePrefs.DEVICE, AppearancePrefs.sourceOf(null, sdkInt = 34, hasPalette = true))
+        assertEquals(AppearancePrefs.GAMING_THEME, AppearancePrefs.sourceOf("unknown", sdkInt = 29, hasPalette = false))
+        assertEquals(AppearancePrefs.GAMING_THEME, AppearancePrefs.sourceOf("device", sdkInt = 29, hasPalette = false))
+        assertEquals(AppearancePrefs.DEVICE, AppearancePrefs.sourceOf("device", sdkInt = 33, hasPalette = true))
+    }
 }
