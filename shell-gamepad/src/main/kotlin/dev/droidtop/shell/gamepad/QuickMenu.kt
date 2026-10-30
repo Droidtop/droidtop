@@ -438,7 +438,9 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
         }
     }
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    // Asked each frame until the window is attached: one early request was lost in the Quick Menu over a game,
+    // and the first D-pad press only gave the section focus (Droidtop/tracker#820).
+    LaunchedEffect(Unit) { requestFocusWhenAttached(focusRequester, "Quick Menu Performance") }
     LaunchedEffect(Unit) { PerformanceMonitor.watch(context) }
 
     Column(
@@ -689,7 +691,9 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
     // A held direction follows the cursor without animating each step.
     var heldStep by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    // Asked each frame until the window is attached: one early request was lost in the Quick Menu over a game,
+    // and the first D-pad press only gave the section focus (Droidtop/tracker#820).
+    LaunchedEffect(Unit) { requestFocusWhenAttached(focusRequester, "Quick Menu Notifications") }
     // List items: the Recent heading (when there is Recent), its rows, then the system rows.
     val headingOffset = if (recent.isNotEmpty()) 1 else 0
     LaunchedEffect(focusIndex, rowCount, activeStart) {
@@ -1091,7 +1095,9 @@ private fun GameTab(
         }
     }
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    // Asked each frame until the window is attached: one early request was lost in the Quick Menu over a game,
+    // and the first D-pad press only gave the section focus (Droidtop/tracker#820).
+    LaunchedEffect(Unit) { requestFocusWhenAttached(focusRequester, "Quick Menu Game") }
 
     Column(
         modifier = Modifier
