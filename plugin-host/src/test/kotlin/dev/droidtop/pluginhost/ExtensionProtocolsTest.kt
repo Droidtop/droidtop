@@ -230,4 +230,22 @@ class ExtensionProtocolsTest {
         assertEquals("extras", GameSectionProtocol.tab(section()))
         assertTrue("a section uses the context action filter", ContextActionFilter.matches(section("systems" to strings("snes")), game))
     }
+
+    @Test
+    fun `a candidate's title that is only its id is no name (tracker 784)`() {
+        val ids = JSONObject().put("thread", "214581")
+        assertTrue(PluginMetadataProtocol.isIdOnly("Thread 214581", ids))
+        assertTrue(PluginMetadataProtocol.isIdOnly("214581", ids))
+        assertTrue(PluginMetadataProtocol.isIdOnly("thread #214581", ids))
+        assertFalse(PluginMetadataProtocol.isIdOnly("Thief of Hearts", ids))
+        assertFalse("a name with a number in it is a name", PluginMetadataProtocol.isIdOnly("Thief of Hearts 214581 Edition", ids))
+        assertFalse(PluginMetadataProtocol.isIdOnly(null, ids))
+    }
+
+    @Test
+    fun `fetch's title is the record's name, one line`() {
+        assertEquals("Thief of Hearts", PluginMetadataProtocol.title(JSONObject().put("title", "  Thief of Hearts ")))
+        assertNull(PluginMetadataProtocol.title(JSONObject().put("title", "two\nlines")))
+        assertNull(PluginMetadataProtocol.title(JSONObject()))
+    }
 }

@@ -197,6 +197,20 @@ object PluginMetadataProtocol {
         return if (top.size == 1) MatchDecision.Match(top.single()) else MatchDecision.Ambiguous(top)
     }
 
+    /** The `title` a `fetch` answer gives, the name the source's record goes by (A3), or null. */
+    fun title(data: JSONObject): String? = text(data, "title")?.takeIf { it.length <= 200 && it.none(Char::isISOControl) }
+
+    /**
+     * Whether [title] is only one of [ids]' values, alone or after one word ("214581", "Thread 214581"): a stand-in for a
+     * name the source did not give, which docs/plugin-api.md 1.11 forbids (Droidtop/tracker#784). droidtop then asks the
+     * source's `fetch` for the name instead of showing the id as one.
+     */
+    fun isIdOnly(title: String?, ids: JSONObject): Boolean {
+        val shown = title?.trim()?.lowercase() ?: return false
+        val values = ids.keys().asSequence().mapNotNull { ids.opt(it)?.toString()?.trim()?.lowercase()?.takeIf { v -> v.isNotEmpty() } }.toList()
+        return values.any { id -> shown == id || Regex("^\\S+\\s+#?${Regex.escape(id)}$").matches(shown) }
+    }
+
     /** The `cover` a `fetch` answer names: an https address, which the host fetches itself, or null. */
     fun cover(data: JSONObject): String? = text(data, "cover")?.takeIf { NetScope.isHttps(it) && NetScope.hostOf(it) != null }
 

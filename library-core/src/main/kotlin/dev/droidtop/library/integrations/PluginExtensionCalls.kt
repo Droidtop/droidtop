@@ -274,16 +274,43 @@ object PluginMetadataSources {
             }
         }
 
-        /** Every candidate each source offers for [facts], for the person to pick from ("Choose match"). */
+        /**
+         * Every candidate each source offers for [facts], for the person to pick from ("Choose match"). A candidate with
+         * no name, or only its id for one ("Thread 214581"), is named by the source's `fetch` (docs/plugin-api.md 1.11,
+         * Droidtop/tracker#784), at most [MAX_NAMED] per source; one still unnamed stays untitled, and the picker says so.
+         */
         suspend fun candidates(facts: JSONObject): List<Pair<Source, PluginMetadataProtocol.Candidate>> = sources.flatMap { source ->
             try {
                 val match = policy.handle(source.record, newCall(POINT, "match", "pick", facts, 15_000L))
-                if (!match.ok) emptyList() else PluginMetadataProtocol.candidates(match.data).map { source to it }
+                if (!match.ok) return@flatMap emptyList()
+                var asked = 0
+                PluginMetadataProtocol.candidates(match.data).map { candidate ->
+                    val unnamed = candidate.title == null || PluginMetadataProtocol.isIdOnly(candidate.title, candidate.ids)
+                    val named = when {
+                        !unnamed -> candidate
+                        asked >= MAX_NAMED -> candidate.copy(title = null)
+                        else -> {
+                            asked++
+                            candidate.copy(title = nameOf(source, candidate.ids))
+                        }
+                    }
+                    source to named
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
                 emptyList()
             }
+        }
+
+        /** The name [source]'s record [ids] goes by, from its `fetch` (A3's `title`), or null when it gives none. */
+        private suspend fun nameOf(source: Source, ids: JSONObject): String? = try {
+            val fetch = policy.handle(source.record, newCall(POINT, "fetch", "pick", JSONObject().put("ids", ids), 15_000L))
+            if (fetch.ok) PluginMetadataProtocol.title(fetch.data)?.takeUnless { PluginMetadataProtocol.isIdOnly(it, ids) } else null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            null
         }
 
         /** The fields and links [source] has for one candidate's [ids]. */
@@ -310,6 +337,9 @@ object PluginMetadataSources {
 
         fun close() = policy.shutdown()
     }
+
+    /** How many unnamed candidates of one source are named through its `fetch` for one picker. */
+    const val MAX_NAMED = 8
 
     /** A session over the running sources, or null when there are none (the common case: nothing is bound). */
     fun open(context: Context): Session? = sources(context).takeIf { it.isNotEmpty() }?.let { Session(context, it) }
