@@ -4995,8 +4995,14 @@ droidtop 0.2.0-dev.1931).
   one stroke continued by each next gesture, collapses moves and scrolls that wait behind a gesture to the newest, and drops
   the rest of a drag another touch interrupted. Middle click does nothing: a touch screen has none. Without the service
   (or on Android 10 and earlier for a second screen) the Input tab says "Pointer needs the accessibility service" with a
-  button that opens Android's accessibility settings. A shell-command route (`input -d <display> tap`/`swipe` through the
-  helper app) could play the same touches without the service; it is not built, and `GestureRunner` is where it would go. Connected controllers show with their batteries
+  button that opens Android's accessibility settings. **Without the service, the helper app's shell** (built 2026-10-30,
+  Droidtop/tracker#811): with a running `priv.shell` provider (Shizuku or Sui) the same touches are played as Android's
+  `input` command on the target screen (`ShellPointerCommands`, `:input-seat`, tested): a tap is `input -d <display>
+  tap`, a long press a swipe that stays in place, a scroll a swipe, a drag one stroke of `input motionevent` DOWN, MOVE
+  and UP. `RoutedPointerRunner` plays a gesture through the accessibility service where it can reach the screen, else
+  through the shell, and keeps a drag on the route it started on. Without the service the cursor is an ordinary overlay
+  window when droidtop may draw over other apps, else there is no arrow. With neither route the line reads "Pointer
+  needs the accessibility service or Shizuku". Connected controllers show with their batteries
   (`InputDevice.getBatteryState`, Android 12 and later), and Home's status line names the one in hand ("Pad 80%")
   when exactly one reports a battery.
 - **One screen (slice C13, owner question 2's default).** A device with no second screen gets the same

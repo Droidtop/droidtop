@@ -22,6 +22,7 @@ import dev.droidtop.input.GestureRunner
 import dev.droidtop.input.PointerGestureQueue
 import dev.droidtop.input.PointerInjector
 import dev.droidtop.input.PointerOp
+import kotlinx.coroutines.launch
 
 /**
  * The companion trackpad's pointer on the main screen (docs/SPEC.md "The companion's tabs", Input; Droidtop/tracker#486
@@ -65,15 +66,67 @@ internal object AccessibilityPointer {
         return metrics.widthPixels to metrics.heightPixels
     }
 
+    /**
+     * Whether the helper app's shell can play a touch (Droidtop/tracker#811): a running `priv.shell` provider, for a
+     * device where the accessibility service is off or cannot reach the screen. Cheap: no provider call.
+     */
+    fun shellCanPoint(): Boolean = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
+
+    /** Whether a touch can be played on [displayId] now, by the accessibility service or else the helper's shell. */
+    fun canPoint(displayId: Int): Boolean = canReach(displayId) || shellCanPoint()
+
     /** An injector for the screen [displayId] names now (null: nowhere to play a touch). */
     fun injector(context: Context, displayId: () -> Int?): PointerInjector {
         val app = context.applicationContext
-        val runner = PointerGestureRunner(
+        PointerCursor.fallbackContext = app
+        val accessibility = PointerGestureRunner(
             service = { service },
             displayId = { displayId() },
             screenSize = { id -> screenSize(app, id) },
         )
+        val shell = ShellPointerRunner(displayId = { displayId() }, screenSize = { id -> screenSize(app, id) })
+        val runner = RoutedPointerRunner(accessibility, shell) { displayId()?.let(::canReach) == true }
         return PointerGestureQueue(runner) { x, y -> displayId()?.let { PointerCursor.show(it, x, y) } }
+    }
+}
+
+/**
+ * The accessibility service where it can reach the screen, else the helper's shell (Droidtop/tracker#811). A drag stays
+ * on the route it started on until it ends, since each route keeps its own stroke.
+ */
+internal class RoutedPointerRunner(
+    private val accessibility: GestureRunner,
+    private val shell: GestureRunner,
+    private val useAccessibility: () -> Boolean,
+) : GestureRunner {
+    private var dragOn: GestureRunner? = null
+
+    override fun run(op: PointerOp, done: (completed: Boolean) -> Unit) {
+        val runner = dragOn ?: if (useAccessibility()) accessibility else shell
+        dragOn = if (op is PointerOp.DragStart || op is PointerOp.DragMove) runner else null
+        runner.run(op, done)
+    }
+}
+
+/**
+ * Plays a [PointerOp] as the `input` shell command through the helper app ([dev.droidtop.input.ShellPointerCommands]),
+ * off the main thread; the queue plays one at a time, so the commands keep their order. Answers on the main thread.
+ */
+internal class ShellPointerRunner(
+    private val displayId: () -> Int?,
+    private val screenSize: (Int) -> Pair<Int, Int>?,
+) : GestureRunner {
+    private val main = Handler(Looper.getMainLooper())
+
+    override fun run(op: PointerOp, done: (completed: Boolean) -> Unit) {
+        val id = displayId()
+        val size = id?.let(screenSize)
+        if (id == null || size == null) return done(false)
+        val argv = dev.droidtop.input.ShellPointerCommands.argv(op, id, (size.first - 1).toFloat(), (size.second - 1).toFloat())
+        dev.droidtop.runtime.util.AppScopes.io.launch {
+            val ok = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.exec(argv) }.getOrNull()?.exit == 0
+            main.post { done(ok) }
+        }
     }
 }
 
@@ -200,7 +253,8 @@ internal class PointerGestureRunner(
 
 /**
  * The pointer's cursor: a small arrow in an accessibility overlay on the target screen, never touchable, so a touch
- * played under it reaches the app. It moves with the pointer (one layout update a frame) and goes away after a few
+ * played under it reaches the app. Without the service (the shell route, Droidtop/tracker#811) it is an ordinary
+ * overlay window when droidtop may draw over other apps, else there is no arrow. It moves with the pointer (one layout update a frame) and goes away after a few
  * seconds without movement and when the trackpad goes.
  */
 internal object PointerCursor {
@@ -213,16 +267,21 @@ internal object PointerCursor {
     private var updateQueued = false
     private val hideLater = Runnable { hide() }
 
+    /** droidtop's own context, for the overlay window drawn without the accessibility service. */
+    @Volatile
+    var fallbackContext: Context? = null
+
     fun show(displayId: Int, x: Float, y: Float) {
         if (shownOn != displayId) hide()
         if (view == null) {
-            val context = AccessibilityTyping.overlayContext(displayId) ?: return
+            val service = AccessibilityTyping.overlayContext(displayId)
+            val context = service ?: overlayWindowContext(displayId) ?: return
             val manager = context.getSystemService(WindowManager::class.java) ?: return
             val size = (CURSOR_DP * context.resources.displayMetrics.density).toInt()
             val layout = WindowManager.LayoutParams(
                 size,
                 size,
-                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                if (service != null) WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY else WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -247,6 +306,14 @@ internal object PointerCursor {
         }
         main.removeCallbacks(hideLater)
         main.postDelayed(hideLater, IDLE_HIDE_MS)
+    }
+
+    /** [displayId]'s context for an ordinary overlay window, when droidtop may draw over other apps. */
+    private fun overlayWindowContext(displayId: Int): Context? {
+        val app = fallbackContext ?: return null
+        if (!android.provider.Settings.canDrawOverlays(app)) return null
+        val display = app.getSystemService(DisplayManager::class.java)?.getDisplay(displayId) ?: return null
+        return app.createDisplayContext(display)
     }
 
     fun hide() {

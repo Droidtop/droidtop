@@ -441,14 +441,14 @@ class SecondScreenInputView(
     /**
      * What the trackpad drives outside Desktop right now: droidtop's own selection while the shell is what the target
      * screen shows (pointer and focus are one selection there), else the game's mouse while droidtop's own game screen
-     * is there (Droidtop/tracker#565), else a pointer on that screen when droidtop's accessibility service can play
-     * touches on it, else nothing.
+     * is there (Droidtop/tracker#565), else a pointer on that screen when droidtop's accessibility service or the helper
+     * app's shell (Droidtop/tracker#811) can play touches on it, else nothing.
      */
     private fun currentRoute(): TrackpadRoute {
         val id = targetId()
         return TrackpadRoute.of(
             shellOnTarget = id != null && shellDisplayId() == id,
-            pointerReachable = id != null && AccessibilityPointer.canReach(id),
+            pointerReachable = id != null && AccessibilityPointer.canPoint(id),
             gameOnTarget = id != null && gamePointer()?.displayId == id,
         )
     }
@@ -602,7 +602,7 @@ class SecondScreenInputView(
         TrackpadRoute.GAME -> "Trackpad is the game's mouse"
         TrackpadRoute.POINTER -> "Trackpad is a pointer"
         TrackpadRoute.UNAVAILABLE ->
-            if (targetId() == null) "No other screen" else "Pointer needs the accessibility service"
+            if (targetId() == null) "No other screen" else "Pointer needs the accessibility service or Shizuku"
     }
 
     companion object {
