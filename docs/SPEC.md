@@ -8150,7 +8150,10 @@ forever, and stopping a capture from the UI thread raced the frame
 callback still drawing with it. Capture uses `copy_with_damage` (screencopy
 v2+), so the compositor holds each frame until something on the output
 changed and an idle desktop costs nothing; a buffer is reallocated when the
-frame's geometry changes, not just its byte count.
+frame's geometry changes, not just its byte count. The first copy into a
+newly presented surface is a plain `copy`: an idle desktop has no damage to
+wait for, so a surface presented again (back from an Android app) stayed
+black until the first touch (Droidtop/tracker#386, AVD rig 2026-10-30).
 
 **Keys.** Android keycodes are translated to Linux evdev codes and injected
 raw. There is no second layout table: the layout is entirely the XKB keymap

@@ -156,6 +156,12 @@ struct OutputCapture {
     // can run.
     uint32_t screencopyVersion = 0;
 
+    // The first copy into a newly presented window is a plain copy, not
+    // copy_with_damage: an idle desktop has no damage to wait for, so a
+    // surface presented again (back from an Android app) stayed black
+    // until the first touch changed something (Droidtop/tracker#386).
+    bool firstFrame = true;
+
     bool running = false;
 };
 
@@ -899,11 +905,12 @@ void frame_buffer_done(void* data, zwlr_screencopy_frame_v1* frame) {
         return;
     }
 
-    if (cap->screencopyVersion >= 2) {
+    if (cap->screencopyVersion >= 2 && !cap->firstFrame) {
         zwlr_screencopy_frame_v1_copy_with_damage(frame, cap->buffer);
     } else {
         zwlr_screencopy_frame_v1_copy(frame, cap->buffer);
     }
+    cap->firstFrame = false;
 }
 
 // A real named object with static storage duration — deliberately NOT a
