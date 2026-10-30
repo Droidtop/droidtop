@@ -18,6 +18,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.async
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -475,6 +477,48 @@ object PluginJobsCenter {
         return resume(jobId, byPolicy = true)
     }
 
+    /**
+     * When each running native job last reported (Droidtop/tracker#842): a run that says nothing for [stallMs] has stopped
+     * making progress (a step waiting on something that will not come back), and is ended with a plain reason and Retry
+     * instead of staying "current" for hours.
+     */
+    private val lastHeard = ConcurrentHashMap<String, Long>()
+
+    /** How long a running native job may report nothing before it is stopped; tests shorten it. */
+    @Volatile
+    internal var stallMs: Long = 30 * 60_000L
+
+    /** How often a run's silence is checked. */
+    @Volatile
+    internal var stallCheckMs: Long = 60_000L
+
+    /** What a stopped run says; Retry carries on from what is on disk (a download's partial file, the archive). */
+    internal const val STALLED = "It made no progress for 30 minutes, so it was stopped. Retry carries on from where it got to"
+
+    private class Stalled : Exception(STALLED)
+
+    private fun heard(jobId: String) {
+        lastHeard[jobId] = System.currentTimeMillis()
+    }
+
+    /** Sets a running job's bar and line from inside one of its steps ([JobHandle.progress]); a paused or finished job keeps its own. */
+    internal fun setProgress(jobId: String, percent: Int, line: String) {
+        val now = find(jobId) ?: return
+        if (now.done || now.paused) return
+        heard(jobId)
+        update(jobId) { it.copy(percent = percent, statusLine = line) }
+    }
+
+    /**
+     * Writes the jobs list now, not within [PERSIST_INTERVAL_MS] (Droidtop/tracker#842): before droidtop installs its own
+     * update, so the restart finds every running job with its last checkpoint and runs it again from there.
+     */
+    suspend fun flushNow() {
+        val context = persistenceContext ?: return
+        val snapshot = encodeEntries(state.value)
+        context.pluginJobsStore.edit { it[persistedKey] = snapshot }
+    }
+
     private fun launchNative(jobId: String, checkpoint: String?) {
         val spec = nativeSpecs[jobId] ?: return
         val runner = nativeRunners[spec.kind]
@@ -499,16 +543,42 @@ object PluginJobsCenter {
             // A paused run may still be reaching its next boundary; never two at once.
             previous?.join()
             try {
-                val summary = runner(spec.args, checkpoint) { percent, status, newCheckpoint ->
-                    val report = ProgressThrottle.Report(percent, status, newCheckpoint)
-                    if (throttle.offer(report)) {
-                        publish(report)
-                    } else if (trailing.compareAndSet(false, true)) {
-                        nativeScope.launch(nativeDispatcher) {
-                            delay(throttle.waitMs())
-                            trailing.set(false)
-                            throttle.takePending()?.let(::publish)
+                heard(jobId)
+                val summary = coroutineScope {
+                    val work = async {
+                        runner(spec.args, checkpoint) { percent, status, newCheckpoint ->
+                            heard(jobId)
+                            val report = ProgressThrottle.Report(percent, status, newCheckpoint)
+                            if (throttle.offer(report)) {
+                                publish(report)
+                            } else if (trailing.compareAndSet(false, true)) {
+                                nativeScope.launch(nativeDispatcher) {
+                                    delay(throttle.waitMs())
+                                    trailing.set(false)
+                                    throttle.takePending()?.let(::publish)
+                                }
+                            }
                         }
+                    }
+                    // A run that reports nothing for [stallMs] is stopped (Droidtop/tracker#842), so nothing stays
+                    // "current" with no work behind it.
+                    var stalled = false
+                    val watch = launch {
+                        while (true) {
+                            delay(stallCheckMs)
+                            if (isStalled(lastHeard[jobId], System.currentTimeMillis(), stallMs)) {
+                                stalled = true
+                                work.cancel()
+                                break
+                            }
+                        }
+                    }
+                    try {
+                        work.await()
+                    } catch (e: CancellationException) {
+                        if (stalled) throw Stalled() else throw e
+                    } finally {
+                        watch.cancel()
                     }
                 }
                 finishNative(jobId, PluginResult.success(mapOf("summary" to summary)))
@@ -526,7 +596,11 @@ object PluginJobsCenter {
     /** The least time between two progress updates of one native job's row: about four a second. */
     internal const val PROGRESS_INTERVAL_MS = 250L
 
+    /** Whether a run last heard at [lastHeardMs] has been silent longer than [limitMs] at [now]. Pure. */
+    internal fun isStalled(lastHeardMs: Long?, now: Long, limitMs: Long): Boolean = lastHeardMs != null && now - lastHeardMs > limitMs
+
     private fun finishNative(jobId: String, result: PluginResult) {
+        lastHeard.remove(jobId)
         nativeSpecs[jobId]?.let { finishedSpecs[jobId] = it }
         update(jobId) {
             it.copy(

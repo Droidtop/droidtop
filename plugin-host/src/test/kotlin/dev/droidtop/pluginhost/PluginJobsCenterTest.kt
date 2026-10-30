@@ -337,6 +337,60 @@ class PluginJobsCenterTest {
     }
 
     @Test
+    fun aRunThatSaysNothingIsStoppedWithAPlainReasonInsteadOfStayingCurrent() = runBlocking {
+        // Droidtop/tracker#842: "Download Bare Witness" stayed current for hours with nothing behind it.
+        PluginJobsCenter.nativeDispatcher = Dispatchers.Default
+        val limit = PluginJobsCenter.stallMs
+        val check = PluginJobsCenter.stallCheckMs
+        try {
+            PluginJobsCenter.stallMs = 100
+            PluginJobsCenter.stallCheckMs = 20
+            PluginJobsCenter.registerNative("test_native_silent") { _, _, _ -> awaitCancellation() }
+            val id = PluginJobsCenter.startNative(null, "test_native_silent", "Silent", emptyMap())!!
+            withTimeout(5_000) {
+                while (PluginJobsCenter.find(id)?.done != true) kotlinx.coroutines.delay(10)
+            }
+            val done = PluginJobsCenter.find(id)!!
+            assertEquals(PluginJobsCenter.STALLED, done.result?.error)
+            assertTrue(done.retryable)
+        } finally {
+            PluginJobsCenter.stallMs = limit
+            PluginJobsCenter.stallCheckMs = check
+        }
+    }
+
+
+    @Test
+    fun aDownloadKilledMidwayComesBackAndRunsAgainFromItsCheckpointByItself() = runBlocking {
+        // Droidtop/tracker#842: the process dies mid-download (a crash, droidtop updating itself, Android killing it).
+        PluginJobsCenter.nativeDispatcher = Dispatchers.Default
+        val starts = CopyOnWriteArrayList<String?>()
+        val hold = CompletableDeferred<Unit>()
+        PluginJobsCenter.registerNative("test_native_killed", reattachOnRestart = true) { _, checkpoint, report ->
+            starts += checkpoint
+            if (checkpoint == null) {
+                report(50, "Half", "fetched-half")
+                hold.await()
+            }
+            "carried on from $checkpoint"
+        }
+        val id = PluginJobsCenter.startNative(null, "test_native_killed", "Download Game", mapOf("url" to "https://host.example/a"))!!
+        withTimeout(5_000) {
+            while (PluginJobsCenter.find(id)?.resumePayload != "fetched-half") kotlinx.coroutines.delay(10)
+        }
+        val stored = PluginJobsCenter.encodeEntries(listOf(PluginJobsCenter.find(id)!!))
+        PluginJobsCenter.cancel(id)
+
+        PluginJobsCenter.restore(PluginJobsCenter.decodeEntries(stored))
+        withTimeout(5_000) {
+            while (PluginJobsCenter.find(id)?.done != true) kotlinx.coroutines.delay(10)
+        }
+        assertEquals(listOf(null, "fetched-half"), starts.toList())
+        assertEquals("carried on from fetched-half", PluginJobsCenter.find(id)!!.result?.values?.get("summary"))
+    }
+
+
+    @Test
     fun aJobThatCannotPauseComesBackFromARestartEndedSoItsKindRunsAgain() = runBlocking {
         // Droidtop/tracker#837: the update check, running when a self-update restarted droidtop, came back paused with
         // no Resume, and Check now joined it and waited for ever.

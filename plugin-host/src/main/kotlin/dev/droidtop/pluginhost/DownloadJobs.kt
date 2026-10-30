@@ -457,8 +457,9 @@ object DownloadJobs {
         // version folder must be new.
         val folder = if (version != null) newVersionFolder(destination, version) else freeName(destination, stem)
         val building = File(destination, ".${folder.name}.unpacking")
+        // What a run cut short left (Droidtop/tracker#842) is cleared by the extractor before it fills the folder again.
         try {
-            ArchiveExtractor.extract(file, building)
+            ArchiveExtractor.extract(file, building, onProgress = unpackProgress(JobHandle.current(), targetName))
         } catch (e: java.io.IOException) {
             throw IllegalStateException("could not unpack $targetName: ${e.message}. The download is kept in droidtop's downloads folder", e)
         }
@@ -485,7 +486,7 @@ object DownloadJobs {
         val folder = if (version != null) newVersionFolder(destination, version) else freeName(destination, name)
         val building = File(destination, ".${folder.name}.unpacking")
         try {
-            ArchiveExtractor.extractVolumes(volumes, building)
+            ArchiveExtractor.extractVolumes(volumes, building, onProgress = unpackProgress(JobHandle.current(), name))
         } catch (e: java.io.IOException) {
             throw IllegalStateException("could not unpack the ${volumes.size} RAR parts: ${e.message}", e)
         }
@@ -494,6 +495,29 @@ object DownloadJobs {
         if (inner != null) building.delete()
         volumes.forEach { it.delete() }
         return folder
+    }
+
+    /**
+     * An unpack's progress on its job's row (Droidtop/tracker#842): a long unpack used to show no change at all, so it
+     * looked stuck. Told only when the percent moves, so a many-file archive does not rebuild the jobs list per file.
+     */
+    internal fun unpackProgress(job: JobHandle?, name: String): (dev.droidtop.runtime.util.ArchiveExtractionProgress) -> Unit {
+        if (job == null) return {}
+        var shown = -1
+        return { p ->
+            val percent = unpackPercent(p.extractedBytes, p.totalBytes, p.entriesProcessed, p.totalEntries)
+            if (percent != shown) {
+                shown = percent
+                job.progress(percent, "Unpacking $name: $percent%")
+            }
+        }
+    }
+
+    /** How far an unpack is, 0 to 100: by bytes when the archive says its size, else by entries. Pure. */
+    internal fun unpackPercent(extractedBytes: Long, totalBytes: Long, entries: Int, totalEntries: Int): Int = when {
+        totalBytes > 0 -> (extractedBytes * 100 / totalBytes).toInt().coerceIn(0, 100)
+        totalEntries > 0 -> (entries * 100 / totalEntries).coerceIn(0, 100)
+        else -> 0
     }
 
     /** [name] in [games] for an update's new version folder; throws when something of that name is already there. */

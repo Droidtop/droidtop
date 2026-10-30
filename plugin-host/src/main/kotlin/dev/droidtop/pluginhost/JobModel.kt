@@ -141,6 +141,9 @@ class JobHandle internal constructor(val jobId: String) : AbstractCoroutineConte
 
     fun numbers(numbers: JobNumbers) = PluginJobsCenter.setNumbers(jobId, numbers)
 
+    /** The job's bar and line from inside a step its runner does not report from itself (an unpack, Droidtop/tracker#842). */
+    fun progress(percent: Int, line: String) = PluginJobsCenter.setProgress(jobId, percent, line)
+
     fun item(item: ReportItem) = PluginJobsCenter.addReportItem(jobId, item)
 
     fun item(title: String, outcome: Outcome, detail: String? = null, open: OpenTarget? = null) =

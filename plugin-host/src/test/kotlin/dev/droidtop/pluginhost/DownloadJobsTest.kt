@@ -638,4 +638,26 @@ class DownloadJobsTest {
         assertFalse(from.exists())
         assertFalse(File(to.parentFile, ".to.placing").exists())
     }
+
+    @Test
+    fun `an unpack cut short by the process dying is done again from the archive, its leftover folder cleared`(): Unit = kotlinx.coroutines.runBlocking {
+        // Droidtop/tracker#842: ".Bare Witness vSteam Build.unpacking" was left behind in the game folder.
+        val games = java.nio.file.Files.createTempDirectory("unpack842").toFile()
+        val archive = zipOf(File(games.parentFile, "bw_${System.nanoTime()}.zip"), "Game/game.exe" to "exe", "Game/data.rpa" to "data")
+        val stale = File(games, ".Game v0.5.unpacking").apply { mkdirs() }
+        File(stale, "half-written.bin").writeText("cut short")
+        val folder = DownloadJobs.unpackIntoFolder(archive, mapOf("destinationPath" to games.path, "targetName" to "x.zip", DownloadJobs.ARG_VERSION_FOLDER to "Game v0.5"))
+        assertEquals("Game v0.5", folder.name)
+        assertTrue(File(folder, "game.exe").isFile)
+        assertFalse(File(folder, "half-written.bin").exists())
+        assertFalse("the leftover folder is gone", stale.exists())
+        games.deleteRecursively()
+    }
+
+    @Test
+    fun `an unpack's percent is by bytes, else by entries`() {
+        assertEquals(50, DownloadJobs.unpackPercent(500, 1000, 1, 10))
+        assertEquals(30, DownloadJobs.unpackPercent(0, 0, 3, 10))
+        assertEquals(0, DownloadJobs.unpackPercent(0, 0, 0, 0))
+    }
 }

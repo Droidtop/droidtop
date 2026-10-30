@@ -359,6 +359,9 @@ object AppSelfUpdate {
         requireInstallAllowed(context)
         require(apk.isFile) { "the downloaded APK is missing" }
         require(sha256(apk) == digest.uppercase()) { "the downloaded APK does not match the published digest" }
+        // Installing ends this process. Every running job is written down first with its last checkpoint, so the new
+        // version runs it again from there instead of losing up to a second of it (Droidtop/tracker#842).
+        runCatching { kotlinx.coroutines.runBlocking { dev.droidtop.pluginhost.PluginJobsCenter.flushNow() } }
         return commitSession(context, apk, "$versionName (build $versionCode)")
     }
 
