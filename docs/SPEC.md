@@ -10122,6 +10122,13 @@ point at a real button. Resolution order, strongest first:
 3. **The glyph family of an external pad**, from SDL's controller list.
 4. **Unknown**: Xbox-style, flagged as not established (only unknown asks anything of the person).
 
+**Where it lives (Droidtop/tracker#827 F1a, 2026-10-30).** The detection is `:runtime-common`'s
+(`dev.droidtop.library.controller`: `LayoutResolver`, `FaceLayout`, `ControllerClassifier`, `SdlControllerIds`,
+`LayoutSignals`, `CaptureStore` and the table's row types), so the shell's input pipeline (`:shell-gamepad`'s
+`input/`) imports nothing from `:library-core` and can move into `:ui-shared` (F1b). The table itself,
+`HardwareDatabase`, fetches through the platform databases and stays in `:library-core`; droidtop installs its
+lookup at start (`ConsoleLookup`), and the pipeline asks that.
+
 **Console table (data-driven).** The `hardware` collection of droidtop-platforms
 (`hardware/<device>.json`, composed into `hardware-database.json`; the same bundled-seed, index-refresh and
 validate-before-replace mechanism as the engines and players databases: `HardwareDatabase`,

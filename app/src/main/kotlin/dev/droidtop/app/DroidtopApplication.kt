@@ -68,6 +68,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         }
         // Main-thread file, database and network work is logged in debuggable builds, from here on (Droidtop/tracker#729).
         DebugStrictMode.install(this)
+        // The console table, for the shell's input pipeline, which does not depend on :library-core (Droidtop/tracker#827 F1a).
+        dev.droidtop.library.controller.ConsoleLookup.forThisDevice = dev.droidtop.library.controller.HardwareDatabase::forThisDevice
         // The feature steps, before onboarding or What's new reads them (docs/SPEC.md 7b, "Update onboarding").
         WhatsNew.registerSteps()
         // Every entry to Updates says how many are waiting (Droidtop/tracker#792): the page lists them, off the main thread.

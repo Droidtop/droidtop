@@ -15,7 +15,7 @@ import dev.droidtop.library.controller.CaptureStore
 import dev.droidtop.library.controller.ConsoleDef
 import dev.droidtop.library.controller.ControllerClassifier
 import dev.droidtop.library.controller.FaceLayout
-import dev.droidtop.library.controller.HardwareDatabase
+import dev.droidtop.library.controller.ConsoleLookup
 import dev.droidtop.library.controller.LayoutResolver
 import dev.droidtop.library.controller.LayoutSignals
 import dev.droidtop.library.controller.PadCapture
@@ -310,7 +310,7 @@ object ControllerLayouts {
             val loadedState = withContext(Dispatchers.IO) {
                 val prefs = app.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
                 Triple(
-                    HardwareDatabase.forThisDevice(app),
+                    ConsoleLookup.thisDevice(app),
                     CaptureStore.parse(prefs.getString(KEY_CAPTURES, null)),
                     parseSnapshot(prefs.getString(KEY_SNAPSHOT, null)),
                 )
