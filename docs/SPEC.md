@@ -4004,6 +4004,35 @@ the `ContainerRuntime` interface that already exists (§3):
   tested). The overlay is never touchable, so it is placed from here rather than dragged; a change shows at the
   overlay's next refresh, within a second. Not built: a frame-time graph and plugin-supplied readings
   (`perf.source` is declared and has no consumer yet).
+
+  **Power policy (Droidtop/tracker#841, owner 2026-10-30; slice 2, the core).** One automatic policy with a default
+  and rules. Its core is pure and tested (`PowerResolver`, `PowerGovernor` in runtime-common `power`). Nothing applies
+  it yet: the standard layer (Game Mode with read-back and a restore journal), the heat sources, the device layer and
+  the Desktop load follow as slices 3 to 9 of #841.
+  - **Levels:** Saver, Standard, Performance, Max. Max exists only where the device has a top mode, and falls to
+    Performance elsewhere.
+  - **Defaults** (owner, Q1): Saver at rest (Home, Library, an idle Desktop), Standard for a game no rule names, so
+    no game runs worse than without the policy.
+  - **Rules,** most specific first: game, core, emulator, platform. A rule says a level or Auto, which keeps looking.
+    With no rule naming a level, the Desktop's load (when it asks) and then the defaults decide.
+  - **Suggested rules** (PS2, Switch, Wine, Godot 4, mkxp-z) ship as a list the person accepts once, and every rule
+    can be overridden (owner, Q2). Auto stays off until chosen, offered in onboarding with a recommendation to turn
+    it on (Q3).
+  - **Heat caps every level, a pick of the person's included** (owner, Q4). The person may set a lower limit of
+    their own, never a higher one. The sources, first that answers:
+    - Android's headroom: 0.70 to 0.85 means no Max; 0.85 and over, or status light, one level down; 1.0 and over,
+      or status moderate, Standard; status severe and over, Saver.
+    - Android's status alone.
+    - The battery's temperature: 40 C no Max, 42 C one level down, 45 C Standard. A rise of 1 C a minute or more
+      while at Performance also steps down. A device row can give its own thresholds.
+    With no reading at all, nothing above Standard is asked for.
+  - **The battery and the screen:** a battery at 15 percent or under, not charging, caps at Standard. The screen off
+    caps at Saver unless the Desktop's load asks for more.
+  - **Dwell** (`PowerGovernor`): a rise applies after 8 seconds of asking, a fall after 30, so a spike does not flip
+    it. A cap from heat applies at once.
+  - **Every decision carries its reason** ("Emulator rule", "Getting hot", "Battery under 15 percent"), shown in Info.
+  - **The fan is the person's to set,** Max included, with no forced limit (owner, Q5). Auto may suggest following
+    heat, and a manual pick is always honoured. It reaches a device through the device layer (slice 5).
 - **In-game overlays: HOME chords (decided 2026-10-29, Droidtop/tracker#740).** The owner: "As for the keyboard
   shortcut: we only care about it working when droidtop is the home, so can we use home + something else?" and
   "Home + r2 gets the quick menu, and home +l2 gives the local contextual menu/companion-style overlay. This gives us
