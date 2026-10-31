@@ -2250,13 +2250,14 @@ internal fun GameCard(
             // accent border over a brightened surface (MenuTokens), not a
             // third one beside the menus' brightened card and the theme's
             // own highlight.
-            // The card rises with its ring at its own edge; its art grows inside that edge (focusZoom).
+            // The card rises and its art grows inside its edge (focusZoom): that is the cursor, with no ring.
             .focusRise(lift, Corners.Tile)
             .selectionFrame(
                 selected = focused,
                 shape = Corners.Tile,
                 rest = MenuTokens.Surface,
                 restOutline = MenuTokens.CardOutline,
+                art = true,
             )
             .focusZoom(lift, Corners.Tile),
     ) {

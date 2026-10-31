@@ -20323,7 +20323,10 @@ theme's roles (section 7k2).
 - **One focus treatment** (`selectionFrame` for the outline and fill, `focusRise` and `focusZoom` for a
   capsule, both reading one `rememberFocusLift`): the focused card rises 4dp and its platform shadow deepens
   from 4 to 18dp, black as Steam's; **its art grows 6 percent (Droidtop/tracker#644) inside the card's fixed edge** (a landscape card
-  2.4 percent) and comes up from 90 to 100 percent brightness. The card, its clip and the window's ring keep the
+  2.4 percent) and comes up from 90 to 100 percent brightness. **That growth is the cursor on game art: no ring**
+  (the owner, 2026-10-31: "The outline still lags behind. But it's also not really necessary? The game image grows a
+  bit, which is enough of an indicator"; `selectionFrame(art = true)` on capsules and game cards; text tiles and
+  controls keep the ring). The card, its clip and the window's ring keep the
   card's own size (owner on the console, 2026-10-23, Droidtop/tracker#632: the image "scales up but the outline
   stays at the original size, so the image is clipped by it or pokes through"). When the whole card grew from
   near its bottom, a tall card's top passed the edge its row clips at and the ring, measured through that clip,
