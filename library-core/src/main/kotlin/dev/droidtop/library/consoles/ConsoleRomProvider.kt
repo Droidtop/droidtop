@@ -546,6 +546,8 @@ class ConsoleRomProvider(
                         }
                     }
                     send(ScanStep.RootDone(root.absolutePath, systemScan.units.map { it.system.id }))
+                    // When this root was last walked, for Game sources > Folders; a root that cannot be read does not count.
+                    if (GamesRoots.isAvailable(root)) GamesRoots.markRomScanned(context, root.absolutePath)
                     logRootSummary(root, systemScan, rootGames.get(), rootStartedAt)
                 }
             }

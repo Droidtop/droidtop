@@ -4,8 +4,10 @@ import android.content.Context
 import android.net.Uri
 import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.library.GamesRoots
+import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.PcSource
+import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -19,17 +21,27 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** One game folder as Game sources > Folders shows it. */
-internal data class RootCount(val path: String, val games: Int, val available: Boolean, val scannedAt: Long?)
+/**
+ * One game folder as Game sources > Folders shows it: every game under it, console ROMs included, and the ROMs by
+ * system ([systems]: a system's name and its count, most first).
+ */
+internal data class RootCount(
+    val path: String,
+    val games: Int,
+    val available: Boolean,
+    val scannedAt: Long?,
+    val roms: Int = 0,
+    val systems: List<Pair<String, Int>> = emptyList(),
+)
 
-/** The person's game folders with the PC and engine games under each, and the Wine shortcuts beside them. */
+/** The person's game folders with the games under each, ROMs included, and the Wine shortcuts beside them. */
 internal data class FolderCounts(val roots: List<RootCount>, val shortcuts: Int) {
     val games: Int get() = roots.sumOf { it.games }
 }
 
 /**
  * Game sources > Folders (docs/SPEC.md 7j "Places", Droidtop/tracker#397
- * slice E): the game folders droidtop looks in for PC and engine games, each
+ * slice E): the game folders droidtop looks in for games, console ROMs included, each
  * with how many it found there and when it last looked, or "Not available"
  * when the folder cannot be read (an SD card that is out: its games are kept,
  * never marked gone). Adding and removing a folder are the same settings
@@ -91,26 +103,44 @@ internal object FoldersCatalog {
     }
 
     /**
-     * Each configured game folder with the PC and engine games the library
-     * holds under it (the most specific folder when one is inside another,
-     * [PcSource.of]), whether it can be read, and when the PC walk last
-     * finished it ([GamesRoots.pcScannedAt]). The library's own index, read
-     * once; one `stat` and listing per folder for "Not available". Off the
-     * main thread.
+     * Each configured game folder with the games the library holds under it (the most specific folder when one is
+     * inside another, [PcSource.of]): the PC and engine games, and the console ROMs by system. The ROMs used to be
+     * left out, so a "Roms" folder read "0 games" while Retro Games listed them (Droidtop/tracker#846). Also whether
+     * it can be read, and when a walk of either kind last finished it ([GamesRoots.scannedAt]). The library's own
+     * index, read once; one `stat` and listing per folder for "Not available". Off the main thread.
      */
     suspend fun counts(context: Context): FolderCounts = withContext(Dispatchers.IO) {
         val roots = GamesRootPrefs.gamesRootPaths(context).sorted()
         val entries = runCatching {
-            dev.droidtop.app.LibraryCore.library(context).currentEntriesOf(LibraryKinds.PC_GAMES)
+            dev.droidtop.app.LibraryCore.library(context).currentEntriesOf(LibraryKinds.GAMES)
         }.getOrDefault(emptyList()).filterNot { it.missing }
-        val sources = entries.mapNotNull { PcSource.of(it, roots) }
+        val (roms, pc) = entries.partition { it.kind == LibraryEntryKind.CONSOLE_ROM }
+        val sources = pc.mapNotNull { PcSource.of(it, roots) }
         val byRoot = sources.mapNotNull { (it as? PcSource.Folder)?.rootId }.groupingBy { it }.eachCount()
-        val scanned = runCatching { GamesRoots.pcScannedAt(context) }.getOrDefault(emptyMap())
+        val systemNames = runCatching { ConsoleSystemsRepository.allSystems(context).associate { it.id to it.displayName } }.getOrDefault(emptyMap())
+        val romsByRoot = romsBySystem(roms.map { it.id to it.systemId }, roots, systemNames)
+        val scanned = runCatching { GamesRoots.scannedAt(context) }.getOrDefault(emptyMap())
         FolderCounts(
-            roots = roots.map { RootCount(it, byRoot[it] ?: 0, GamesRoots.isAvailable(File(it)), scanned[it]) },
+            roots = roots.map { root ->
+                val systems = romsByRoot[root].orEmpty()
+                val romCount = systems.sumOf { it.second }
+                RootCount(root, (byRoot[root] ?: 0) + romCount, GamesRoots.isAvailable(File(root)), scanned[root], romCount, systems)
+            },
             shortcuts = sources.count { it == PcSource.WineShortcut },
         )
     }
+
+    /**
+     * The ROMs ([roms]: each one's path and system id) under each of [roots], the most specific root holding it, as
+     * (system name, count) pairs, most first and then by name. A system [names] does not know is named by its id, and
+     * a ROM with none as "Other". Pure.
+     */
+    fun romsBySystem(roms: List<Pair<String, String?>>, roots: List<String>, names: Map<String, String>): Map<String, List<Pair<String, Int>>> =
+        roms.mapNotNull { (path, system) -> PcSource.rootOf(path, roots)?.let { it to (system?.let { id -> names[id] ?: id } ?: "Other") } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, systems) ->
+                systems.groupingBy { it }.eachCount().toList().sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
+            }
 
     /**
      * A root row's value: its games and when the walk last finished it, or that it cannot be read now. The scan time
@@ -120,8 +150,14 @@ internal object FoldersCatalog {
     fun rootValue(root: RootCount, now: Long): String {
         if (!root.available) return "Not available"
         val scanned = root.scannedAt?.let { "scanned " + agoWords(now, it) } ?: "not scanned yet"
-        return "${gamesWord(root.games)} · $scanned"
+        // "412 games (380 ROMs)": the ROMs said apart only when the folder holds other games too.
+        val roms = if (root.roms in 1 until root.games) " (${"%,d".format(root.roms)} ROMs)" else ""
+        return "${gamesWord(root.games)}$roms · $scanned"
     }
+
+    /** "Nintendo Switch 12, Super Nintendo 40": a folder's ROMs by system, for its page; null with none. */
+    fun systemsLine(root: RootCount): String? =
+        root.systems.takeIf { it.isNotEmpty() }?.joinToString(", ") { (name, count) -> "$name ${"%,d".format(count)}" }
 
     /**
      * One folder's own page: what was found there and when, a rescan, and Remove as a named row behind a question.
@@ -137,8 +173,11 @@ internal object FoldersCatalog {
                 CatalogGroup(
                     id = "folders_root_facts_${root.path}",
                     title = null,
-                    items = listOf(
+                    items = listOfNotNull(
                         TextBlockItem(id = "folders_root_found_${root.path}", text = rootValue(root, now).replaceFirstChar { it.uppercase() }),
+                        systemsLine(root)?.let { TextBlockItem(id = "folders_root_systems_${root.path}", text = "Console games by system: $it. Retro Games lists them") },
+                        // The PC rescan never walks ROMs: a folder with console games is rescanned whole.
+                        GamingSettingsCatalog.rescanLibraryItem().takeIf { root.roms > 0 },
                         GamingSettingsCatalog.rescanPcFoldersItem(),
                         ActionItem(
                             id = "folders_root_remove_${root.path}",

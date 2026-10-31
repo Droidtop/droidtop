@@ -77,4 +77,31 @@ class StoresCatalogTest {
         assertEquals("Not available", FoldersCatalog.rootValue(counts.roots[1], 1_000L))
         assertEquals("12 games · scanned just now", FoldersCatalog.rootValue(counts.roots[1].copy(available = true), 1_000L))
     }
+
+    @Test
+    fun `a folder of ROMs counts them, by system, and says them apart only beside other games`() {
+        // The console's "Roms" folder read 0 games while Retro Games listed its 12 Switch games (Droidtop/tracker#846).
+        val roots = listOf("/sd/Games", "/sd/Roms")
+        val roms = listOf(
+            "/sd/Roms/nsw/a.nsp" to "switch",
+            "/sd/Roms/nsw/b.nsp" to "switch",
+            "/sd/Roms/snes/c.sfc" to "snes",
+            "/sd/Roms/odd/d.bin" to "mystery",
+            "/sd/Games/psx/e.chd" to "psx",
+            "/sd/Elsewhere/f.gba" to "gba",
+            "/sd/Roms/g.zip" to null,
+        )
+        val names = mapOf("switch" to "Nintendo Switch", "snes" to "Super Nintendo", "psx" to "PlayStation")
+        val bySystem = FoldersCatalog.romsBySystem(roms, roots, names)
+        assertEquals(listOf("Nintendo Switch" to 2, "Other" to 1, "Super Nintendo" to 1, "mystery" to 1), bySystem["/sd/Roms"])
+        assertEquals(listOf("PlayStation" to 1), bySystem["/sd/Games"])
+        assertEquals(setOf("/sd/Games", "/sd/Roms"), bySystem.keys)
+
+        val onlyRoms = RootCount("/sd/Roms", 12, true, null, roms = 12, systems = listOf("Nintendo Switch" to 12))
+        assertEquals("12 games · not scanned yet", FoldersCatalog.rootValue(onlyRoms, 0L))
+        assertEquals("Nintendo Switch 12", FoldersCatalog.systemsLine(onlyRoms))
+        val mixed = RootCount("/sd/Games", 1_412, true, null, roms = 1_380, systems = listOf("PlayStation" to 1_380))
+        assertEquals("1,412 games (1,380 ROMs) · not scanned yet", FoldersCatalog.rootValue(mixed, 0L))
+        assertEquals(null, FoldersCatalog.systemsLine(RootCount("/sd/Pc", 3, true, null)))
+    }
 }

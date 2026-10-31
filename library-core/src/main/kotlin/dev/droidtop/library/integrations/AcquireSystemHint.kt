@@ -1,6 +1,7 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
+import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.SystemFolders
 import java.io.File
@@ -29,9 +30,28 @@ object AcquireSystemHint {
         return destination.isBlank() || hostContext.optJSONObject("system")?.optString("id") != hint
     }
 
-    /** The games folder of system [id] under the person's games roots, or null when there is none. Off the main thread. */
-    suspend fun folderFor(context: Context, id: String): File? = withContext(Dispatchers.IO) {
+    /**
+     * The games folder of system [id] under the person's games roots. When there is none yet and droidtop knows the
+     * system by its folder, one is made, named by the system's id as ES-DE names them
+     * ([dev.droidtop.library.consoles.EsDeFolderStructure]), beside
+     * the person's other system folders ([placeFor]): a DOS zip from Abandonware was refused with "there is no games
+     * folder for dos" (Droidtop/tracker#846). Null for a system droidtop does not know or a folder that cannot be made.
+     * [onMade] hears the folder made. Off the main thread.
+     */
+    suspend fun folderFor(context: Context, id: String, onMade: (File) -> Unit = {}): File? = withContext(Dispatchers.IO) {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-        SystemFolders.all(context, systemsById).firstOrNull { (_, system) -> system.id == id }?.first
+        val found = SystemFolders.all(context, systemsById)
+        found.firstOrNull { (_, system) -> system.id == id }?.first?.let { return@withContext it }
+        if (systemsById[id]?.canResolveFromFolder() != true) return@withContext null
+        val place = placeFor(found.map { it.first }, GamesRoots.current(context)) ?: return@withContext null
+        File(place, id).takeIf { it.isDirectory || it.mkdirs() }?.also(onMade)
     }
+
+    /**
+     * Where a new system folder goes: the folder most of the person's system folders are in (a "Roms" folder with
+     * nsw and snes in it), the first such one on a tie, else the first games root. Null with no root. Pure.
+     */
+    fun placeFor(systemFolders: List<File>, roots: List<File>): File? =
+        systemFolders.mapNotNull { it.parentFile }.groupingBy { it.path }.eachCount().entries
+            .maxByOrNull { it.value }?.key?.let(::File) ?: roots.firstOrNull()
 }

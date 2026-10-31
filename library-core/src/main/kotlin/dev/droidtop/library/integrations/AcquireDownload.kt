@@ -44,7 +44,7 @@ internal object AcquireDownload {
         val destination = if (update != null) {
             update["destinationPath"]
         } else if (AcquireSystemHint.overrides(systemHint, hostContext)) {
-            AcquireSystemHint.folderFor(context, systemHint!!)?.absolutePath
+            AcquireSystemHint.folderFor(context, systemHint!!) { made -> onStatus("Made a ${made.name} folder in ${made.parentFile?.name ?: made.parent}") }?.absolutePath
         } else {
             hostContext.optString("destination").takeIf { it.isNotBlank() }
         }
@@ -58,7 +58,7 @@ internal object AcquireDownload {
         }
         if (destination == null) {
             return PluginResult.failure(
-                if (systemHint != null) "there is no games folder for $systemHint; add one under Settings > Game folders" else "the game folder is not available",
+                if (systemHint != null) "droidtop doesn't know the system $systemHint, so it has no folder for it; add one under Settings > Game folders" else "the game folder is not available",
             )
         }
         // A BIOS file goes to the games folder's bios folder under the database's name, not among the games (#558).

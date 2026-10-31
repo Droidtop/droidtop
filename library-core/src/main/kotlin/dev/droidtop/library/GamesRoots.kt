@@ -54,6 +54,8 @@ object GamesRoots {
 
     private const val PC_SCANS_PREFS = "droidtop_pc_root_scans"
 
+    private const val ROM_SCANS_PREFS = "droidtop_rom_root_scans"
+
     /**
      * When the PC walk last finished each of [roots] (Game sources > Folders,
      * docs/SPEC.md 7j "Places"): written by the walk itself for every root it
@@ -71,6 +73,22 @@ object GamesRoots {
     fun pcScannedAt(context: Context): Map<String, Long> =
         context.getSharedPreferences(PC_SCANS_PREFS, Context.MODE_PRIVATE).all
             .mapNotNull { (path, value) -> (value as? Long)?.let { path to it } }.toMap()
+
+    /**
+     * When the ROM walk last finished [root], as [markPcScanned] is for the PC walk: a folder that holds only ROMs
+     * read "not scanned yet" beside its games (Droidtop/tracker#846). Off the main thread.
+     */
+    fun markRomScanned(context: Context, root: String, now: Long = System.currentTimeMillis()) {
+        context.getSharedPreferences(ROM_SCANS_PREFS, Context.MODE_PRIVATE).edit().putLong(root, now).apply()
+    }
+
+    /** Each root's last finished walk of either kind ([markPcScanned], [markRomScanned]), the later one, by path. */
+    fun scannedAt(context: Context): Map<String, Long> {
+        val rom = context.getSharedPreferences(ROM_SCANS_PREFS, Context.MODE_PRIVATE).all
+            .mapNotNull { (path, value) -> (value as? Long)?.let { path to it } }.toMap()
+        val pc = pcScannedAt(context)
+        return (pc.keys + rom.keys).associateWith { maxOf(pc[it] ?: 0L, rom[it] ?: 0L) }
+    }
 
     /**
      * The games folder among [roots] that holds [file]: the longest one that is the file itself or a folder above it,

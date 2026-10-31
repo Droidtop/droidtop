@@ -19421,10 +19421,17 @@ menu still list every `listed` place.
   ("Shared with you · 573", Free to play) are pressable like Open library:
   the shell opens PC Games filtered to that store and that holding
   (`PcSource.holdingItemId`), and the pill says so. **Folders**
-  (`FoldersCatalog`) lists each game folder with the PC and engine games the
-  library holds under it and when the PC walk last finished it
-  (`GamesRoots.pcScannedAt`), both in the row's value ("170 games · scanned 5
-  min ago"; a row's subtitle is only its hint in the Gaming shell), or "Not
+  (`FoldersCatalog`) lists each game folder with every game the library holds
+  under it, console ROMs included, and when a walk of either kind last finished
+  it (`GamesRoots.scannedAt`: the PC walk's and the ROM walk's times, the later
+  one), both in the row's value ("170 games · scanned 5 min ago", "1,412 games
+  (1,380 ROMs)" when it holds both; a row's subtitle is only its hint in the
+  Gaming shell). A folder's own page also says its ROMs by system ("Console
+  games by system: Nintendo Switch 12, Super Nintendo 40") and offers Rescan
+  library beside Rescan PC game folders when it holds ROMs, since the PC rescan
+  never walks them. Until Droidtop/tracker#846 the count read only PC and
+  engine games, so a "Roms" folder read "0 games" while Retro Games listed its
+  ROMs. A row reads "Not
   available" when it cannot be read (a card
   that is out: its games are kept, never marked gone); Add a folder and, by
   selecting a folder, stop looking there (the same `GamesRootPrefs` settings

@@ -942,8 +942,13 @@ no destination, such as the PC library). Ops:
   id for the game's platform (`dos`, `windows`, `snes`, ...). When the search is
   not already that system's own (a search from the PC library or from
   global search), the download is placed in that system's games folder, so the
-  system's player finds it; a system with no games folder fails the job with a
-  sentence saying so, and the game is never dropped in another system's folder.
+  system's player finds it. A system droidtop knows by its folder that has no
+  games folder yet gets one, named by the system's id (`dos`), beside the
+  person's other system folders (the folder most of them are in, else the first
+  games root), and the job says so ("Made a dos folder in Roms",
+  Droidtop/tracker#846). Only a system droidtop does not know fails the job,
+  with a sentence saying so, and the game is never dropped in another system's
+  folder.
   **File names:** `fileName` is kept as given, because the library reads
   titles and regions from it: spaces, brackets and accents stay. It must not
   hold `/` or `\`, start with a dot, or exceed 200 bytes of UTF-8; characters

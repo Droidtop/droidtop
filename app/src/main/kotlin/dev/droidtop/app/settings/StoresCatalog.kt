@@ -267,7 +267,7 @@ internal object StoresCatalog {
                         NestedScreenItem(
                             id = "game_sources_folders",
                             title = "Folders",
-                            subtitle = "The game folders droidtop looks in for PC and engine games",
+                            subtitle = "The game folders droidtop looks in for games, console ROMs included",
                             registryId = FoldersCatalog.SCREEN_ID,
                             valueLabel = { FoldersCatalog.summary(folders) },
                             icon = CatalogIcon.GAME_FOLDERS,
