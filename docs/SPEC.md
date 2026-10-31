@@ -14145,9 +14145,37 @@ The rows below it stay pickable by hand, and a source result's page (a new game)
 **One row per build and platform (2026-10-30, Droidtop/tracker#838).** The rows below Get the update are one per
 heading the source gave ("Win/Linux", "Steam Build · Win/Linux"), not one per link. Each row:
 - lists its hosts under it ("GOFILE, MEGA, MIXDROP, PIXELDRAIN, UPLOADHAVEN"); a screen that draws chips draws one per host;
-- on A (two presses), tries those hosts in turn, served first, then the person's host order (`RecordAction.Group`).
+- on A, opens its host list (below).
 
 A heading with one link is that link's row, as before.
+
+**A build's host list (decided 2026-10-31, Droidtop/tracker#859).** The owner, from the console: "I can't pick a
+specific source to download from", and: "Pressing A opens a list of sources, at the top is "try in order", with the
+sources listed below so the user can override them. A quick double tap of A accomplishes the same behavior, while
+still giving users choice". So A on a build's row opens a list (`hostChoices`):
+- **Try in order** first, with focus when the list opens: the build's hosts tried in turn, served first, then the
+  person's host order (`RecordAction.Group`, as before). A pressed twice is therefore the old automatic pick.
+- **Each host** below it, once, with its link's label: picked, the download comes from that host alone.
+
+Every screen that draws a record's rows uses this list: the record page (a list over the page), the Updates record
+screen and a source result's item page (a screen of their own, Try in order first).
+
+**One name per host.** A host a thread names by another of its domains is that host (`HostNames`): BZZHR is
+BuzzHeavier, so the console's "BZZHR, BUZZHEAVIER, ..." listed one host twice. Rows, host lists and the host order
+all go by that one name.
+
+**Headings are headings.** "Extras · For any system", "Patches" and "Other builds" are drawn as section headings;
+focus passes over them and A does nothing on them (`RecordRow.heading`). Two links that read the same ("Italian
+Translation" twice under Extras) each say where they point: the address's host, else "Link 1", "Link 2".
+
+**Versions in one form.** The page shows the available version in the installed one's form, and update checks
+compare them so: a thread's "P3 Ep.10 v0.0.10" is "v0.0.10" beside "Installed: v0.0.9" (`GameUpdates.comparable`,
+`sameForm`). Only a label before a version number is dropped; a version that does not end in one ("Steam Build",
+"1.0 Part 2") is kept whole.
+
+**The thread parser and platform links.** A thread whose links are named for a platform ("Win", "Linux") reads each
+as that platform's download, with the address's host; such a thread read as one host called "Win"
+(`ThreadDownloads.onlyPlatform`).
 
 Most games have one build, and their rows are just its platforms. When a thread has several builds, the copy's build
 comes first, marked "Your copy". A Steam copy's build is the "Steam" one; any other copy's is the build without it.

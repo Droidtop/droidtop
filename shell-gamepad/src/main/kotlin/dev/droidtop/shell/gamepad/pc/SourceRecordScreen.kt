@@ -25,6 +25,7 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
+import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.pluginhost.DownloadSystems
@@ -128,13 +129,26 @@ object SourceRecordScreen {
         }
         // The record page's Downloads rows, less its System row: here the system is the choice above.
         val downloads = downloadRows(record, picked, dev.droidtop.library.DownloadPick.isSteamCopy(facet.entry)).filterNot { it.action == RecordAction.PickSystem }
+        // A heading ("Extras", "Other builds") starts a group of its own, titled by it, rather than being a row
+        // (Droidtop/tracker#859).
+        val headed = downloads.withIndex().filter { it.value.heading }
+        val firstHeading = headed.firstOrNull()?.index ?: downloads.size
+        val sections = headed.mapIndexed { n, (at, heading) ->
+            val end = headed.getOrNull(n + 1)?.index ?: downloads.size
+            CatalogGroup(
+                id = "update_record_downloads_$n",
+                title = listOfNotNull(heading.title, heading.subtitle).joinToString(" \u00b7 "),
+                items = items(downloads.subList(at + 1, end), "links_$n"),
+            )
+        }
         return listOf(
             versions,
             CatalogGroup(
                 id = "update_record_downloads",
                 title = RecordTab.DOWNLOADS.label,
-                items = items(head, "head") + listOfNotNull(system) + items(downloads, "links"),
+                items = items(head, "head") + listOfNotNull(system) + items(downloads.subList(0, firstHeading), "links"),
             ),
+        ) + sections + listOf(
             CatalogGroup(
                 id = "update_record_changelog",
                 title = RecordTab.CHANGELOG.label,
@@ -172,13 +186,39 @@ object SourceRecordScreen {
                 confirmTitle = "Get the update? droidtop picks the build and the host, and it lands beside your other versions",
                 run = { ctx, onStatus -> getBest(library, facet.source, record, facet.gameName, facet.entry, dev.droidtop.library.HostOrder.get(ctx), onStatus) },
             )
-            is RecordAction.Group -> AsyncActionItem(
+            // A build's hosts to choose from, Try in order first (Droidtop/tracker#859), as on the record page.
+            is RecordAction.Group -> NestedScreenItem(
                 id = id,
                 title = row.title,
                 subtitle = row.subtitle,
-                value = row.value,
-                confirmTitle = "Download this build? Its mirrors are tried in turn",
-                run = { ctx, onStatus -> getGroup(library, facet.source, record, action.downloads, facet.gameName, facet.entry, dev.droidtop.library.HostOrder.get(ctx), onStatus) },
+                valueLabel = row.value?.let { value -> { _: Context -> value } },
+                inline = CatalogScreen(
+                    id = "${id}_hosts",
+                    title = row.title,
+                    subtitle = "Pick a host, or try them in order",
+                    groups = {
+                        listOf(
+                            CatalogGroup(
+                                id = "${id}_hosts_list",
+                                title = null,
+                                items = dev.droidtop.library.hostChoices(action.downloads).mapIndexed { n, choice ->
+                                    AsyncActionItem(
+                                        id = "${id}_host_$n",
+                                        title = choice.title,
+                                        subtitle = choice.subtitle,
+                                        run = { ctx, onStatus ->
+                                            if (choice.inOrder) {
+                                                getGroup(library, facet.source, record, choice.downloads, facet.gameName, facet.entry, dev.droidtop.library.HostOrder.get(ctx), onStatus)
+                                            } else {
+                                                getDownload(library, facet.source, record, choice.downloads.single(), facet.gameName, facet.entry, onStatus)
+                                            }
+                                        },
+                                    )
+                                },
+                            ),
+                        )
+                    },
+                ),
             )
             RecordAction.SignIn -> AsyncActionItem(
                 id = id,

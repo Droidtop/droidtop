@@ -11,6 +11,7 @@ import dev.droidtop.library.SYSTEM_KEY_PREFIX
 import dev.droidtop.library.UpdateSources
 import dev.droidtop.library.downloadRows
 import dev.droidtop.library.downloadSystems
+import dev.droidtop.library.hostChoices
 import dev.droidtop.library.ratingLine
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -18,6 +19,8 @@ import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
+import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.DownloadSystems
@@ -133,24 +136,49 @@ object SourceItemPage {
                     confirmTitle = "Download this?",
                     run = { ctx, onStatus -> get.download(ctx, action.download, onStatus) },
                 )
-                // One build's mirrors (Droidtop/tracker#838): the next is tried when one starts nothing.
-                is RecordAction.Group -> AsyncActionItem(
+                // One build's hosts (Droidtop/tracker#859): Try in order first (the next mirror is tried when one starts
+                // nothing, #838), then each host on its own, as on the record page.
+                is RecordAction.Group -> NestedScreenItem(
                     id = id,
                     title = row.title,
                     subtitle = row.subtitle,
-                    value = row.value,
-                    confirmTitle = "Download this?",
-                    run = { ctx, onStatus ->
-                        val ordered = DownloadPick.hostOrdered(action.downloads, HostOrder.get(ctx)) { false }
-                        var outcome = DownloadPick.NOTHING_STARTED
-                        for (d in ordered) {
-                            outcome = get.download(ctx, d, onStatus)
-                            if (outcome != DownloadPick.NOTHING_STARTED) break
-                        }
-                        outcome
-                    },
+                    valueLabel = row.value?.let { value -> { _: Context -> value } },
+                    inline = CatalogScreen(
+                        id = "${id}_hosts",
+                        title = row.title,
+                        subtitle = "Pick a host, or try them in order",
+                        groups = {
+                            listOf(
+                                CatalogGroup(
+                                    id = "${id}_hosts_list",
+                                    title = null,
+                                    items = hostChoices(action.downloads).mapIndexed { n, choice ->
+                                        AsyncActionItem(
+                                            id = "${id}_host_$n",
+                                            title = choice.title,
+                                            subtitle = choice.subtitle,
+                                            run = { ctx, onStatus ->
+                                                val ordered = DownloadPick.hostOrdered(choice.downloads, HostOrder.get(ctx)) { false }
+                                                var outcome = DownloadPick.NOTHING_STARTED
+                                                for (d in ordered) {
+                                                    outcome = get.download(ctx, d, onStatus)
+                                                    if (outcome != DownloadPick.NOTHING_STARTED) break
+                                                }
+                                                outcome
+                                            },
+                                        )
+                                    },
+                                ),
+                            )
+                        },
+                    ),
                 )
-                else -> ActionItem(id = id, title = row.title, subtitle = row.subtitle, value = row.value)
+                // A section's heading is read, never picked (Droidtop/tracker#859).
+                else -> if (row.heading) {
+                    TextBlockItem(id = id, text = listOfNotNull(row.title, row.subtitle).joinToString(" \u00b7 "))
+                } else {
+                    ActionItem(id = id, title = row.title, subtitle = row.subtitle, value = row.value)
+                }
             }
         }
         return listOfNotNull(system) + rows

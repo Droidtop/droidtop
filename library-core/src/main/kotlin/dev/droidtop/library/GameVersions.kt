@@ -85,7 +85,30 @@ object GameUpdates {
             ?: return null
         val here = versions.map(::normalize).filter { it.isNotEmpty() }
         if (here.isEmpty()) return null
-        return if (here.any { it.equals(newest, ignoreCase = true) }) null else newest
+        // Compared in one form (Droidtop/tracker#859): a thread's "P3 Ep.10 v0.0.10" is the folder's "v0.0.10".
+        return if (here.any { comparable(it).equals(comparable(newest), ignoreCase = true) }) null else newest
+    }
+
+    /** A version that ends in a version number after a leading label ("P3 Ep.10 v0.0.10"). */
+    private val LABELLED = Regex("^(.*\\S)\\s+(v?\\d+(?:\\.\\d+)+[a-z]?)$", RegexOption.IGNORE_CASE)
+
+    /**
+     * [version] in the form another source writes it: a leading label before the version number dropped ("P3 Ep.10
+     * v0.0.10" is "0.0.10"), and a leading `v`. A version that does not end in a number with a dot ("Steam Build",
+     * "1.0 Part 2") is kept whole. Pure.
+     */
+    fun comparable(version: String): String =
+        normalize(LABELLED.find(version.trim())?.groupValues?.get(2) ?: version)
+
+    /**
+     * [available] as the record page shows it beside [installed] (Droidtop/tracker#859): in [installed]'s form, so
+     * "Available: P3 Ep.10 v0.0.10" beside "Installed: v0.0.9" reads "Available: v0.0.10" when the installed version
+     * carries no label of its own. Unchanged when the installed one is unknown or labelled too. Pure.
+     */
+    fun sameForm(available: String, installed: String?): String {
+        val here = installed?.trim()?.takeIf { it.isNotEmpty() } ?: return available
+        if (LABELLED.matches(here) || comparable(here) != normalize(here)) return available
+        return comparable(available).takeIf { it.isNotEmpty() && it != normalize(available) } ?: available
     }
 
     /**

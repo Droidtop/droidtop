@@ -117,14 +117,24 @@ object ThreadDownloads {
                     EXTRA.containsMatchIn(clean) && systemsOf(clean).isEmpty() -> Role.EXTRA
                     else -> role
                 }
-                val systems = if (lineRole == Role.BUILD) systemsOf(clean) else emptyList()
                 val url = link.href.takeIf { it.startsWith("https://", ignoreCase = true) } ?: continue
                 if (NOT_DOWNLOADS.any { url.contains(it, ignoreCase = true) }) continue
                 if (url.contains("f95zone.to", ignoreCase = true) && !url.contains("/masked/")) continue
                 val text = link.text.replace("*", "").trim()
-                val host = hostName(text, url)
+                // A link named for a platform ("Win", "Linux") on a line whose label names none is that platform's
+                // download, and its host is the address's: such a thread read as one host called "Win"
+                // (Droidtop/tracker#859).
+                val forPlatform = lineRole == Role.BUILD && systemsOf(clean).isEmpty() && onlyPlatform(text)
+                val systems = when {
+                    lineRole != Role.BUILD -> emptyList()
+                    forPlatform -> systemsOf(text)
+                    else -> systemsOf(clean)
+                }
+                // A platform's name is never a host, whatever the label says.
+                val host = if (lineRole == Role.BUILD && onlyPlatform(text)) hostName("", url) else hostName(text, url)
+                val platform = if (forPlatform) text else clean
                 val section = when (lineRole) {
-                    Role.BUILD -> listOfNotNull(build, clean.ifEmpty { null }).joinToString(" · ").ifEmpty { "Download" }
+                    Role.BUILD -> listOfNotNull(build, platform.ifEmpty { null }).joinToString(" · ").ifEmpty { "Download" }
                     Role.PATCH -> clean.ifEmpty { "Patches" }
                     Role.EXTRA -> clean.ifEmpty { "Extras" }
                 }
@@ -146,6 +156,14 @@ object ThreadDownloads {
             if (words.any { it == "android" || it == "apk" }) add("android")
         }
     }
+
+    /** Whether [text] names platforms and nothing else ("Win", "Win/Linux", "Android"). Pure. */
+    fun onlyPlatform(text: String): Boolean {
+        val words = text.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() }
+        return words.isNotEmpty() && words.all { it in PLATFORM_WORDS }
+    }
+
+    private val PLATFORM_WORDS = setOf("win", "windows", "pc", "win64", "win32", "linux", "mac", "macos", "osx", "android", "apk", "x64", "64bit", "32bit")
 
     /** A link's host as the thread names it ("GOFILE"), else the address's host without "www.". Pure. */
     fun hostName(text: String, url: String): String {

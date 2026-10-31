@@ -2,6 +2,8 @@ package dev.droidtop.shell.gamepad.pc
 
 import android.content.Context
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,6 +45,9 @@ import dev.droidtop.library.checkRow
 import dev.droidtop.library.controlRows
 import dev.droidtop.library.downloadRows
 import dev.droidtop.library.downloadSystems
+import dev.droidtop.library.firstFocusable
+import dev.droidtop.library.hostChoices
+import dev.droidtop.library.nextFocusable
 import dev.droidtop.library.pressedState
 import dev.droidtop.library.ratingLine
 import dev.droidtop.library.signInRow
@@ -50,6 +55,7 @@ import dev.droidtop.pluginhost.DownloadSystems
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
+import dev.droidtop.shell.gamepad.MenuSectionLabel
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
@@ -300,6 +306,8 @@ internal fun SourceRecordPage(
     var tab by remember(source.key, externalId) { mutableStateOf(startTab) }
     var focusIndex by remember(source.key, externalId, tab) { mutableIntStateOf(0) }
     var armed by remember(source.key, externalId, tab) { mutableStateOf<Int?>(null) }
+    // A build's host list, open over the page (Droidtop/tracker#859): Try in order first, focused, then each host.
+    var hostsOf by remember(source.key, externalId, tab) { mutableStateOf<RecordAction.Group?>(null) }
     val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
     val record = answer?.record
     // The system last picked on this source's pages is picked again (Droidtop/tracker#617).
@@ -314,6 +322,10 @@ internal fun SourceRecordPage(
             check + listOfNotNull(signIn) + recordRows(r, tab, picked, DownloadPick.isSteamCopy(newest)) { ms -> dateFormat.format(Date(ms)) }
         }
             ?: if (answer != null) check + changeLinkRow() else emptyList()
+    }
+    // Focus never rests on a heading: the first row that is not one, whenever the rows change.
+    androidx.compose.runtime.LaunchedEffect(rows) {
+        if (rows.getOrNull(focusIndex)?.heading != false) focusIndex = firstFocusable(rows)
     }
 
     fun pickSystem(step: Int) {
@@ -367,17 +379,10 @@ internal fun SourceRecordPage(
                 val order = HostOrder.get(context)
                 scope.launch { say(getBest(library, source, current, gameName, newest, order, say)) }
             }
+            // A build's hosts to choose from, Try in order first (Droidtop/tracker#859); a second A takes it.
             is RecordAction.Group -> {
-                if (armed != index) {
-                    armed = index
-                    return
-                }
                 armed = null
-                val current = record ?: return
-                onClose()
-                say("Getting ${current.version?.let { "v" + it.removePrefix("v") } ?: "the new version"} (${action.downloads.first().section})...")
-                val order = HostOrder.get(context)
-                scope.launch { say(getGroup(library, source, current, action.downloads, gameName, newest, order, say)) }
+                hostsOf = action
             }
             is RecordAction.Download -> {
                 // Two presses: the first says what the second does (the design language's two-step confirm).
@@ -403,6 +408,34 @@ internal fun SourceRecordPage(
         }
     }
 
+    // The host list A on a build opens: picking Try in order runs the build's mirrors in turn, a host gets its link alone.
+    hostsOf?.let { group ->
+        val current = record
+        if (current == null) {
+            hostsOf = null
+        } else {
+            HostList(
+                title = group.downloads.first().section,
+                choices = hostChoices(group.downloads),
+                onPick = { choice ->
+                    hostsOf = null
+                    onClose()
+                    val version = current.version?.let { "v" + it.removePrefix("v") } ?: "the new version"
+                    if (choice.inOrder) {
+                        say("Getting $version (${group.downloads.first().section})...")
+                        val order = HostOrder.get(context)
+                        scope.launch { say(getGroup(library, source, current, choice.downloads, gameName, newest, order, say)) }
+                    } else {
+                        say("Getting $version from ${choice.title}...")
+                        scope.launch { say(getDownload(library, source, current, choice.downloads.single(), gameName, newest, say)) }
+                    }
+                },
+                onDismiss = { hostsOf = null },
+            )
+            return
+        }
+    }
+
     BackHandler { onClose() }
     ShellDialog(onDismissRequest = onClose) {
         GatePadInThisDialog()
@@ -413,7 +446,7 @@ internal fun SourceRecordPage(
             onPad = { pad ->
                 when (pad.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> {
-                        val next = menuStep(focusIndex, rows.size, if (pad.action == GamepadAction.UP) -1 else 1)
+                        val next = nextFocusable(rows, focusIndex, if (pad.action == GamepadAction.UP) -1 else 1)
                         if (next != focusIndex) {
                             focusIndex = next
                             armed = null
@@ -452,7 +485,8 @@ internal fun SourceRecordPage(
                     // Which version is which, in words: the one on offer stands out, the one here is secondary (Droidtop/tracker#639).
                     record?.version?.takeIf { it.isNotBlank() }?.let { available ->
                         Text(
-                            GameUpdates.availableLabel(available),
+                            // In the installed version's form, so the two compare at a glance (Droidtop/tracker#859).
+                            GameUpdates.availableLabel(GameUpdates.sameForm(available, installedVersion)),
                             style = MaterialTheme.typography.titleMedium,
                             color = MenuTokens.OnSurface,
                             fontWeight = FontWeight.SemiBold,
@@ -467,14 +501,22 @@ internal fun SourceRecordPage(
             }
             // The tabs as the shell's tab pills between the shoulder glyphs, the PC game page's strip: L1/R1 step them
             // and a tap picks one. They were words in brackets on one line, which touch could not reach.
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.Sm), verticalAlignment = Alignment.CenterVertically) {
-                ShoulderGlyph("L1")
-                RecordTab.entries.forEach { entry ->
-                    ShellChip(entry.label, tab = true, on = entry == tab, selected = false) {
-                        if (entry != tab) switchTab(entry.ordinal - tab.ordinal)
+            // The shoulders sit outside the pills, which scroll when the panel is narrow, so R1 is never cut off
+            // (Droidtop/tracker#859), as on the game page's strip.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ShoulderGlyph("L1", badge = true, modifier = Modifier.padding(end = Space.Sm))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Space.Sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                ) {
+                    RecordTab.entries.forEach { entry ->
+                        ShellChip(entry.label, tab = true, on = entry == tab, selected = false) {
+                            if (entry != tab) switchTab(entry.ordinal - tab.ordinal)
+                        }
                     }
                 }
-                ShoulderGlyph("R1")
+                ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = Space.Sm))
             }
             when {
                 answer == null -> MenuRow(title = "Asking ${source.label}...")
@@ -504,6 +546,10 @@ internal fun SourceRecordPage(
                         MenuRow(title = "Saved ${dateFormat.format(Date(saved))}", subtitle = answer?.failure ?: "Asking ${source.label} for the page as it is now...")
                     }
                     rows.forEachIndexed { index, row ->
+                        if (row.heading) {
+                            MenuSectionLabel(listOfNotNull(row.title, row.subtitle).joinToString(" \u00b7 "))
+                            return@forEachIndexed
+                        }
                         MenuRow(
                             title = row.title,
                             value = row.value,
@@ -530,5 +576,63 @@ private fun changeLinkRow(): RecordRow =
 private val RECORD_HINTS = listOf(
     HintBinding(GamepadAction.A, "Select"),
     HintBinding(GamepadAction.L, "Switch tab"),
+    HintBinding(GamepadAction.R, "Switch tab"),
+    HintBinding(GamepadAction.B, "Back"),
+)
+
+/**
+ * A build's hosts (Droidtop/tracker#859): Try in order first, with focus when the list opens, so A twice is the old
+ * pick-for-me; then each host with its link's label, picked to download from that host alone.
+ */
+@Composable
+private fun HostList(
+    title: String,
+    choices: List<dev.droidtop.library.HostChoice>,
+    onPick: (dev.droidtop.library.HostChoice) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var focus by remember(choices) { mutableIntStateOf(0) }
+    BackHandler { onDismiss() }
+    ShellDialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
+        MenuPanel(
+            modifier = Modifier.width(LocalShellWindow.current.panelWidth(560.dp)),
+            focusLabel = title,
+            hints = HOST_HINTS,
+            onPad = { pad ->
+                when (pad.action) {
+                    GamepadAction.UP, GamepadAction.DOWN -> {
+                        val next = menuStep(focus, choices.size, if (pad.action == GamepadAction.UP) -1 else 1)
+                        if (next != focus) {
+                            focus = next
+                            EsDeNavigationSounds.play(UiSound.MOVE)
+                        }
+                    }
+                    GamepadAction.A -> choices.getOrNull(focus)?.let(onPick)
+                    GamepadAction.B -> onDismiss()
+                    else -> Unit
+                }
+                true
+            },
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge, color = MenuTokens.OnSurface, fontWeight = FontWeight.SemiBold)
+            choices.forEachIndexed { index, choice ->
+                MenuRow(
+                    title = choice.title,
+                    subtitle = choice.subtitle,
+                    selected = index == focus,
+                    chevron = true,
+                    onClick = {
+                        focus = index
+                        onPick(choice)
+                    },
+                )
+            }
+        }
+    }
+}
+
+private val HOST_HINTS = listOf(
+    HintBinding(GamepadAction.A, "Download"),
     HintBinding(GamepadAction.B, "Back"),
 )

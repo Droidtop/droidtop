@@ -65,8 +65,59 @@ fun signInRow(sourceLabel: String, record: UpdateSources.Record, signedOut: Bool
     RecordRow("Sign in to $sourceLabel", subtitle = "to get download links", action = RecordAction.SignIn)
         .takeIf { signedOut && record.downloads.any { it.url == null } }
 
-/** One row; [on] is an on/off row's state, drawn as a switch rather than said (show, then say: Droidtop/tracker#738). */
-data class RecordRow(val title: String, val value: String? = null, val subtitle: String? = null, val action: RecordAction? = null, val on: Boolean? = null)
+/**
+ * One row; [on] is an on/off row's state, drawn as a switch rather than said (show, then say: Droidtop/tracker#738).
+ * [heading] is a section's heading ("Extras", "Other builds"): drawn as a heading, never focused or picked
+ * (Droidtop/tracker#859).
+ */
+data class RecordRow(
+    val title: String,
+    val value: String? = null,
+    val subtitle: String? = null,
+    val action: RecordAction? = null,
+    val on: Boolean? = null,
+    val heading: Boolean = false,
+)
+
+/** The first row focus lands on: the first that is not a heading. Pure. */
+fun firstFocusable(rows: List<RecordRow>): Int = rows.indexOfFirst { !it.heading }.coerceAtLeast(0)
+
+/** The row [step] rows from [from] that is not a heading, or [from] when there is none that way. Pure. */
+fun nextFocusable(rows: List<RecordRow>, from: Int, step: Int): Int {
+    var at = from + step
+    while (at in rows.indices) {
+        if (!rows[at].heading) return at
+        at += step
+    }
+    return from
+}
+
+/**
+ * One choice in a build's host list (Droidtop/tracker#859): "Try in order" first, then each host. The owner,
+ * 2026-10-31: "Pressing A opens a list of sources, at the top is "try in order", with the sources listed below so the
+ * user can override them. A quick double tap of A accomplishes the same behavior, while still giving users choice".
+ * [downloads] is what the choice gets: every mirror for Try in order, else that host's link alone.
+ */
+data class HostChoice(val title: String, val subtitle: String?, val downloads: List<UpdateSources.Download>, val inOrder: Boolean)
+
+/** [group]'s host list: Try in order, then each host once (by [HostNames.key]) with its link's label. Pure. */
+fun hostChoices(group: List<UpdateSources.Download>): List<HostChoice> {
+    val hosts = group.map { it.host }
+    val each = group.groupBy { HostNames.key(it.host) }.values.map { same ->
+        val first = same.first()
+        val name = HostNames.display(first.host, hosts)
+        HostChoice(
+            title = name,
+            subtitle = listOfNotNull(first.label.takeIf { it.isNotBlank() && HostNames.key(it) != HostNames.key(first.host) }, partsLine(first))
+                .joinToString(" \u00b7 ").ifEmpty { null },
+            downloads = listOf(first),
+            inOrder = false,
+        )
+    }
+    return listOf(
+        HostChoice("Try in order", "Each host in your order until one starts", group, inOrder = true),
+    ) + each
+}
 
 /** "4.3 of 5 (1,234 votes)" for a 0-to-1 rating; null when the source gives none. */
 fun ratingLine(rating: Double?, votes: Int?): String? {
@@ -83,7 +134,7 @@ fun groupedDownloads(downloads: List<UpdateSources.Download>): List<UpdateSource
     val sections = downloads.map { it.section }.distinct()
     return sections.flatMap { section ->
         val inSection = downloads.filter { it.section == section }
-        inSection.map { it.host.lowercase() }.distinct().flatMap { host -> inSection.filter { it.host.lowercase() == host } }
+        inSection.map { HostNames.key(it.host) }.distinct().flatMap { host -> inSection.filter { HostNames.key(it.host) == host } }
     }
 }
 
@@ -94,8 +145,31 @@ fun downloadSystems(record: UpdateSources.Record): List<String> = DownloadSystem
  * One link's row: the host and its label, and under it the heading the source gave it, which says what it is. A
  * release in parts is one row, its parts counted beside it ("4 parts, 12 GB").
  */
-private fun linkRow(d: UpdateSources.Download): RecordRow =
-    RecordRow("${d.host} · ${d.label}".takeIf { d.label != d.host } ?: d.host, value = partsLine(d), subtitle = d.section, action = RecordAction.Download(d))
+private fun linkRow(d: UpdateSources.Download): RecordRow {
+    val host = HostNames.display(d.host)
+    return RecordRow("$host · ${d.label}".takeIf { d.label != d.host } ?: host, value = partsLine(d), subtitle = d.section, action = RecordAction.Download(d))
+}
+
+/**
+ * [downloads]' rows, where two would read the same ("Italian Translation" twice, Droidtop/tracker#859) each saying
+ * where its link goes: the address's host, else "Link 1", "Link 2". Pure.
+ */
+private fun linkRows(downloads: List<UpdateSources.Download>): List<RecordRow> {
+    val rows = downloads.map(::linkRow)
+    val twice = rows.groupingBy { it.title to it.subtitle }.eachCount().filterValues { it > 1 }.keys
+    val counts = HashMap<Pair<String, String?>, Int>()
+    return rows.mapIndexed { index, row ->
+        val key = row.title to row.subtitle
+        if (key !in twice) return@mapIndexed row
+        val n = counts.merge(key, 1, Int::plus)!!
+        val where = addressHost(downloads[index].url)?.takeUnless { host -> rows.indices.any { other -> other != index && rows[other].title == row.title && addressHost(downloads[other].url) == host } }
+        row.copy(value = listOfNotNull(where ?: "Link $n", row.value).joinToString(", "))
+    }
+}
+
+/** The host of [url] without "www.", or null. Pure. */
+private fun addressHost(url: String?): String? =
+    url?.let { Regex("^https?://(?:www\\.)?([^/:?#]+)", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) }
 
 /** "4 parts, 12 GB" for a release in parts (the size when the source gave every part's); null for a single link. Pure. */
 fun partsLine(d: UpdateSources.Download): String? {
@@ -122,7 +196,7 @@ fun buildRows(downloads: List<UpdateSources.Download>, steamCopy: Boolean?): Lis
         val base = if (list.size == 1) {
             linkRow(list.single())
         } else {
-            RecordRow(section, subtitle = list.map { it.host }.distinctBy { it.lowercase() }.joinToString(", "), action = RecordAction.Group(list))
+            RecordRow(section, subtitle = HostNames.distinct(list.map { it.host }).joinToString(", "), action = RecordAction.Group(list))
         }
         return if (mine) base.copy(value = "Your copy") else base
     }
@@ -131,7 +205,7 @@ fun buildRows(downloads: List<UpdateSources.Download>, steamCopy: Boolean?): Lis
     val yours = steamCopy?.let { steam -> builds.firstOrNull { (it?.contains("steam", ignoreCase = true) == true) == steam } } ?: builds.first()
     val (first, rest) = groups.keys.partition { buildOf(it) == yours }
     return first.map { row(it, mine = steamCopy != null) } +
-        RecordRow("Other builds", subtitle = rest.map { buildOf(it) ?: "The default build" }.distinct().joinToString(", ")) +
+        RecordRow("Other builds", subtitle = rest.map { buildOf(it) ?: "The default build" }.distinct().joinToString(", "), heading = true) +
         rest.map { row(it, mine = false) }
 }
 
@@ -175,7 +249,7 @@ private fun apart(downloads: List<UpdateSources.Download>, subtitle: String?): L
     val patches = downloads.filter { it.role == "patch" }
     val (extras, other) = (downloads - patches.toSet()).partition { it.role == "extra" || DownloadSystems.isExtra(it.section) || DownloadSystems.isExtra(it.label) }
     fun group(title: String, list: List<UpdateSources.Download>): List<RecordRow> =
-        if (list.isEmpty()) emptyList() else listOf(RecordRow(title, subtitle = subtitle)) + groupedDownloads(list).map(::linkRow)
+        if (list.isEmpty()) emptyList() else listOf(RecordRow(title, subtitle = subtitle, heading = true)) + linkRows(groupedDownloads(list))
     return group("Patches", patches) + group("Extras", extras) + group("Other", other)
 }
 

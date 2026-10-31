@@ -45,6 +45,21 @@ class ThreadDownloadsTest {
     }
 
     @Test
+    fun `links named for their platform are each platform's download, hosted where they point`() {
+        // Droidtop/tracker#859: a thread whose links are named "Win" and "Linux" read as one host called "Win".
+        val read = ThreadDownloads.read(
+            page(
+                """<b>DOWNLOAD</b><br>
+                ${a("https://gofile.io/d/win", "Win")} - ${a("https://pixeldrain.com/u/lin", "Linux")}<br>
+                <b>Mac</b>: ${a("https://mega.nz/file/mac", "Mac")}<br>""",
+            ),
+        )
+        assertEquals(listOf("gofile.io", "pixeldrain.com", "mega.nz"), read.entries.map { it.host })
+        assertEquals(listOf(listOf("windows"), listOf("linux"), listOf("mac")), read.entries.map { it.systems })
+        assertEquals(listOf("Win", "Linux", "Mac"), read.entries.map { it.section })
+    }
+
+    @Test
     fun `several builds are told apart by their heading`() {
         val read = ThreadDownloads.read(
             page(
