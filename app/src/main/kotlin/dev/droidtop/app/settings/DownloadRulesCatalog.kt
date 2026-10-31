@@ -45,10 +45,14 @@ object DownloadRulesCatalog {
                     ChoiceItem(
                         id = "download_rules_network_rule",
                         title = "Download over",
-                        subtitle = "A held download says why. On a metered network you allow the network, never one download",
+                        subtitle = "Update checks follow it too. On a metered network you allow the network, not one download",
                         options = NetworkRule.values().map { ChoiceOption(it.key, it.label) },
                         current = s.network.key,
-                        onSelect = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(network = NetworkRule.fromKey(value)) } },
+                        onSelect = { ctx, value ->
+                            DownloadPolicy.update(ctx) { it.copy(network = NetworkRule.fromKey(value)) }
+                            // The scheduled check waits for an unmetered network under Wi-Fi only (#833).
+                            dev.droidtop.app.update.UpdateChecks.schedule(ctx)
+                        },
                     ),
                 ),
             ),

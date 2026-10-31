@@ -7121,7 +7121,7 @@ one:
     - Download rules lists the always grants under "Metered connections you allowed", each taken back with one press.
     Held with no network, a job offers nothing to press: it goes when a network comes back.
   - **Not while a game is running** has only the signal Android gives: a game droidtop launched less than four hours ago (`LaunchLedger`, the Game tab's limit: no liveness query for another app exists). A game closed from inside itself therefore stops holding automatic downloads after four hours at most, and a restart forgets it at once.
-  - **Auto-updates** (`StoreAutoUpdates`, `:library-core`): a sweep, at most once every six hours, a couple of minutes after start and after a store library read, goes through the installed games of signed-in stores whose rules say keep up to date, asks the store (`StoreLibrary.checkUpdate`) and starts an automatic `StoreInstallJob` for each answer of *available*, into the folder above the installed game; the policy then holds or runs it. The work is linear in the installed games of signed-in stores, off the main thread; an unmetered-only check of droidtop's own updates (`AppSelfUpdate.unmeteredOnly`) is a different, older switch about a probe, not a download, and stays.
+  - **Auto-updates** (`StoreAutoUpdates`, `:library-core`): a sweep, at most once every six hours, a couple of minutes after start and after a store library read, goes through the installed games of signed-in stores whose rules say keep up to date, asks the store (`StoreLibrary.checkUpdate`) and starts an automatic `StoreInstallJob` for each answer of *available*, into the folder above the installed game; the policy then holds or runs it. The work is linear in the installed games of signed-in stores, off the main thread; checks for updates follow the same network rule (Download rules' Wi-Fi only keeps them off mobile data; `DownloadPolicy.checksOnMetered`, Droidtop/tracker#833), which replaced their own older switch.
   Not built: throttling, an "Up next" order, a per-job schedule, and a size threshold setting (50 MB is fixed).
   Headers go with the request; an `Authorization` header is kept in memory only (never in the persisted job arguments), and a request to a token host is first resolved by hand to its final signed address (`GitHubAuth.downloadRequestFor`) so that the token never travels to the signed address (the downloader also drops credentials when a redirect changes host). Callers on this path: the plugin catalog's bundle install and update (`PluginCatalog`), the Python and Flutter runtimes, the app's own update APK, and contract-2 source-plugin acquires that return a download descriptor (docs/plugin-api.md 1.6). Those acquire jobs place the downloaded file in the destination folder and report that file to the library from the job, so it is indexed with no rescan and whether or not the page is open (7g, "Targeted indexing"); plugins without a descriptor continue their own transfer and report what they wrote. Credential headers remain in memory only. Left on their own transports because they are not a single file: library scraping, store depots (chunked), container image layers (an OCI layout, flattened by droidtop), and the ES-DE theme repositories (a git clone, with only the small themes list fetched as a JSON read). Left because they are not droidtop's loop: the Windows support files (Wine and base-system archives are fetched by the vendored gamenative downloader, which is hooked, not rewritten).
   **One summary notification:** `JobsSummaryNotification` posts a single low-importance notification, "N jobs running", counting every running job (downloads, library scrape, plugin work jobs including store depots, brokered jobs; a download has no notification of its own now). Tapping it opens the "Downloads and installs" place (`PlaceLinks.intent(Place.DOWNLOADS)`, 7j: Gaming on that place when Gaming is the mode in use, else the screen host). It is posted only when the notification permission is already granted (asked once, with its reason, where `DesktopNotificationPermission` asks it) and is updated only when the count changes.
@@ -19701,13 +19701,17 @@ menu still list every `listed` place.
     release deferred on a metered network is fetched by the next unmetered pass instead of hiding behind GitHub's 304.
     Enginehost's engine cores ("update … waiting" on its plugin page) are not listed: droidtop can only read that
     list (`engines.cores@1` has no install operation), so the update is Enginehost's own to install.
-  - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
+  - **Update settings**: how often droidtop checks, the build channel, debug builds, and
     Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a
     privilege allows a silent install), after the jobs. Get apps and Get new games are Downloads and Updates' Get games
     rows now (#749).
   It reads only what checks recorded and is built off the main thread.
   **Checks run on their own schedule** (`UpdateChecks`): one job, at the "Check for updates" interval (every day by
-  default; Never cancels it) and on an unmetered network when that is set, runs the same check as Check now. It
+  default; Never cancels it) and, when Download rules' network rule is Wi-Fi only, on an unmetered network, runs the
+  same check as Check now. Checks follow that one rule (Droidtop/tracker#833): a check is a few small reads, so only
+  Wi-Fi only keeps it off mobile data (`DownloadPolicy.checksOnMetered`). Update settings had a second switch for the
+  same thing, "Only on Wi-Fi or unmetered networks"; it is gone, and a device that had it on moved to Wi-Fi only, the
+  stricter of the two (`AppSelfUpdate.migrateUnmeteredOnly`, once at process start). It
   replaced the check that ran only when droidtop's process started, which a launcher's seldom does; the process start
   only makes sure the job is scheduled. `AppSelfUpdate.mayCheck` is its gate (a tenth early still counts, as Android
   runs a periodic job in a window before its period ends).
@@ -19722,8 +19726,8 @@ menu still list every `listed` place.
   game runs** (2026-10-30, DroidDeck's "when idle", Droidtop/tracker#363): a plugin or app replaced under a game can
   stop what the game uses, and droidtop's install ends in Android's confirmation over the screen, so while
   `LaunchDisplay.running` holds a game the policy step waits and runs once when the game ends; a scheduled pass's
-  wait keeps its droidtop install and its notification. "Only on Wi-Fi" already holds every check and install to an
-  unmetered network, and a capsule's top-left corner already marks a game with an update. **Where Updates is reached:** its page, from the shortcut row in Downloads and Updates and in the Quick Menu's Downloads tab, or the companion; Settings > About
+  wait keeps its droidtop install and its notification. Download rules' Wi-Fi only already holds every check and
+  download to an unmetered network, and a capsule's top-left corner already marks a game with an update. **Where Updates is reached:** its page, from the shortcut row in Downloads and Updates and in the Quick Menu's Downloads tab, or the companion; Settings > About
   droidtop > Updates, whose value says when droidtop has a newer build ("droidtop 0.2.0-dev.2700 is out"; it was a
   group of its own under System, now in About, one row); a plugin's page (its version and Update), in Settings and
   as its panel in the Quick Menu and on the companion; the plugin list's "N updates" row, each row's value naming the
@@ -22785,9 +22789,9 @@ and compares versionCode. Privacy is the design constraint, not an
 afterthought: nothing about the device, settings, or library is sent --
 GitHub sees an IP address fetching a public release asset, which is the
 floor for fetching anything at all. Offline or failed checks are silent and
-simply retried after the next interval; an "only on unmetered networks"
-option skips the scheduled check on mobile data. Settings > Software
-updates holds the schedule, that option, when the last check ran, and a
+simply retried after the next interval; Download rules' Wi-Fi only skips
+the scheduled check on mobile data (§10b, #833). Settings > Software
+updates holds the schedule, when the last check ran, and a
 manual "Check now"; "never" means zero automatic update traffic. Updates
 are never forced: the check only reports, and installing is always the
 user's tap (enginehost's plugin bundles can additionally be installed
@@ -22812,8 +22816,8 @@ checks the release feed immediately, and when the published `versionCode`
 is higher it downloads, verifies and hands the APK to PackageInstaller
 straight away -- the system's own confirmation is the only prompt that
 remains. What it bypasses is droidtop's own gating and nothing else: the
-frequency (including "never"), the interval since the last check and the
-unmetered-only option all come from one function,
+frequency (including "never"), the interval since the last check and
+Download rules' Wi-Fi only all come from one function,
 `AppSelfUpdate.mayCheck(forced = ...)`, which the scheduled pass calls with
 `forced = false` and this one with `forced = true`, so the bypass cannot
 drift from what it bypasses. Guard: `UpdateNowReceiver` is exported but
@@ -23144,8 +23148,8 @@ signed in to through the vendored client (§7g). There is no analytics, no
 telemetry, no usage statistics and no crash upload, so there is no
 "send usage data" setting: a switch for a thing that does not exist would
 be a lie either way. The update check and the database refresh run on the
-schedule the person set and never on mobile data when "unmetered only" is
-on (§10b).
+schedule the person set and never on mobile data under Download rules'
+Wi-Fi only (§10b).
 
 ## 11. Open risks to verify hands-on, not assume
 

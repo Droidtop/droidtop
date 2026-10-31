@@ -180,6 +180,20 @@ object DownloadPolicy {
         NetworkRule.SMALL_ON_MOBILE -> sizeBytes in 1..SMALL_BYTES
     }
 
+    /**
+     * Whether droidtop may check for updates on a metered network under [settings] (Droidtop/tracker#833): a check is a
+     * few small reads, so the network rule's own line for small downloads decides, and only Wi-Fi only stops it. Before,
+     * Update settings had a second switch, "Only on Wi-Fi or unmetered networks", for the same thing.
+     */
+    fun checksOnMetered(settings: DownloadSettings): Boolean = settings.network != NetworkRule.WIFI_ONLY
+
+    /**
+     * The network rule after that old switch is retired: Wi-Fi only when it was on, the stricter of the two, else
+     * unchanged. Pure.
+     */
+    fun migratedNetwork(current: NetworkRule, unmeteredOnlyWasOn: Boolean): NetworkRule =
+        if (unmeteredOnlyWasOn) NetworkRule.WIFI_ONLY else current
+
     fun decide(settings: DownloadSettings, conditions: Conditions, job: JobFacts): Verdict {
         when (conditions.network) {
             NetworkClass.OFFLINE -> return Verdict.Hold(WAITING_FOR_NETWORK)

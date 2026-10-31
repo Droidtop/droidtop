@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.core.content.pm.PackageInfoCompat
 import org.json.JSONObject
 import java.io.File
+import dev.droidtop.net.DownloadPolicy
 import dev.droidtop.net.Http
 import dev.droidtop.shared.trust.Sha256
 import dev.droidtop.app.apps.ApkInstaller
@@ -48,6 +49,7 @@ object AppSelfUpdate {
     private const val PREFS = "app_update_check"
     private const val KEY_CHECK_DAILY = "updates_check_daily"
     private const val KEY_FREQUENCY = "updates_frequency"
+    /** Retired: checks follow Download rules' network rule ([migrateUnmeteredOnly], Droidtop/tracker#833). */
     private const val KEY_UNMETERED_ONLY = "updates_unmetered_only"
     private const val KEY_LAST_ATTEMPT = "last_attempt_ms"
     private const val KEY_SEEN_CODE = "newest_seen_version_code"
@@ -141,11 +143,31 @@ object AppSelfUpdate {
     fun setDebugBuilds(context: Context, value: Boolean) =
         prefs(context).edit().putBoolean(KEY_DEBUG_BUILDS, value).apply()
 
-    /** Skip the probe on metered connections (mobile data, tethering). */
-    fun unmeteredOnly(context: Context): Boolean = prefs(context).getBoolean(KEY_UNMETERED_ONLY, false)
+    /**
+     * Whether checks stay off metered connections (mobile data, tethering): Download rules' network rule decides
+     * ([DownloadPolicy.checksOnMetered]), the one place for it (Droidtop/tracker#833). Reads preferences: not for the
+     * main thread.
+     */
+    fun unmeteredOnly(context: Context): Boolean {
+        DownloadPolicy.load(context)
+        return !DownloadPolicy.checksOnMetered(DownloadPolicy.settings.value)
+    }
 
-    fun setUnmeteredOnly(context: Context, value: Boolean) =
-        prefs(context).edit().putBoolean(KEY_UNMETERED_ONLY, value).apply()
+    /**
+     * Retires Update settings' own "Only on Wi-Fi or unmetered networks": a device that had it on gets Download rules'
+     * Wi-Fi only, the stricter of the two, and the old setting is removed. Runs once at process start, off the main
+     * thread; does nothing once the setting is gone.
+     */
+    fun migrateUnmeteredOnly(context: Context) {
+        val prefs = prefs(context)
+        if (!prefs.contains(KEY_UNMETERED_ONLY)) return
+        val wasOn = prefs.getBoolean(KEY_UNMETERED_ONLY, false)
+        DownloadPolicy.load(context)
+        val current = DownloadPolicy.settings.value.network
+        val next = DownloadPolicy.migratedNetwork(current, wasOn)
+        if (next != current) DownloadPolicy.update(context) { it.copy(network = next) }
+        prefs.edit().remove(KEY_UNMETERED_ONLY).apply()
+    }
 
     /** When the probe last ran, as epoch milliseconds, or null if it never has. */
     fun lastAttempt(context: Context): Long? = prefs(context).getLong(KEY_LAST_ATTEMPT, 0L).takeIf { it > 0 }

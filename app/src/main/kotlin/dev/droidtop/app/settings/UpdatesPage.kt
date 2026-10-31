@@ -652,16 +652,6 @@ object UpdatesPage {
                                     UpdateChecks.schedule(ctx)
                                 },
                             ),
-                            ToggleItem(
-                                id = "updates_unmetered_only",
-                                title = "Only on Wi-Fi or unmetered networks",
-                                subtitle = "Skips the scheduled check while on mobile data or a metered connection",
-                                current = update.unmeteredOnly(context),
-                                onToggle = { ctx, value ->
-                                    update.setUnmeteredOnly(ctx, value)
-                                    UpdateChecks.schedule(ctx)
-                                },
-                            ),
                             ChoiceItem(
                                 id = "updates_channel",
                                 title = "Build channel",
