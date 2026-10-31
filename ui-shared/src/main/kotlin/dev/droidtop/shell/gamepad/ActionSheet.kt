@@ -29,6 +29,8 @@ class ActionRow(
     /** A job this row stands for: its bar under the title, as on every job row (show, then say: Droidtop/tracker#738). */
     val progress: Float? = null,
     val look: dev.droidtop.library.settings.JobLook? = dev.droidtop.library.settings.JobLook.of(progress),
+    /** An option the row turns on or off: its state as a switch in the value column. Null: not an option. */
+    val switchOn: Boolean? = null,
     // Last, so a row's action can follow it as a trailing lambda.
     val onSelect: (() -> Unit)?,
 ) : ActionSheetItem
@@ -128,6 +130,7 @@ internal fun ActionSheetBody(
                         selected = index == focusIndex,
                         progress = item.progress,
                         progressLook = item.look,
+                        switchOn = item.switchOn,
                         onClick = {
                             focusIndex = index
                             item.onSelect?.invoke()

@@ -9,7 +9,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
-import android.widget.PopupMenu
+import dev.droidtop.ui.shared.MenuViews
 import app.murinelauncher.settings.prefs.DrawerTabs
 import com.android.launcher3.R
 
@@ -89,40 +89,27 @@ class DrawerTabsRow @JvmOverloads constructor(context: Context, attrs: Attribute
     }
 
     private fun edit(anchor: View, tab: String) {
-        val menu = PopupMenu(context, anchor)
-        menu.menu.add(0, MENU_RENAME, 0, R.string.drawer_tab_rename)
-        menu.menu.add(0, MENU_MOVE_LEFT, 1, R.string.drawer_tab_move_left)
-        menu.menu.add(0, MENU_MOVE_RIGHT, 2, R.string.drawer_tab_move_right)
-        menu.menu.add(0, MENU_AS_FOLDER, 3, R.string.drawer_tab_as_folder).apply {
-            isCheckable = true
-            isChecked = DrawerTabs.tabs(context).firstOrNull { it.name == tab }?.folder == true
-        }
-        menu.menu.add(0, MENU_DELETE, 4, R.string.drawer_tab_delete)
-        menu.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                MENU_RENAME -> askName(context, tab) { name ->
-                    DrawerTabs.rename(context, tab, name).also { if (it) onTabsChanged() }
-                }
-                MENU_MOVE_LEFT -> { DrawerTabs.move(context, tab, -1); onTabsChanged() }
-                MENU_MOVE_RIGHT -> { DrawerTabs.move(context, tab, +1); onTabsChanged() }
-                MENU_DELETE -> { DrawerTabs.delete(context, tab); onTabsChanged() }
-                MENU_AS_FOLDER -> { DrawerTabs.setFolder(context, tab, !item.isChecked); onTabsChanged() }
-            }
-            true
-        }
-        menu.show()
+        // The one anchored menu beside the tab, in the colours outside Gaming (MenuViews, Droidtop/tracker#827).
+        val asFolder = DrawerTabs.tabs(context).firstOrNull { it.name == tab }?.folder == true
+        val rows = listOf(
+            MenuViews.Row(context.getString(R.string.drawer_tab_rename), {
+                askName(context, tab) { name -> DrawerTabs.rename(context, tab, name).also { if (it) onTabsChanged() } }
+            }),
+            MenuViews.Row(context.getString(R.string.drawer_tab_move_left), { DrawerTabs.move(context, tab, -1); onTabsChanged() }),
+            MenuViews.Row(context.getString(R.string.drawer_tab_move_right), { DrawerTabs.move(context, tab, +1); onTabsChanged() }),
+            MenuViews.Row(
+                context.getString(R.string.drawer_tab_as_folder),
+                { DrawerTabs.setFolder(context, tab, !asFolder); onTabsChanged() },
+                asFolder,
+            ),
+            MenuViews.Row(context.getString(R.string.drawer_tab_delete), { DrawerTabs.delete(context, tab); onTabsChanged() }),
+        )
+        MenuViews.show(anchor, tab, rows)
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     companion object {
-        // A tab's long-press menu, by what each row does.
-        private const val MENU_RENAME = 0
-        private const val MENU_MOVE_LEFT = 1
-        private const val MENU_MOVE_RIGHT = 2
-        private const val MENU_DELETE = 3
-        private const val MENU_AS_FOLDER = 4
-
         /**
          * Asks for a tab's name, filled with [current]; [accept] says whether it was taken. A blank or
          * taken name keeps the dialog open and says why on the field.
