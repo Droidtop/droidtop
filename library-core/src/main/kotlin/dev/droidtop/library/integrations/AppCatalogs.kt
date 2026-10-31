@@ -503,7 +503,7 @@ object AppCatalogs {
             maxBytes = descriptor.size ?: 0L,
             headers = headers,
             sizeBytes = descriptor.size ?: 0L,
-            extra = expected.toArgs() + (ARG_LABEL to label),
+            extra = expected.toArgs() + (ARG_LABEL to label) + (DownloadJobs.ARG_UPDATE_FOR to UpdateTags.app(id, versionCode)),
             onStatus = onStatus,
         )
     }

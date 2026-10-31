@@ -475,7 +475,7 @@ object PluginRepoUpdates {
      * the window applies once the pass hands its bundles over instead of waiting. Blocks: these passes run off the main
      * thread.
      */
-    private fun download(context: Context, url: String, headers: Map<String, String>, sha256: String?, file: File, assetName: String) =
+    private fun download(context: Context, url: String, headers: Map<String, String>, sha256: String?, file: File, assetName: String, updateFor: String? = null) =
         kotlinx.coroutines.runBlocking {
             dev.droidtop.pluginhost.DownloadJobs.run(
                 context = context,
@@ -486,7 +486,8 @@ object PluginRepoUpdates {
                 name = "bundle_${System.nanoTime()}.droidplugin.tar.xz",
                 sha256 = sha256,
                 headers = headers,
-                extra = mapOf(dev.droidtop.pluginhost.DownloadJobs.ARG_TARGET_PATH to file.absolutePath),
+                extra = mapOf(dev.droidtop.pluginhost.DownloadJobs.ARG_TARGET_PATH to file.absolutePath) +
+                    updateFor?.let { mapOf(dev.droidtop.pluginhost.DownloadJobs.ARG_UPDATE_FOR to it) }.orEmpty(),
             )
         }
 
@@ -496,7 +497,14 @@ object PluginRepoUpdates {
      * signed with the same key. [onInstalled] gets the id of a plugin that now waits for approval, for the caller to open
      * its page, where it is approved (Droidtop/tracker#759). Blocking: off the main thread.
      */
-    fun installFromRepo(context: Context, entry: UserOriginKey, assetName: String, onInstalled: (pluginId: String) -> Unit = {}): RepoInstallOutcome {
+    fun installFromRepo(
+        context: Context,
+        entry: UserOriginKey,
+        assetName: String,
+        /** The update this install is, when one is known ([UpdateTags.plugin]): its download job carries it for the Updates row. */
+        updateFor: String? = null,
+        onInstalled: (pluginId: String) -> Unit = {},
+    ): RepoInstallOutcome {
         fun refused(line: String) = RepoInstallOutcome(installed = false, line = line)
         val repo = entry.repo ?: return refused("Not a repository.")
         val token = GitHubTokenStore.get(context)
@@ -507,7 +515,7 @@ object PluginRepoUpdates {
         try {
             val address = if (token != null && asset.apiUrl.isNotBlank()) asset.apiUrl else asset.downloadUrl
             val (url, headers) = GitHubAuth.downloadRequestFor(address, token)
-            val fetched = download(context, url, headers, asset.sha256, file, asset.name)
+            val fetched = download(context, url, headers, asset.sha256, file, asset.name, updateFor)
             if (!fetched.ok) return refused("Couldn't download it: ${fetched.error}")
             val peeked = PluginRepos.peek(file) ?: return refused("That is not a plugin bundle.")
             if (peeked.manifest.origin != entry.origin) return refused("That bundle is for another origin than this repository is trusted for.")

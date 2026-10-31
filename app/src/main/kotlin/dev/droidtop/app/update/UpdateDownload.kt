@@ -83,12 +83,15 @@ internal object UpdateDownload {
     fun liveLine(): String? {
         val pass = UpdateNow.pass.value
         if (pass.running) return pass.line.ifBlank { "Checking..." }
-        val entry = PluginJobsCenter.entries().value.firstOrNull { entry ->
-            entry.nativeKind == DownloadJobs.KIND && !entry.done &&
-                PluginJobsCenter.argsOf(entry.jobId)?.get("name")?.let { UpdateFiles.buildOf(it) } != null
-        } ?: return null
+        val entry = liveJob() ?: return null
         // The job's own words, as the Downloads place says them (docs/SPEC.md 12a, "Jobs and their results").
         return dev.droidtop.library.integrations.PluginJobsScreen.oneLine(entry)
+    }
+
+    /** The running download job of a droidtop build, or null: what droidtop's Updates row shows (Droidtop/tracker#833). */
+    fun liveJob(): PluginJobsCenter.Entry? = PluginJobsCenter.entries().value.firstOrNull { entry ->
+        entry.nativeKind == DownloadJobs.KIND && !entry.done &&
+            PluginJobsCenter.argsOf(entry.jobId)?.get("name")?.let { UpdateFiles.buildOf(it) } != null
     }
 
     /** The id of the running download job for the file [name], or null. */

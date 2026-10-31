@@ -35,12 +35,19 @@ import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.library.integrations.UpdateTags
 import dev.droidtop.library.stores.StoreAutoUpdates
+import dev.droidtop.library.stores.StoreInstallJob
+import dev.droidtop.pluginhost.DownloadJobs
+import dev.droidtop.pluginhost.JobState
+import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.shell.standard.BackButtonMenu
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -51,9 +58,11 @@ import kotlinx.coroutines.withContext
  * (plugins, games, etc)"). Its header says when droidtop last checked; its bar is Check now and Update all; its views,
  * on the shell's strip (L1 and R1), are All and each kind that has updates, each with its count. Every update is one
  * row of one shape: its picture, its name, "installed → available · size · from where", and its state in the value
- * column (Update, Updating, Waiting, Failed · Retry), A starting it. It reads only what checks already recorded; Check
- * now is what asks. The page is its own: the Quick Menu's Downloads and Updates tab, the left menu (with its badge) and
- * the companion reach it, each saying how many are waiting ([UpdatesWaiting]); none draws its rows.
+ * column (Update, its percent while it downloads, Waiting, Failed · Retry), A starting it. A row's state is its
+ * download job's, read from the jobs center (Droidtop/tracker#833): the page keeps none of its own. It reads only what
+ * checks already recorded; Check now is what asks. The page is its own: the Quick Menu's Downloads and Updates tab, the
+ * left menu (with its badge) and the companion reach it, each saying how many are waiting ([UpdatesWaiting]); none
+ * draws its rows.
  */
 object UpdatesPage {
     /** Install debug builds: for finding faults in droidtop itself, so it is in the Developer menu (docs/SPEC.md 7, "Developer menu"). */
@@ -141,17 +150,39 @@ object UpdatesPage {
     /** Where one update stands, the value its row shows: one model for every kind. */
     internal enum class State(val label: String) {
         AVAILABLE("Update"),
+        /** Pressed, and its job not started yet (an address is being resolved, a plugin asked for the download). */
+        STARTING("Starting"),
         DOWNLOADING("Updating"),
+        /** Its job waits: in its pool's queue, held by a download rule, for the network, or to try again. */
         WAITING("Waiting"),
+        PAUSED("Paused"),
+        /** Its download ended and the install step after it is still running. */
+        INSTALLING("Installing"),
         FAILED("Failed · Retry"),
     }
 
-    /** One row's state from what the page knows: running, queued by Update all, failed last time, else available. Pure. */
-    internal fun stateOf(id: String, busy: Set<String>, waiting: Set<String>, failed: Set<String>): State = when (id) {
-        in busy -> State.DOWNLOADING
-        in waiting -> State.WAITING
-        in failed -> State.FAILED
-        else -> State.AVAILABLE
+    /**
+     * One row's state from its job (Droidtop/tracker#833): [job] is the state of the newest job for the update, null
+     * when it has none; [pressed] is whether its press is still running (before the job starts, and through any install
+     * step after it). Pure.
+     */
+    internal fun stateOf(job: JobState?, pressed: Boolean): State = when (job) {
+        JobState.RUNNING -> State.DOWNLOADING
+        JobState.HELD, JobState.WAITING_FOR_NETWORK, JobState.WAITING_TO_RETRY -> State.WAITING
+        JobState.PAUSED -> State.PAUSED
+        // A press that is running again after a failure is the new attempt, not the old failure.
+        JobState.FAILED -> if (pressed) State.STARTING else State.FAILED
+        // Once a job ended well and its press is over, the row is what the last read says: gone, or offered again when
+        // the install did not keep the update (its press said why), or a store game the library has not read again yet.
+        JobState.DONE -> if (pressed) State.INSTALLING else State.AVAILABLE
+        null -> if (pressed) State.STARTING else State.AVAILABLE
+    }
+
+    /** The bar a row draws for [state]: the job's own percent while it downloads (indeterminate before it knows), else none. Pure. */
+    internal fun progressOf(state: State, percent: Int): Float? = when (state) {
+        State.DOWNLOADING -> if (percent in 0..100) percent / 100f else -1f
+        State.STARTING, State.INSTALLING -> -1f
+        else -> null
     }
 
     /** A row's one line: the version step, the size, where it comes from. Pure. */
@@ -166,12 +197,11 @@ object UpdatesPage {
         listOf<Pair<Kind?, String>>(null to "All · ${counts.values.sum()}") +
             Kind.entries.filter { (counts[it] ?: 0) > 0 }.map { it to "${it.label} · ${counts[it]}" }
 
-    /** How an update ended: its line, and whether it worked (a failed one is drawn as Failed · Retry). */
-    private class Done(val line: String, val ok: Boolean)
-
     /**
-     * One update. [install] runs it (Update, Retry and Update all); null for a row that opens a page instead (a folder
-     * game's source) or explains why it cannot be installed ([own] draws those).
+     * One update. [install] runs it (Update, Retry and Update all) and returns its line; null for a row that opens a page
+     * instead (a folder game's source) or explains why it cannot be installed ([own] draws those). [job] finds the
+     * update's newest job in the jobs center, given the download jobs by their update tag ([DownloadJobs.updateJobs]).
+     * [running] is true while droidtop itself is running it without a press (droidtop's own pass).
      */
     private class Update(
         val kind: Kind,
@@ -183,6 +213,8 @@ object UpdatesPage {
         val iconFile: String? = null,
         val install: (suspend (Context, (String) -> Unit) -> String)? = null,
         val own: CatalogItem? = null,
+        val job: (Map<String, PluginJobsCenter.Entry>) -> PluginJobsCenter.Entry? = { null },
+        val running: () -> Boolean = { false },
     )
 
     /**
@@ -201,10 +233,11 @@ object UpdatesPage {
     private val kept = ConcurrentHashMap<Section, Pair<Long, List<Update>>>()
     private val reading: MutableSet<Section> = ConcurrentHashMap.newKeySet()
 
-    /** Rows updating now, queued by Update all, and whose last update failed, by row id. */
-    private val busy: MutableSet<String> = ConcurrentHashMap.newKeySet()
-    private val waiting: MutableSet<String> = ConcurrentHashMap.newKeySet()
-    private val failed: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    /**
+     * Rows whose press is still running, by row id: the one thing a job cannot say, the moments before its job starts
+     * and after its download while it installs. Where the update stands is its job's (#833).
+     */
+    private val pressed: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val changes = MutableStateFlow(0)
 
     /** Check now's line, drawn in place at the top of the page: its live status while it runs, then what it found (#837). */
@@ -238,24 +271,20 @@ object UpdatesPage {
     }
 
     /**
-     * [install] for the row [id]: Updating while it runs, Failed · Retry if it did not work, and once it returns its
-     * section is read again, so the row goes (or says what is left) at once.
+     * [install] for the row [id], marked as pressed while it runs; once it returns its section is read again, so the row
+     * goes (or says what is left) at once. What it said is the press's answer line, a failure before any job included.
      */
-    private fun tracked(
+    private fun pressing(
         id: String,
         section: Section?,
-        install: suspend (Context, (String) -> Unit) -> Done,
+        install: suspend (Context, (String) -> Unit) -> String,
     ): suspend (Context, (String) -> Unit) -> String = { ctx, onStatus ->
-        waiting.remove(id)
-        failed.remove(id)
-        busy.add(id)
+        pressed.add(id)
         changes.value++
         try {
-            val done = runCatching { install(ctx, onStatus) }.getOrElse { Done(it.message ?: "it failed", ok = false) }
-            if (!done.ok) failed.add(id)
-            done.line
+            runCatching { install(ctx, onStatus) }.getOrElse { it.message ?: "it failed" }
         } finally {
-            busy.remove(id)
+            pressed.remove(id)
             if (section != null) refresh(ctx, section, force = true) else changes.value++
         }
     }
@@ -275,18 +304,37 @@ object UpdatesPage {
         UpdatesWaiting.publish(collect(context).first.size)
     }
 
-    /** One update's row: the one shape for every kind. */
-    private fun rowOf(update: Update): CatalogItem {
+    /** Where [update] stands, from its job and its press. */
+    private fun stateOf(update: Update, jobs: Map<String, PluginJobsCenter.Entry>): Pair<State, PluginJobsCenter.Entry?> {
+        val job = update.job(jobs)
+        return stateOf(job?.state, update.id in pressed || update.running()) to job
+    }
+
+    /**
+     * One update's row: the one shape for every kind. While its job runs or waits, the row is that job: its percent and
+     * bar, or its own reason for waiting; a failed job's line is said beside Retry.
+     */
+    private fun rowOf(update: Update, jobs: Map<String, PluginJobsCenter.Entry>): CatalogItem {
         update.own?.let { return it }
-        val state = stateOf(update.id, busy, waiting, failed)
-        return AsyncActionItem(
-            id = update.id,
-            title = update.title,
-            subtitle = line(update.step, update.sizeBytes, update.from),
-            value = state.label,
-            iconFile = update.iconFile,
-            run = update.install ?: { _, _ -> "" },
-        ).let { row -> if (state == State.DOWNLOADING) ActionItem(id = row.id, title = row.title, subtitle = row.subtitle, value = row.value, progress = -1f) else row }
+        val (state, job) = stateOf(update, jobs)
+        val versionLine = line(update.step, update.sizeBytes, update.from)
+        val jobLine = job?.takeIf { state != State.AVAILABLE && state != State.STARTING }?.let { PluginJobsScreen.oneLine(it) }
+        val subtitle = listOfNotNull(versionLine, jobLine).joinToString(" · ")
+        val value = if (state == State.DOWNLOADING && job != null && job.percent in 0..100) "${job.percent}%" else state.label
+        val progress = progressOf(state, job?.percent ?: -1)
+        // Pressing a row that is already under way would only join its job: it is drawn, not offered.
+        return if (state == State.AVAILABLE || state == State.FAILED) {
+            AsyncActionItem(
+                id = update.id,
+                title = update.title,
+                subtitle = subtitle,
+                value = value,
+                iconFile = update.iconFile,
+                run = update.install ?: { _, _ -> "" },
+            )
+        } else {
+            ActionItem(id = update.id, title = update.title, subtitle = subtitle, value = value, iconFile = update.iconFile, progress = progress)
+        }
     }
 
     private suspend fun page(context: Context): CatalogPage {
@@ -297,7 +345,11 @@ object UpdatesPage {
         val failure = AppSelfUpdate.lastFailure(context)
         val checked = UpdateChecks.lastCheck(context)
         val lastLine = checked?.let { "Last checked " + ValueFormat.ago(System.currentTimeMillis(), it).replaceFirstChar { c -> c.lowercase() } }
-        val installable = updates.mapNotNull { update -> update.install?.let { update.id to it } }
+        val jobs = DownloadJobs.updateJobs()
+        // What Update all starts: every row that is not already under way.
+        val installable = updates.mapNotNull { update ->
+            update.install?.takeIf { stateOf(update, jobs).first.let { it == State.AVAILABLE || it == State.FAILED } }
+        }
         val checkingRows = unread.associate { section ->
             section.kind to ActionItem(id = "updates_checking_${section.name.lowercase()}", title = section.checking, progress = -1f)
         }
@@ -322,7 +374,7 @@ object UpdatesPage {
                     if (kind == null && updates.isEmpty() && checked != null && failure == null && unread.isEmpty()) {
                         add(TextBlockItem(id = "updates_none", text = "Everything is up to date."))
                     }
-                    shown.forEach { add(rowOf(it)) }
+                    shown.forEach { add(rowOf(it, jobs)) }
                     // droidtop always has its row: an update when one is known, else where it stands and the way to ask
                     // again (Droidtop/tracker#837; the owner: "there's nowhere to download/install an update to droidtop
                     // anymore"). Not an update, so it is not counted and Update all does not run it.
@@ -371,20 +423,19 @@ object UpdatesPage {
                     id = "updates_all",
                     label = "Update all",
                     enabled = installable.isNotEmpty(),
-                    // A row that opens its source's page has nothing for Update all to install: the button says so,
-                    // never "Nothing to update" beside rows (Droidtop/tracker#837).
-                    disabledReason = if (updates.isEmpty()) "Nothing to update" else "Each one opens its own page",
+                    // A row that opens its source's page has nothing for Update all to install, and one under way is
+                    // already started: the button says so, never "Nothing to update" beside rows (Droidtop/tracker#837).
+                    disabledReason = when {
+                        updates.isEmpty() -> "Nothing to update"
+                        updates.any { it.install != null } -> "Every update is under way"
+                        else -> "Each one opens its own page"
+                    },
                 ) { ctx ->
-                    // Each update is the row's own (tracked): the rest wait, each row changes as its own starts and ends.
-                    waiting.addAll(installable.map { it.first })
-                    changes.value++
+                    // Every update starts at once as its own job; their pools decide the order, and each row shows its
+                    // job's place in it (Waiting, then its bar) (#833). Not one after the other from here.
                     scope.launch {
-                        val said = try {
-                            installable.map { (_, install) -> install(ctx) { } }.filter { it.isNotBlank() }.joinToString(". ")
-                        } finally {
-                            waiting.removeAll(installable.map { it.first }.toSet())
-                            changes.value++
-                        }
+                        val said = installable.map { install -> async { install(ctx) { } } }.awaitAll()
+                            .filter { it.isNotBlank() }.joinToString(". ")
                         dev.droidtop.library.settings.Notices.flash(said.ifBlank { "Updated" }, context = ctx)
                     }
                 },
@@ -407,10 +458,10 @@ object UpdatesPage {
                 title = "droidtop",
                 step = GameUpdates.step(AppSelfUpdate.installedVersionName(context), newer),
                 from = "droidtop's releases",
-                install = tracked(id, null) { ctx, onStatus ->
-                    val said = UpdateNow.startAndAwait(ctx, onStatus)
-                    Done(said, ok = AppSelfUpdate.lastFailure(ctx) == null)
-                },
+                install = pressing(id, null) { ctx, onStatus -> UpdateNow.startAndAwait(ctx, onStatus) },
+                job = { dev.droidtop.app.update.UpdateDownload.liveJob() },
+                // A pass droidtop started itself (an automatic update) is this row's too.
+                running = { UpdateNow.pass.value.running },
             ),
         )
     }
@@ -466,10 +517,11 @@ object UpdatesPage {
                     sizeBytes = offer.release.bundle.size,
                     from = if (offer.source.official) "droidtop's catalog" else "${offer.source.name}, unofficial",
                     iconFile = PluginStore.iconFile(context, record),
-                    install = tracked(id, null) { ctx, onStatus ->
+                    install = pressing(id, null) { ctx, onStatus ->
                         val outcome = PluginCatalog.installOutcome(ctx, offer.plugin, offer.release) { status -> onStatus("$label: $status") }
-                        Done("$label: ${outcome.line}", outcome.installed)
+                        "$label: ${outcome.line}"
                     },
+                    job = { jobs -> jobs[UpdateTags.plugin(record.manifest.id, offer.release.version)] },
                 )
             } ?: fromRepos[record.manifest.id]?.let { update ->
                 Update(
@@ -481,11 +533,13 @@ object UpdatesPage {
                     from = "${update.repo.repo} on GitHub",
                     iconFile = PluginStore.iconFile(context, record),
                     // The repository's own install, the one its screen's rows run: the latest release's bundle, verified again.
-                    install = tracked(id, null) { ctx, onStatus ->
+                    install = pressing(id, null) { ctx, onStatus ->
                         onStatus("$label: downloading...")
-                        val outcome = withContext(Dispatchers.IO) { PluginRepoUpdates.installFromRepo(ctx, update.repo, update.bundle.assetName) }
-                        Done(if (outcome.installed) outcome.line else "$label: ${outcome.line}", outcome.installed)
+                        val tag = UpdateTags.plugin(record.manifest.id, update.version)
+                        val outcome = withContext(Dispatchers.IO) { PluginRepoUpdates.installFromRepo(ctx, update.repo, update.bundle.assetName, updateFor = tag) }
+                        if (outcome.installed) outcome.line else "$label: ${outcome.line}"
                     },
+                    job = { jobs -> jobs[UpdateTags.plugin(record.manifest.id, update.version)] },
                 )
             }
         }
@@ -506,7 +560,8 @@ object UpdatesPage {
                         title = state.offer.name,
                         step = GameUpdates.step(state.installed.versionName ?: state.installed.versionCode.toString(), state.offer.version),
                         from = state.offer.source ?: state.pluginLabel,
-                        install = tracked(id, Section.APPS) { ctx, onStatus -> updateApp(ctx, state, onStatus) },
+                        install = pressing(id, Section.APPS) { ctx, onStatus -> updateApp(ctx, state, onStatus) },
+                        job = { jobs -> jobs[UpdateTags.app(state.offer.id, state.offer.versionCode)] },
                     )
                 }
                 // Android would refuse it, so it is said, not offered: Update explains instead of failing at install.
@@ -527,11 +582,11 @@ object UpdatesPage {
         }
     }
 
-    private suspend fun updateApp(context: Context, state: AppCatalogs.UpdateState.Available, onStatus: (String) -> Unit): Done {
+    private suspend fun updateApp(context: Context, state: AppCatalogs.UpdateState.Available, onStatus: (String) -> Unit): String {
         val record = AppCatalogs.providers(context).firstOrNull { it.manifest.id == state.pluginId }
-            ?: return Done("${state.offer.name}: ${state.pluginLabel} is no longer installed or allowed", ok = false)
+            ?: return "${state.offer.name}: ${state.pluginLabel} is no longer installed or allowed"
         val result = AppCatalogs.install(context, record, state.offer.id, state.offer.versionCode, state.offer.name, onStatus)
-        return if (result.ok) Done(result.values["summary"] ?: "${state.offer.name} updated", ok = true) else Done("${state.offer.name}: ${result.error ?: "it failed"}", ok = false)
+        return if (result.ok) result.values["summary"] ?: "${state.offer.name} updated" else "${state.offer.name}: ${result.error ?: "it failed"}"
     }
 
     /**
@@ -563,13 +618,15 @@ object UpdatesPage {
                         sizeBytes = pc.sizeBytes,
                         from = "its store",
                         iconFile = entry.artworkUri?.toString(),
-                        install = tracked(id, null) { ctx, _ ->
+                        install = pressing(id, null) { ctx, _ ->
                             if (StoreAutoUpdates.startUpdate(ctx, key, entry.title, path, pc.sizeBytes)) {
-                                Done("${entry.title}: updating. It is listed under Downloads", ok = true)
+                                "${entry.title}: updating. It is listed under Downloads"
                             } else {
-                                Done("${entry.title}: no store in this build updates it", ok = false)
+                                "${entry.title}: no store in this build updates it"
                             }
                         },
+                        // The store's own job is the update: the row follows it to its end, its automatic ones included.
+                        job = { StoreInstallJob.lastFor(key) },
                     )
                 } else {
                     Update(
