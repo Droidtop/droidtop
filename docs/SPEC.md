@@ -22804,6 +22804,33 @@ redirects to Gaming so the banner is reachable and the recovery action works);
 it does not render themes itself, but the safe-mode banner must still be
 reachable from it.
 
+**Storage full (Droidtop/tracker#849, 2026-10-31).** The bar is "a plain message that storage is full, no ANR, no
+stuck state". With about 12 MB free on /data, `am start -n dev.droidtop.app/.MainActivity` ended twice on an
+Android 13 emulator in "Input dispatching timed out (Application does not have a focused window)", with no crash.
+`StorageGuard` (:runtime-common) asks once, with one statfs of the app's files directory and no write, whether less
+than 64 MB is free (`StorageGuard.LOW_SPACE_BYTES`; the larger bundled theme alone is about 29 MB on disk once
+extracted, and Android's own storage-low warning starts far above it, at 5 to 10% of the volume); a statfs that
+fails counts as room. It is asked in `DroidtopApplication.attachBaseContext`, before every content provider, and
+again first thing in `MainActivity.onCreate` and `OnboardingActivity.onCreate`. Too little room there and the
+activity shows the storage-full screen and does nothing else: no preference read, no shell, no library, no display
+orchestration, and every later lifecycle step of `MainActivity` returns early. The screen is droidtop's own palette
+(`GamingPalette.Default`, never `DroidtopTheme`, which in Gaming mode loads the theme), a title ("Storage is full"),
+one line ("droidtop needs at least about 64 MB free to start. Free some space, then try again.") and two
+`PadButton`s: Open storage settings (Android's internal storage page, else its Settings) and Try again, which
+checks again and, with room, recreates the activity, which then starts as usual and applies the Intent it was
+opened with; without room it stays and says how much is still free. The first button has the focus, so the pad's A
+works at once; Back leaves. The application's and the start-up provider's own start still run while storage is
+full: other components of the process (Standard's launcher, widgets, services) assume them, and Try again starts
+the shell in the same process. The likely cause, from reading the code: `ThemeAssets` extracts a bundled theme into
+the cache under one lock, and on a full disk each file copy failed silently and the marker write failed, so every
+later load deleted the copy and extracted the whole theme again while the first composition waited on the lock.
+`ThemeAssets` now checks the cache's usable space against `EXTRACTION_SPACE_BYTES` (40 MB, an estimate: the
+largest theme is 28.8 MB on disk) before writing anything, fails the extraction on any file that cannot be written,
+and remembers a failed theme in `ExtractionFailures` for the rest of the process (until Try again finds room):
+it then loads from an older build's complete extraction if one is left, else as no theme, the state the shell
+already draws its unthemed fallback for. The half-written copy a failure leaves in the cache is removed by the next
+attempt.
+
 **Share diagnostics** is one action in Global settings > Data. It zips the
 logs folder, the settings export (§7 Data, with every `droidtop_*`
 credential key left out), the platform-database snapshot ids (§7e2), the

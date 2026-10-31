@@ -28,6 +28,9 @@ object DebugStrictMode {
         // Two existence checks, first thing in Application.onCreate: a restore the person staged must be in place before
         // anything opens a database (Droidtop/tracker#625), so this one cannot move off the main thread.
         "dev.droidtop.app.settings.DroidtopBackup#finishPendingRestore",
+        // One statfs, no write: whether storage is too full to start has to be known before the first screen is drawn
+        // (docs/SPEC.md 10c, "Storage full", Droidtop/tracker#849).
+        "dev.droidtop.runtime.StorageGuard",
     )
 
     /** An entry is a class (every method of it) or `class#method` (that method only). */

@@ -229,8 +229,22 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         )
     }
 
+    /**
+     * Whether this instance is the storage-full screen and nothing else (docs/SPEC.md 10c, "Storage full";
+     * Droidtop/tracker#849). Every lifecycle step below that starts, reads or writes anything returns early while it
+     * is, and the shell's fields it would touch (the library, the display orchestrator) were never made.
+     */
+    internal var storageFull = false
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Too little space to start: one plain screen that says so, before any preference is read or any shell is
+        // built (Droidtop/tracker#849, about 12 MB free ended in "Application does not have a focused window").
+        if (StorageFullScreen.showIfFull(this)) {
+            storageFull = true
+            return
+        }
         // A recreate is not a new delivery of this Intent. The Gaming
         // deep-link extras it may carry were consumed by the instance
         // that saved this state, and re-applying them would drag the user
@@ -240,7 +254,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // triggers exactly such a recreate (AccessibilityPrefs). Real
         // re-deliveries still arrive, and are applied, through
         // onNewIntent below.
-        if (savedInstanceState == null) applyGamingDeepLink(intent)
+        // The storage-full screen's Try again is such a recreate, but that instance applied nothing, so its Intent
+        // is still to be applied.
+        if (savedInstanceState == null || savedInstanceState.getBoolean(STATE_STORAGE_FULL)) applyGamingDeepLink(intent)
 
         // A third crash while starting sends the app to Global settings,
         // where Data > Share diagnostics is, instead of into any shell
@@ -595,6 +611,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // Applied by the instance Try again creates, once there is room.
+        if (storageFull) return
         applyGamingDeepLink(intent)
         val previous = mode
         mode = resolveMode(intent)
@@ -664,6 +682,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
      */
     override fun onResume() {
         super.onResume()
+        if (storageFull) return
         refreshModeIfUndecided()
         // A screen nobody has answered for yet (found at start, or left while setup ran) is asked about now (ScreenRoleAsk).
         ScreenRoleAsk.check()
@@ -716,6 +735,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
         topResumed = isTopResumedActivity
+        if (storageFull) return
         // The wake lock a running game holds is released while the shell covers it (GameWakeLock).
         dev.droidtop.library.GameWakeLock.shellInFront(if (isTopResumedActivity) currentDisplayId() else null)
         if (!isTopResumedActivity) {
@@ -824,6 +844,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        if (storageFull) return
         clipboardBridge?.onWindowFocusChanged(hasFocus)
         // The bars were hidden only when the mode changed. Any other window
         // that shows them -- Android's own settings screens opened from
@@ -952,11 +973,13 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // The system's new configuration replaces the canvas density and text scale on this activity's Resources.
         AccessibilityPrefs.applyTextScale(this)
         super.onConfigurationChanged(newConfig)
+        if (storageFull) return
         displayOrchestrator.onConfigurationChanged()
     }
 
     override fun onStop() {
         super.onStop()
+        if (storageFull) return
         if (mode == Mode.GAMING && dev.droidtop.library.LaunchDisplay.runningGame != null) {
             stoppedWithGameAtMs = android.os.SystemClock.elapsedRealtime()
         }
@@ -976,6 +999,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     override fun onStart() {
         super.onStart()
+        if (storageFull) return
         dev.droidtop.library.LaunchDisplay.noteShellStarted(System.currentTimeMillis())
         // Coming back to the foreground re-asserts the live companion,
         // through the same orchestration pass everything else uses, and
@@ -984,7 +1008,18 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         displayOrchestrator.onActivityStart(lifecycleScope)
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (storageFull) outState.putBoolean(STATE_STORAGE_FULL, true)
+    }
+
     override fun onDestroy() {
+        if (storageFull) {
+            // The storage-full screen built nothing to tear down, and held no shell whose place could be kept.
+            ShellRestore.keepPlace = false
+            super.onDestroy()
+            return
+        }
         // Only a configuration recreate may bring the Gaming shell back on its last place.
         ShellRestore.keepPlace = isChangingConfigurations
         // onCreate finishes early (first-run onboarding hand-off, crash-recovery
@@ -1019,6 +1054,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     companion object {
         /** How long the keep-running offer waits for the mode switched to to be able to ask. */
         private const val KEEP_RUNNING_HOST_WAIT_MS = 5_000L
+
+        /** Saved by the storage-full screen, so the instance its Try again creates applies the Intent it never did. */
+        private const val STATE_STORAGE_FULL = "dev.droidtop.app.storage_full"
 
         /** The shell instance created last; an older one still alive is the one a relocation left behind. */
         private var live: java.lang.ref.WeakReference<MainActivity>? = null

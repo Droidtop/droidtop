@@ -173,6 +173,9 @@ class OnboardingActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Too little space to start: the storage-full screen, before any setup state is read or saved (docs/SPEC.md
+        // 10c, "Storage full", Droidtop/tracker#849). Its Try again recreates this screen once there is room.
+        if (StorageFullScreen.showIfFull(this)) return
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         // The ground runs under the bars; the theme would paint them grey
         // over it (rig, BlueStacks, dq-onboard-02).

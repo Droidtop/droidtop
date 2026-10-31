@@ -607,7 +607,23 @@ object ThemeAssets {
 
     private val extractionLock = Any()
 
-    private fun extractedBundledThemeDir(context: Context, assetFolder: String): File {
+    /**
+     * What extracting one bundled theme needs free in the cache, at most: the larger bundled theme (DEcaffe) is
+     * 25.2 MB in 1,239 files, 28.8 MB on disk once each file is rounded up to whole blocks; Slate is 20.9 MB on disk.
+     * Summing the assets' own sizes would mean opening every one of them (a compressed asset has no length without
+     * reading it), so this is the estimate, with room to spare for the theme dir an older build left beside the new one.
+     * A cache with less than this is not written to at all (Droidtop/tracker#849).
+     */
+    private const val EXTRACTION_SPACE_BYTES = 40L * 1_000_000L
+
+    /**
+     * The bundled theme [assetFolder] extracted into the cache, or null when it cannot be. Null, rather than the
+     * folder, once an extraction has failed in this process ([ExtractionFailures]): a full disk made every later
+     * load delete the half-written copy and extract the whole theme again under [extractionLock], while the first
+     * composition waited on that lock (Droidtop/tracker#849). A complete extraction from an older build, if one is
+     * still there, is used instead of none.
+     */
+    private fun extractedBundledThemeDir(context: Context, assetFolder: String): File? {
         val themeDir = File(context.cacheDir, "theme_$assetFolder")
         val marker = File(themeDir, EXTRACTED_MARKER)
         // The marker stores the APK's own lastUpdateTime -- NOT
@@ -631,6 +647,10 @@ object ThemeAssets {
             false
         }
         if (markerCurrent()) return themeDir
+        // A complete tree from an older build: its marker is there, only its version differs. An extraction removes
+        // it only after the new tree is complete, so it is still whole when that extraction failed.
+        fun previousExtraction(): File? = themeDir.takeIf { marker.isFile }
+        if (!ExtractionFailures.shouldTry(assetFolder)) return previousExtraction()
         // Real, confirmed-live regression this synchronized/atomic shape
         // fixes: post-install, the first Gaming composition parses the
         // theme WHILE extraction is still running (the shell parses
@@ -647,7 +667,17 @@ object ThemeAssets {
         // new-complete one.
         synchronized(extractionLock) {
             if (markerCurrent()) return themeDir
-            try {
+            // A caller that waited on the lock while another's extraction failed does not start one of its own.
+            if (!ExtractionFailures.shouldTry(assetFolder)) return previousExtraction()
+            // Too little room is known before anything is written: one statfs (Droidtop/tracker#849).
+            val room = context.cacheDir.usableSpace
+            if (room < EXTRACTION_SPACE_BYTES) {
+                Log.w("droidtop.ThemeAssets", "Not extracting bundled theme '$assetFolder': $room bytes free in the cache, $EXTRACTION_SPACE_BYTES needed")
+                ExtractionFailures.failed(assetFolder)
+                return previousExtraction()
+            }
+            // A half-written temp dir left by a failure is removed by the next attempt's own delete, below.
+            val extracted = try {
                 val tempDir = File(context.cacheDir, "theme_$assetFolder.extracting")
                 tempDir.deleteRecursively()
                 extractAssetDir(context, "$BUNDLED_THEMES_ASSET_ROOT/$assetFolder", tempDir)
@@ -655,9 +685,17 @@ object ThemeAssets {
                 themeDir.deleteRecursively()
                 if (!tempDir.renameTo(themeDir)) {
                     Log.e("droidtop.ThemeAssets", "Atomic swap failed for bundled theme '$assetFolder'")
+                    false
+                } else {
+                    true
                 }
             } catch (t: Exception) {
                 Log.e("droidtop.ThemeAssets", "Failed to extract bundled theme '$assetFolder'", t)
+                false
+            }
+            if (!extracted) {
+                ExtractionFailures.failed(assetFolder)
+                return previousExtraction()
             }
         }
         return themeDir
@@ -670,13 +708,18 @@ object ThemeAssets {
             // an empty array for both "empty directory" and "not a
             // directory," so this is the real, standard way to tell them
             // apart: try to open it as a file.
-            destDir.parentFile?.mkdirs()
-            try {
-                context.assets.open(assetPath).use { input ->
-                    destDir.outputStream().use { output -> input.copyTo(output) }
-                }
+            val input = try {
+                context.assets.open(assetPath)
             } catch (t: Exception) {
                 // Genuinely empty directory -- fine, nothing to copy.
+                return
+            }
+            // A file that cannot be written (a full disk) fails the whole
+            // extraction instead of leaving a tree with holes in it that
+            // the marker would then call complete (Droidtop/tracker#849).
+            destDir.parentFile?.mkdirs()
+            input.use { source ->
+                destDir.outputStream().use { output -> source.copyTo(output) }
             }
             return
         }

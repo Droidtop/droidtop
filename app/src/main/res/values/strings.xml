@@ -152,4 +152,10 @@
     <string name="device_setup_change">Change it</string>
     <string name="device_setup_undo">Undo</string>
     <string name="device_setup_not_now">Not now</string>
+    <!-- The storage-full screen, shown instead of droidtop when too little space is free to start (docs/SPEC.md 10c, "Storage full", Droidtop/tracker#849) -->
+    <string name="storage_full_title">Storage is full</string>
+    <string name="storage_full_body">droidtop needs at least about %1$s free to start. Free some space, then try again.</string>
+    <string name="storage_full_open_settings">Open storage settings</string>
+    <string name="storage_full_try_again">Try again</string>
+    <string name="storage_full_still">Still only %1$s free.</string>
 </resources>

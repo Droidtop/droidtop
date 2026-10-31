@@ -43,6 +43,10 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // Catalog words are string resources read through Words (Droidtop/tracker#177); the content providers that
         // register the catalogs start before onCreate, so it gets the Context here, first.
         dev.droidtop.library.settings.Words.init(base)
+        // Whether storage is too full to start, known before any content provider or onCreate runs (one statfs, no
+        // write): MainActivity and onboarding then show the storage-full screen instead of themselves (docs/SPEC.md
+        // 10c, "Storage full", Droidtop/tracker#849).
+        dev.droidtop.runtime.StorageGuard.check(base)
     }
 
     override fun onCreate() {
@@ -200,7 +204,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 dev.droidtop.shell.gamepad.InWindowKeyboard.attach(activity)
                 if (!activity.isParkedSurface()) AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
                 // The first of droidtop's own screens in front after an update opens What's new (SPEC 7b, "Update onboarding").
-                if (activity is MainActivity || activity is com.android.launcher3.Launcher || activity is CatalogScreenActivity) {
+                // Not over the storage-full screen, which only says that storage is full (Droidtop/tracker#849).
+                if ((activity is MainActivity && !activity.storageFull) || activity is com.android.launcher3.Launcher || activity is CatalogScreenActivity) {
                     WhatsNew.onShellResumed(activity)
                 }
                 // Another of droidtop's screens over the shell is not a game: coming back from it is not a return (ShellReturn).
