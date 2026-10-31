@@ -127,6 +127,8 @@ internal object HostWebApis {
             val max = args.optInt("max", 1).coerceIn(1, MAX_CAPTURED)
             // A link a host account, a debrid account or the host's own API serves comes from there, without the page (#638);
             // the plugin gets the files as it would a captured download, and never the account or its key.
+            // The debrid accounts' host lists first, so the view hands on a mirror they serve as it navigates (#638).
+            runCatching { dev.droidtop.pluginhost.debrid.DebridLinks.prime() }
             val downloads = dev.droidtop.pluginhost.hosts.HostLinks.resolve(url) ?: run {
                 val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, inUse(env, record), null, maxDownloads = max)
                 // Out of sight first (Droidtop/tracker#783): a served host or a started download needs no page, and an

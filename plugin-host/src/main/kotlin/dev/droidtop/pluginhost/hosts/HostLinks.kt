@@ -20,10 +20,16 @@ object HostLinks {
     val resolvers: List<HostResolver> by lazy { listOf(PixelDrain(), Mega()) }
 
     /**
-     * Whether [link] is on a host droidtop has an API for, so a page that leads to it hands it here instead of loading
-     * the host's page (Droidtop/tracker#650: a masked forum link the person unmasks in the view). Local, no request.
+     * Whether [link] is on a host droidtop has an API for, or one a connected debrid account serves (from its host list
+     * already fetched, `DebridLinks.prime`), so a page that leads to it hands it here instead of loading the host's page
+     * (Droidtop/tracker#650: a masked forum link the person unmasks in the view; #638: with TorBox signed in, a GoFile
+     * or MixDrop mirror was never handed to TorBox, because only PixelDrain and Mega counted). Local, no request.
      */
-    fun served(link: String, resolvers: List<HostResolver> = this.resolvers): Boolean = resolvers.any { it.matches(link) }
+    fun served(
+        link: String,
+        resolvers: List<HostResolver> = this.resolvers,
+        debrid: (String) -> Boolean = DebridLinks::serves,
+    ): Boolean = resolvers.any { it.matches(link) } || debrid(link)
 
     /**
      * [link]'s files, or null when no way serves it. [debrid] and [resolvers] are replaceable for the tests. [refused] is
@@ -32,14 +38,15 @@ object HostLinks {
      */
     fun resolve(
         link: String,
-        debrid: (String) -> List<WebSessionDownload>? = DebridLinks::resolve,
+        debrid: ((String) -> List<WebSessionDownload>?)? = null,
         resolvers: List<HostResolver> = this.resolvers,
         refused: (String) -> Unit = {},
     ): List<WebSessionDownload>? {
         val host = resolvers.firstOrNull { it.matches(link) }
         val key = host?.let { accounts(it.id)?.trim()?.takeIf { k -> k.isNotEmpty() } }
         if (host != null && key != null) serve(host, link, key, "via your ${host.name}", refused)?.let { return it }
-        debrid(link)?.let { return it }
+        // A debrid account passed over says why, as a host's own refusal does (Droidtop/tracker#638).
+        (debrid ?: { l -> DebridLinks.resolve(l, refused) })(link)?.let { return it }
         return host?.let { serve(it, link, null, "direct from ${it.name}", refused) }
     }
 

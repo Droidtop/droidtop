@@ -89,6 +89,8 @@ internal suspend fun getDownload(
     pageFallback: Boolean = true,
 ): String {
     val externalId = record.externalId
+    // TorBox's hosts known before any page opens, so a mirror it serves goes to it (Droidtop/tracker#638).
+    primeDebrid()
     // The game's own page on the source's site, opened in droidtop's web view when droidtop's own requests are turned
     // away: the web view passes the site's browser check itself (it is the browser), and the person picks the mirror
     // there, as on the site; droidtop takes the download the page starts (Droidtop/tracker#600, #599). Cloudflare
@@ -163,6 +165,7 @@ internal suspend fun getBest(
     hostOrder: List<String>,
     say: (String) -> Unit,
 ): String {
+    primeDebrid()
     val candidates = DownloadPick.candidates(
         record.downloads,
         systems = DownloadPick.systemsFor(newest),
@@ -185,12 +188,24 @@ internal suspend fun getGroup(
     hostOrder: List<String>,
     say: (String) -> Unit,
 ): String {
+    primeDebrid()
     val ordered = DownloadPick.hostOrdered(group, hostOrder, served = ::servedHere)
     return tryInTurn(library, source, record, ordered, gameName, newest, say)
 }
 
+/**
+ * Whether droidtop serves [d] without its page: its address is on a served host, or it names a host a connected debrid
+ * account serves. A masked forum link names its host ("GOFILE") before it is opened, so the name decides then
+ * (Droidtop/tracker#638: with TorBox signed in, the pick never put TorBox's hosts first).
+ */
 private fun servedHere(d: UpdateSources.Download): Boolean =
-    (d.url ?: d.parts.firstOrNull()?.url)?.let { dev.droidtop.pluginhost.hosts.HostLinks.served(it) } == true
+    (d.url ?: d.parts.firstOrNull()?.url)?.let { dev.droidtop.pluginhost.hosts.HostLinks.served(it) } == true ||
+        dev.droidtop.pluginhost.debrid.DebridLinks.servesName(d.host)
+
+/** The debrid accounts' host lists, fetched before a pick ranks by them: a request per account, so off the main thread. */
+private suspend fun primeDebrid() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    runCatching { dev.droidtop.pluginhost.debrid.DebridLinks.prime() }
+}
 
 /**
  * [candidates] tried in turn: a mirror that starts nothing gives way to the next, said on the status line; anything
