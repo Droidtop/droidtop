@@ -1,6 +1,7 @@
 package dev.droidtop.library.settings
 
 import android.content.Context
+import dev.droidtop.runtime.R
 import java.io.File
 import java.time.ZoneId
 import org.json.JSONObject
@@ -104,19 +105,19 @@ object PlaySummaryScreen {
 
     fun screen() = CatalogScreen(
         id = "your_play",
-        title = "Your play",
-        subtitle = "Time played in games droidtop started",
+        title = words(R.string.your_play_title),
+        subtitle = words(R.string.your_play_subtitle),
         groups = { context -> groups(context) },
     )
 
     fun link() = NestedScreenItem(
         id = ID_LINK,
-        title = "Your play",
-        subtitle = "This week, all time, and your most played games",
+        title = words(R.string.your_play_title),
+        subtitle = words(R.string.your_play_link_subtitle),
         inline = screen(),
         valueLabel = { context ->
             val summary = PlayLog.summary(PlayLogStore.log(context), System.currentTimeMillis(), ZoneId.systemDefault())
-            if (summary.allTimeSeconds > 0) "${PlayTime.duration(summary.weekSeconds)} this week" else "Nothing played yet"
+            if (summary.allTimeSeconds > 0) words(R.string.your_play_this_week_value, PlayTime.duration(summary.weekSeconds)) else words(R.string.your_play_nothing_yet)
         },
     )
 
@@ -127,7 +128,7 @@ object PlaySummaryScreen {
                 CatalogGroup(
                     id = "your_play_empty",
                     title = null,
-                    items = listOf(TextBlockItem(id = "your_play_none", text = "Nothing played yet. Time counts from the next game droidtop starts.")),
+                    items = listOf(TextBlockItem(id = "your_play_none", text = words(R.string.your_play_nothing_yet_explained))),
                 ),
             )
         }
@@ -136,20 +137,20 @@ object PlaySummaryScreen {
                 id = "your_play_totals",
                 title = null,
                 items = listOf(
-                    ActionItem(id = "your_play_week", title = "This week", subtitle = "From Monday", value = PlayTime.duration(summary.weekSeconds)),
-                    ActionItem(id = "your_play_all", title = "All time", value = PlayTime.duration(summary.allTimeSeconds)),
+                    ActionItem(id = "your_play_week", title = words(R.string.your_play_this_week), subtitle = words(R.string.your_play_from_monday), value = PlayTime.duration(summary.weekSeconds)),
+                    ActionItem(id = "your_play_all", title = words(R.string.your_play_all_time), value = PlayTime.duration(summary.allTimeSeconds)),
                 ),
             ),
             CatalogGroup(
                 id = "your_play_top",
-                title = "Most played",
+                title = words(R.string.your_play_most_played),
                 items = summary.top.mapIndexed { i, game ->
                     ActionItem(id = "your_play_top_$i", title = game.title, subtitle = game.system, value = PlayTime.duration(game.totalSeconds))
                 },
             ),
             CatalogGroup(
                 id = "your_play_systems",
-                title = "By system",
+                title = words(R.string.your_play_by_system),
                 items = summary.bySystem.mapIndexed { i, (system, seconds) ->
                     ActionItem(id = "your_play_system_$i", title = system, value = PlayTime.duration(seconds))
                 },

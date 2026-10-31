@@ -75,4 +75,15 @@
     <string name="device_setup_power_not_needed">Android has no per-game power setting here</string>
     <string name="device_setup_power_to_do">Off. Recommended: droidtop sets each game\'s power. Press to turn it on</string>
     <string name="device_setup_power_on">On: droidtop sets each game\'s power. Press to turn it off</string>
+    <string name="your_play_title">Your play</string>
+    <string name="your_play_subtitle">Time played in games droidtop started</string>
+    <string name="your_play_link_subtitle">This week, all time, and your most played games</string>
+    <string name="your_play_this_week_value">%1$s this week</string>
+    <string name="your_play_nothing_yet">Nothing played yet</string>
+    <string name="your_play_nothing_yet_explained">Nothing played yet. Time counts from the next game droidtop starts.</string>
+    <string name="your_play_this_week">This week</string>
+    <string name="your_play_from_monday">From Monday</string>
+    <string name="your_play_all_time">All time</string>
+    <string name="your_play_most_played">Most played</string>
+    <string name="your_play_by_system">By system</string>
 </resources>
