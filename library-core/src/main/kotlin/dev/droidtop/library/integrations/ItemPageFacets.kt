@@ -1,5 +1,6 @@
 package dev.droidtop.library.integrations
 
+import dev.droidtop.library.RecordSections
 import dev.droidtop.library.UpdateSources
 import dev.droidtop.pluginhost.Facet
 import dev.droidtop.pluginhost.FacetBody
@@ -68,7 +69,12 @@ object ItemPageFacets {
             updatedEpochMs = meta?.updated?.takeIf { it > 0 },
             cover = (images.firstOrNull { it.role == "cover" } ?: images.firstOrNull())?.url,
             overview = about?.overview,
-            changelog = about?.changelog,
+            // A changelog the source gives only as a named section is still the changelog (Droidtop/tracker#845).
+            changelog = about?.changelog ?: about?.sections?.firstOrNull { RecordSections.isChangelog(it.title) }?.body,
+            sections = about?.sections.orEmpty()
+                .filterNot { RecordSections.isChangelog(it.title) && about?.changelog == null }
+                .map { UpdateSources.Section(it.title, it.body) },
+            thread = about?.thread,
             downloads = distinctDownloads(downloads.mapNotNull { d ->
                 val url = d.url?.takeIf { it.startsWith("https://") }
                 val parts = d.parts.mapNotNull { p ->

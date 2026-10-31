@@ -42,7 +42,19 @@ object ThreadDownloads {
         val build: String? = null,
     )
 
-    data class Read(val version: String?, val entries: List<Entry>, val problem: Problem?, val facts: Facts = Facts.NONE)
+    data class Read(
+        val version: String?,
+        val entries: List<Entry>,
+        val problem: Problem?,
+        val facts: Facts = Facts.NONE,
+        /** The post's named sections beside its links ("Overview", "Installation"), in its order (Droidtop/tracker#845). */
+        val sections: List<Section> = emptyList(),
+        /** The first post as plain text, for the game page's Show thread; null when there is none. */
+        val post: String? = null,
+    )
+
+    /** One named section of a first post: its heading as written, and the text under it. */
+    data class Section(val title: String, val body: String)
 
     /**
      * What a first post says of the game besides its links (Droidtop/tracker#845): its platforms ("OS: Windows,
@@ -69,6 +81,13 @@ object ThreadDownloads {
     private val EXTRA = Regex("\\b(extras?|walkthrough|guide|saves?|soundtrack|ost|art ?book|bonus)\\b", RegexOption.IGNORE_CASE)
     private val DOWNLOAD_HEADING = Regex("^\\s*downloads?\\s*:?\\s*$", RegexOption.IGNORE_CASE)
     private val VERSION_LINE = Regex("^\\s*version\\s*:\\s*(.{1,60})$", RegexOption.IGNORE_CASE)
+    private val SECTION_HEADING = Regex(
+        "^(overview|about( the game)?|story|synopsis|plot|description|features|installation( instructions)?|how to install|install(ing)?|changelog|change log|what'?s new|developer notes?|dev notes?|notes)\\s*:?$",
+        RegexOption.IGNORE_CASE,
+    )
+    private const val MAX_SECTIONS = 8
+    private const val MAX_SECTION_TEXT = 4_000
+    private const val MAX_POST_TEXT = 20_000
     private val FACT_LINE = Regex("^\\s*(os|platforms?|languages?|censored|censorship)\\s*:\\s*(.{1,160})$", RegexOption.IGNORE_CASE)
     private val LIST_SPLIT = Regex("\\s*(?:,|/|&|\\band\\b|\\|)\\s*", RegexOption.IGNORE_CASE)
     private val GUEST_LINKS = Regex("(you must be registered to see the links|you must be logged in to see the links)", RegexOption.IGNORE_CASE)
@@ -81,9 +100,12 @@ object ThreadDownloads {
         val lines = lines(post)
         val version = lines.firstNotNullOfOrNull { line -> VERSION_LINE.find(line.text)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() } }
         val facts = facts(lines.map { it.text })
+        val texts = lines.map { it.text }
+        val sections = sections(texts)
+        val post = texts.filter { it.isNotEmpty() }.joinToString("\n").take(MAX_POST_TEXT).ifEmpty { null }
         val start = lines.indexOfFirst { it.links.isEmpty() && DOWNLOAD_HEADING.matches(it.text.trim().trimEnd('*').trim()) }
         if (start < 0) {
-            return Read(version, emptyList(), if (GUEST_LINKS.containsMatchIn(post) || guestPage(page)) Problem.MEMBERS else Problem.NO_DOWNLOADS, facts)
+            return Read(version, emptyList(), if (GUEST_LINKS.containsMatchIn(post) || guestPage(page)) Problem.MEMBERS else Problem.NO_DOWNLOADS, facts, sections, post)
         }
         val entries = entries(lines.drop(start + 1))
         val problem = when {
@@ -91,7 +113,38 @@ object ThreadDownloads {
             GUEST_LINKS.containsMatchIn(post) || guestPage(page) -> Problem.MEMBERS
             else -> Problem.NO_DOWNLOADS
         }
-        return Read(version, entries, problem, facts)
+        return Read(version, entries, problem, facts, sections, post)
+    }
+
+    /**
+     * The named sections [lines] (a first post's lines, as text) hold: a line that is only a known heading
+     * ("Overview", "Installation:", "Developer Notes") starts one, and the text lines up to the next heading, or the
+     * download section, are its body. A heading with nothing under it is left out. Pure.
+     */
+    fun sections(lines: List<String>): List<Section> {
+        val out = mutableListOf<Section>()
+        var title: String? = null
+        val body = StringBuilder()
+        fun close() {
+            val text = body.toString().trim()
+            if (title != null && text.isNotEmpty() && out.size < MAX_SECTIONS) out += Section(title!!, text.take(MAX_SECTION_TEXT))
+            title = null
+            body.clear()
+        }
+        for (raw in lines) {
+            val line = raw.trim().trimEnd('*').trim()
+            if (line.isEmpty()) continue
+            when {
+                SECTION_HEADING.matches(line) -> {
+                    close()
+                    title = line.trimEnd(':').trim()
+                }
+                DOWNLOAD_HEADING.matches(line) -> close()
+                title != null -> body.append(line).append('\n')
+            }
+        }
+        close()
+        return out
     }
 
     /**
@@ -192,7 +245,7 @@ object ThreadDownloads {
         return Regex("^https?://(?:www\\.)?([^/:?#]+)", RegexOption.IGNORE_CASE).find(url)?.groupValues?.get(1) ?: "Link"
     }
 
-    /** `{version?, entries, problem?, message?, facts?}`: what `sources.parse_thread` answers. Pure. */
+    /** `{version?, entries, problem?, message?, facts?, sections?, post?}`: what `sources.parse_thread` answers. Pure. */
     fun toJson(read: Read): JSONObject = JSONObject().apply {
         read.version?.let { put("version", it) }
         put(
@@ -220,6 +273,10 @@ object ThreadDownloads {
             if (read.facts.contentNotes.isNotEmpty()) put("contentNotes", JSONArray(read.facts.contentNotes))
         }
         if (facts.length() > 0) put("facts", facts)
+        if (read.sections.isNotEmpty()) {
+            put("sections", JSONArray(read.sections.map { JSONObject().put("title", it.title).put("body", it.body) }))
+        }
+        read.post?.let { put("post", it) }
     }
 
     // --- reading the page -----------------------------------------------------------------------------------------

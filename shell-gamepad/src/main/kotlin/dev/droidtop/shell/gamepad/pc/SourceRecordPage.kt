@@ -46,6 +46,7 @@ import dev.droidtop.library.downloadSystems
 import dev.droidtop.library.pressedState
 import dev.droidtop.library.factRows
 import dev.droidtop.library.ratingLine
+import dev.droidtop.library.sectionRows
 import dev.droidtop.library.signInRow
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuPanel
@@ -262,6 +263,7 @@ internal fun recordRows(
         record.updatedEpochMs?.let { RecordRow("Updated", formatDate(it)) },
     ) + factRows(record) + listOfNotNull(
         record.tags.takeIf { it.isNotEmpty() }?.let { RecordRow("Tags", subtitle = it.joinToString(", ")) },
+    ) + sectionRows(record) + listOfNotNull(
         record.url?.let { url -> RecordRow(OPEN_SOURCE_ROW, linkHost(url), action = RecordAction.Open(url)) },
         changeLinkRow(),
     )

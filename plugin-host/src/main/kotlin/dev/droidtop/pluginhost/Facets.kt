@@ -153,7 +153,18 @@ sealed interface FacetBody {
         val contentNotes: List<String> = emptyList(),
     ) : FacetBody
 
-    data class Description(val overview: String?, val changelog: String?) : FacetBody
+    /**
+     * [sections]: the source's other named texts ("Installation", "Developer notes"), in its order; [thread]: the
+     * source page's main text as it reads, for Show thread (Droidtop/tracker#845).
+     */
+    data class Description(
+        val overview: String?,
+        val changelog: String?,
+        val sections: List<Section> = emptyList(),
+        val thread: String? = null,
+    ) : FacetBody {
+        data class Section(val title: String, val body: String)
+    }
 
     data class Image(val media: Media) : FacetBody
 
@@ -514,7 +525,17 @@ object Facets {
             "description" -> {
                 val overview = text("overview", "textBody")
                 val changelog = text("changelog", "textBody")
-                if (overview == null && changelog == null) null else FacetBody.Description(overview, changelog)
+                val sections = capped(json.optJSONArray("sections"), "tags", "sections") { s ->
+                    val title = text("title", "label", s) ?: return@capped null
+                    val body = text("body", "textBody", s) ?: return@capped null
+                    FacetBody.Description.Section(title, body)
+                }
+                val thread = text("thread", "textBody")
+                if (overview == null && changelog == null && sections.isEmpty() && thread == null) {
+                    null
+                } else {
+                    FacetBody.Description(overview, changelog, sections, thread)
+                }
             }
             "download" -> FacetBody.Download(
                 capped(json.optJSONArray("entries"), "downloadEntries", "entries") { e ->

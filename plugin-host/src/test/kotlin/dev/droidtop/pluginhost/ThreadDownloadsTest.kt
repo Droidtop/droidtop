@@ -190,4 +190,31 @@ class ThreadDownloadsTest {
         assertEquals("Uncensored", json.getJSONArray("contentNotes").getString(0))
         assertFalse(ThreadDownloads.toJson(ThreadDownloads.Read(null, emptyList(), null)).has("facts"))
     }
+    @Test
+    fun `a first post's named sections are read in order, and a heading with nothing under it is left out`() {
+        // Droidtop/tracker#845: named texts for the game page, and the post itself for Show thread.
+        val sections = ThreadDownloads.sections(
+            listOf(
+                "Overview:", "A story about a town.", "It has two endings.",
+                "Installation", "Extract and run.",
+                "Features:",
+                "DOWNLOAD", "Win/Linux:",
+                "Developer Notes", "Thanks for playing.",
+            ),
+        )
+        assertEquals(
+            listOf(
+                ThreadDownloads.Section("Overview", "A story about a town.\nIt has two endings."),
+                ThreadDownloads.Section("Installation", "Extract and run."),
+                ThreadDownloads.Section("Developer Notes", "Thanks for playing."),
+            ),
+            sections,
+        )
+        val read = ThreadDownloads.read(page("<b>Overview</b><br>A story.<br><b>DOWNLOAD</b><br><b>Win/Linux</b>: ${a("https://gofile.io/d/g", "GOFILE")}<br>"))
+        assertEquals(listOf("Overview"), read.sections.map { it.title })
+        assertTrue(read.post!!.contains("A story."))
+        val json = ThreadDownloads.toJson(read)
+        assertEquals("A story.", json.getJSONArray("sections").getJSONObject(0).getString("body"))
+        assertTrue(json.has("post"))
+    }
 }

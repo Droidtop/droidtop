@@ -78,6 +78,21 @@ fun factRows(record: UpdateSources.Record): List<RecordRow> = listOfNotNull(
     record.contentNotes.takeIf { it.isNotEmpty() }?.let { RecordRow("Content", subtitle = it.joinToString(", ")) },
 )
 
+/** Which of a source's named texts are which (Droidtop/tracker#845). Pure. */
+object RecordSections {
+    private val CHANGELOG = Regex("^(changelog|change log|what'?s new)$", RegexOption.IGNORE_CASE)
+
+    /** Whether a section headed [title] is the changelog, which the Changelog tab shows. */
+    fun isChangelog(title: String): Boolean = CHANGELOG.matches(title.trim())
+}
+
+/**
+ * The source's named texts beside its overview and changelog ("Installation", "Developer notes"), a row each with its
+ * text under it, in the source's order (Droidtop/tracker#845). The record's Info tab shows them. Pure.
+ */
+fun sectionRows(record: UpdateSources.Record): List<RecordRow> =
+    record.sections.filterNot { RecordSections.isChangelog(it.title) }.map { RecordRow(it.title, subtitle = it.body) }
+
 /** "4.3 of 5 (1,234 votes)" for a 0-to-1 rating; null when the source gives none. */
 fun ratingLine(rating: Double?, votes: Int?): String? {
     rating ?: return null
