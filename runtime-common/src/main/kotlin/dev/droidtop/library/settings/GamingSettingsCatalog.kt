@@ -1123,7 +1123,14 @@ object GamingSettingsCatalog {
                     controls.switchRadio(ctx, dev.droidtop.runtime.tasks.TaskManager.shell, radio, on)
                 }
                 if (!switched) {
-                    Notices.flash("Android did not switch $title, so its screen is open", tone = NoticeTone.Caution, context = ctx)
+                    // Why, before Android's screen opens (Droidtop/tracker#851): with nothing privileged behind the
+                    // provider, the switch could never have worked, and the person is told what would make it work.
+                    val why = dev.droidtop.runtime.tasks.TaskManager.shell.unavailableReason()
+                    Notices.flash(
+                        if (why != null) "$title wasn't switched: $why. Android's screen for it is open" else "Android did not switch $title, so its screen is open",
+                        tone = NoticeTone.Caution,
+                        context = ctx,
+                    )
                     SettingsLaunch.start(ctx, controls.radioSettingsIntent(radio))
                 }
             },

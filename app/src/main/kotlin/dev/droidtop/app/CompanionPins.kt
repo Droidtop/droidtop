@@ -410,7 +410,7 @@ internal enum class HelperStep(val button: String?) {
         fun next(shizukuInstalled: Boolean, state: BackendState): HelperStep = when (state) {
             BackendState.READY -> DONE
             BackendState.NEEDS_PERMISSION -> ALLOW
-            BackendState.ABSENT -> if (shizukuInstalled) OPEN else GET
+            BackendState.ABSENT, BackendState.UNBACKED -> if (shizukuInstalled) OPEN else GET
         }
     }
 }

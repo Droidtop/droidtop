@@ -68,6 +68,9 @@ object ElevatedAccessCatalog {
         return ChoiceItem(
             id = "accounts_elevated_access",
             title = "Elevated access",
+            // Nothing answering is said, with the one step that changes it, rather than a backend that cannot act
+            // (Droidtop/tracker#851).
+            subtitle = if (active == null) shell.unavailableReason() else null,
             options = shown.map { ChoiceOption(it.id, label(it, active?.label)) },
             current = current.id,
             onSelect = { ctx, value -> ElevatedAccessHost.setChoice(ctx, ElevatedChoice.fromId(value)) },
@@ -75,7 +78,7 @@ object ElevatedAccessCatalog {
     }
 
     private fun label(choice: ElevatedChoice, activeLabel: String?): String = when (choice) {
-        ElevatedChoice.AUTO -> if (activeLabel == null) choice.label else "${choice.label} ($activeLabel)"
+        ElevatedChoice.AUTO -> "${choice.label} (${activeLabel ?: "none available"})"
         else -> choice.label
     }
 }
