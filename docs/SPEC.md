@@ -14223,7 +14223,11 @@ reimplemented it as my own f95seeker code." So:
     the source last updated it, the platforms, languages and content notes
     the source states (`metadata` `platforms`, `languages`, `contentNotes`,
     Droidtop/tracker#845; `sources.parse_thread` reads them from a thread's
-    first post), the tags, and Open the source's page.
+    first post), the tags, the source's other named texts a row each
+    ("Installation", "Developer notes": `description` `sections`; one headed
+    "Changelog" is the Changelog tab's when the source gives no changelog),
+    and Open the source's page. The source page's main text (`description`
+    `thread`) is kept for the game page's Show thread.
 - **Where it opens:** tapping an update wherever it shows (the game page's
   update line, the Update available shelf, a row of Settings > Updates, which
   opened the game page before) opens the record of the source that named the

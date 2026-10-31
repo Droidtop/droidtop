@@ -118,10 +118,17 @@ interface UpdateSources {
         val cover: String? = null,
         val overview: String? = null,
         val changelog: String? = null,
+        /** The source's other named texts ("Installation", "Developer notes"), in its order (Droidtop/tracker#845). */
+        val sections: List<Section> = emptyList(),
+        /** The source page's main text as it reads, for the game page's Show thread; null when the source gives none. */
+        val thread: String? = null,
         val downloads: List<Download> = emptyList(),
         /** The source's own switches, buttons, links and notices for this item (docs/plugin-api.md 1.10, `item.page`). */
         val controls: List<Control> = emptyList(),
     )
+
+    /** One named text of a source's page: its heading as the source writes it, and the text under it. */
+    data class Section(val title: String, val body: String)
 
     /**
      * One of the source's controls on the record page: a switch (watch this thread), a button, a link or a notice.

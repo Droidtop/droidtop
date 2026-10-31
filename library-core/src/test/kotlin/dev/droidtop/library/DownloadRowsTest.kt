@@ -90,4 +90,13 @@ class DownloadRowsTest {
         )
         assertEquals(emptyList<RecordRow>(), factRows(UpdateSources.Record("4", "Bare")))
     }
+    @Test
+    fun `a record's named texts are a row each, the changelog left to its own tab`() {
+        val record = UpdateSources.Record(
+            "5", "Game",
+            sections = listOf(UpdateSources.Section("Installation", "Extract and run."), UpdateSources.Section("Changelog", "v0.2: more")),
+        )
+        assertEquals(listOf(RecordRow("Installation", subtitle = "Extract and run.")), sectionRows(record))
+        assertTrue(RecordSections.isChangelog("What's new"))
+    }
 }
