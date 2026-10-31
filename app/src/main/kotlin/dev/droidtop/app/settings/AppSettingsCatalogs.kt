@@ -1179,6 +1179,7 @@ object AppSettingsCatalogs {
                 title = "File hosts",
                 items = listOf(
                     guidedKeyRow(context, ScraperKeyService.PIXELDRAIN, "PixelDrain"),
+                    guidedKeyRow(context, ScraperKeyService.GOFILE, "GoFile"),
                 ),
             ),
             // droidtop's own sign-ins for download sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648).

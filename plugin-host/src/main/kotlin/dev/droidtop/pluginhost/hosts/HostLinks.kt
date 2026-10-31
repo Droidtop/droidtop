@@ -14,10 +14,10 @@ import java.io.IOException
  * Blocking: called where the web view would block.
  */
 object HostLinks {
-    /** :app sets this: the person's key for the host with this id ("pixeldrain"), or null when they have none. */
+    /** :app sets this: the person's key for the host with this id ("pixeldrain", "gofile"), or null when they have none. */
     @Volatile var accounts: (hostId: String) -> String? = { null }
 
-    val resolvers: List<HostResolver> by lazy { listOf(PixelDrain(), Mega()) }
+    val resolvers: List<HostResolver> by lazy { listOf(PixelDrain(), Mega(), GoFile()) }
 
     /**
      * Whether [link] is on a host droidtop has an API for, or one a connected debrid account serves (from its host list
@@ -65,7 +65,7 @@ object HostLinks {
         if (files.isNullOrEmpty() || files.size > DownloadJobs.MAX_FILES) return null
         return files.map { file ->
             val own = file.decrypt?.let { mapOf(HostDecryption.SECRET to it) }.orEmpty()
-            WebSessionDownload.direct(file.url, file.name, file.size, file.headers + own, file.sha256, via)
+            WebSessionDownload.direct(file.url, file.name, file.size, file.headers + own, file.sha256, via, file.md5)
         }
     }
 }
