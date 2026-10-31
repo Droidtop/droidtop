@@ -30,7 +30,10 @@ import androidx.compose.ui.unit.dp
  * [rest] is the fill while not selected and [selectedFill] while selected;
  * [restOutline] is an optional hairline kept while not selected (the cards
  * keep [MenuTokens.CardOutline]); [ringOutset] puts the ring that far
- * outside the edge (capsules, whose art keeps its edge clear).
+ * outside the edge. [art] is a game's picture: it shows the cursor by growing
+ * (focusRise and focusZoom, with its shine), never with the ring (the owner,
+ * 2026-10-31: "The outline still lags behind. But it's also not really
+ * necessary? The game image grows a bit, which is enough of an indicator").
  *
  * Drawn only while a pad or keyboard is driving ([PadModality], docs/
  * SPEC.md 6e): on touch the selection is still there -- a tap moves it --
@@ -44,8 +47,9 @@ fun Modifier.selectionFrame(
     selectedFill: Color = MenuTokens.SurfaceSelected,
     ringOutset: Dp = 0.dp,
     // A row (Droidtop/tracker#644, the visual language's "Focus"): focused, it is the accent at 22 percent behind it and
-    // a 4 dp accent bar at its leading edge, and no ring. Art and controls keep the ring; the two never mix on a surface.
+    // a 4 dp accent bar at its leading edge, and no ring. Controls keep the ring; art grows instead ([art]).
     row: Boolean = false,
+    art: Boolean = false,
 ): Modifier = composed {
     val shown = selected && PadModality.showsFocus
     Modifier
@@ -64,7 +68,7 @@ fun Modifier.selectionFrame(
                 Modifier
             },
         )
-        .focusRing(shown && !row, shape, ringOutset)
+        .focusRing(shown && !row && !art, shape, ringOutset)
 }
 
 /**
