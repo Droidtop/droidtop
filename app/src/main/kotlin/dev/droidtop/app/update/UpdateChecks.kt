@@ -252,9 +252,10 @@ object UpdateChecks {
     }
 
     /**
-     * Keeps the scheduled job in step with "Check for updates" and "Only on Wi-Fi": every day, week or month, on any
-     * network or only an unmetered one, none at all on Never. Called when droidtop's process starts (the job is not
-     * persisted across reboots) and when either setting changes.
+     * Keeps the scheduled job in step with "Check for updates" and Download rules' network rule: every day, week or
+     * month, on any network or, under Wi-Fi only, an unmetered one; none at all on Never. Called when droidtop's process
+     * starts (the job is not persisted across reboots) and when either setting changes. Reads preferences: not for the
+     * main thread.
      */
     fun schedule(context: Context) {
         val app = context.applicationContext

@@ -205,8 +205,12 @@ class SettingsCatalogInitProvider : ContentProvider() {
             )
         }
         // Every kind of update is checked by a job on droidtop's own schedule (Updates > Update settings, Check for
-        // updates; Droidtop/tracker#570). The job is not persisted, so each process start makes sure it is there.
-        dev.droidtop.app.update.UpdateChecks.schedule(appContext)
+        // updates; Droidtop/tracker#570). The job is not persisted, so each process start makes sure it is there. Off the
+        // main thread: it reads the download rules, and moves a retired update setting into them first (#833).
+        dev.droidtop.runtime.util.AppScopes.io.launch {
+            dev.droidtop.app.update.AppSelfUpdate.migrateUnmeteredOnly(appContext)
+            dev.droidtop.app.update.UpdateChecks.schedule(appContext)
+        }
         // Its preferences are read off the main thread.
         dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.app.ContainerBackups.schedule(appContext) }
         return true
