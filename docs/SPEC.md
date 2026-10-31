@@ -4773,7 +4773,14 @@ any command still running and Kill reported "process hasn't exited" (tracker#412
 broker (`priv.packages`, `priv.shell`). The owner's trade-off: the plugin integrates more directly with
 droidtop; the official app gives control and independent updates, updated by its own developers and working
 as it normally would. Auto takes the first backend that is ready, the app before the plugin; a named backend
-is never swapped for the other. The row offers only what is present and is absent when neither is, and a
+is never swapped for the other. **Ready means something answers (2026-10-31, Droidtop/tracker#851).** On the
+console the Shizuku plugin ran without the Shizuku app, and Elevated access read "Auto (Shizuku plugin)" while
+every command failed and system switches silently opened Android's screens. A `priv.shell` provider plugin is now
+ready only once `exec ["true"]` through it succeeds (probed off the main thread, the answer kept 30 s). A provider
+that runs with nothing behind it is `BackendState.UNBACKED`: never the active backend, and its reason says so
+with the step that fixes it (start Shizuku, or pair wireless debugging). The row reads "Auto (none available)"
+with that reason under it, and a system switch that falls back to Android's screen says why first. Until the
+provider host of Droidtop/tracker#852 starts its own privileged server, this is how the gap is shown. The row offers only what is present and is absent when neither is, and a
 privileged control is drawn only while the active backend reports its capability, so with no backend none
 appears. The third backend is the device's own **wireless debugging** (Droidtop/tracker#816, owner 2026-10-30:
 "through wireless debugging's autosetup"; section "Wireless debugging"). droidtop pairs with it using the code

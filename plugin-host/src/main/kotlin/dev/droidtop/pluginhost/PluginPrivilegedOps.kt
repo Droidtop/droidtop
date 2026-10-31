@@ -34,14 +34,57 @@ class PluginPrivilegedOps(private val context: Context) : ElevatedBackend {
         )
 
     /**
-     * Ready while a running provider plugin serves either interface; the plugin itself says why a call fails. A provider
-     * plugin that is installed but not running (not approved yet, turned off, disabled after a crash) needs the person:
-     * [BackendState.NEEDS_PERMISSION], so Kill says to approve it instead of to add it (console, build 1773).
+     * Ready while a running provider plugin serves either interface and something privileged answers behind it. A
+     * provider plugin that is installed but not running (not approved yet, turned off, disabled after a crash) needs the
+     * person: [BackendState.NEEDS_PERMISSION], so Kill says to approve it instead of to add it (console, build 1773).
+     * One that runs with nothing behind it (the Shizuku plugin with no Shizuku app, Droidtop/tracker#851) is
+     * [BackendState.UNBACKED], never ready: droidtop does not claim a backend that cannot act.
      */
-    override fun state(): BackendState = when {
-        available().let { it.forceStop || it.shell } -> BackendState.READY
-        providerInstalled() -> BackendState.NEEDS_PERMISSION
-        else -> BackendState.ABSENT
+    override fun state(): BackendState {
+        val offered = available()
+        return when {
+            offered.shell -> if (backed()) BackendState.READY else BackendState.UNBACKED
+            offered.forceStop -> BackendState.READY
+            providerInstalled() -> BackendState.NEEDS_PERMISSION
+            else -> BackendState.ABSENT
+        }
+    }
+
+    @Volatile
+    private var probedAt = 0L
+
+    @Volatile
+    private var probeAnswer: Boolean? = null
+
+    @Volatile
+    private var probing = false
+
+    /**
+     * Whether the `priv.shell` provider can run anything: `exec ["true"]`, which succeeds only when something
+     * privileged ran it (the provider says why not otherwise). The answer is kept [PROBE_MS], since [state] is asked
+     * often. Off the main thread a stale answer is probed again at once; on it, the last answer stands and a probe
+     * runs in the background, and with none yet the provider is not counted as backed.
+     */
+    private fun backed(): Boolean {
+        val known = probeAnswer
+        if (known != null && System.currentTimeMillis() - probedAt < PROBE_MS) return known
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            if (!probing) {
+                probing = true
+                Thread({ runCatching { probe() }; probing = false }, "droidtop-provider-probe").apply { isDaemon = true }.start()
+            }
+            return known ?: false
+        }
+        return probe()
+    }
+
+    private fun probe(): Boolean {
+        val reply = runCatching { caller.call("priv.shell", 1, "exec", JSONObject().put("argv", JSONArray(listOf("true")))) }.getOrNull()
+        val answer = reply?.ok == true && reply.data.optInt("exit", -1) == 0
+        if (answer != probeAnswer) android.util.Log.i("droidtop.elevated", "provider plugin backed=$answer${reply?.takeIf { !it.ok }?.let { ": " + it.message } ?: ""}")
+        probeAnswer = answer
+        probedAt = System.currentTimeMillis()
+        return answer
     }
 
     @Volatile
@@ -139,5 +182,8 @@ class PluginPrivilegedOps(private val context: Context) : ElevatedBackend {
         const val FILE_CHUNK = 192 * 1024
         const val ROOT_LEVEL = "root"
         const val INSTALLED_CACHE_MS = 5_000L
+
+        /** How long a probe's answer stands (Droidtop/tracker#851): long enough that [state] stays cheap, short enough that starting Shizuku shows. */
+        const val PROBE_MS = 30_000L
     }
 }
