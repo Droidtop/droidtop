@@ -42,7 +42,17 @@ object ThreadDownloads {
         val build: String? = null,
     )
 
-    data class Read(val version: String?, val entries: List<Entry>, val problem: Problem?)
+    data class Read(val version: String?, val entries: List<Entry>, val problem: Problem?, val facts: Facts = Facts.NONE)
+
+    /**
+     * What a first post says of the game besides its links (Droidtop/tracker#845): its platforms ("OS: Windows,
+     * Linux"), its languages and its content notes ("Censored: No" is "Uncensored"). Empty for what it does not say.
+     */
+    data class Facts(val platforms: List<String>, val languages: List<String>, val contentNotes: List<String>) {
+        companion object {
+            val NONE = Facts(emptyList(), emptyList(), emptyList())
+        }
+    }
 
     /** The longest page read; a thread page is far smaller. */
     const val MAX_HTML = 4_000_000
@@ -59,6 +69,8 @@ object ThreadDownloads {
     private val EXTRA = Regex("\\b(extras?|walkthrough|guide|saves?|soundtrack|ost|art ?book|bonus)\\b", RegexOption.IGNORE_CASE)
     private val DOWNLOAD_HEADING = Regex("^\\s*downloads?\\s*:?\\s*$", RegexOption.IGNORE_CASE)
     private val VERSION_LINE = Regex("^\\s*version\\s*:\\s*(.{1,60})$", RegexOption.IGNORE_CASE)
+    private val FACT_LINE = Regex("^\\s*(os|platforms?|languages?|censored|censorship)\\s*:\\s*(.{1,160})$", RegexOption.IGNORE_CASE)
+    private val LIST_SPLIT = Regex("\\s*(?:,|/|&|\\band\\b|\\|)\\s*", RegexOption.IGNORE_CASE)
     private val GUEST_LINKS = Regex("(you must be registered to see the links|you must be logged in to see the links)", RegexOption.IGNORE_CASE)
 
     /** [html], the thread page as the web view loaded it, read. Pure. */
@@ -68,9 +80,10 @@ object ThreadDownloads {
         val post = firstPost(page) ?: return Read(null, emptyList(), if (guestPage(page)) Problem.MEMBERS else Problem.LAYOUT)
         val lines = lines(post)
         val version = lines.firstNotNullOfOrNull { line -> VERSION_LINE.find(line.text)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() } }
+        val facts = facts(lines.map { it.text })
         val start = lines.indexOfFirst { it.links.isEmpty() && DOWNLOAD_HEADING.matches(it.text.trim().trimEnd('*').trim()) }
         if (start < 0) {
-            return Read(version, emptyList(), if (GUEST_LINKS.containsMatchIn(post) || guestPage(page)) Problem.MEMBERS else Problem.NO_DOWNLOADS)
+            return Read(version, emptyList(), if (GUEST_LINKS.containsMatchIn(post) || guestPage(page)) Problem.MEMBERS else Problem.NO_DOWNLOADS, facts)
         }
         val entries = entries(lines.drop(start + 1))
         val problem = when {
@@ -78,7 +91,29 @@ object ThreadDownloads {
             GUEST_LINKS.containsMatchIn(post) || guestPage(page) -> Problem.MEMBERS
             else -> Problem.NO_DOWNLOADS
         }
-        return Read(version, entries, problem)
+        return Read(version, entries, problem, facts)
+    }
+
+    /**
+     * The facts [lines] (a first post's lines, as text) state, each from the first line that names it. Platforms are
+     * droidtop's names for the systems a line names ("Win" is Windows), else the line's own words. Pure.
+     */
+    fun facts(lines: List<String>): Facts {
+        fun first(vararg keys: String): String? = lines.firstNotNullOfOrNull { line ->
+            FACT_LINE.find(line.trim())?.takeIf { it.groupValues[1].lowercase() in keys }?.groupValues?.get(2)?.trim()?.takeIf { it.isNotEmpty() }
+        }
+        fun items(value: String?): List<String> =
+            value?.split(LIST_SPLIT)?.map { it.trim().trimEnd('.') }?.filter { it.isNotEmpty() && it.length <= 40 }?.distinct()?.take(12).orEmpty()
+        val platformLine = first("os", "platform", "platforms")
+        val known = platformLine?.let { systemsOf(it) }.orEmpty().map { DownloadSystems.LABELS[it] ?: it }
+        val censored = first("censored", "censorship")?.lowercase()
+        val content = when {
+            censored == null -> emptyList()
+            censored.startsWith("no") -> listOf("Uncensored")
+            censored.startsWith("yes") -> listOf("Censored")
+            else -> listOf("Censorship: ${censored.take(60)}")
+        }
+        return Facts(known.ifEmpty { items(platformLine) }, items(first("language", "languages")), content)
     }
 
     /** The entries from the lines after the DOWNLOAD heading, in the thread's order, each address once. */
@@ -157,7 +192,7 @@ object ThreadDownloads {
         return Regex("^https?://(?:www\\.)?([^/:?#]+)", RegexOption.IGNORE_CASE).find(url)?.groupValues?.get(1) ?: "Link"
     }
 
-    /** `{version?, entries, problem?, message?}`: what `sources.parse_thread` answers. Pure. */
+    /** `{version?, entries, problem?, message?, facts?}`: what `sources.parse_thread` answers. Pure. */
     fun toJson(read: Read): JSONObject = JSONObject().apply {
         read.version?.let { put("version", it) }
         put(
@@ -178,6 +213,13 @@ object ThreadDownloads {
             ),
         )
         read.problem?.let { put("problem", it.id).put("message", it.sentence) }
+        // What the first post says of the game, for the source's metadata facet (Droidtop/tracker#845).
+        val facts = JSONObject().apply {
+            if (read.facts.platforms.isNotEmpty()) put("platforms", JSONArray(read.facts.platforms))
+            if (read.facts.languages.isNotEmpty()) put("languages", JSONArray(read.facts.languages))
+            if (read.facts.contentNotes.isNotEmpty()) put("contentNotes", JSONArray(read.facts.contentNotes))
+        }
+        if (facts.length() > 0) put("facts", facts)
     }
 
     // --- reading the page -----------------------------------------------------------------------------------------

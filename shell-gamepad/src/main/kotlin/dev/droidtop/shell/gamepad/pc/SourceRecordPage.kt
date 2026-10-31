@@ -44,6 +44,7 @@ import dev.droidtop.library.controlRows
 import dev.droidtop.library.downloadRows
 import dev.droidtop.library.downloadSystems
 import dev.droidtop.library.pressedState
+import dev.droidtop.library.factRows
 import dev.droidtop.library.ratingLine
 import dev.droidtop.library.signInRow
 import dev.droidtop.shell.gamepad.LocalShellWindow
@@ -259,6 +260,7 @@ internal fun recordRows(
         record.status?.let { RecordRow("Status", it) },
         ratingLine(record.rating, record.votes)?.let { RecordRow("Rating", it) },
         record.updatedEpochMs?.let { RecordRow("Updated", formatDate(it)) },
+    ) + factRows(record) + listOfNotNull(
         record.tags.takeIf { it.isNotEmpty() }?.let { RecordRow("Tags", subtitle = it.joinToString(", ")) },
         record.url?.let { url -> RecordRow(OPEN_SOURCE_ROW, linkHost(url), action = RecordAction.Open(url)) },
         changeLinkRow(),

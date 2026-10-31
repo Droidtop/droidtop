@@ -11,6 +11,7 @@ import dev.droidtop.library.SYSTEM_KEY_PREFIX
 import dev.droidtop.library.UpdateSources
 import dev.droidtop.library.downloadRows
 import dev.droidtop.library.downloadSystems
+import dev.droidtop.library.factRows
 import dev.droidtop.library.ratingLine
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -97,6 +98,7 @@ object SourceItemPage {
             record.status?.let { RecordRow("Status", it) },
             ratingLine(record.rating, record.votes)?.let { RecordRow("Rating", it) },
             record.updatedEpochMs?.let { RecordRow("Updated", formatDate(it)) },
+        ) + factRows(record) + listOfNotNull(
             record.tags.takeIf { it.isNotEmpty() }?.let { RecordRow("Tags", subtitle = it.joinToString(", ")) },
         )
         return facts.mapIndexed { index, row -> ActionItem(id = "item_fact_$index", title = row.title, subtitle = row.subtitle, value = row.value) } +

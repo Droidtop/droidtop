@@ -173,4 +173,21 @@ class ThreadDownloadsTest {
             assertTrue(file.name, read.entries.isNotEmpty() || read.problem != null)
         }
     }
+    @Test
+    fun `a first post's platforms, languages and content notes are read, and none it does not state`() {
+        // Droidtop/tracker#845: facts beside the links, for the source's metadata.
+        val facts = ThreadDownloads.facts(
+            listOf("Thread Updated: 2026-10-01", "Censored: No", "Version: 0.5", "OS: Win, Linux, Mac", "Language: English, Japanese"),
+        )
+        assertEquals(listOf("Windows", "Linux", "macOS"), facts.platforms)
+        assertEquals(listOf("English", "Japanese"), facts.languages)
+        assertEquals(listOf("Uncensored"), facts.contentNotes)
+        assertEquals(listOf("Censored"), ThreadDownloads.facts(listOf("Censorship: Yes (mosaic)")).contentNotes)
+        // A platform droidtop has no name for keeps the post's own word.
+        assertEquals(listOf("Browser"), ThreadDownloads.facts(listOf("Platform: Browser")).platforms)
+        assertEquals(ThreadDownloads.Facts.NONE, ThreadDownloads.facts(listOf("Developer: Someone", "Genre: 2dcg")))
+        val json = ThreadDownloads.toJson(ThreadDownloads.Read(null, emptyList(), null, facts)).getJSONObject("facts")
+        assertEquals("Uncensored", json.getJSONArray("contentNotes").getString(0))
+        assertFalse(ThreadDownloads.toJson(ThreadDownloads.Read(null, emptyList(), null)).has("facts"))
+    }
 }

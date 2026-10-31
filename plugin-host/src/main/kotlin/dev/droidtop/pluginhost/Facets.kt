@@ -147,6 +147,10 @@ sealed interface FacetBody {
         val votes: Long?,
         val tags: List<String>,
         val genres: List<String>,
+        /** The platforms the game is for, the languages it is in, and its content notes (Droidtop/tracker#845). */
+        val platforms: List<String> = emptyList(),
+        val languages: List<String> = emptyList(),
+        val contentNotes: List<String> = emptyList(),
     ) : FacetBody
 
     data class Description(val overview: String?, val changelog: String?) : FacetBody
@@ -503,6 +507,9 @@ object Facets {
                 votes = json.optLong("votes", -1).takeIf { it >= 0 },
                 tags = cappedStrings("tags", "tags", "tag"),
                 genres = cappedStrings("genres", "genres", "tag"),
+                platforms = cappedStrings("platforms", "tags", "tag"),
+                languages = cappedStrings("languages", "tags", "tag"),
+                contentNotes = cappedStrings("contentNotes", "tags", "tag"),
             )
             "description" -> {
                 val overview = text("overview", "textBody")

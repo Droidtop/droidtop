@@ -14220,7 +14220,10 @@ reimplemented it as my own f95seeker code." So:
     (`systems`), else the ones its heading names; a heading naming none
     ("Extras") is for any system.
   - **Info**: version, developer, status, rating with its vote count, when
-    the source last updated it, the tags, and Open the source's page.
+    the source last updated it, the platforms, languages and content notes
+    the source states (`metadata` `platforms`, `languages`, `contentNotes`,
+    Droidtop/tracker#845; `sources.parse_thread` reads them from a thread's
+    first post), the tags, and Open the source's page.
 - **Where it opens:** tapping an update wherever it shows (the game page's
   update line, the Update available shelf, a row of Settings > Updates, which
   opened the game page before) opens the record of the source that named the
