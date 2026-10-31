@@ -11,5 +11,7 @@ import android.util.Log
  */
 fun Instrumentation.rigLine(text: String) {
     Log.i("droidtop.plugin", "rig start: $text")
-    sendStatus(0, Bundle().apply { putString(Instrumentation.REPORT_KEY_STREAMRESULT, "rig start: $text\n") })
+    // On a line of its own: the runner prints a class's name and a colon before its first test with no line break,
+    // so a first line would have read "dev.droidtop.app.PluginStartRigTest:rig start: ..." and not been found.
+    sendStatus(0, Bundle().apply { putString(Instrumentation.REPORT_KEY_STREAMRESULT, "\nrig start: $text\n") })
 }
