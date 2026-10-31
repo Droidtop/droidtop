@@ -38,7 +38,6 @@ class DownloadSystemsTest {
     fun `only Android has droidtop's notice`() {
         assertEquals("This will not be trackable by us. Windows or Linux is recommended.", DownloadSystems.notice("android"))
         assertNull(DownloadSystems.notice("windows"))
-        assertEquals("linux", DownloadSystems.first(listOf("linux", "android")))
     }
 
     @Test

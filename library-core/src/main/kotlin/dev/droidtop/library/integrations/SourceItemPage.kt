@@ -20,7 +20,6 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.pluginhost.DownloadJobs
-import dev.droidtop.pluginhost.DownloadSystems
 import dev.droidtop.pluginhost.Facet
 import dev.droidtop.pluginhost.FacetBody
 import dev.droidtop.pluginhost.FacetViews
@@ -112,8 +111,8 @@ object SourceItemPage {
                 id = "item_system",
                 title = "System",
                 subtitle = "Which system's links are listed",
-                options = offered.map { ChoiceOption(it, DownloadSystems.LABELS[it] ?: it) },
-                current = picked?.takeIf { it in offered } ?: DownloadSystems.first(offered),
+                options = offered.map { ChoiceOption(it, dev.droidtop.library.DownloadLines.label(it)) },
+                current = dev.droidtop.library.DownloadLines.picked(offered, picked),
                 onSelect = { ctx, value ->
                     ctx.getSharedPreferences(RECORD_PREFS, Context.MODE_PRIVATE).edit().putString(SYSTEM_KEY_PREFIX + record.manifest.id, value).apply()
                 },

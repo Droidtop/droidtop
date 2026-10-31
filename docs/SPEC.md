@@ -14195,9 +14195,18 @@ reimplemented it as my own f95seeker code." So:
     and have the download links for it. Make sure to flag when "android" is
     selected, saying "this will not be trackable by us. Windows or Linux is
     recommended"". When the links are for more than one system, the tab's
-    first row is System (the system last picked on that source's pages, else
-    Windows, then Linux; Left, Right and A change it) and only that system's
-    links show. The links for any system follow whichever system is picked,
+    first row is System (the choice last picked on that source's pages, else
+    the one with Windows, then Linux; Left, Right and A change it) and only
+    that choice's links show. **The choices are the thread's own download
+    groupings, not single systems (the owner, 2026-10-30,
+    Droidtop/tracker#845):** with Windows/Linux as one download and Android as
+    another, two choices, "Windows/Linux" and "Android"; with one download for
+    everything, no picker. The builds decide the choices, so a patch for one
+    system alone adds none, and a link for any of a choice's systems is listed
+    under it. One function, `DownloadLines` (`library-core`), groups the
+    downloads for every page that lists them: the record rows and the source
+    item page now, droidtop's pick, Updates and the game page's Versions tab as
+    they move to it. The links for any system follow whichever system is picked,
     under their own heading (the owner: "It should show under every section,
     but it should have the description with it, under an "extras" or "other"
     section"): "Extras" for a walkthrough, a patch, a save file and the like,

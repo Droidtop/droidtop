@@ -87,8 +87,11 @@ fun groupedDownloads(downloads: List<UpdateSources.Download>): List<UpdateSource
     }
 }
 
-/** The systems the record's links are for (Droidtop/tracker#617), in the order the Downloads tab's picker offers them. */
-fun downloadSystems(record: UpdateSources.Record): List<String> = DownloadSystems.offered(record.downloads.map { it.systems })
+/**
+ * The System choices the record's links give (Droidtop/tracker#617, #845), by key, in the order the Downloads tab's
+ * picker offers them: the thread's own download groupings ("windows+linux", "android"), [DownloadLines.options].
+ */
+fun downloadSystems(record: UpdateSources.Record): List<String> = DownloadLines.options(record.downloads)
 
 /**
  * One link's row: the host and its label, and under it the heading the source gave it, which says what it is. A
@@ -144,30 +147,25 @@ fun buildRows(downloads: List<UpdateSources.Download>, steamCopy: Boolean?): Lis
  */
 fun downloadRows(record: UpdateSources.Record, picked: String?, steamCopy: Boolean? = null): List<RecordRow> {
     if (record.downloads.isEmpty()) return listOf(RecordRow("No downloads listed", subtitle = "The source lists no links for this version"))
-    val offered = downloadSystems(record)
+    val lines = DownloadLines.of(record.downloads, picked)
     // droidtop's own pick first (Droidtop/tracker#838): one press, no link to choose; the rows below stay for picking by hand.
     val get = listOfNotNull(
         RecordRow("Get the update", subtitle = "droidtop picks the build and the host, and tries the next if one fails", action = RecordAction.GetBest)
             .takeIf { DownloadPick.offers(record.downloads) },
     )
     // Links that do not differ by system: the source's own list, as it gives it.
-    if (offered.isEmpty()) {
-        val (builds, rest) = record.downloads.partition { it.role == "build" && !DownloadSystems.isExtra(it.section) }
-        return get + buildRows(builds, steamCopy) + apart(rest, subtitle = null)
-    }
-    val system = picked?.takeIf { it in offered } ?: DownloadSystems.first(offered)
+    val choice = lines.picked ?: return get + buildRows(lines.builds, steamCopy) + apart(lines.apart, subtitle = null)
+    val label = DownloadLines.label(choice)
     val head = listOfNotNull(
-        if (offered.size >= 2) {
-            RecordRow("System", DownloadSystems.LABELS[system] ?: system, subtitle = "Left and Right show another system's links", action = RecordAction.PickSystem)
+        if (lines.options.size >= 2) {
+            RecordRow("System", label, subtitle = "Left and Right show another system's links", action = RecordAction.PickSystem)
         } else {
             null
         },
-        system?.let { DownloadSystems.notice(it) }?.let { RecordRow(it) },
+        lines.notice?.let { RecordRow(it) },
     )
-    val label = DownloadSystems.LABELS[system] ?: system
-    val links = buildRows(record.downloads.filter { it.systems.isNotEmpty() && system in it.systems }, steamCopy)
-    val anySystem = record.downloads.filter { it.systems.isEmpty() }
-    return get + head + links.ifEmpty { listOf(RecordRow("No links for $label")) } + apart(anySystem, subtitle = "For any system")
+    val links = buildRows(lines.builds, steamCopy)
+    return get + head + links.ifEmpty { listOf(RecordRow("No links for $label")) } + apart(lines.apart, subtitle = "For any system")
 }
 
 /** Patches, extras and the rest, each under its own heading, link by link: offered, never part of a build's row. */

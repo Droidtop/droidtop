@@ -27,7 +27,6 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
-import dev.droidtop.pluginhost.DownloadSystems
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
@@ -112,12 +111,12 @@ object SourceRecordScreen {
         val head = listOfNotNull(checkRow(facet.source.label).takeIf { needsCheck }, signInRow(facet.source.label, record, signedOut).takeIf { !needsCheck })
         val offered = downloadSystems(record)
         val system = if (offered.size >= 2) {
-            val current = picked?.takeIf { it in offered } ?: DownloadSystems.first(offered)
+            val current = dev.droidtop.library.DownloadLines.picked(offered, picked)
             ChoiceItem(
                 id = "update_record_system",
                 title = "System",
                 subtitle = "Which system's links are listed",
-                options = offered.map { ChoiceOption(it, DownloadSystems.LABELS[it] ?: it) },
+                options = offered.map { ChoiceOption(it, dev.droidtop.library.DownloadLines.label(it)) },
                 current = current,
                 onSelect = { ctx, value ->
                     ctx.getSharedPreferences(RECORD_PREFS, Context.MODE_PRIVATE).edit().putString(SYSTEM_KEY_PREFIX + facet.source.key, value).apply()
