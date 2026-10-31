@@ -233,4 +233,22 @@ class ElevatedAccessTest {
         assertEquals(ElevatedBackendId.WIRELESS_DEBUGGING, shell.active())
         assertEquals("wireless", shell.exec(listOf("id"))?.stdout)
     }
+
+    /** Droidtop/tracker#851: the Shizuku plugin installed with no Shizuku app running has nothing behind it. */
+    @Test
+    fun `a provider plugin with nothing behind it is never claimed, and says why`() {
+        val unbacked = BackendState.UNBACKED
+        assertNull(ElevatedAccess.resolve(ElevatedChoice.AUTO, absent, unbacked))
+        assertNull(ElevatedAccess.resolve(ElevatedChoice.SHIZUKU_PLUGIN, absent, unbacked))
+        assertEquals(ElevatedAccess.PLUGIN_UNBACKED, ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, absent, unbacked))
+        assertEquals(ElevatedAccess.PLUGIN_UNBACKED, ElevatedAccess.unavailableReason(ElevatedChoice.SHIZUKU_PLUGIN, absent, unbacked))
+        // Still offered as a choice: it is there, and picking it says what is missing.
+        assertTrue(ElevatedChoice.SHIZUKU_PLUGIN in ElevatedAccess.options(absent, unbacked))
+        // Anything that does answer wins over it.
+        assertEquals(ElevatedBackendId.WIRELESS_DEBUGGING, ElevatedAccess.resolve(ElevatedChoice.AUTO, absent, unbacked, ready))
+        val shell = ElevatedShell(FakeBackend(absent, TaskPrivileges.NONE, "app"), FakeBackend(unbacked, TaskPrivileges.NONE, "plugin"), { ElevatedChoice.AUTO })
+        assertNull(shell.active())
+        assertEquals(TaskPrivileges.NONE, shell.capabilities())
+        assertEquals(ElevatedAccess.PLUGIN_UNBACKED, shell.unavailableReason())
+    }
 }

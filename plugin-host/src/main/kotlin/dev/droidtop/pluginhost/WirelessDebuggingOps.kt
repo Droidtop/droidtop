@@ -69,7 +69,7 @@ class WirelessDebuggingOps(context: Context) : ElevatedBackend {
     override fun unavailableReason(): String? = when (state()) {
         BackendState.READY -> null
         BackendState.NEEDS_PERMISSION -> dev.droidtop.runtime.tasks.ElevatedAccess.WIRELESS_OFF
-        BackendState.ABSENT -> "droidtop isn't paired with wireless debugging yet"
+        BackendState.ABSENT, BackendState.UNBACKED -> "droidtop isn't paired with wireless debugging yet"
     }
 
     /**

@@ -13,6 +13,12 @@ enum class BackendState {
      */
     NEEDS_PERMISSION,
 
+    /**
+     * Running, but nothing privileged answers behind it (Droidtop/tracker#851): the Shizuku provider plugin with no
+     * Shizuku app running, so every command it is asked for fails. Never offered as the active backend.
+     */
+    UNBACKED,
+
     READY,
 }
 
@@ -70,7 +76,8 @@ object ElevatedAccess {
     ): ElevatedBackendId? = when (choice) {
         ElevatedChoice.OFF -> null
         ElevatedChoice.SHIZUKU_APP -> ElevatedBackendId.SHIZUKU_APP.takeIf { app != BackendState.ABSENT }
-        ElevatedChoice.SHIZUKU_PLUGIN -> ElevatedBackendId.SHIZUKU_PLUGIN.takeIf { plugin != BackendState.ABSENT }
+        // A plugin with nothing behind it is never claimed: its reason says so instead (Droidtop/tracker#851).
+        ElevatedChoice.SHIZUKU_PLUGIN -> ElevatedBackendId.SHIZUKU_PLUGIN.takeIf { plugin != BackendState.ABSENT && plugin != BackendState.UNBACKED }
         ElevatedChoice.WIRELESS_DEBUGGING -> ElevatedBackendId.WIRELESS_DEBUGGING.takeIf { wireless != BackendState.ABSENT }
         // Wireless debugging last: it is there only while its switch is on, and Shizuku, when running, needs nothing.
         ElevatedChoice.AUTO -> when {
@@ -91,6 +98,10 @@ object ElevatedAccess {
 
     private const val PLUGIN_NOT_APPROVED = "The Shizuku plugin is installed but not approved and turned on yet: open it in $SETTINGS_PLACE"
 
+    /** The plugin runs, but the Shizuku app it bridges to does not (Droidtop/tracker#851): the person's one step. */
+    const val PLUGIN_UNBACKED =
+        "The Shizuku plugin is on, but nothing is behind it: the Shizuku app isn't running. Install and start Shizuku, or pair wireless debugging in $SETTINGS_PLACE"
+
     /**
      * Why [choice] gives no elevated access with the backends in these states, or null when it does
      * ([ElevatedShell.unavailableReason]). Each sentence is the real state and the one step that changes it: Shizuku
@@ -109,23 +120,25 @@ object ElevatedAccess {
         ElevatedChoice.SHIZUKU_APP -> when (app) {
             BackendState.READY -> null
             BackendState.NEEDS_PERMISSION -> NOT_ALLOWED
-            BackendState.ABSENT -> "The Shizuku app is not running: start it, or pick another source in $SETTINGS_PLACE > Elevated access"
+            BackendState.ABSENT, BackendState.UNBACKED -> "The Shizuku app is not running: start it, or pick another source in $SETTINGS_PLACE > Elevated access"
         }
         ElevatedChoice.SHIZUKU_PLUGIN -> when (plugin) {
             BackendState.READY -> null
             BackendState.NEEDS_PERMISSION -> PLUGIN_NOT_APPROVED
+            BackendState.UNBACKED -> PLUGIN_UNBACKED
             BackendState.ABSENT -> "The Shizuku plugin picked in $SETTINGS_PLACE > Elevated access is not installed or not running"
         }
         ElevatedChoice.WIRELESS_DEBUGGING -> when (wireless) {
             BackendState.READY -> null
             BackendState.NEEDS_PERMISSION -> WIRELESS_OFF
-            BackendState.ABSENT -> "droidtop isn't paired with wireless debugging yet: $SETTINGS_PLACE > Wireless debugging"
+            BackendState.ABSENT, BackendState.UNBACKED -> "droidtop isn't paired with wireless debugging yet: $SETTINGS_PLACE > Wireless debugging"
         }
         ElevatedChoice.AUTO -> when {
             app == BackendState.READY || plugin == BackendState.READY || wireless == BackendState.READY -> null
             app == BackendState.NEEDS_PERMISSION -> NOT_ALLOWED
             plugin == BackendState.NEEDS_PERMISSION -> PLUGIN_NOT_APPROVED
             wireless == BackendState.NEEDS_PERMISSION -> WIRELESS_OFF
+            plugin == BackendState.UNBACKED -> PLUGIN_UNBACKED
             appInstalled -> "Shizuku is installed but not running: open the Shizuku app and start it"
             else -> "droidtop can only ask Android to close apps. Install Shizuku, or add the Shizuku plugin in $SETTINGS_PLACE"
         }
