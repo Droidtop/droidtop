@@ -100,7 +100,9 @@ internal fun StatusPill(onClick: () -> Unit, onActivity: () -> Unit, modifier: M
  * companion (`SystemStatus`), never a receiver of the shell's own.
  *
  * Tapping it opens the Quick Menu, which has the controls behind these
- * readings. Not a focus target, like everything in the top bar.
+ * readings. Not a focus target, like everything in the top bar. The
+ * companion draws the same readout in place of Android's status bar
+ * (Droidtop/tracker#524), its tap opening its own System tab.
  */
 @Composable
 fun StatusCluster(showBatteryPercent: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {

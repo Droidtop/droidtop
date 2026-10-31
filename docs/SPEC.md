@@ -6811,7 +6811,14 @@ this is the most direct evidence available):
 
 Top to bottom, each layer earning its space:
 
-1. **Status bar** (built): clock, Wi-Fi, VPN, battery, Controls.
+1. **Status bar** (built): clock, Wi-Fi, VPN, battery, Controls. In Gaming
+   and Desktop the companion hides Android's status and navigation bars, as
+   the main screen does, and ends its top row with droidtop's own readout
+   (`StatusCluster`: clock, network, battery; a tap opens System). Standard
+   keeps Android's bars and draws no second clock (`companionImmersive`,
+   Droidtop/tracker#524: "droidtop's own status line instead of Android's
+   bar (immersive)"; owner, #486: "This is a hobbyist application, not a
+   serious one, and we need to fix that").
 2. **Focused entry** (partly built): when the user is browsing, the
    companion shows what the main screen cannot fit — hero art, full
    description, developer/publisher/year/genre/players, rating, playtime,
