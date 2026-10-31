@@ -160,4 +160,5 @@
     <string name="gamepad_games">Games</string>
     <string name="gamepad_sources_unreachable">Could not reach your sources</string>
     <string name="gamepad_sources_unreachable_line">Check the connection, then try again</string>
+    <string name="gamepad_app_update_key_differs">From %1$s, signed by a different key than the installed app, so Android refuses it</string>
 </resources>
