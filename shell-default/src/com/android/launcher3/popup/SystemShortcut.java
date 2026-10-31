@@ -361,29 +361,24 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
         public void onClick(View view) {
             Context context = mOriginalView.getContext();
             String component = mItemInfo.getTargetComponent().flattenToString();
-            android.widget.PopupMenu menu = new android.widget.PopupMenu(context, mOriginalView);
             java.util.List<DrawerTabs.Tab> tabs = DrawerTabs.tabs(context);
-            for (int i = 0; i < tabs.size(); i++) {
-                menu.getMenu().add(0, i, i, tabs.get(i).getName()).setCheckable(true)
-                        .setChecked(tabs.get(i).getApps().contains(component));
-            }
-            menu.getMenu().add(0, tabs.size(), tabs.size(), R.string.drawer_tab_new);
-            menu.setOnMenuItemClickListener(item -> {
-                if (item.getItemId() < tabs.size()) {
-                    DrawerTabs.Tab tab = tabs.get(item.getItemId());
-                    DrawerTabs.setMember(context, tab.getName(), component, !item.isChecked());
+            java.util.List<dev.droidtop.ui.shared.MenuViews.Row> rows = new java.util.ArrayList<>();
+            for (DrawerTabs.Tab tab : tabs) {
+                boolean member = tab.getApps().contains(component);
+                rows.add(new dev.droidtop.ui.shared.MenuViews.Row(tab.getName(), () -> {
+                    DrawerTabs.setMember(context, tab.getName(), component, !member);
                     tabsChanged(context);
-                } else {
-                    DrawerTabsRow.askName(context, null, name -> {
+                }, member));
+            }
+            rows.add(new dev.droidtop.ui.shared.MenuViews.Row(context.getString(R.string.drawer_tab_new),
+                    () -> DrawerTabsRow.askName(context, null, name -> {
                         boolean added = DrawerTabs.add(context, name, component);
                         if (added) tabsChanged(context);
                         return added;
-                    });
-                }
-                return true;
-            });
+                    })));
             dismissTaskMenuView();
-            menu.show();
+            // The one anchored menu beside the app's icon, in the colours outside Gaming (Droidtop/tracker#827).
+            dev.droidtop.ui.shared.MenuViews.show(mOriginalView, context.getString(R.string.drawer_tabs_option), rows);
         }
 
         private static void tabsChanged(Context context) {
