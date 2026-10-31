@@ -115,6 +115,7 @@ import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.isInert
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.library.settings.confirmKeep
 import dev.droidtop.library.settings.confirmText
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
@@ -777,7 +778,7 @@ fun CatalogNavigator(
             item = ChoiceItem(
                 id = "${ButtonBarItem.ID}_confirm",
                 title = button.confirmTitle.orEmpty(),
-                options = listOf(ChoiceOption(CONFIRM_CANCEL, "Cancel"), ChoiceOption(button.id, button.label)),
+                options = listOf(ChoiceOption(CONFIRM_CANCEL, safeChoice(null, button.label)), ChoiceOption(button.id, button.label)),
                 current = CONFIRM_CANCEL,
                 onSelect = { _, _ -> },
             ),
@@ -797,6 +798,7 @@ fun CatalogNavigator(
         ConfirmDialog(
             question = item.confirmText ?: item.title,
             action = item.title,
+            keep = item.confirmKeep,
             onConfirm = {
                 confirming = null
                 // Marked as the yes, then pressed: the row's own path runs it as it always did.

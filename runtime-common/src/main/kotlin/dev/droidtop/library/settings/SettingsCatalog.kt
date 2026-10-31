@@ -240,6 +240,8 @@ class ActionItem(
     override val statusMark: StatusMark? = null,
     override val chip: RowTag? = null,
     override val iconFile: String? = null,
+    /** The safe answer's name when [confirmTitle] asks ("Keep downloading"); null reads "Cancel". */
+    val confirmKeep: String? = null,
     // What A does. A row given none is a fact or a state, not an action (Droidtop/tracker#587): no renderer promises A
     // on it ([inert]), and pressing it does nothing.
     val run: (Context) -> Unit = NOTHING,
@@ -254,6 +256,14 @@ class ActionItem(
 
 /** Whether pressing [this] does nothing, so no renderer may show A on it: a paragraph, or an action row with no action. */
 val CatalogItem.isInert: Boolean get() = this is TextBlockItem || (this is ActionItem && inert)
+
+/** What the safe answer to [confirmText] says, or null for the default ("Cancel"). */
+val CatalogItem.confirmKeep: String?
+    get() = when (this) {
+        is ActionItem -> confirmKeep
+        is AsyncActionItem -> confirmKeep
+        else -> null
+    }
 
 /** The explicit-yes sentence an item asks for before it runs, or null. */
 val CatalogItem.confirmText: String?
@@ -305,6 +315,8 @@ class AsyncActionItem(
     override val statusMark: StatusMark? = null,
     /** The thing's own picture (a plugin's icon, a game's art), as [CatalogItem.iconFile]. */
     override val iconFile: String? = null,
+    /** The safe answer's name when [confirmTitle] asks, as [ActionItem.confirmKeep]. */
+    val confirmKeep: String? = null,
     val run: suspend (Context, onStatus: (String) -> Unit) -> String,
 ) : CatalogItem
 

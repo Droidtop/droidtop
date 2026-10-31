@@ -11788,8 +11788,10 @@ Two checks, both required:
    droidtop's preferences on a background thread at start and answer from memory; **until they have loaded the
    answer is no**.
 2. **The confirmation, every use.** A row that would use a class is a confirm row (`confirmTitle`): the Gaming
-   surface asks in the shell's one confirmation (`ConfirmDialog`): the sentence over Cancel, first and under the
-   cursor, and the action in the danger tone; A on Cancel, B or Back cancel, only A on the action runs it (owner,
+   surface asks in the shell's one confirmation (`ConfirmDialog`): the sentence over the safe choice, first and under
+   the cursor, and the action in the danger tone; each choice names what it does (the row's `confirmKeep`, else
+   Cancel; a safe choice that would read the same as the action is "Keep it", `safeChoice`), so cancelling a
+   download asks "Keep downloading" or "Cancel download", never Cancel or Cancel (the owner, 2026-10-31); A on Cancel, B or Back cancel, only A on the action runs it (owner,
    2026-10-30, Droidtop/tracker#835: "if I hit something like "quit", I can't back out of it, all I can do is
    confirm it"). It replaced "press A again to confirm", which armed the row and could only be confirmed or left
    with the whole page. Quit, Restart and Kill in the running game's L2 sheet (over the game and in Gaming) ask the
@@ -19584,6 +19586,13 @@ menu still list every `listed` place.
     (its row pushes the update's own screen in place, 7g "Facets in place"; the version picked lands as a new version
     folder, and droidtop never replaces a folder's files). With
     nothing to update after a check that worked: "Everything is up to date", once.
+  - **droidtop always has a row** (Droidtop/tracker#837; the owner: "there's nowhere to download/install an update
+    to droidtop anymore"). Its update row appeared only once a check had recorded a newer build, so a check that
+    failed, or never ran in this process, left droidtop with no row and no way to update. Now, with no update
+    recorded, the All and droidtop views carry droidtop's status row: the version here and "Up to date as far as
+    droidtop knows", or why the last check failed, with **Check** (**Try again** after a failure), which checks
+    droidtop's releases alone. When the check finds a newer build the row becomes the update row above, "v0.37 → v0.38",
+    Update and its progress through the install.
   - **Live, and quick to show** (Droidtop/tracker#748; the owner: "It not auto-refreshing is a ux bug"). On the
     console each plugin of an Update all said it was ready in a notice while its row still read "Available" until the
     whole run ended, and the page took about 10 s to show anything. Now the screen is live (`CatalogScreen.live`): a

@@ -323,6 +323,12 @@ object UpdatesPage {
                         add(TextBlockItem(id = "updates_none", text = "Everything is up to date."))
                     }
                     shown.forEach { add(rowOf(it)) }
+                    // droidtop always has its row: an update when one is known, else where it stands and the way to ask
+                    // again (Droidtop/tracker#837; the owner: "there's nowhere to download/install an update to droidtop
+                    // anymore"). Not an update, so it is not counted and Update all does not run it.
+                    if ((kind == null || kind == Kind.DROIDTOP) && updates.none { it.kind == Kind.DROIDTOP }) {
+                        add(droidtopStatusRow(context, failure))
+                    }
                     checkingRows.filterKeys { kind == null || it == kind }.values.forEach(::add)
                     if (kind == null) add(settingsRow())
                 },
@@ -408,6 +414,29 @@ object UpdatesPage {
             ),
         )
     }
+
+    /**
+     * droidtop's row while no newer build is known: the installed version, and why the last check failed if it did, with
+     * the one action that can change that, checking droidtop's releases again. When the check finds a newer build the
+     * page reads again and [droidtop] gives the Update row in its place.
+     */
+    private fun droidtopStatusRow(context: Context, failure: String?): CatalogItem = AsyncActionItem(
+        id = "updates_droidtop_status",
+        title = "droidtop",
+        subtitle = if (failure != null) {
+            "v${AppSelfUpdate.installedVersionName(context)} · The last check failed: $failure"
+        } else {
+            "v${AppSelfUpdate.installedVersionName(context)} · Up to date as far as droidtop knows"
+        },
+        value = if (failure != null) "Try again" else "Check",
+        run = { ctx, onStatus ->
+            onStatus("Checking droidtop's releases...")
+            // A network call: never on the main thread.
+            val said = withContext(Dispatchers.IO) { AppSelfUpdate.check(ctx) }
+            changes.value++
+            said
+        },
+    )
 
     /**
      * Installed plugins with a newer version, from both of their sources as last read: a catalog (what Settings > Plugins
