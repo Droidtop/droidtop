@@ -179,7 +179,7 @@ class SystemShizukuOps : ElevatedBackend {
     private fun notReady(): String? = when (state()) {
         BackendState.READY -> null
         BackendState.NEEDS_PERMISSION -> "droidtop is not allowed in Shizuku"
-        BackendState.ABSENT -> "Shizuku is not running"
+        BackendState.ABSENT, BackendState.UNBACKED -> "Shizuku is not running"
     }
 
     /**
