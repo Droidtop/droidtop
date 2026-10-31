@@ -42,7 +42,7 @@
 	shallow = true
 [submodule "vendor/sandbox"]
 	path = vendor/sandbox
-	url = https://github.com/bi0shacker001/sandbox
+	url = https://github.com/bi0shacker001/fibrewall
 [submodule "vendor/notices"]
 	path = vendor/notices
 	url = https://github.com/Droidtop/notices
