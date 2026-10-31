@@ -119,9 +119,10 @@ class GoFile(
 
         /** Adds [node]'s files; a folder that came without its children is asked for, up to [MAX_FOLDER_CALLS] times. */
         fun add(node: JSONObject) {
-            if (files.size > DownloadJobs.MAX_FILES) throw Declined("The GoFile link has more files than one job takes")
             if (node.optString("type") == "file") {
                 files += fileOf(node, token)
+                // Counted as each file is added, so a folder one over the limit is refused, not taken whole.
+                if (files.size > DownloadJobs.MAX_FILES) throw Declined("The GoFile link has more files than one job takes")
                 return
             }
             when (val children = node.opt("children")) {
