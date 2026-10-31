@@ -45,7 +45,15 @@ object AcquireSystemHint {
         found.firstOrNull { (_, system) -> system.id == id }?.first?.let { return@withContext it }
         if (systemsById[id]?.canResolveFromFolder() != true) return@withContext null
         val place = placeFor(found.map { it.first }, GamesRoots.current(context)) ?: return@withContext null
-        File(place, id).takeIf { it.isDirectory || it.mkdirs() }?.also(onMade)
+        // A folder of that name already there is used as it is (the owner's Roms/dos, #846): the walk counts a system
+        // folder only when it holds that system's files within one level, so a DOS folder of games a level deeper was
+        // not one, and the download into it makes it one.
+        val folder = File(place, id)
+        when {
+            folder.isDirectory -> folder
+            folder.mkdirs() -> folder.also(onMade)
+            else -> null
+        }
     }
 
     /**
