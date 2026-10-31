@@ -174,6 +174,8 @@ object PluginWebAccount {
         if (!NetScope.isHttps(url) || NetScope.hostOf(url) == null) return emptyList()
         // A link a host account, a debrid account or the host's own API serves comes from there, without the page (#638).
         var refusal: String? = null
+        // The debrid accounts' host lists first, so the view hands on a mirror they serve as it navigates (#638).
+        runCatching { dev.droidtop.pluginhost.debrid.DebridLinks.prime() }
         dev.droidtop.pluginhost.hosts.HostLinks.resolve(url, refused = { refusal = it })?.let { return it.take(max) }
         val domains = WebSessions.declaredDomains(record.manifest.v2.permissions)
         val snapshot = PluginGrants.forContext(context).read(record.manifest.id)
