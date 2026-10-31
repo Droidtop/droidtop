@@ -827,9 +827,12 @@ object PluginJobsCenter {
         persist()
     }
 
-    /** A cleared job's record in the log: who ran it, what it was, and its last line. */
+    /**
+     * A cleared job's record in the log: who ran it, what it was, and its last line. Guarded as [HostNetApis]' log is,
+     * since a JVM unit test has no android.util.Log.
+     */
     private fun logCleared(entry: Entry) {
-        android.util.Log.i("droidtop.jobs", "cleared: ${entry.pluginLabel}: ${entry.title}: ${entry.statusLine}")
+        runCatching { android.util.Log.i("droidtop.jobs", "cleared: ${entry.pluginLabel}: ${entry.title}: ${entry.statusLine}") }
     }
 
     /**
