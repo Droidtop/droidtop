@@ -105,7 +105,8 @@ tabs.
 The anchored menu is `AnchoredMenu` in `:ui-shared` (`ui-shared/.../gamepad/AnchoredMenu.kt`, Droidtop/tracker#827):
 the sheet of choices' body placed below the item, or above it where there is no room, held inside the window's
 gutter, about eight rows before it scrolls, closed by a tap outside it. A centred `ActionSheet` is the same menu with
-no item to stand beside. Gaming's app and game menus and Desktop's taskbar menus use it. On Desktop a right-click on
+no item to stand beside. Gaming's app and game menus, the game page's Edit metadata and Options
+(Droidtop/tracker#845), and Desktop's taskbar menus use it. On Desktop a right-click on
 one of droidtop's own items (the taskbar's) opens that item's menu, as a long press does.
 
 ### Names (Droidtop/tracker#827 F0, 2026-10-30)

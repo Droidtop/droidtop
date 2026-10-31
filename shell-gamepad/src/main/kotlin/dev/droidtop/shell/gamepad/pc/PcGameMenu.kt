@@ -1331,7 +1331,7 @@ private fun PcGameMenuSheet(
 
 /** A minimal full-bleed [Dialog] host for a screen written as a plain fillMaxSize() composable (see the call sites above). */
 @Composable
-private fun FullScreenOverlay(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun FullScreenOverlay(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     ShellDialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),

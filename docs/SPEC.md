@@ -15635,7 +15635,7 @@ no version (`Far Cry 5`, `Cyberpunk 2077`). Engine games are keyed by their
 folder's path and are not covered by this.
 
 **A linked source's page.** On a folder game's page, a linked update source
-whose page is known has the row **Open source page**: the page shows only the
+whose page is known has the row **Open source page** (on the Show thread tab since Droidtop/tracker#845): the page shows only the
 link's host, the whole link is the row's tip, and A opens it in the browser.
 It fetches nothing. The options menu keeps its "Check now" for the source.
 
@@ -17082,7 +17082,7 @@ it:
 | Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (newest added first, by "When a game was added" below), Update available (never a game whose files are missing: it cannot be updated, Droidtop/tracker#756), Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), then, when the library has more than one source (a store, a game folder, the Wine shortcuts: `PcSource`), one shelf per source in the Source filter's order, else one per pinned collection, else one per engine family (Visual Novels, RPG Maker, Windows, ...). On Overview, **Update available leads whenever it has rows**, above Continue playing, its heading always with its count; a tap on that heading opens the Updates tab (Droidtop/tracker#397 slice C), and so does A on it from the pad: Left from the shelf's first capsule puts the cursor on the heading (its ring, the hint reads "Open"), and any other move leaves it (slice E). **The Collections tab** (`PcCollections.kt`, slice D) is a tile grid in three groups: your collections, your saved views, and each store's imported collections under "From <store>". A tile shows its name, its count and, when it is a tab, a mark, without needing focus; A opens the grid filtered to it (the **Collection** facet, static membership only, values OR), a saved view's tile applies the view. Hidden games do not count in a tile, and a collection whose every game here is hidden is not shown. Select on a tile: Pin as a tab (or Unpin), Pin all imported, Unpin all imported. A pinned collection's tab is a saved view over its Collection facet. **Home** keeps one row of games, Recent games (Continue playing, else Recently added, `homeShelves`); updates and additions are its What's new cards ("Home" below). Every shelf is capped at 24; Recently added is hidden when no entry has an added time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
 | Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip** (decided 2026-10-02, Droidtop/tracker#273 slice 2): the one row above PC Games' content, L1 and R1 glyphs at its ends: **Overview** (the shelves, `VIEW_OVERVIEW`, first and where PC Games opens), then the fixed built-in tabs **All games, Installed, Favourites, Collections**, then the person's **pinned views** in their own order (`pcStripTabs`, Droidtop/tracker#397 slice C). Built-in tabs never come and go: an empty one shows one line saying how to fill it (Collections: "Add a game to a collection from its menu (L2). Collections a store keeps appear here after it syncs."). List options > **Favourites tab / Collections tab** can hide those two; Overview, All games and Installed cannot be hidden, and the order is fixed so press counts stay the same. **Store tabs and the Updates tab are gone**: a store is a Source filter, and any filter can be saved as a tab. Everyone was given, once, a pinned view **"Updates"** over the Update available facet, first among the pinned views (`LibraryViewPrefs.withUpdatesView`); unpinning or removing it is the person's choice. Every grid tab, built-in or pinned, carries its count ("Installed · 12"). **A pinned tab's Options**: Edit (a new name, then the Filter sheet over its filters and sort; saving writes the same view, same tab position), Unpin (it stays a saved view, listed in Collections), Move left, Move right, Move to first: **L2 on a pinned tab**, or a long press on its chip (2026-10-23, Droidtop/tracker#621; it was Select). The chips are Steam's tab pills (`ShellChip(tab = true)`, 2026-10-08): small bold capitals in the tab-label role, padded 6 by 16; the view on screen sits on a quiet plate (not the accent: it is a place, not a filter in effect) that is one shape behind the chips and glides to the new view over Motion's focus time when the view changes, following the strip's own scroll at once and standing still when motion is off (DroidDeck's sliding selection pill, Droidtop/tracker#363, 2026-10-30), the chip under the cursor turns solid, and a shoulder glyph with nowhere to go is drawn at half strength. The full grid is one press away (R1 from Overview is All games). No Home chip (Home is a destination of its own and has no strip), no Filters chip (X opens the filter dialog), no Continue playing view (it is the first shelf). B from a grid view returns to Overview. The strip ends short of the floating status cluster (`StatusClusterRoom`, Droidtop/tracker#292), so its R1 glyph is never under the clock. The filters set that no strip view stands for show as ONE pill at the strip's end, naming every active filter, the first two by name and the rest as a number ("Steam · Shared with you · +2, 40 of 3,300 ✕"), on one line that shortens its own text and never pushes tabs off the strip, cleared by one press; there is no count line and no chip row on this page (the Filter sheet keeps its chips). The filter, sort, search and saved views are reached from X, Y and the sheets (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
 | 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule; that line carries the version management fact too: the installed build and, when a source knows a newer one, "v0.9.6 is available" (`focusLine`, `GameUpdates.line`). No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is Steam's, by the window's tier (`capsuleWidth`, `capsuleWidthFor`; 2026-10-08, Droidtop/tracker#363): 110dp up to an 853dp window (about six across on the console's 768dp window, so a shelf's last capsule is cut and says there is more; three on a phone held upright), 134dp up to 1279dp, 172dp from 1280dp. Shelves and the grid share it; the grid packs whole capsules of that width 12dp apart and centres the row in what is left (`GridCells.FixedSize`), never stretching a capsule to fill. |
-| Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons (**X plays and Y is Favourite from anywhere on the page**, as on the library tile: owner decision, 2026-10-24, Droidtop/tracker#644 slice 4, proposal 6.C; X was Favourite), a quiet facts strip, a tab strip (Overview, Versions, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are one row of Overview, the same row for every source: RetroAchievements fills it for a console game on its detail screen (7h, "RetroAchievements"); a store's achievements (Droidtop/tracker#230) fill this page's row (Steam's, 2026-10-24). |
+| Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band with the status row under the title, ONE large primary action that says what A does (`PcPlayState`), Edit metadata and Options as buttons beside it and Favourite as a small icon button (Droidtop/tracker#845; **X plays and Y is Favourite from anywhere on the page**, as on the library tile: owner decision, 2026-10-24, Droidtop/tracker#644 slice 4, proposal 6.C; X was Favourite), a quiet facts strip, a tab strip (Overview, Versions, Activity, Extras, Details, Show thread) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows, and every tab is drawn. Achievements are one row of Activity, the same row for every source: RetroAchievements fills it for a console game on its detail screen (7h, "RetroAchievements"); a store's achievements (Droidtop/tracker#230) fill this page's row (Steam's, 2026-10-24). |
 | The page's rows are the same rows as Steam's settings | | **Settings' rows.** The page's facts are `MenuRow(uniformHeight = true)` at `uniformRowHeight()`, with one content-sized value column (`LocalValueColumnWidth`) and the selected row's full text in the detail strip under the list (`CatalogDetailStrip`, §7k "Text in rows and tiles"); a long description is read there, never by growing a row. |
 | A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A opens the game, X plays it** (owner, 2026-10-24, Droidtop/tracker#641: "hitting A on the page shouldn't immediately launch the game, it should open the game's page"; it replaced "A is Primary Action" of 2026-10-01). In Gaming, A (or a tap) on a game card or row opens it inside Gaming's stack (`cardPress`): a PC game's page with Play focused, a Retro game's details (the cards, Home's rows and the themed and headless gamelists); an app, which has no game page, still opens. **X is Play now** on PC Games and Home, shown in the hint row only where Play works as it is (no setup step first), and goes through `PcRunnerOptions.resolveAndPlay` as before. PC Games' Filter moved from X to the List options (Select). In a Retro gamelist X stays Favourite and Y Info, ES-DE's own buttons; Play is on the details. Mobile's games screen still plays on A. |
 
@@ -17202,6 +17202,44 @@ copied:
   row menu offer Game page for PC, engine and console games. What the themed gamelist draws around a
   game (the theme's own elements) stays Gaming's.
 
+**The page's frame (decided 2026-10-30, Droidtop/tracker#845, slice U1).** The owner, verbatim: "Activity tab:
+yes (including data pulled from game stores and stuff, like steam profile). eight buttons? Empty tabs shouldn't be
+hidden"; "put a "show thread" tab so the user can read if they need to"; "Let's have a set of icons to indicate the
+status of each thing. Keep "edit metadata" as a button, put "scrape" IN the edit metadata panel, and move the rest
+to an options menu. This means we can confirm saves are synced, achievements are available, etc, visually". So:
+
+- **Six tabs, always drawn** (`PageTab`): Overview, Versions, Activity, Extras, Details, Show thread. An empty tab is
+  still on the strip and says its one line (`PageTab.emptyLine`); nothing filters the strip.
+- **Activity** is how the game has been played: droidtop's own Last played, Play time and Times played
+  (`activityRows`; they left the facts strip and Overview, not copied), and the Achievements row (a service's or a
+  store's, `GameInfoKind.ACHIEVEMENTS`). A store's profile data (Steam's play time and the like) joins it with
+  Droidtop/tracker#230.
+- **Show thread** holds, for now, the linked source's own page (**Open source page**, which opens it in the browser
+  through `Links.open`; it moved here from Versions). The thread's first post, read-only, comes with the plugins
+  lane's named sections (Droidtop/tracker#845 plugins slice 4); until then a game with no linked source page says
+  "No thread is linked to this game".
+- **The action band's buttons**: the primary action (Launch: Play, or the setup step that makes it Play), **Edit
+  metadata**, **Options**, then Favourite. Edit metadata opens beside its button (`AnchoredMenu`) with **Scrape**
+  first (the scrape a game nothing matched used to offer as Overview's "Not scraped yet" row, gone with this), then
+  the game's own Title. **Options** opens beside its button with the ones this game has of Saves (the saves screen;
+  it was a row of Overview), Sign in for achievements (RetroAchievements' guided key setup; it was Overview's
+  Achievements row while no key was stored), Choose match, View media (more than one scraped image or video) and
+  Collections, then **All game options**, the game menu L2 and Select open (`PcGameMenu`). Every button is a tap
+  target and a pad stop (Left and Right along them, A presses), and both menus answer the pad (Up, Down, A, B) and
+  a tap, a tap outside closing them.
+- **The status row** (`pageStatuses`, `PageStatusRow`): small glyphs under the game's name or logo, each with its
+  words for a screen reader, drawn only from what the page already knows: ready to play (with which runner) or not
+  and why, an update and its version, a store's cloud saves (synced, offline, failed, syncing, not synced yet, the
+  Cloud saves row's own glyph), droidtop's view of the saves (Saves' value), achievements (earned of total, or sign
+  in to see them), and not scraped yet. Glyphs come from the outlined set the catalog and the state glyphs use
+  (`StatusGlyph` for a cloud-saves state). Nothing is fetched for it. Not drawn yet, because the page does not know
+  them: whether the person is signed in to the game's store, saves synced to another device (beyond a store's
+  cloud), and achievements a service has but has not loaded; the plugins lane's `GameStatus.of` (Droidtop/tracker#845
+  plugins slice 5) is to compute the row's states, and the page then draws those.
+
+A console game's detail (`EntryDetailScreen`) keeps its own buttons until it moves onto this page
+(Droidtop/tracker#845 slice U2).
+
 Droidtop/tracker#254, 2026-10-02. The page keeps one job, "everything about
 this game and the one thing you most likely want to do", and has this
 structure, top to bottom, drawn only from theme tokens:
@@ -17231,18 +17269,18 @@ structure, top to bottom, drawn only from theme tokens:
   (`ShellChip(large)`, the same `PcPlayState` verb and detail the card's A
   hint and the menu's first row use, so the three cannot disagree), the
   quiet **facts strip** beside it (Steam's status panel: each fact a small
-  capitals label, the eyebrow role, over its value), and Favourite and
-  Options as small square buttons (`PageIconButton`, with a spoken
-  description; Options is a drawn gear that turns a quarter as the cursor
-  arrives) at the right edge, all in one row (`factsStrip`): Last played,
-  Play time, Version (the installed version against the latest known:
-  "0.9.5, v0.9.6 is available", the one wording of `GameUpdates.line`), Size
-  and Runs with, only those that exist. It scrolls sideways rather than
-  clipping at a large text size. Play time is time only, and only once some
-  was recorded; how many times the game was played is Overview's "Times
-  played", said once (Droidtop/tracker#662). Under it the one line saying why the
+  capitals label, the eyebrow role, over its value), and Edit metadata and
+  Options (`ShellChip`s, each opening its `AnchoredMenu` beside it) and
+  Favourite (a small square `PageIconButton`, with a spoken description) at
+  the right edge, all in one row (`factsStrip`): Version (the installed
+  version against the latest known: "0.9.5, v0.9.6 is available", the one
+  wording of `GameUpdates.line`), Size and Runs with, only those that exist.
+  It scrolls sideways rather than clipping at a large text size. Last played,
+  Play time and Times played are Activity's rows (Droidtop/tracker#845); play
+  time is time only, and only once some was recorded, and how many times is
+  said once (Droidtop/tracker#662). Under it the one line saying why the
   primary action is what it is. In portrait the strip sits under the
-  buttons. While the cursor is in the rows the band has scrolled away.
+  buttons, and the buttons' row scrolls sideways on a narrow screen. While the cursor is in the rows the band has scrolled away.
   Store games have no installed or latest version until #222 gives them
   one; the strip simply has no Version fact for them.
   "Choose a runner", the button of a game no runner offers, is pressable and opens the Engine picker (the menu's
@@ -17250,18 +17288,19 @@ structure, top to bottom, drawn only from theme tokens:
   about such a game (Droidtop/tracker#287). The Details tab's Runner row states only the resolved runner and its reason. A store game that is not
   installed has no runner worked out, and the action band's line ("Downloads 590 MB") is not a runner fact, so
   the row is left out rather than showing it (Droidtop/tracker#371).
-- **The tab strip** (`PageTabStrip`): Overview, Versions, Extras,
-  Details as Steam's uppercase tab pills (`ShellChip(tab = true)`), centred,
+- **The tab strip** (`PageTabStrip`): Overview, Versions, Activity, Extras,
+  Details, Show thread as Steam's uppercase tab pills (`ShellChip(tab = true)`), every one drawn whether it has
+  rows or not, centred,
   scrolling sideways when it must, the end it can scroll to fading so a tab
   cut at the edge says there is more (`fadeWhileMoreSideways`, the library's
-  view strip too; the four short names fit a landscape page, so "Versions"
+  view strip too; short names, so "Versions"
   replaced "Versions and updates", Droidtop/tracker#661), under the band and pinned at the top once
   the page scrolls, L1/R1 glyphs at its ends (half strength at an end). Every row names its own tab (`PageFact.tab`, required): a row is never
   placed by matching its English title, so renaming one cannot move it and a
   plugin's or a new row cannot land on Details by accident
-  (Droidtop/tracker#678). No row repeats the facts strip (last played, play time, version,
-  size, runs with). Overview: About, the unscraped game's Scrape row,
-  Install state, Times played, Compatibility, and for a game of several parts
+  (Droidtop/tracker#678). No row repeats the facts strip (version,
+  size, runs with). Overview: About,
+  Install state, Compatibility, How long to beat, and for a game of several parts
   the **part list** first (`partFacts`: a heading row with the count, then
   each part with its newest version, in the order the folder names give).
   Versions: the Update row first when a source knows a newer
@@ -17271,7 +17310,9 @@ structure, top to bottom, drawn only from theme tokens:
   matches, a pasted link, or unlink) and, once linked,
   "Check for update", which answers in one short line (`checkOutcomeLine`:
   "Up to date", "v0.9.6 is available", or why it failed). The rows need the
-  library handed to `PcGamePage` and appear only on folder games. Extras: the
+  library handed to `PcGamePage` and appear only on folder games. Activity:
+  Last played, Play time, Times played and Achievements. Show thread: a
+  linked source's Open source page. Extras: the
   game's own links (A opens one, the URL is the tooltip), Manual and Video
   when the game has them, where the facts came from. Details: Store,
   Install location, Folder name, Engine, Runner and the scraped facts
@@ -17324,7 +17365,8 @@ the control they grow from; only the capsule under the cursor reports where it i
 With motion off, or a page opened some other way, the page and the launch screen
 simply appear.
 
-**Not on the page yet:** the Saves and Activity tabs (#229, #230), and the
+**Not on the page yet:** the Saves tab (#229), a store's profile data on Activity (#230), the thread's first post on
+Show thread (Droidtop/tracker#845), and the
 Install, Update and Downloading verbs of the primary action (#223), which
 land in `PcPlayState` and appear here without a change to the page. No
 version rollback (#231).
@@ -21250,9 +21292,10 @@ several equal programs give `ambiguous` and the person picks from the
 classifier passes through what `GameEngineDetector.detectGame` says.
 
 **Unmatched games are shown plainly.** A game with no art, description or
-scrape source (`isUnscraped`) is drawn with its parsed title and its game
-page has a "Not scraped yet" row whose A press runs the existing
-`PcScraper.scrape` (no new scraper).
+scrape source (`isUnscraped`) is drawn with its parsed title, and its game
+page says "Not scraped yet" in its status row; Scrape, the first row of the
+page's Edit metadata (Droidtop/tracker#845; it was an Overview row before),
+runs the existing `PcScraper.scrape` (no new scraper).
 
 Gaps recorded, not built (#264): the first-scan scrape offer for the PC tab
 (#174 wording), store-library identity (#8, #11), `metadata_source` plugin

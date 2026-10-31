@@ -27,6 +27,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.SportsEsports
+import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,7 +52,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
@@ -57,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -80,7 +88,13 @@ import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.scraper.FieldSources
+import dev.droidtop.shell.gamepad.ActionRow
+import dev.droidtop.shell.gamepad.AnchoredMenu
+import dev.droidtop.shell.gamepad.GameInfoKind
+import dev.droidtop.shell.gamepad.anchorFor
 import dev.droidtop.shell.gamepad.fadeWhileMoreSideways
+import dev.droidtop.shell.gamepad.isAchievementsSignIn
+import dev.droidtop.shell.gamepad.rememberAnchor
 import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.CatalogDetailStrip
 import dev.droidtop.shell.gamepad.labelCase
@@ -92,8 +106,6 @@ import dev.droidtop.shell.gamepad.Corners
 import dev.droidtop.shell.gamepad.FloodOrigin
 import dev.droidtop.shell.gamepad.FocusGlideHost
 import dev.droidtop.shell.gamepad.PageFlood
-import dev.droidtop.shell.gamepad.QuickGlyph
-import dev.droidtop.shell.gamepad.QuickGlyphIcon
 import dev.droidtop.shell.gamepad.screenRect
 import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.ShoulderGlyph
@@ -136,14 +148,19 @@ import dev.droidtop.shell.gamepad.ShellDialog
  *   the cursor down in the tab's rows the hero and the action band scroll
  *   away and the tab strip stays pinned at the top, gaining a plate once
  *   rows pass under it.
+ * - **The status row** under the title ([pageStatuses]): one small glyph per
+ *   thing whose state droidtop knows (ready to play, an update, cloud saves,
+ *   saves, achievements, not scraped), each with its words for a screen reader.
  * - **The action band**, one row: ONE large primary action that says what A
  *   does (Play, or the one setup step that makes it Play, or why it cannot --
- *   [PcPlayState]), a quiet facts strip beside it ([factsStrip]: last
- *   played, play time, the version installed against the latest known, size,
- *   what runs it, each a small capitals label over its value), small
- *   Favourite and Options (a gear) square buttons at the right edge, and the
- *   one-line reason under it.
- * - **The tab strip** (Overview, Versions, Extras, Details),
+ *   [PcPlayState]), a quiet facts strip beside it ([factsStrip]: the version
+ *   installed against the latest known, size, what runs it, each a small
+ *   capitals label over its value), then Edit metadata (Scrape is its first
+ *   row), Options (the game's Saves, achievements sign-in, Choose match, View
+ *   media, Collections and the rest of its menu) and a small Favourite button
+ *   at the right edge, and the one-line reason under it. Edit metadata and
+ *   Options open beside their buttons ([AnchoredMenu]).
+ * - **The tab strip** (Overview, Versions, Activity, Extras, Details, Show thread),
  *   Steam's uppercase tab pills, centred under the band. It OWNS L1/R1 while the page is open: the page
  *   is a window of its own over the library, so its one `onPad` handler is
  *   what the shoulders reach, the same "nearest strip takes them" rule the
@@ -154,8 +171,9 @@ import dev.droidtop.shell.gamepad.ShellDialog
  *   selected row's full text in the detail strip under the list
  *   (docs/SPEC.md 7k, "Text in rows and tiles"). A game of several parts
  *   lists them first on Overview ([partFacts]). Every fact the page always
- *   had is still a row, under the tab it names ([PageFact.tab]); nothing a
- *   person would look for is behind a menu (Droidtop/tracker#173).
+ *   had is still a row, under the tab it names ([PageFact.tab]), and every
+ *   tab is drawn, an empty one with its line ([PageTab.emptyLine]). The
+ *   saves' state, which became an Options row, is a glyph of the status row.
  *
  * The pad comes through the one pipeline (docs/SPEC.md 6e,
  * Droidtop/tracker#178): this is a window of its own, so it gets the
@@ -206,11 +224,26 @@ internal fun PcGamePage(
         val path = entry.groupingPath() ?: return@produceState
         value = withContext(Dispatchers.IO) { folderSizeBytes(path) }
     }
-    // A game nothing has matched shows a plain row that scrapes it through the
-    // one PC scrape pipeline (docs/SPEC.md 7n); what the scrape said replaces
-    // the row's value until the library publishes the result.
+    // Scrape is the first row of Edit metadata (docs/SPEC.md 7i, "The action band"; the owner, Droidtop/tracker#845:
+    // "put "scrape" IN the edit metadata panel"), through the one PC scrape pipeline (docs/SPEC.md 7n). What the scrape
+    // said is the row's line while the panel is open, and a flash once it is done.
     val scope = rememberCoroutineScope()
     var scrapeStatus by remember(entry.id) { mutableStateOf<String?>(null) }
+    // The two panels the action band opens beside their buttons, and what their rows open over the page.
+    var editingMetadata by remember(entry.id) { mutableStateOf(false) }
+    var optionsOpen by remember(entry.id) { mutableStateOf(false) }
+    var renaming by remember(entry.id) { mutableStateOf(false) }
+    var pickingMatch by remember(entry.id) { mutableStateOf(false) }
+    var viewingMedia by remember(entry.id) { mutableStateOf(false) }
+    var editingCollections by remember(entry.id) { mutableStateOf(false) }
+    val editAnchor = rememberAnchor()
+    val optionsAnchor = rememberAnchor()
+    // The scraped media, for Options' View media: a folder listing, so read on IO when the page opens.
+    val media by produceState(emptyList<Pair<String, String>>(), entry.id) {
+        value = withContext(Dispatchers.IO) {
+            PcScraper.scrapedMedia(context, entry, alsoUnder = dev.droidtop.library.PcRunnerOptions.gameFolderFor(entry)?.name)
+        }
+    }
     // The game's update sources (docs/SPEC.md 7g, 7i): a link is the GAME's,
     // so it is read and written for every folder of it, through the same
     // library calls the options menu uses.
@@ -339,7 +372,7 @@ internal fun PcGamePage(
         value = withContext(Dispatchers.IO) { dev.droidtop.library.originLabel(entry, 1, roots = pcRootsOf(context)).full }
     }
     val sizeLine = (folderSize ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { dev.droidtop.library.format.ValueFormat.size(it) }
-    val rows = remember(entry, play, runner, siblings, scrapeStatus, updateStatus, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers) {
+    val rows = remember(entry, play, runner, siblings, updateStatus, links, updateSources, setVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers) {
         pageRows(
             entry, play, runner, siblings,
             origin = originText,
@@ -355,7 +388,6 @@ internal fun PcGamePage(
             },
             moreOpen = moreOpen,
             onToggleMore = { moreOpen = !moreOpen },
-            scrapeStatus = scrapeStatus,
             latest = links?.latestKnown ?: entry.latestKnown,
             onOpenLink = { url ->
                 dev.droidtop.library.Links.open(context, url)
@@ -409,13 +441,16 @@ internal fun PcGamePage(
                 val page = store?.webPages?.accountLibrary
                 if (store != null && page != null) dev.droidtop.library.stores.StoreWeb.open(context, store, page)
             },
-            onScrape = {
-                scope.launch {
-                    scrapeStatus = "Looking it up..."
-                    scrapeStatus = PcScraper.scrape(context, listOf(entry), filter = dev.droidtop.library.scraper.ScrapeFilter.ALL)
-                }
-            },
         )
+    }
+    fun scrape() {
+        if (scrapeStatus == SCRAPING) return
+        scope.launch {
+            scrapeStatus = SCRAPING
+            val said = PcScraper.scrape(context, listOf(entry), filter = dev.droidtop.library.scraper.ScrapeFilter.ALL)
+            scrapeStatus = said
+            dev.droidtop.library.settings.Notices.flash(said, source = GameNaming.displayName(entry.title), context = context)
+        }
     }
     val parts by produceState(emptyList<PageFact>(), entry.id, siblings) {
         value = withContext(Dispatchers.Default) { partFacts(siblings) }
@@ -426,6 +461,18 @@ internal fun PcGamePage(
     // service has them, achievements (docs/SPEC.md 7h, "Game info"). Asked for once when the page opens.
     var infoScreen by remember(entry.id) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     val infoRows = dev.droidtop.shell.gamepad.rememberGameInfoRows(entry, copies = siblings)
+    // Saves and the achievements sign-in are rows of Options (Droidtop/tracker#845), and glyphs of the status row; the
+    // achievements themselves are Activity's, the rest Overview's.
+    val savesInfo = infoRows.firstOrNull { it.kind == GameInfoKind.SAVES }
+    val signInInfo = infoRows.firstOrNull { it.isAchievementsSignIn }
+    val achievementsInfo = infoRows.firstOrNull { it.kind == GameInfoKind.ACHIEVEMENTS && !it.isAchievementsSignIn }
+    val infoFacts = remember(infoRows) {
+        infoRows.filter { it.kind != GameInfoKind.SAVES && !it.isAchievementsSignIn }.map { info ->
+            info.toPageFact(context, tab = if (info.kind == GameInfoKind.ACHIEVEMENTS) PageTab.ACTIVITY else PageTab.OVERVIEW) { screen -> infoScreen = screen }
+        }
+    }
+    // How the person has played it, droidtop's own record, on Activity (Droidtop/tracker#845).
+    val activity = remember(entry) { activityRows(entry, System.currentTimeMillis()) }
     // Which program a Windows game runs (docs/SPEC.md 7i, "Which program
     // runs"): the folder is read for this one open game, on IO, and again
     // when the choice sheet closes.
@@ -462,16 +509,31 @@ internal fun PcGamePage(
         )
     }
     val tabs = remember { PageTab.values() }
-    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, driversFact?.value, infoRows, copies, oldRows) {
+    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, driversFact?.value, infoFacts, copies, oldRows, activity) {
         groupRowsByTab(
-            rows + copies + oldRows + listOfNotNull(programFact, driversFact) + pluginRows.facts + infoRows.map { it.toPageFact(context) { screen -> infoScreen = screen } },
+            rows + copies + oldRows + listOfNotNull(programFact, driversFact) + pluginRows.facts + activity + infoFacts,
             parts,
+        )
+    }
+    // The status row under the title (owner, Droidtop/tracker#845: "a set of icons to indicate the status of each
+    // thing"), from what the page already knows; nothing is asked for it.
+    val statuses = remember(entry, play, runner, cloudStore, lastSync, online, cloudStatus, savesInfo, achievementsInfo, signInInfo) {
+        pageStatuses(
+            entry = entry,
+            play = play,
+            runsWith = runner?.label,
+            cloudSaves = cloudStore?.takeIf { it.hasCloudSaves && entry.pcInfo?.installed == true }?.let { store ->
+                (cloudStatus ?: cloudSavesLine(store.label, true, lastSync, online, System.currentTimeMillis()).first) to
+                    cloudSavesMark(true, lastSync, online, syncing = cloudStatus == SYNCING)
+            },
+            saves = savesInfo?.value,
+            achievements = achievementsInfo?.value,
+            achievementsSignIn = signInInfo != null,
         )
     }
     val strip = remember(entry, runner, folderSize, siblings, setVersion) {
         factsStrip(
             entry = entry,
-            now = System.currentTimeMillis(),
             folderSizeBytes = folderSize,
             installedVersion = installedVersions(entry, siblings, setVersion).firstOrNull(),
             runsWith = runner?.label,
@@ -526,10 +588,9 @@ internal fun PcGamePage(
     val closePage: () -> Unit = { if (!leaving) leaving = true }
     var playAt by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
 
-    val buttons = 3
     fun pressButton(index: Int) {
         when (index) {
-            0 -> if (play.chooseEngine) {
+            BUTTON_PRIMARY -> if (play.chooseEngine) {
                 onChooseEngine()
             } else if (play.pressable) {
                 // The setup step runs over the page, which stays: closing it
@@ -538,8 +599,9 @@ internal fun PcGamePage(
                 if (play.ready || play.store != null) onClose()
                 onPlay()
             }
-            1 -> onToggleFavorite()
-            2 -> onOpenOptions()
+            BUTTON_EDIT_METADATA -> editingMetadata = true
+            BUTTON_OPTIONS -> optionsOpen = true
+            BUTTON_FAVOURITE -> onToggleFavorite()
         }
     }
 
@@ -564,7 +626,7 @@ internal fun PcGamePage(
         listOf(
             HintBinding(GamepadAction.A, if (zone == PageZone.ACTIONS) pageActionLabel(button, verb) else "Select") {
                 when (zone) {
-                    PageZone.ACTIONS -> button != 0 || play.pressable
+                    PageZone.ACTIONS -> button != BUTTON_PRIMARY || play.pressable
                     PageZone.TABS -> current.isNotEmpty()
                     PageZone.CONTENT -> current.getOrNull(row)?.onActivate != null
                 }
@@ -643,7 +705,7 @@ internal fun PcGamePage(
                                 val step = if (press.action == GamepadAction.LEFT) -1 else 1
                                 when (zone) {
                                     PageZone.ACTIONS -> {
-                                        val next = menuStep(button, buttons, step)
+                                        val next = menuStep(button, PAGE_BUTTONS, step)
                                         if (next != button) EsDeNavigationSounds.play(UiSound.MOVE)
                                         button = next
                                     }
@@ -669,7 +731,7 @@ internal fun PcGamePage(
                             }
                             // X plays from anywhere on the page, as on the library tile; Y is Favourite
                             // (owner decision, Droidtop/tracker#644 slice 4, proposal 6.C).
-                            GamepadAction.X -> pressButton(0)
+                            GamepadAction.X -> pressButton(BUTTON_PRIMARY)
                             GamepadAction.Y -> onToggleFavorite()
                             GamepadAction.L2 -> onOpenOptions()
                             // Select on a copy's row is that copy's Options; anywhere else the game's.
@@ -699,7 +761,7 @@ internal fun PcGamePage(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         contentPadding = PaddingValues(bottom = Space.Lg),
                     ) {
-                        item(key = "hero") { PageHero(entry, heroHeight) }
+                        item(key = "hero") { PageHero(entry, heroHeight, statuses) }
                         item(key = "band") {
                             Box(Modifier.padding(horizontal = window.edgePadding)) {
                                 PageActionBand(
@@ -709,6 +771,8 @@ internal fun PcGamePage(
                                     strip = strip,
                                     portrait = window.portrait,
                                     onPlayPlaced = { playAt = it },
+                                    editModifier = Modifier.anchorFor(editAnchor),
+                                    optionsModifier = Modifier.anchorFor(optionsAnchor),
                                     onPress = { index ->
                                         zone = PageZone.ACTIONS
                                         button = index
@@ -827,6 +891,114 @@ internal fun PcGamePage(
         }
     }
     PluginPageScreen(pluginRows)
+    // Edit metadata, beside its button: Scrape first (owner, Droidtop/tracker#845), then the game's own title.
+    if (editingMetadata) {
+        AnchoredMenu(
+            anchor = editAnchor.value,
+            title = EDIT_METADATA,
+            rows = listOfNotNull(
+                ActionRow(
+                    SCRAPE_ROW,
+                    scrapeStatus ?: if (entry.isUnscraped()) "Not scraped yet. Looks this game up in the PC sources" else "Looks this game up in the PC sources again",
+                    onSelect = if (scrapeStatus == SCRAPING) null else ({ scrape() }),
+                ),
+                // The person's own title for the game (docs/SPEC.md 7n), kept by the library.
+                if (library != null) {
+                    ActionRow("Title", entry.gameName?.takeIf { name -> name.isNotBlank() }?.let { name -> "Your own title: $name" } ?: "From the folder name") {
+                        editingMetadata = false
+                        renaming = true
+                    }
+                } else {
+                    null
+                },
+            ),
+            onDismiss = { editingMetadata = false },
+        )
+    }
+    // Options, beside its button: what the owner moved off the page's buttons (Droidtop/tracker#845), only the ones this
+    // game has, then the rest of the game's menu, the one L2 opens.
+    if (optionsOpen) {
+        val savesScreen = savesInfo?.screen
+        val signIn = signInInfo?.run
+        AnchoredMenu(
+            anchor = optionsAnchor.value,
+            title = OPTIONS,
+            rows = listOfNotNull(
+                savesScreen?.let { screen ->
+                    ActionRow("Saves", savesInfo?.value) {
+                        optionsOpen = false
+                        infoScreen = screen
+                    }
+                },
+                signIn?.let { step ->
+                    ActionRow("Sign in for achievements", "Shows your RetroAchievements progress on this game") {
+                        optionsOpen = false
+                        step(context)
+                    }
+                },
+                ActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong") {
+                    optionsOpen = false
+                    pickingMatch = true
+                },
+                if (media.size > 1) {
+                    ActionRow("View media", "${media.size} images and videos scraped for this game") {
+                        optionsOpen = false
+                        viewingMedia = true
+                    }
+                } else {
+                    null
+                },
+                if (library != null) {
+                    ActionRow("Collections", "Which of your collections this game is in") {
+                        optionsOpen = false
+                        editingCollections = true
+                    }
+                } else {
+                    null
+                },
+                ActionRow("All game options", "Install, updates, how it runs and the rest of the game's menu") {
+                    optionsOpen = false
+                    onOpenOptions()
+                },
+            ),
+            onDismiss = { optionsOpen = false },
+        )
+    }
+    if (renaming && library != null) {
+        TextEditDialog(
+            title = "Title",
+            subtitle = "Blank uses the title read from the folder name",
+            initial = entry.gameName.orEmpty(),
+            onCommit = { text ->
+                renaming = false
+                scope.launch {
+                    library.renameGame(gameIds, text)
+                    dev.droidtop.library.settings.Notices.flash(
+                        if (text.isBlank()) "Back to the title read from the folder name" else "Renamed to ${text.trim()}",
+                        context = context,
+                    )
+                }
+            },
+            onDismiss = { renaming = false },
+        )
+    }
+    if (pickingMatch) {
+        dev.droidtop.shell.gamepad.ManualMatchPicker(
+            entry = entry,
+            onApplied = { line -> dev.droidtop.library.settings.Notices.flash(line, context = context) },
+            onDismiss = { pickingMatch = false },
+        )
+    }
+    if (viewingMedia) {
+        FullScreenOverlay(onDismiss = { viewingMedia = false }) {
+            dev.droidtop.shell.gamepad.MediaViewer(title = entry.title, media = media, onClose = { viewingMedia = false })
+        }
+    }
+    if (editingCollections && library != null) {
+        FullScreenOverlay(onDismiss = { editingCollections = false }) {
+            dev.droidtop.shell.gamepad.CollectionMembershipEditor(entry = entry, library = library, onDismiss = { editingCollections = false })
+        }
+    }
     programScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { programScreen = null }) }
     infoScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { infoScreen = null }) }
     copyOptions?.let { copy ->
@@ -952,10 +1124,10 @@ private const val PAGE_PLATE_SHADOW_ALPHA = 0.5f
  * plate, never stretched across the band, and the name keeps to the width
  * left of it; with none, the plate carries the
  * name, never a stand-in cover. The logo is large, bottom-left, as on
- * Steam's page; nothing else is stacked on the art.
+ * Steam's page; under it only the status row ([PageStatusRow]).
  */
 @Composable
-private fun PageHero(entry: LibraryEntry, height: Dp) {
+private fun PageHero(entry: LibraryEntry, height: Dp, statuses: List<PageStatus>) {
     val window = LocalShellWindow.current
     val title = GameNaming.displayName(entry.title)
     val hero = entry.heroUri
@@ -1005,6 +1177,7 @@ private fun PageHero(entry: LibraryEntry, height: Dp) {
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                if (statuses.isNotEmpty()) PageStatusRow(statuses, Modifier.padding(top = Space.Sm))
             }
             if (coverArt != null) {
                 AsyncImage(
@@ -1027,11 +1200,12 @@ private const val COVER_ASPECT = 2f / 3f
 
 /**
  * The action band, one row as on Steam's page: the ONE large primary action
- * at the left, the quiet facts strip beside it, Favourite and Options as
- * small icon buttons at the right edge, and under them the one line saying
- * why the primary action is what it is. [selectedButton] is the button the
- * cursor is on (0 primary, 1 Favourite, 2 Options), null when the cursor is
- * elsewhere. In portrait the strip sits under the buttons.
+ * at the left, the quiet facts strip beside it, Edit metadata, Options and a
+ * small Favourite button at the right edge (Droidtop/tracker#845), and under
+ * them the one line saying why the primary action is what it is.
+ * [selectedButton] is the button the cursor is on ([BUTTON_PRIMARY] and the
+ * rest, in the order they are drawn), null when the cursor is elsewhere. In
+ * portrait the strip sits under the buttons.
  */
 @Composable
 private fun PageActionBand(
@@ -1042,6 +1216,9 @@ private fun PageActionBand(
     portrait: Boolean,
     // Where Play is, for the launch to grow out of (PageFlood.kt).
     onPlayPlaced: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit,
+    // Where Edit metadata and Options are, for their menus to open beside ([anchorFor]).
+    editModifier: Modifier,
+    optionsModifier: Modifier,
     onPress: (Int) -> Unit,
 ) {
     val primary: @Composable () -> Unit = {
@@ -1051,25 +1228,30 @@ private fun PageActionBand(
             primary = true,
             large = true,
             enabled = play.pressable,
-            selected = selectedButton == 0,
-            onClick = { onPress(0) },
+            selected = selectedButton == BUTTON_PRIMARY,
+            onClick = { onPress(BUTTON_PRIMARY) },
         )
     }
-    val icons: @Composable () -> Unit = {
+    val buttons: @Composable () -> Unit = {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.Sm), verticalAlignment = Alignment.CenterVertically) {
+            ShellChip(
+                EDIT_METADATA,
+                modifier = editModifier,
+                selected = selectedButton == BUTTON_EDIT_METADATA,
+                onClick = { onPress(BUTTON_EDIT_METADATA) },
+            )
+            ShellChip(
+                OPTIONS,
+                modifier = optionsModifier,
+                selected = selectedButton == BUTTON_OPTIONS,
+                onClick = { onPress(BUTTON_OPTIONS) },
+            )
             PageIconButton(
                 glyph = if (favourite) "\u2605" else "\u2606",
                 description = if (favourite) "Remove from favourites" else "Add to favourites",
                 on = favourite,
-                selected = selectedButton == 1,
-                onClick = { onPress(1) },
-            )
-            PageIconButton(
-                glyph = null,
-                description = "Game options",
-                on = false,
-                selected = selectedButton == 2,
-                onClick = { onPress(2) },
+                selected = selectedButton == BUTTON_FAVOURITE,
+                onClick = { onPress(BUTTON_FAVOURITE) },
             )
         }
     }
@@ -1085,10 +1267,14 @@ private fun PageActionBand(
     }
     Column(modifier = Modifier.padding(top = Space.Sm)) {
         if (portrait) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Four buttons outgrow a phone's width: the row scrolls sideways rather than clipping one.
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(Space.Sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 primary()
-                Spacer(Modifier.weight(1f))
-                icons()
+                buttons()
             }
             // Why the button says what it says sits right under it, before the facts (Droidtop/tracker#657); a
             // download's line is its time left and stays under its bar.
@@ -1102,7 +1288,7 @@ private fun PageActionBand(
                 } else {
                     Spacer(Modifier.weight(1f))
                 }
-                icons()
+                buttons()
             }
         }
         // The download's bar: how far, seen rather than read (Droidtop/tracker#643); the line under it says the time left.
@@ -1118,13 +1304,12 @@ private fun PageActionBand(
 }
 
 /**
- * A small square button for the cursor to rest on (Steam's gear and favourite beside the status panel): a
- * glyph, never a word, with a spoken description. At rest it is a quiet plate; under the cursor it turns
- * solid, as every quiet button does. Null [glyph] is the gear (the game's options), drawn, which turns a
- * quarter as the cursor arrives (DroidDeck's cog, ui/FrontEndWidgets.kt at 9310d19).
+ * A small square button for the cursor to rest on (Steam's favourite beside the status panel): a glyph, never a
+ * word, with a spoken description. At rest it is a quiet plate; under the cursor it turns solid, as every quiet
+ * button does.
  */
 @Composable
-private fun PageIconButton(glyph: String?, description: String, on: Boolean, selected: Boolean, onClick: () -> Unit) {
+private fun PageIconButton(glyph: String, description: String, on: Boolean, selected: Boolean, onClick: () -> Unit) {
     val lit = selected && dev.droidtop.shell.gamepad.input.PadModality.showsFocus
     val ink = when {
         lit -> MenuTokens.OnSelected
@@ -1139,21 +1324,9 @@ private fun PageIconButton(glyph: String?, description: String, on: Boolean, sel
             .padRow(onClick = onClick)
             .selectionFrame(selected, Corners.Crisp, selectedFill = MenuTokens.Selected),
     ) {
-        if (glyph != null) {
-            Text(glyph, color = ink, style = MaterialTheme.typography.titleLarge)
-        } else {
-            val turn = animateFloatAsState(if (lit) GEAR_TURN_DEGREES else 0f, Motion.focus(), label = "gear")
-            QuickGlyphIcon(
-                glyph = QuickGlyph.SETTINGS,
-                tint = ink,
-                modifier = Modifier.size(24.dp).graphicsLayer { rotationZ = turn.value },
-            )
-        }
+        Text(glyph, color = ink, style = MaterialTheme.typography.titleLarge)
     }
 }
-
-/** How far the gear turns as the cursor reaches it. */
-private const val GEAR_TURN_DEGREES = 90f
 
 /**
  * The status panel beside Play (Steam's): each fact a small capitals label over its value, quiet, scrolling
@@ -1176,9 +1349,9 @@ private fun PageFactsStrip(facts: List<Pair<String, String>>, modifier: Modifier
 
 /**
  * The tab strip, L1 and R1 at its ends: while the page is open it owns
- * the shoulders. Its four short names fit a landscape page; at a large
- * text size or in portrait it scrolls sideways, and the end it can scroll
- * to fades, so a tab cut at the edge says there is more (Droidtop/tracker#661).
+ * the shoulders. Every tab is drawn, an empty one too (the owner, Droidtop/tracker#845: "Empty tabs
+ * shouldn't be hidden"). Where its names do not fit (a large text size, portrait) it scrolls sideways,
+ * and the end it can scroll to fades, so a tab cut at the edge says there is more (Droidtop/tracker#661).
  */
 @Composable
 private fun PageTabStrip(
@@ -1214,16 +1387,35 @@ private fun PageTabStrip(
     }
 }
 
+/** The action band's buttons, in the order they are drawn and the cursor moves along them. */
+internal const val BUTTON_PRIMARY = 0
+internal const val BUTTON_EDIT_METADATA = 1
+internal const val BUTTON_OPTIONS = 2
+internal const val BUTTON_FAVOURITE = 3
+internal const val PAGE_BUTTONS = 4
+
+/** The two buttons beside the primary action, and the panels they open (Droidtop/tracker#845). */
+internal const val EDIT_METADATA = "Edit metadata"
+internal const val OPTIONS = "Options"
+
+/** Edit metadata's first row (the owner, Droidtop/tracker#845: "put "scrape" IN the edit metadata panel"). */
+internal const val SCRAPE_ROW = "Scrape"
+
+/** The Scrape row's line while a scrape it started runs. */
+private const val SCRAPING = "Looking it up\u2026"
+
 /** The A hint on the action band: what the button under the cursor does. */
 internal fun pageActionLabel(button: Int, primaryVerb: String): String = when (button) {
-    0 -> primaryVerb
-    1 -> "Favourite"
-    else -> "Options"
+    BUTTON_PRIMARY -> primaryVerb
+    BUTTON_EDIT_METADATA -> EDIT_METADATA
+    BUTTON_OPTIONS -> OPTIONS
+    else -> "Favourite"
 }
 
-/** A fact from outside the library as a row of Overview: A opens its page of rows or its address. */
+/** A fact from outside the library as a row of [tab]: A opens its page of rows or its address. */
 private fun dev.droidtop.shell.gamepad.GameInfoRow.toPageFact(
     context: android.content.Context,
+    tab: PageTab,
     openScreen: (dev.droidtop.library.settings.CatalogScreen) -> Unit,
 ): PageFact {
     val page = screen
@@ -1238,7 +1430,7 @@ private fun dev.droidtop.shell.gamepad.GameInfoRow.toPageFact(
     } else {
         null
     }
-    return PageFact(title, value, subtitle, onActivate = action, tip = address, tab = PageTab.OVERVIEW)
+    return PageFact(title, value, subtitle, onActivate = action, tip = address, tab = tab)
 }
 
 /** One fact on the page: a row title, what it says, and what A does on it when it does anything. */
@@ -1432,7 +1624,6 @@ private fun pageRows(
     play: PcPlayState,
     runner: dev.droidtop.library.ResolvedRunner?,
     siblings: List<LibraryEntry>,
-    scrapeStatus: String?,
     sourceRows: List<PageFact> = emptyList(),
     latest: String? = null,
     onOpenLink: (String) -> Unit = {},
@@ -1454,32 +1645,20 @@ private fun pageRows(
     onClearVersion: (() -> Unit)? = null,
     moreOpen: Boolean = false,
     onToggleMore: () -> Unit = {},
-    onScrape: () -> Unit,
 ): List<PageFact> = buildList {
     // Each fact is on ONE tab, and none repeats the facts strip under the
-    // action band (last played, play time, version, size, runs with): Overview
-    // is the game, Versions what is installed against what is out, Extras
-    // what comes with it, Details where it lives and what runs it.
+    // action band (version, size, runs with): Overview is the game, Versions
+    // what is installed against what is out, Activity how it has been played
+    // ([activityRows]), Extras what comes with it, Details where it lives and
+    // what runs it, Show thread its source's own page.
     if (!entry.hideMetadata) {
         entry.description?.takeIf { it.isNotBlank() }?.let { add(PageFact("About", subtitle = it, tab = PageTab.OVERVIEW)) }
-    }
-    if (entry.isUnscraped()) {
-        add(
-            PageFact(
-                "Not scraped yet",
-                value = scrapeStatus ?: "Scrape",
-                subtitle = "No cover or description yet",
-                onActivate = onScrape,
-                tab = PageTab.OVERVIEW,
-            ),
-        )
     }
     if (entry.pcInfo?.installed == false) add(PageFact("Install state", "Not installed", tab = PageTab.OVERVIEW))
     // A GOG installer's row: what the installer file says it holds (docs/SPEC.md 7g, "Installers in a games folder").
     entry.pcInfo?.installer?.let { installer ->
         add(PageFact("Installer", installer.file, subtitle = listOfNotNull(installer.version?.let { "Version $it" }, installer.build?.let { "GOG build $it" }).joinToString(". ").ifEmpty { null }, tab = PageTab.OVERVIEW))
     }
-    if (entry.playCount > 0) add(PageFact("Times played", entry.playCount.toString(), tab = PageTab.OVERVIEW))
     entry.pcInfo?.compatibility?.let { add(PageFact("Compatibility", subtitle = it.summary() + ". Other people's results on other hardware, not a verdict.", tab = PageTab.OVERVIEW)) }
 
     // A version comes from a folder's own name (docs/SPEC.md 7m); a store
@@ -1669,8 +1848,12 @@ internal fun sourcesLine(entry: LibraryEntry): String? {
 internal enum class PageTab(val label: String, val emptyLine: String) {
     OVERVIEW("Overview", "Nothing is known about this game yet"),
     VERSIONS("Versions", "No version information for this game"),
+    // How the person has played it (the owner, Droidtop/tracker#845: an Activity tab).
+    ACTIVITY("Activity", "You have not played this game yet"),
     EXTRAS("Extras", "No extras for this game yet"),
     DETAILS("Details", "No details for this game yet"),
+    // The source's own thread (the owner, Droidtop/tracker#845: "put a "show thread" tab"); its first post comes later.
+    THREAD("Show thread", "No thread is linked to this game"),
 }
 
 /** The rows a game page folds under More (docs/SPEC.md 7i), and the row that opens them. */
@@ -1759,20 +1942,17 @@ internal fun versionFact(installed: String?, latest: String?): String? = when {
 
 /**
  * The page's quiet facts strip, label then value, only the facts that
- * exist: when it was last played, play time, the version installed against
- * the latest known, size on this device (or to download), and what runs
- * it. Pure; sizes read through the one formatter ([dev.droidtop.library.format.ValueFormat]).
+ * exist: the version installed against the latest known, size on this
+ * device (or to download), and what runs it. When it was last played and
+ * for how long are Activity's ([activityRows]). Pure; sizes read through the
+ * one formatter ([dev.droidtop.library.format.ValueFormat]).
  */
 internal fun factsStrip(
     entry: LibraryEntry,
-    now: Long,
     folderSizeBytes: Long?,
     installedVersion: String?,
     runsWith: String?,
 ): List<Pair<String, String>> = listOfNotNull(
-    "Last played" to (entry.lastPlayedEpochMs?.let { dev.droidtop.library.format.ValueFormat.daysAgo(now, it).replaceFirstChar { c -> c.uppercase() } } ?: "Never"),
-    // Play time is time; how many times is Overview's "Times played", said once (Droidtop/tracker#662).
-    entry.playtimeSeconds.takeIf { it > 0 }?.let { "Play time" to dev.droidtop.library.format.ValueFormat.duration(it) },
     versionFact(installedVersion, entry.availableUpdate)?.let { "Version" to it },
     (folderSizeBytes ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { "Size" to dev.droidtop.library.format.ValueFormat.size(it) },
     runsWith?.takeIf { it.isNotBlank() }?.let { "Runs with" to it },
@@ -1784,6 +1964,116 @@ internal fun heroCaption(entry: LibraryEntry, now: Long): String {
     val time = dev.droidtop.library.format.ValueFormat.duration(entry.playtimeSeconds).takeIf { entry.playtimeSeconds > 0 }
     return listOfNotNull(last, time).joinToString(" · ").ifEmpty { "Not played yet" }
 }
+
+/**
+ * Activity's rows from droidtop's own record (docs/SPEC.md 7i, "The game page"; Droidtop/tracker#845): when it was
+ * last played, play time, and how many times, only the ones that exist, so a game never played shows Activity's
+ * empty line. A store's or a service's achievements join them as their own row. Pure.
+ */
+internal fun activityRows(entry: LibraryEntry, now: Long): List<PageFact> = listOfNotNull(
+    entry.lastPlayedEpochMs?.let {
+        PageFact("Last played", dev.droidtop.library.format.ValueFormat.daysAgo(now, it).replaceFirstChar { c -> c.uppercase() }, tab = PageTab.ACTIVITY)
+    },
+    // Play time is time; how many times is "Times played", said once (Droidtop/tracker#662).
+    entry.playtimeSeconds.takeIf { it > 0 }?.let { PageFact("Play time", dev.droidtop.library.format.ValueFormat.duration(it), tab = PageTab.ACTIVITY) },
+    entry.playCount.takeIf { it > 0 }?.let { PageFact("Times played", it.toString(), tab = PageTab.ACTIVITY) },
+)
+
+/** What a glyph of the status row stands for ([pageStatuses]). */
+internal enum class PageStatusKind { READY, UPDATE, CLOUD_SAVES, SAVES, ACHIEVEMENTS, NOT_SCRAPED }
+
+/** How a glyph of the status row is inked: done or there (the accent), a plain fact, or waiting on the person. */
+internal enum class PageStatusTone { GOOD, PLAIN, WAITING }
+
+/** One glyph of the status row: what it is, the words a screen reader says for it, and its ink (or its state glyph). */
+internal data class PageStatus(
+    val kind: PageStatusKind,
+    val label: String,
+    val tone: PageStatusTone,
+    /** Drawn as the shared state glyph (synced, offline, failed, syncing) instead of the kind's own. */
+    val mark: dev.droidtop.library.settings.StatusMark? = null,
+)
+
+/**
+ * The status row under the title (the owner, Droidtop/tracker#845: "a set of icons to indicate the status of each
+ * thing ... so we can confirm saves are synced, achievements are available, etc, visually"), from what the page
+ * already knows, in this order: whether it is ready to play, an update, the store's cloud saves ([cloudSaves], its
+ * words and glyph), droidtop's view of its saves ([saves], their value), its achievements ([achievements], their
+ * value; [achievementsSignIn] when signing in would show them), and that it is not scraped yet. Pure.
+ */
+internal fun pageStatuses(
+    entry: LibraryEntry,
+    play: PcPlayState,
+    runsWith: String?,
+    cloudSaves: Pair<String, dev.droidtop.library.settings.StatusMark?>?,
+    saves: String?,
+    achievements: String?,
+    achievementsSignIn: Boolean,
+): List<PageStatus> = listOfNotNull(
+    if (play.ready) {
+        PageStatus(PageStatusKind.READY, runsWith?.takeIf { it.isNotBlank() }?.let { "Ready to play with $it" } ?: "Ready to play", PageStatusTone.GOOD)
+    } else {
+        PageStatus(PageStatusKind.READY, "Not ready to play: " + play.detail.ifBlank { play.verb }, PageStatusTone.WAITING)
+    },
+    entry.availableUpdate?.let { PageStatus(PageStatusKind.UPDATE, "Update: " + GameUpdates.line(it), PageStatusTone.GOOD) },
+    cloudSaves?.let { (line, mark) ->
+        PageStatus(
+            PageStatusKind.CLOUD_SAVES,
+            "Cloud saves: $line",
+            if (mark == dev.droidtop.library.settings.StatusMark.SYNCED) PageStatusTone.GOOD else PageStatusTone.WAITING,
+            mark,
+        )
+    },
+    saves?.let { PageStatus(PageStatusKind.SAVES, "Saves: $it", PageStatusTone.PLAIN) },
+    when {
+        achievements != null -> PageStatus(PageStatusKind.ACHIEVEMENTS, "Achievements: $achievements", PageStatusTone.GOOD)
+        achievementsSignIn -> PageStatus(PageStatusKind.ACHIEVEMENTS, "Achievements: sign in to see them", PageStatusTone.WAITING)
+        else -> null
+    },
+    if (entry.isUnscraped()) PageStatus(PageStatusKind.NOT_SCRAPED, "Not scraped yet", PageStatusTone.WAITING) else null,
+)
+
+/** The status row's glyphs, each saying its words to a screen reader ([PageStatus.label]); nothing here is pressed. */
+@Composable
+private fun PageStatusRow(statuses: List<PageStatus>, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(Space.Sm), verticalAlignment = Alignment.CenterVertically) {
+        statuses.forEach { status ->
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(PAGE_STATUS_GLYPH).clearAndSetSemantics { contentDescription = status.label },
+            ) {
+                val mark = status.mark
+                if (mark != null) {
+                    dev.droidtop.ui.shared.StatusGlyph(mark, MenuTokens.Accent, size = PAGE_STATUS_GLYPH)
+                } else {
+                    Icon(
+                        status.kind.glyph(),
+                        contentDescription = null,
+                        tint = when (status.tone) {
+                            PageStatusTone.GOOD -> MenuTokens.Accent
+                            PageStatusTone.PLAIN -> MenuTokens.OnSurface
+                            PageStatusTone.WAITING -> MenuTokens.OnSurfaceMuted
+                        },
+                        modifier = Modifier.size(PAGE_STATUS_GLYPH),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Each kind's glyph, from the outlined set the catalog and the state glyphs are drawn in. */
+private fun PageStatusKind.glyph(): androidx.compose.ui.graphics.vector.ImageVector = when (this) {
+    PageStatusKind.READY -> Icons.Outlined.SportsEsports
+    PageStatusKind.UPDATE -> Icons.Outlined.SystemUpdate
+    PageStatusKind.CLOUD_SAVES -> Icons.Outlined.Cloud
+    PageStatusKind.SAVES -> Icons.Outlined.Save
+    PageStatusKind.ACHIEVEMENTS -> Icons.Outlined.EmojiEvents
+    PageStatusKind.NOT_SCRAPED -> Icons.Outlined.Image
+}
+
+/** A status glyph's size: the state glyph's own on a row. */
+private val PAGE_STATUS_GLYPH = 18.dp
 
 /**
  * The game's versions on the person's other devices, on Versions

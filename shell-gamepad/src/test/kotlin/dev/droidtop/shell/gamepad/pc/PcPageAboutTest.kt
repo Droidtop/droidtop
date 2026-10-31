@@ -133,16 +133,20 @@ class PcPageAboutTest {
         val o = PageTab.OVERVIEW
         val v = PageTab.VERSIONS
         val d = PageTab.DETAILS
+        val a = PageTab.ACTIVITY
         val rows = listOf(
-            "Times played" to o, "Install location" to d, "Version" to v, "Latest" to v, "Update" to v, "Runner" to d,
-            "Manual" to PageTab.EXTRAS, "Engine" to d, "Developer" to d, "About" to o,
+            "Times played" to a, "Install location" to d, "Version" to v, "Latest" to v, "Update" to v, "Runner" to d,
+            "Manual" to PageTab.EXTRAS, "Engine" to d, "Developer" to d, "About" to o, "Last played" to a,
+            OPEN_SOURCE_ROW to PageTab.THREAD,
         ).map { (title, tab) -> PageFact(title, tab = tab) } + PageFact("Official site", tab = PageTab.EXTRAS)
         val parts = listOf(PageFact("Parts", tab = o), PageFact("Week 1", tab = o))
         val byTab = groupRowsByTab(rows, parts)
 
         assertEquals(PageTab.values().toList(), byTab.keys.toList())
         assertEquals(rows.size + parts.size, byTab.values.sumOf { it.size })
-        assertEquals(listOf("Parts", "Week 1", "Times played", "About"), byTab.getValue(PageTab.OVERVIEW).map { it.title })
+        assertEquals(listOf("Parts", "Week 1", "About"), byTab.getValue(PageTab.OVERVIEW).map { it.title })
+        assertEquals(listOf("Times played", "Last played"), byTab.getValue(PageTab.ACTIVITY).map { it.title })
+        assertEquals(listOf(OPEN_SOURCE_ROW), byTab.getValue(PageTab.THREAD).map { it.title })
         // An available update leads the tab.
         assertEquals(listOf("Update", "Version", "Latest"), byTab.getValue(PageTab.VERSIONS).map { it.title })
         assertEquals(listOf("Manual", "Official site"), byTab.getValue(PageTab.EXTRAS).map { it.title })
@@ -167,6 +171,8 @@ class PcPageAboutTest {
         var opened: String? = null
         val linked = sourceRows(listOf(source), links, {}, { opened = it })
         assertEquals(listOf("Forum thread", OPEN_SOURCE_ROW), linked.map { it.title })
+        // The source's own page is the Show thread tab's row; linking it stays under Versions.
+        assertEquals(listOf(PageTab.VERSIONS, PageTab.THREAD), linked.map { it.tab })
         assertEquals("#123", linked[0].value)
         // Only the host is shown; the whole link is the tip and what opens.
         assertEquals("example.org", linked[1].value)
@@ -221,11 +227,10 @@ class PcPageAboutTest {
             playtimeSeconds = 3600,
             availableUpdate = "0.9.6",
         )
-        val strip = factsStrip(played, now, folderSizeBytes = 2048, installedVersion = "0.9.5", runsWith = "Wine")
+        // When and how long it was played are Activity's rows, not the strip's.
+        val strip = factsStrip(played, folderSizeBytes = 2048, installedVersion = "0.9.5", runsWith = "Wine")
         assertEquals(
             listOf(
-                "Last played" to "2 days ago",
-                "Play time" to "1 h",
                 "Version" to "0.9.5, v0.9.6 is available",
                 "Size" to "2 KB",
                 "Runs with" to "Wine",
@@ -233,12 +238,80 @@ class PcPageAboutTest {
             strip,
         )
 
-        val bare = factsStrip(entry(), now, folderSizeBytes = null, installedVersion = null, runsWith = null)
-        assertEquals(listOf("Last played" to "Never"), bare)
+        assertEquals(emptyList<Pair<String, String>>(), factsStrip(entry(), folderSizeBytes = null, installedVersion = null, runsWith = null))
+    }
 
-        // Counted but not timed: the count is Overview's "Times played", not a play time.
-        val counted = factsStrip(entry().copy(playCount = 14), now, folderSizeBytes = null, installedVersion = null, runsWith = null)
-        assertEquals(listOf("Last played" to "Never"), counted)
+    @Test
+    fun activityListsWhenHowLongAndHowOftenOnlyOnceItWasPlayed() {
+        val now = 100 * day
+        val played = entry().copy(lastPlayedEpochMs = now - 2 * day - 1000, playtimeSeconds = 3600, playCount = 14)
+        val rows = activityRows(played, now)
+        assertEquals(listOf("Last played" to "2 days ago", "Play time" to "1 h", "Times played" to "14"), rows.map { it.title to it.value })
+        assertTrue(rows.all { it.tab == PageTab.ACTIVITY })
+        // Counted but not timed: the count is a row of its own, not a play time.
+        assertEquals(listOf("Times played"), activityRows(entry().copy(playCount = 3), now).map { it.title })
+        // Never played: no rows, so the tab says its empty line.
+        assertEquals(emptyList<PageFact>(), activityRows(entry(), now))
+    }
+
+    @Test
+    fun everyTabIsDrawnAndAnEmptyOneHasItsLine() {
+        assertEquals(
+            listOf("Overview", "Versions", "Activity", "Extras", "Details", "Show thread"),
+            PageTab.values().map { it.label },
+        )
+        assertTrue(PageTab.values().all { it.emptyLine.isNotBlank() })
+        // Nothing at all still gives every tab, each with no rows.
+        val byTab = groupRowsByTab(emptyList(), emptyList())
+        assertEquals(PageTab.values().toList(), byTab.keys.toList())
+        assertTrue(byTab.values.all { it.isEmpty() })
+    }
+
+    private val ready = PcPlayState(verb = "Play", detail = "", pressable = true, ready = true)
+
+    @Test
+    fun theStatusRowSaysReadyUpdateSavesAndAchievementsFromWhatThePageKnows() {
+        val statuses = pageStatuses(
+            entry().copy(availableUpdate = "0.9.6", fieldSources = mapOf("description" to "IGDB")),
+            ready,
+            runsWith = "Wine",
+            cloudSaves = "Synced 2 days ago" to dev.droidtop.library.settings.StatusMark.SYNCED,
+            saves = "3 save files, today",
+            achievements = "4 of 10",
+            achievementsSignIn = false,
+        )
+        assertEquals(
+            listOf(PageStatusKind.READY, PageStatusKind.UPDATE, PageStatusKind.CLOUD_SAVES, PageStatusKind.SAVES, PageStatusKind.ACHIEVEMENTS),
+            statuses.map { it.kind },
+        )
+        assertEquals("Ready to play with Wine", statuses[0].label)
+        assertEquals("Update: v0.9.6 is available", statuses[1].label)
+        assertEquals("Cloud saves: Synced 2 days ago", statuses[2].label)
+        assertEquals(PageStatusTone.GOOD, statuses[2].tone)
+        assertEquals(dev.droidtop.library.settings.StatusMark.SYNCED, statuses[2].mark)
+        assertEquals("Saves: 3 save files, today", statuses[3].label)
+        assertEquals("Achievements: 4 of 10", statuses[4].label)
+    }
+
+    @Test
+    fun theStatusRowSaysWhatWaitsOnThePerson() {
+        val notReady = PcPlayState(verb = "Set up Windows", detail = "Windows games need a one-time setup", pressable = true, ready = false)
+        val statuses = pageStatuses(
+            entry(),
+            notReady,
+            runsWith = null,
+            cloudSaves = "Last sync failed" to dev.droidtop.library.settings.StatusMark.ATTENTION,
+            saves = null,
+            achievements = null,
+            achievementsSignIn = true,
+        )
+        assertEquals("Not ready to play: Windows games need a one-time setup", statuses.first { it.kind == PageStatusKind.READY }.label)
+        assertEquals(PageStatusTone.WAITING, statuses.first { it.kind == PageStatusKind.CLOUD_SAVES }.tone)
+        assertEquals("Achievements: sign in to see them", statuses.first { it.kind == PageStatusKind.ACHIEVEMENTS }.label)
+        // Nothing scraped yet: its glyph says so, and Edit metadata holds Scrape.
+        assertTrue(statuses.any { it.kind == PageStatusKind.NOT_SCRAPED })
+        // A state the page does not know is not a glyph: no saves row, no update.
+        assertTrue(statuses.none { it.kind == PageStatusKind.SAVES || it.kind == PageStatusKind.UPDATE })
     }
 
     @Test
@@ -256,10 +329,12 @@ class PcPageAboutTest {
 
     @Test
     fun theActionHintNamesTheButtonUnderTheCursor() {
-        assertEquals("Play", pageActionLabel(0, "Play"))
-        assertEquals("Install", pageActionLabel(0, "Install"))
-        assertEquals("Favourite", pageActionLabel(1, "Play"))
-        assertEquals("Options", pageActionLabel(2, "Play"))
+        assertEquals("Play", pageActionLabel(BUTTON_PRIMARY, "Play"))
+        assertEquals("Install", pageActionLabel(BUTTON_PRIMARY, "Install"))
+        assertEquals("Edit metadata", pageActionLabel(BUTTON_EDIT_METADATA, "Play"))
+        assertEquals("Options", pageActionLabel(BUTTON_OPTIONS, "Play"))
+        assertEquals("Favourite", pageActionLabel(BUTTON_FAVOURITE, "Play"))
+        assertEquals(PAGE_BUTTONS, listOf(BUTTON_PRIMARY, BUTTON_EDIT_METADATA, BUTTON_OPTIONS, BUTTON_FAVOURITE).distinct().size)
     }
 
     @Test

@@ -54,7 +54,16 @@ internal data class GameInfoRow(
     val chip: String? = null,
     /** A step A or the chip takes in place (the guided key setup of the sign-in row); before [screen] and [url]. */
     val run: ((Context) -> Unit)? = null,
+    /** Which source said it, so a page places the row by what it is and never by its English title. */
+    val kind: GameInfoKind? = null,
 )
+
+/** The sources of [GameInfoRow]s ([rememberGameInfoRows]). */
+internal enum class GameInfoKind { SAVES, ACHIEVEMENTS, PLAY_TIME, COMPATIBILITY }
+
+/** Whether this is the row of a game RetroAchievements knows while no key is stored ([ACHIEVEMENTS_SIGN_IN]). */
+internal val GameInfoRow.isAchievementsSignIn: Boolean
+    get() = kind == GameInfoKind.ACHIEVEMENTS && subtitle == ACHIEVEMENTS_SIGN_IN
 
 /** The row a game RetroAchievements knows gets while no key is stored: A opens the guided key setup in place. */
 internal const val ACHIEVEMENTS_SIGN_IN = "Show your achievements: sign in to RetroAchievements"
@@ -87,25 +96,25 @@ internal fun rememberGameInfoRows(
         var saves = emptyList<GameInfoRow>()
         coroutineScope {
             launch {
-                achievements = withContext(Dispatchers.IO) { achievementRows(context, entry) }
+                achievements = withContext(Dispatchers.IO) { achievementRows(context, entry) }.map { it.copy(kind = GameInfoKind.ACHIEVEMENTS) }
                 value = saves + achievements + playTime + compatibility
             }
             launch {
-                playTime = withContext(Dispatchers.IO) { playTimeRows(context, entry) }
+                playTime = withContext(Dispatchers.IO) { playTimeRows(context, entry) }.map { it.copy(kind = GameInfoKind.PLAY_TIME) }
                 value = saves + achievements + playTime + compatibility
             }
             launch {
-                compatibility = withContext(Dispatchers.IO) { compatibilityRows(context, entry) }
+                compatibility = withContext(Dispatchers.IO) { compatibilityRows(context, entry) }.map { it.copy(kind = GameInfoKind.COMPATIBILITY) }
                 value = saves + achievements + playTime + compatibility
             }
             launch {
-                saves = saveRows(context, entry, copies)
+                saves = saveRows(context, entry, copies).map { it.copy(kind = GameInfoKind.SAVES) }
                 value = saves + achievements + playTime + compatibility
             }
         }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        if (rows.any { it.subtitle == ACHIEVEMENTS_SIGN_IN }) {
+        if (rows.any { it.isAchievementsSignIn }) {
             scope.launch { if (withContext(Dispatchers.IO) { RetroAchievements.isConfigured(context) }) signedIn++ }
         }
     }
