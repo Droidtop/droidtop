@@ -29,7 +29,6 @@
     <string name="matches_version">Version %1$s</string>
     <string name="matches_searched">Searched %1$s for “%2$s”</string>
     <string name="theme_ready">Your theme is ready: %1$s</string>
-    <string name="played_for">Played %1$s</string>
     <!-- A plugin's secret on droidtop's own sheet (docs/plugin-api.md 1.10, secret). -->
     <string name="secret_from">From %1$s</string>
     <string name="secret_copy">Copy</string>

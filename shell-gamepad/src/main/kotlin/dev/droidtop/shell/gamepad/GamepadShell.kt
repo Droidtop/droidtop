@@ -395,9 +395,6 @@ internal fun GamepadShellBody(
                 ?: appEntries.orEmpty().firstOrNull { it.id == id }
         }
     }
-    // What A does on the open detail's focused element, reported by the
-    // detail itself; null is the generic "Select". Reset per detail.
-    var detailPrimaryLabel by remember(nav.detailId) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     // What the last launch left to say or fix ([LaunchProblems]).
     val launchProblems = remember { LaunchProblems() }
@@ -1260,13 +1257,12 @@ internal fun GamepadShellBody(
             if (screensaverOn) return@shellHelpRow
             ButtonHintFooter(
                 background = background,
-                // A names what it does on a detail's primary button
-                // ("A Play"). In Retro Games A goes into what the cursor is
-                // on (a system, a game's page): "Open", the verb Home and
-                // the left menu use for it (Droidtop/tracker#681). "Select"
-                // is left for where A chooses.
-                aLabel = detailPrimaryLabel.takeIf { detailEntry != null }
-                    ?: if (!overlayScreen && section == GamingSection.GAMES) "Open" else "Select",
+                // In Retro Games A goes into what the cursor is on (a system,
+                // a game's page): "Open", the verb Home and the left menu use
+                // for it (Droidtop/tracker#681). "Select" is left for where A
+                // chooses. A game's page names its own presses, a layer on
+                // this footer (GamePageFrame).
+                aLabel = if (!overlayScreen && section == GamingSection.GAMES) "Open" else "Select",
                 canGoBack = canGoBack || overlayScreen,
                 showInfo = infoBound,
                 showSystemSwitch = !overlayScreen && section == GamingSection.GAMES && canGoBack,
@@ -1337,9 +1333,11 @@ internal fun GamepadShellBody(
                             library = library,
                             onLaunch = { onLaunch(entry); nav.back() },
                             onClose = { nav.back() },
-                            onPrimaryFocus = { detailPrimaryLabel = it },
                             // An edited Sort name, title or favourite shows in the list at once, as a favourite's toggle does.
-                            onEntryChanged = { changed -> gameEntries = gameEntries?.map { if (it.id == changed.id) changed else it } },
+                            onEntryChanged = { changed ->
+                                gameEntries = gameEntries?.map { if (it.id == changed.id) changed else it }
+                                appEntries = appEntries?.map { if (it.id == changed.id) changed else it }
+                            },
                         )
                         // Get new games (Droidtop/tracker#612, #621): a page of Updates that opens on what is
                         // new for the person, with Search first, never on a blank search bar; leaving it goes back to

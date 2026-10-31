@@ -3179,7 +3179,7 @@ Risk low.
   - `convert {fd} → job`, which writes output only to a host-chosen
     folder.
 - **Surfaces:**
-  - G: the chips on a game's detail screen;
+  - G: rows on a game's page, beside the `open_with` rows of its Extras tab;
   - A: droidtop's file actions;
   - D: the file manager's "Open with" menu and default-app associations
     (E4).
@@ -3410,8 +3410,8 @@ dropped, one panel per plugin).
     section as a page). Every row's tooltip names the plugin. A section
     that fails is one row saying so. Context actions (C4) on the same
     game are rows under Extras there too.
-  - G: the console game screen shows each section as a chip that opens
-    it as a page.
+  - G: a console game's page and an app's draw the same rows under the same tabs (the game page's frame,
+    docs/SPEC.md 7i, Droidtop/tracker#845; each section was a chip that opened it as a page).
 - **Permission:** `provide:ui.game_section`; the game's identity is in
   `target` only with `library.read`, as for C4.
 - **Status:** built (2026-10-07, `PluginGameSections`).

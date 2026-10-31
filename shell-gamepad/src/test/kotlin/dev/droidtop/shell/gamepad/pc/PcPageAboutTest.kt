@@ -329,12 +329,33 @@ class PcPageAboutTest {
 
     @Test
     fun theActionHintNamesTheButtonUnderTheCursor() {
-        assertEquals("Play", pageActionLabel(BUTTON_PRIMARY, "Play"))
-        assertEquals("Install", pageActionLabel(BUTTON_PRIMARY, "Install"))
-        assertEquals("Edit metadata", pageActionLabel(BUTTON_EDIT_METADATA, "Play"))
-        assertEquals("Options", pageActionLabel(BUTTON_OPTIONS, "Play"))
-        assertEquals("Favourite", pageActionLabel(BUTTON_FAVOURITE, "Play"))
-        assertEquals(PAGE_BUTTONS, listOf(BUTTON_PRIMARY, BUTTON_EDIT_METADATA, BUTTON_OPTIONS, BUTTON_FAVOURITE).distinct().size)
+        assertEquals("Play", pageActionLabel(PageButton.PRIMARY, "Play"))
+        assertEquals("Install", pageActionLabel(PageButton.PRIMARY, "Install"))
+        assertEquals("Edit metadata", pageActionLabel(PageButton.EDIT_METADATA, "Play"))
+        assertEquals("Options", pageActionLabel(PageButton.OPTIONS, "Play"))
+        assertEquals("Favourite", pageActionLabel(PageButton.FAVOURITE, "Play"))
+    }
+
+    @Test
+    fun theBandHasEditMetadataOnlyOnAPageWithMetadataToEdit() {
+        assertEquals(
+            listOf(PageButton.PRIMARY, PageButton.EDIT_METADATA, PageButton.OPTIONS, PageButton.FAVOURITE),
+            pageButtons(hasEditMetadata = true),
+        )
+        // An app's page: Play, Options and the star, the cursor never stopping on a button that is not drawn.
+        assertEquals(listOf(PageButton.PRIMARY, PageButton.OPTIONS, PageButton.FAVOURITE), pageButtons(hasEditMetadata = false))
+    }
+
+    @Test
+    fun theScrapeRowSaysWhatItDoesAndTakesNoPressWhileItRuns() {
+        val unscraped = entry()
+        assertEquals(SCRAPE_ROW, scrapeRow(unscraped, null, "the PC sources") {}.title)
+        assertEquals("Not scraped yet. Looks this game up in the PC sources", scrapeRow(unscraped, null, "the PC sources") {}.detail)
+        val scraped = entry(description = "A game", fieldSources = mapOf("description" to "IGDB"))
+        assertEquals("Looks this game up in the console scrapers again", scrapeRow(scraped, null, "the console scrapers") {}.detail)
+        // While one runs the row says so and A does nothing; what it said stays as the row's line.
+        assertNull(scrapeRow(scraped, SCRAPING, "the PC sources") {}.onSelect)
+        assertEquals("Scraped 1 game", scrapeRow(scraped, "Scraped 1 game", "the PC sources") {}.detail)
     }
 
     @Test

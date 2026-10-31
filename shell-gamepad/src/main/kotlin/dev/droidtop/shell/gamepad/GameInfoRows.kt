@@ -39,20 +39,18 @@ import kotlinx.coroutines.withContext
 
 /**
  * One fact a game's page gets from outside the library: its achievements, how long it takes, how an emulator
- * runs it (docs/SPEC.md 7h, "Game info"). The PC game page draws it as one of its rows (`PageFact`), the plain
- * detail screen of a console game as a line and, when there is something to open, a chip.
+ * runs it (docs/SPEC.md 7h, "Game info"). Every game's page draws it as one of its rows (`PageFact`, the page's
+ * frame, Droidtop/tracker#845); the saves and the achievements sign-in are rows of its Options.
  */
 internal data class GameInfoRow(
     val title: String,
     val value: String? = null,
     val subtitle: String? = null,
-    /** A page of rows that A or the chip opens (the achievements). */
+    /** A page of rows that A opens (the achievements). */
     val screen: CatalogScreen? = null,
-    /** An address that A or the chip opens in the browser. */
+    /** An address that A opens in the browser. */
     val url: String? = null,
-    /** The chip's label on the detail screen, which draws no chip for a row without one. */
-    val chip: String? = null,
-    /** A step A or the chip takes in place (the guided key setup of the sign-in row); before [screen] and [url]. */
+    /** A step A takes in place (the guided key setup of the sign-in row); before [screen] and [url]. */
     val run: ((Context) -> Unit)? = null,
     /** Which source said it, so a page places the row by what it is and never by its English title. */
     val kind: GameInfoKind? = null,
@@ -147,7 +145,6 @@ internal suspend fun saveRows(context: Context, entry: LibraryEntry, copies: Lis
             value = SaveLines.value(report.status, now),
             subtitle = SaveLines.subtitle(report, now, volumes),
             screen = savesScreen(entry, report, now, volumes, copying),
-            chip = "Saves",
         ),
     )
 }
@@ -307,7 +304,6 @@ internal fun storeAchievementRowsFor(storeLabel: String, gameId: String, result:
             "${list.earned} of ${list.total}",
             "From $storeLabel, as your account has them",
             screen = storeAchievementsScreen(storeLabel, gameId, list),
-            chip = "Achievements",
         ),
     )
 }
@@ -363,7 +359,6 @@ internal fun achievementRowsFor(result: RaResult, entryId: String = ""): List<Ga
                 "Is it ${result.game.title}?",
                 "RetroAchievements has a game of this name, but no file of yours is on its list. Confirm it to see its achievements",
                 screen = raProposalScreen(entryId, result.game),
-                chip = "Confirm achievements",
             ),
         )
         RaResult.Unsupported -> emptyList()
@@ -373,7 +368,6 @@ internal fun achievementRowsFor(result: RaResult, entryId: String = ""): List<Ga
                 "Achievements",
                 "Sign in",
                 ACHIEVEMENTS_SIGN_IN,
-                chip = "Sign in for achievements",
                 run = { ctx -> dev.droidtop.library.scraper.ScraperKeySetupLink.open(ctx, dev.droidtop.library.scraper.ScraperKeyService.RETROACHIEVEMENTS) },
             ),
         )
@@ -384,7 +378,7 @@ internal fun achievementRowsFor(result: RaResult, entryId: String = ""): List<Ga
             val progress = result.progress
             val how = "Recognised by ${result.matchedBy}" + if (result.stale) ". RetroAchievements could not be reached; this is the last progress loaded" else ""
             if (progress == null) {
-                listOf(GameInfoRow("Achievements", "${result.game.numAchievements} to earn", "Your progress was not loaded. $how", url = RetroAchievementsClient.gameUrl(result.game.id), chip = "Achievements"))
+                listOf(GameInfoRow("Achievements", "${result.game.numAchievements} to earn", "Your progress was not loaded. $how", url = RetroAchievementsClient.gameUrl(result.game.id)))
             } else {
                 listOf(
                     GameInfoRow(
@@ -392,7 +386,6 @@ internal fun achievementRowsFor(result: RaResult, entryId: String = ""): List<Ga
                         "${progress.earned} of ${progress.total}",
                         "${progress.pointsEarned} of ${progress.pointsTotal} points. $how",
                         screen = achievementsScreen(result.game.id, result.game.title, progress),
-                        chip = "Achievements",
                     ),
                 )
             }
@@ -455,7 +448,6 @@ internal fun playTimeRows(context: Context, entry: LibraryEntry): List<GameInfoR
                         summary,
                         close + "From HowLongToBeat players, a guide and not a promise.",
                         url = result.game.pageUrl,
-                        chip = "HowLongToBeat",
                     ),
                 )
             }

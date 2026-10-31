@@ -100,13 +100,14 @@ Select), anchored menu (beside the item, up to 8 rows, L2), work panel (about 90
 no). The screen beneath stays visible under a scrim and keeps its focus; one overlay at a time; B closes one level and
 restores the exact item and scroll position; the hint bar stays and shows the overlay's hints. Depth: left menu, item
 menu and Select sheet one level; Quick Menu section then panel; Settings category then pane; the game page one page with
-tabs.
+tabs, the same page for every kind of game (`GamePageFrame`: a PC or store game, a console game, an app;
+Droidtop/tracker#845).
 
 The anchored menu is `AnchoredMenu` in `:ui-shared` (`ui-shared/.../gamepad/AnchoredMenu.kt`, Droidtop/tracker#827):
 the sheet of choices' body placed below the item, or above it where there is no room, held inside the window's
 gutter, about eight rows before it scrolls, closed by a tap outside it. A centred `ActionSheet` is the same menu with
 no item to stand beside. Gaming's app and game menus, the game page's Edit metadata and Options
-(Droidtop/tracker#845), and Desktop's taskbar menus use it. On Desktop a right-click on
+(Droidtop/tracker#845, on every game's page), and Desktop's taskbar menus use it. On Desktop a right-click on
 one of droidtop's own items (the taskbar's) opens that item's menu, as a long press does.
 
 ### Names (Droidtop/tracker#827 F0, 2026-10-30)

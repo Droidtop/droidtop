@@ -16494,10 +16494,11 @@ fit, hash to nothing; `RaConsoles.NONE` marks those consoles so the name can sti
 hash. Hashing reads the file, so it is never done on the main thread or while a list draws.
 
 **RetroAchievements: achievements and progress on the game's page (directed 2026-10-09, Droidtop/tracker#143).**
-A console game's detail screen (`EntryDetailScreen`, Y on a themed gamelist) gets an "Achievements" line and an
-Achievements chip once the person has entered their username and Web API Key (above). **With no key (2026-10-23,
-Droidtop/tracker#143)** a game on a console RetroAchievements covers gets "Achievements: Sign in" ("Show your
-achievements: sign in to RetroAchievements") and a "Sign in for achievements" chip: A on either opens the guided key
+A console game's page (`EntryDetailScreen`, Y on a themed gamelist) gets an Achievements row on its Activity tab
+once the person has entered their username and Web API Key (above). **With no key (2026-10-23,
+Droidtop/tracker#143)** a game on a console RetroAchievements covers gets "Sign in for achievements" in its Options
+(it was a row and a chip; the page's frame, Droidtop/tracker#845) and "Achievements: sign in to see them" in its
+status row: A on the Options row opens the guided key
 setup in place (the same screen as Settings > Accounts and sources, `ScraperKeySetupLink`), and back on the page
 with a key stored the row is asked again and becomes the achievements. A game on a console it does not cover still
 has no row. Before this, a person with no key had no sign the feature existed. It is read when the screen opens, off the main thread, and never for a list
@@ -17082,7 +17083,7 @@ it:
 | Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (newest added first, by "When a game was added" below), Update available (never a game whose files are missing: it cannot be updated, Droidtop/tracker#756), Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), then, when the library has more than one source (a store, a game folder, the Wine shortcuts: `PcSource`), one shelf per source in the Source filter's order, else one per pinned collection, else one per engine family (Visual Novels, RPG Maker, Windows, ...). On Overview, **Update available leads whenever it has rows**, above Continue playing, its heading always with its count; a tap on that heading opens the Updates tab (Droidtop/tracker#397 slice C), and so does A on it from the pad: Left from the shelf's first capsule puts the cursor on the heading (its ring, the hint reads "Open"), and any other move leaves it (slice E). **The Collections tab** (`PcCollections.kt`, slice D) is a tile grid in three groups: your collections, your saved views, and each store's imported collections under "From <store>". A tile shows its name, its count and, when it is a tab, a mark, without needing focus; A opens the grid filtered to it (the **Collection** facet, static membership only, values OR), a saved view's tile applies the view. Hidden games do not count in a tile, and a collection whose every game here is hidden is not shown. Select on a tile: Pin as a tab (or Unpin), Pin all imported, Unpin all imported. A pinned collection's tab is a saved view over its Collection facet. **Home** keeps one row of games, Recent games (Continue playing, else Recently added, `homeShelves`); updates and additions are its What's new cards ("Home" below). Every shelf is capped at 24; Recently added is hidden when no entry has an added time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
 | Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip** (decided 2026-10-02, Droidtop/tracker#273 slice 2): the one row above PC Games' content, L1 and R1 glyphs at its ends: **Overview** (the shelves, `VIEW_OVERVIEW`, first and where PC Games opens), then the fixed built-in tabs **All games, Installed, Favourites, Collections**, then the person's **pinned views** in their own order (`pcStripTabs`, Droidtop/tracker#397 slice C). Built-in tabs never come and go: an empty one shows one line saying how to fill it (Collections: "Add a game to a collection from its menu (L2). Collections a store keeps appear here after it syncs."). List options > **Favourites tab / Collections tab** can hide those two; Overview, All games and Installed cannot be hidden, and the order is fixed so press counts stay the same. **Store tabs and the Updates tab are gone**: a store is a Source filter, and any filter can be saved as a tab. Everyone was given, once, a pinned view **"Updates"** over the Update available facet, first among the pinned views (`LibraryViewPrefs.withUpdatesView`); unpinning or removing it is the person's choice. Every grid tab, built-in or pinned, carries its count ("Installed · 12"). **A pinned tab's Options**: Edit (a new name, then the Filter sheet over its filters and sort; saving writes the same view, same tab position), Unpin (it stays a saved view, listed in Collections), Move left, Move right, Move to first: **L2 on a pinned tab**, or a long press on its chip (2026-10-23, Droidtop/tracker#621; it was Select). The chips are Steam's tab pills (`ShellChip(tab = true)`, 2026-10-08): small bold capitals in the tab-label role, padded 6 by 16; the view on screen sits on a quiet plate (not the accent: it is a place, not a filter in effect) that is one shape behind the chips and glides to the new view over Motion's focus time when the view changes, following the strip's own scroll at once and standing still when motion is off (DroidDeck's sliding selection pill, Droidtop/tracker#363, 2026-10-30), the chip under the cursor turns solid, and a shoulder glyph with nowhere to go is drawn at half strength. The full grid is one press away (R1 from Overview is All games). No Home chip (Home is a destination of its own and has no strip), no Filters chip (X opens the filter dialog), no Continue playing view (it is the first shelf). B from a grid view returns to Overview. The strip ends short of the floating status cluster (`StatusClusterRoom`, Droidtop/tracker#292), so its R1 glyph is never under the clock. The filters set that no strip view stands for show as ONE pill at the strip's end, naming every active filter, the first two by name and the rest as a number ("Steam · Shared with you · +2, 40 of 3,300 ✕"), on one line that shortens its own text and never pushes tabs off the strip, cleared by one press; there is no count line and no chip row on this page (the Filter sheet keeps its chips). The filter, sort, search and saved views are reached from X, Y and the sheets (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
 | 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule; that line carries the version management fact too: the installed build and, when a source knows a newer one, "v0.9.6 is available" (`focusLine`, `GameUpdates.line`). No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is Steam's, by the window's tier (`capsuleWidth`, `capsuleWidthFor`; 2026-10-08, Droidtop/tracker#363): 110dp up to an 853dp window (about six across on the console's 768dp window, so a shelf's last capsule is cut and says there is more; three on a phone held upright), 134dp up to 1279dp, 172dp from 1280dp. Shelves and the grid share it; the grid packs whole capsules of that width 12dp apart and centres the row in what is left (`GridCells.FixedSize`), never stretching a capsule to fill. |
-| Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band with the status row under the title, ONE large primary action that says what A does (`PcPlayState`), Edit metadata and Options as buttons beside it and Favourite as a small icon button (Droidtop/tracker#845; **X plays and Y is Favourite from anywhere on the page**, as on the library tile: owner decision, 2026-10-24, Droidtop/tracker#644 slice 4, proposal 6.C; X was Favourite), a quiet facts strip, a tab strip (Overview, Versions, Activity, Extras, Details, Show thread) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows, and every tab is drawn. Achievements are one row of Activity, the same row for every source: RetroAchievements fills it for a console game on its detail screen (7h, "RetroAchievements"); a store's achievements (Droidtop/tracker#230) fill this page's row (Steam's, 2026-10-24). |
+| Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band with the status row under the title, ONE large primary action that says what A does (`PcPlayState`), Edit metadata and Options as buttons beside it and Favourite as a small icon button (Droidtop/tracker#845; **X plays and Y is Favourite from anywhere on the page**, as on the library tile: owner decision, 2026-10-24, Droidtop/tracker#644 slice 4, proposal 6.C; X was Favourite), a quiet facts strip, a tab strip (Overview, Versions, Activity, Extras, Details, Show thread) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows, and every tab is drawn. Achievements are one row of Activity, the same row for every source: RetroAchievements fills it for a console game on its page, which is drawn in the same frame (`GamePageFrame`, "Console and ROM games share the frame" below; 7h, "RetroAchievements"); a store's achievements (Droidtop/tracker#230) fill this page's row (Steam's, 2026-10-24). |
 | The page's rows are the same rows as Steam's settings | | **Settings' rows.** The page's facts are `MenuRow(uniformHeight = true)` at `uniformRowHeight()`, with one content-sized value column (`LocalValueColumnWidth`) and the selected row's full text in the detail strip under the list (`CatalogDetailStrip`, §7k "Text in rows and tiles"); a long description is read there, never by growing a row. |
 | A on a capsule opens the page; the page's button plays | ES-DE, Daijishō, Beacon: A launches | **A opens the game, X plays it** (owner, 2026-10-24, Droidtop/tracker#641: "hitting A on the page shouldn't immediately launch the game, it should open the game's page"; it replaced "A is Primary Action" of 2026-10-01). In Gaming, A (or a tap) on a game card or row opens it inside Gaming's stack (`cardPress`): a PC game's page with Play focused, a Retro game's details (the cards, Home's rows and the themed and headless gamelists); an app, which has no game page, still opens. **X is Play now** on PC Games and Home, shown in the hint row only where Play works as it is (no setup step first), and goes through `PcRunnerOptions.resolveAndPlay` as before. PC Games' Filter moved from X to the List options (Select). In a Retro gamelist X stays Favourite and Y Info, ES-DE's own buttons; Play is on the details. Mobile's games screen still plays on A. |
 
@@ -17196,8 +17197,9 @@ copied:
 - A console game has a page outside Gaming too (2026-10-29, Droidtop/tracker#349; the owner's
   2026-10-08 option of hosting a Gaming destination instead of porting it). `GamePageStandalone`
   (`:shell-gamepad`) is the one entry for both hosts: a PC or engine game gets `PcGameStandalone`, a
-  console game Gaming's own detail (`EntryDetailScreen`, the screen Y opens on a themed gamelist) in a
-  window of its own, with its Launch, Edit metadata, Scrape, Choose match, View media and Collections. Play
+  console game Gaming's own page (`EntryDetailScreen`, the screen Y opens on a themed gamelist, in the game
+  page's frame since Droidtop/tracker#845 slice U2) in a window of its own, with its Play, Edit metadata (Scrape
+  first), and Options (Choose match, View media, Collections). Play
   is the host's launch path. `hasGamePage` says which games have one, so Mobile's options and Desktop's
   row menu offer Game page for PC, engine and console games. What the themed gamelist draws around a
   game (the theme's own elements) stays Gaming's.
@@ -17237,8 +17239,36 @@ to an options menu. This means we can confirm saves are synced, achievements are
   cloud), and achievements a service has but has not loaded; the plugins lane's `GameStatus.of` (Droidtop/tracker#845
   plugins slice 5) is to compute the row's states, and the page then draws those.
 
-A console game's detail (`EntryDetailScreen`) keeps its own buttons until it moves onto this page
-(Droidtop/tracker#845 slice U2).
+**Console and ROM games share the frame (decided 2026-10-31, Droidtop/tracker#845, slice U2).** The owner: "One
+page for every kind of game". The frame is one composable, `GamePageFrame` (`pc/GamePageFrame.kt`): the hero with
+its status row, the action band (primary action, Edit metadata, Options, Favourite, and the two anchored menus),
+the six-tab strip with its empty lines, the tab's rows with the detail strip, the one cursor through them and the
+footer's hints. Each page works out only its own facts and hands them over as `PageFact`s, `PageStatus`es and
+`ActionRow`s; `PcGamePage` wraps it in its flood window, a console game's page (`EntryDetailScreen`, still the
+screen a card's Info, a search result and Game details open, in place in Gaming and in a window of its own
+elsewhere) draws it as it is. On a console game's page:
+
+- **Play** starts it (`onLaunch`, the host's launch path); its line and the status row's "ready" glyph name the
+  emulator the launch resolves (`EmulatorResolution`, the game's own choice, then its system's, then the default),
+  or say no emulator is installed for the system (still pressable: the launch says what is missing).
+- **Edit metadata** opens beside its button with **Scrape** first (the console scrape for this one ROM,
+  `scrapeSystemArtwork`; its line is the row's while it runs and what it said is a flash; the separate Scrape chip
+  is gone), then **Title, description and more**, the full editor (`GameMetadataEditor`).
+- **Options** has the ones this game has of Saves, Sign in for achievements, Choose match, View media (more than one
+  scraped image, video or screenshot) and Collections. A console game has no other menu of its own, so L2 and
+  Select open Options. Favourite is the star and Y.
+- **The tabs**: Overview the description, how long to beat and the emulator's compatibility list; Versions a
+  Switch game's update and DLC (A opens its emulator and names the files to pick, `SwitchContentHandoff`);
+  Activity Last played, Play time, Times played and the achievements; Extras the manual, the video, the person's
+  own `open_with` hooks (one row per hook and file) and where the facts came from; Details the kind, the system,
+  the emulator, the file (as a person names its place, the whole path its tip) and the scraped facts. Show thread
+  has its empty line.
+- **Plugins** add rows to it as to a PC game's page (`rememberPluginPageRows`): a section's rows under the tab it
+  names and each context action a row of Extras. The detail screen's own chip per section and per action is gone.
+
+An Android app opened from the Apps tab's Info gets the same page: Open, Options with App info and Uninstall, the
+star, Details with its package; it has no Edit metadata button, and the cursor never stops on a button that is
+not drawn (`pageButtons`).
 
 Droidtop/tracker#254, 2026-10-02. The page keeps one job, "everything about
 this game and the one thing you most likely want to do", and has this
@@ -23287,9 +23317,10 @@ declaring which installed app to drive and how:
 **`open_with` surfaced (2026-09-02).** It was declared and documented
 from the start but had zero call sites: a user could write a valid
 `open_with` integration and nothing would ever invoke it. It is now
-offered on a game's own detail screen (`EntryDetailScreen`), one chip per
-real file droidtop has and has no viewer of its own for, which today is
-exactly two:
+offered on a console game's own page (`EntryDetailScreen`), one row of its
+Extras tab per hook and per real file droidtop has and has no viewer of its
+own for (it was a chip before the page's frame, Droidtop/tracker#845),
+which today is exactly two:
 
 - the scraped **manual** (`downloaded_media/<system>/manuals/<rom>.pdf`),
   which droidtop resolves at scan time and then only ever renders a badge
@@ -23311,7 +23342,7 @@ are the decision, not the implementation detail:
    viewer for it. This is what keeps the capability from creeping into
    "hand droidtop's jobs to other apps".
 3. **Nothing is ranked or auto-picked.** Two declared `open_with` hooks
-   produce two chips and the user chooses. droidtop does not decide.
+   produce two rows and the user chooses. droidtop does not decide.
 
 The grant is the narrow one the existing `am start` path already
 produces: a read-only FileProvider `content://` URI for that one file,

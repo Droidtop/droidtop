@@ -16,8 +16,7 @@ class AchievementRowsTest {
         assertEquals("Achievements", row.title)
         assertEquals("Sign in", row.value)
         assertEquals(ACHIEVEMENTS_SIGN_IN, row.subtitle)
-        assertNotNull("A and the chip open the guided key setup in place", row.run)
-        assertNotNull(row.chip)
+        assertNotNull("A opens the guided key setup in place", row.run)
     }
 
     @Test
@@ -33,7 +32,6 @@ class AchievementRowsTest {
         val row = achievementRowsFor(RaResult.Proposed(game), "/roms/snes/sm.sfc").single()
         assertEquals("Is it Super Metroid?", row.value)
         assertNotNull("the answers open in place of the row", row.screen)
-        assertEquals("Confirm achievements", row.chip)
     }
 
     private val list = StoreAchievements(
