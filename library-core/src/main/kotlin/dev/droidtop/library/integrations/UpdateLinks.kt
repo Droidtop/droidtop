@@ -106,6 +106,7 @@ object UpdateLinks {
                 },
                 fileName = names[index],
                 sha256 = download.sha256,
+                md5 = download.md5,
                 size = download.size?.takeIf { it > 0 },
                 unpack = unpack,
             )

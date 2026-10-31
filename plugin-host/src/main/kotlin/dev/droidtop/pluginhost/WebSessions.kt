@@ -161,10 +161,12 @@ data class WebSessionDownload(
     val sha256: String? = null,
     /** How droidtop got it when the page did not ("via your PixelDrain", "direct from PixelDrain"), for the job's line. */
     val via: String? = null,
+    /** The file's MD5 when the host says only that (GoFile), checked once the file is whole; a SHA-256 is preferred when both are given. */
+    val md5: String? = null,
 ) {
     companion object {
         /** A file droidtop knows the address of, named as a page's download would be. */
-        fun direct(url: String, fileName: String, size: Long?, headers: Map<String, String> = emptyMap(), sha256: String? = null, via: String? = null) =
+        fun direct(url: String, fileName: String, size: Long?, headers: Map<String, String> = emptyMap(), sha256: String? = null, via: String? = null, md5: String? = null) =
             WebSessionDownload(
                 url = url,
                 userAgent = null,
@@ -176,6 +178,7 @@ data class WebSessionDownload(
                 headers = headers,
                 sha256 = sha256,
                 via = via,
+                md5 = md5,
             )
     }
 }

@@ -159,6 +159,23 @@ enum class ScraperKeyService(
             KeyField("api_key", "API key", secret = true, storeKey = CredentialStore.PIXELDRAIN_API_KEY),
         ),
     ),
+    // GoFile lists a folder through its API for a Premium account's token only (Droidtop/tracker#638).
+    GOFILE(
+        title = "GoFile",
+        url = "https://gofile.io/myprofile",
+        steps = listOf(
+            "Open gofile.io",
+            "Sign in to your account",
+            "Open My Profile",
+            "Copy your API token",
+            "Enter it here",
+        ),
+        credit = "Downloaded from GoFile",
+        gets = "Downloads with your Premium",
+        fields = listOf(
+            KeyField("api_token", "API token", secret = true, storeKey = CredentialStore.GOFILE_API_TOKEN),
+        ),
+    ),
     ;
 
     /** The stored values, by field id; blank where none is set. */
@@ -183,6 +200,7 @@ enum class ScraperKeyService(
     /** The host resolver id of a file host's account ("pixeldrain", [dev.droidtop.pluginhost.hosts.HostResolver.id]); null for the others. */
     val hostId: String? get() = when (this) {
         PIXELDRAIN -> "pixeldrain"
+        GOFILE -> "gofile"
         else -> null
     }
 
@@ -290,6 +308,7 @@ object ScraperKeyCheck {
                 ScraperKeyService.TORBOX -> debridOutcome("torbox", values.getValue("api_key"))
                 ScraperKeyService.REALDEBRID -> debridOutcome("realdebrid", dev.droidtop.library.debrid.DebridAccounts.realDebridToken(context))
                 ScraperKeyService.PIXELDRAIN -> hostOutcome("pixeldrain", values.getValue("api_key"))
+                ScraperKeyService.GOFILE -> hostOutcome("gofile", values.getValue("api_token"))
             }
         }
         // A network failure says nothing about the credential: keep the last verdict.

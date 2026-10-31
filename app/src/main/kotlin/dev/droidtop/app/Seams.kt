@@ -90,7 +90,7 @@ internal object Seams {
         // And a source's link on a file hoster the account serves (Pixeldrain, Mega, ...), before the page opens.
         dev.droidtop.pluginhost.debrid.DebridLinks.accounts = { dev.droidtop.library.debrid.DebridAccounts.connected(app) }
         dev.droidtop.pluginhost.debrid.DebridLinks.waits = { dev.droidtop.library.debrid.DebridAccounts.waits(app) }
-        // The person's own account on a file host (PixelDrain): its premium downloads are asked before any debrid account.
+        // The person's own account on a file host (PixelDrain, GoFile): its premium downloads are asked before any debrid account.
         dev.droidtop.pluginhost.hosts.HostLinks.accounts = { hostId ->
             dev.droidtop.library.scraper.ScraperKeyService.entries.firstOrNull { it.hostId == hostId }
                 ?.read(app)?.values?.firstOrNull()?.takeIf { it.isNotBlank() }
