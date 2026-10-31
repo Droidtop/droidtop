@@ -50,7 +50,7 @@ object GameProperties {
         val settings = WineGameSettingsPrefs.get(context, entryId)
         val options = settings?.launchOptions.orEmpty()
         val environment = settings?.environment.orEmpty()
-        val controls = GameControlsPrefs.layout(context, entryId)
+        val controls = GamePadLayoutPrefs.layout(context, entryId)
         val edit = buildList<CatalogItem> {
             add(
                 ChoiceItem(
@@ -71,11 +71,11 @@ object GameProperties {
                     id = "properties_controls",
                     title = "Controls",
                     subtitle = "How the pad plays this game; the running game's L2 sheet changes it too",
-                    options = listOf(ChoiceOption(GAMEPAD, GameControls.GAMEPAD_LABEL)) +
-                        GameControls.entries.map { ChoiceOption(it.id, it.label) },
+                    options = listOf(ChoiceOption(GAMEPAD, GamePadLayouts.GAMEPAD_LABEL)) +
+                        GamePadLayouts.entries.map { ChoiceOption(it.id, it.label) },
                     current = controls?.id ?: GAMEPAD,
                     onSelect = { ctx, value ->
-                        CoroutineScope(Dispatchers.IO).launch { GameControlsPrefs.setLayout(ctx, entryId, GameControls.byId(value)) }
+                        CoroutineScope(Dispatchers.IO).launch { GamePadLayoutPrefs.setLayout(ctx, entryId, GamePadLayouts.byId(value)) }
                     },
                 ),
             )

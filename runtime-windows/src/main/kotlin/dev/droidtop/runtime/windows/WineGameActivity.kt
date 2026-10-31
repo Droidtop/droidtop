@@ -13,8 +13,8 @@ import android.view.ViewGroup
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.TextView
-import dev.droidtop.library.GameControls
-import dev.droidtop.library.GameControlsPrefs
+import dev.droidtop.library.GamePadLayouts
+import dev.droidtop.library.GamePadLayoutPrefs
 import dev.droidtop.library.OwnGameScreens
 import dev.droidtop.library.PadMouse
 import dev.droidtop.mapping.ControllerLayout
@@ -123,14 +123,14 @@ class WineGameActivity : Activity() {
             runOnUiThread { this@WineGameActivity.padMouse?.let { it.set(it.settings.copy(on = on)) } }
         }
         override val controls: String?
-            get() = if (this@WineGameActivity.layoutDriver == null) null else controlsChoice?.line ?: GameControls.GAMEPAD_LINE
+            get() = if (this@WineGameActivity.layoutDriver == null) null else controlsChoice?.line ?: GamePadLayouts.GAMEPAD_LINE
         override fun nextControls(): String? {
             if (this@WineGameActivity.layoutDriver == null) return null
-            val next = GameControls.next(controlsChoice)
+            val next = GamePadLayouts.next(controlsChoice)
             useControls(next)
             val id = this@WineGameActivity.entryId
-            if (id != null) startupExecutor.execute { GameControlsPrefs.setLayout(applicationContext, id, next) }
-            return next?.line ?: GameControls.GAMEPAD_LINE
+            if (id != null) startupExecutor.execute { GamePadLayoutPrefs.setLayout(applicationContext, id, next) }
+            return next?.line ?: GamePadLayouts.GAMEPAD_LINE
         }
         override val canReport: Boolean get() = true
         override fun reportProblem(done: (String) -> Unit) {
@@ -279,12 +279,12 @@ class WineGameActivity : Activity() {
         // The pad's layouts (Droidtop/tracker#618): read and parsed off the main thread; the one this game was left
         // with is played.
         startupExecutor.execute {
-            val parsed = GameControls.entries.mapNotNull { choice ->
+            val parsed = GamePadLayouts.entries.mapNotNull { choice ->
                 runCatching {
                     choice to resources.openRawResource(choice.raw).bufferedReader().use { ControllerLayout.parse(it.readText()) }
                 }.getOrNull()
             }.toMap()
-            val chosen = entryId?.let { GameControlsPrefs.layout(applicationContext, it) }
+            val chosen = entryId?.let { GamePadLayoutPrefs.layout(applicationContext, it) }
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 controlLayouts = parsed
@@ -622,11 +622,11 @@ class WineGameActivity : Activity() {
 
     /** The layouts' driver, once they are read; Gamepad unless the game was left with a layout. */
     private var layoutDriver: LayoutDriver? = null
-    private var controlLayouts: Map<GameControls, ControllerLayout> = emptyMap()
-    private var controlsChoice: GameControls? = null
+    private var controlLayouts: Map<GamePadLayouts, ControllerLayout> = emptyMap()
+    private var controlsChoice: GamePadLayouts? = null
 
     /** Plays [choice]'s layout (null: Gamepad). Main thread. */
-    private fun useControls(choice: GameControls?) {
+    private fun useControls(choice: GamePadLayouts?) {
         val layout = choice?.let { controlLayouts[it] }
         controlsChoice = if (layout != null) choice else null
         layoutDriver?.use(layout)
