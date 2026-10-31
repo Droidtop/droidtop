@@ -193,7 +193,9 @@ about 52dp), and a section label is 11sp on a hairline, 10dp above it rather tha
 rows, #363; ShellWindow.inPane).
 
 One sans family (a theme may supply its fonts); tabular figures wherever numbers change; at most two lines in a row,
-then an ellipsis. Focus has two styles, never mixed on one surface: art gets a 3 dp accent ring and a 6% lift; a row
+then an ellipsis. Focus has two styles, never mixed on one surface: art grows (a 6% lift, its picture zooming inside
+its edge, and its shine), with no ring (the owner, 2026-10-31: "The outline still lags behind. But it's also not
+really necessary? The game image grows a bit, which is enough of an indicator"); controls keep the 3 dp accent ring; a row
 gets the accent at 22% behind it and a 4 dp accent bar at its leading edge. Focus never gets lost (a list that updates
 keeps the item; a removed item passes focus to the next), the ring shows with pad input and hides with touch, and
 returning to a screen restores its item.

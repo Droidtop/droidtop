@@ -65,7 +65,6 @@ import dev.droidtop.library.kindLine
 import androidx.compose.ui.layout.onGloballyPositioned
 import dev.droidtop.shell.gamepad.Corners
 import dev.droidtop.shell.gamepad.FloodOrigin
-import dev.droidtop.shell.gamepad.FocusLook
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.ShellProgressBar
@@ -191,8 +190,8 @@ internal fun capsuleStatusOf(entry: LibraryEntry, download: PluginJobsCenter.Ent
  * this shell follows.
  *
  * The focus look is Steam's (docs/SPEC.md "Gaming motion and focus"): the
- * capsule lifts ([focusRise]; its art grows inside its edge, [focusZoom]), the window's ring sits just outside its
- * crisp corners, and a sheen crosses it once as the cursor arrives.
+ * capsule lifts ([focusRise]; its art grows inside its edge, [focusZoom]) and a sheen crosses it once as the cursor
+ * arrives. No ring: the growth is the cursor (the owner, 2026-10-31).
  *
  * [badge], set on the shelves, says what the game is (PC, Retro, App,
  * Engine) and its store or system in words at the bottom-left (it replaces
@@ -256,15 +255,15 @@ internal fun PcCapsule(
                     Modifier
                 },
             )
-            // The card rises with its ring just outside its own edge; its art grows inside that edge (focusZoom),
-            // so the ring and the clip match at every card size (Droidtop/tracker#632).
+            // The card rises and its art grows inside its edge (focusZoom): that growth is the cursor, with no ring
+            // (the owner, 2026-10-31: "The game image grows a bit, which is enough of an indicator").
             .focusRise(lift, shape)
             .selectionFrame(
                 selected,
                 shape,
                 rest = MenuTokens.Card,
                 restOutline = MenuTokens.CardOutline,
-                ringOutset = FocusLook.RingOffsetDp.dp,
+                art = true,
             )
             .focusZoom(lift, shape, wide = hero)
             .shine(ring),
