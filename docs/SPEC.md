@@ -4281,6 +4281,12 @@ the `ContainerRuntime` interface that already exists (§3):
     Emulator, Report a problem, Mouse mode, Controls, the console's search, Quit, Restart and Kill) is the running
     game's L2 sheet, `RunningGameSheet`, below; nothing is in both. Performance (the overlay and the performance mode,
     which apply to every game) stays here. The companion's Game tab keeps all of its rows.
+    **Each game remembers its own** (Droidtop/tracker#423, `GameMemory`): the performance overlay's level and the
+    companion's brightness that the person changed while that game ran are kept for it, put back when it starts again,
+    and the values from before it are restored when it ends, so one game's settings do not follow the person into the
+    next. Only what changed is kept, so a game never adjusted follows the global values. Android's performance mode is
+    not part of it: the power policy ("Power policy", Droidtop/tracker#841: its rules, the game's first, and its journal
+    that puts a package's mode back) is the one mechanism for it.
   - **Running apps**: the task manager's list with Close and Clear all (`AppsTab`, #245, #252).
   - **Notifications**: unchanged (`NotificationsTab`, grant row when access is missing, #180).
   - **Social** (moved off the left menu 2026-10-24, Droidtop/tracker#644 slice 3; owner: "Game sources go into the
