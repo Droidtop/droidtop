@@ -29,7 +29,6 @@
     <string name="matches_version">Version %1$s</string>
     <string name="matches_searched">Searched %1$s for “%2$s”</string>
     <string name="theme_ready">Your theme is ready: %1$s</string>
-    <string name="played_for">Played %1$s</string>
     <!-- A plugin's secret on droidtop's own sheet (docs/plugin-api.md 1.10, secret). -->
     <string name="secret_from">From %1$s</string>
     <string name="secret_copy">Copy</string>
@@ -138,6 +137,7 @@
     <string name="gamepad_link_this_game_to_a_different">Link this game to a different page</string>
     <string name="gamepad_run_once_with">Run once with</string>
     <string name="gamepad_title">Title</string>
+    <string name="gamepad_blank_uses_the_title_read_from_folder">Blank uses the title read from the folder name</string>
     <string name="gamepad_blank_uses_the_folder_name_x">Blank uses the folder name (%1$s)</string>
     <string name="gamepad_runs_with">Runs with</string>
     <string name="gamepad_what_s_new">What\'s new</string>
