@@ -344,6 +344,8 @@ object ThemeAssets {
         val screenAspectRatio: Float,
         /** The appearance: it picks the colour scheme when the person chose none ([colorSchemeFor]). */
         val light: Boolean,
+        /** "Tint themes to my colours": the accent the theme's own colours are swapped for, or null (Droidtop/tracker#844). */
+        val tint: Int?,
     )
 
     private val systemThemeCache = java.util.concurrent.ConcurrentHashMap<ThemeCacheKey, EsDeTheme>()
@@ -415,6 +417,7 @@ object ThemeAssets {
             collectionKind = collectionKind,
             screenAspectRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat(),
             light = dev.droidtop.library.settings.AppearancePrefs.light(context),
+            tint = OutsideGamingColors.tintFor(context, dev.droidtop.library.settings.AppearancePrefs.light(context)),
         )
     }
 
@@ -567,6 +570,8 @@ object ThemeAssets {
             Log.e("droidtop.ThemeAssets", "Failed to parse theme '${active.name}'", t)
             null
         }?.let { applyThemePatchesOverlay(context, it, systemId) }
+            // The theme's own views wear the tint too, not only droidtop's chrome over them (Droidtop/tracker#844).
+            ?.let { parsed -> cacheKey.tint?.let { GamingThemeMapping.tintTheme(parsed, it) } ?: parsed }
         // NEVER cache a failed parse -- a transient failure (mid-
         // extraction race on first launch was the real, confirmed case)
         // would otherwise poison this name-keyed cache for the whole

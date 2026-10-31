@@ -260,6 +260,41 @@ object GamingThemeMapping {
     }
 
     /**
+     * "Tint themes to my colours" in the theme's own views (Droidtop/tracker#844): [theme] with every colour it declares
+     * in its accent swapped for [accent], so the themed gamelist and carousel, which draw the theme's own values rather
+     * than droidtop's roles, change with the chrome. The theme's accent is the one [map] reads (the first declared colour
+     * with real chroma); a colour is swapped when its red, green and blue are exactly that accent's, and keeps its own
+     * alpha. The colour put in is the accent [tint] gives the chrome, held to the text floor on the theme's surfaces, so
+     * the two agree. A theme that declares no accent is returned as it is. Pure.
+     */
+    fun tintTheme(theme: EsDeTheme, accent: Int): EsDeTheme {
+        val own = read(theme).accent ?: return theme
+        val held = tint(map(theme), accent).accent
+        val ownRgb = own.toLong() and RGB_MASK
+        if (ownRgb == (held.toLong() and RGB_MASK)) return theme
+        val heldRgba = (held.toLong() and RGB_MASK) shl 8
+        val views = theme.views.mapValues { (_, view) ->
+            view.copy(
+                elements = view.elements.mapValues { (_, element) ->
+                    element.copy(
+                        properties = element.properties.mapValues { (_, value) ->
+                            if (value is EsDeThemeValue.Color && ((value.argbLikeRgba ushr 8) and RGB_MASK) == ownRgb) {
+                                EsDeThemeValue.Color(heldRgba or (value.argbLikeRgba and 0xFFL))
+                            } else {
+                                value
+                            }
+                        },
+                    )
+                },
+            )
+        }
+        return theme.copy(views = views)
+    }
+
+    /** Red, green and blue of a colour, without its alpha. */
+    private const val RGB_MASK = 0xFFFFFFL
+
+    /**
      * Android's system palette (Android 12 and later, "Device colours"), as the tones Android publishes for its first
      * accent and first neutral family: [accent1] and [neutral1] each hold [TONES] in that order (`system_accent1_0`
      * through `system_accent1_1000`).

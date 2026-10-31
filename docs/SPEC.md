@@ -18877,9 +18877,13 @@ stored on a device without a palette reads as Gaming theme (`AppearancePrefs.sou
 the active palette's (the Device or Custom source's accent), and nothing else changes: grounds, surfaces, text, the
 primary button, typefaces, texture and artwork stay the theme's, and turning it off gives the theme back exactly. The
 swap is made at the one point a theme's colours are mapped (`GamingThemeMapping.resolved`, through
-`GamingThemeMapping.tint`), so Gaming's palette and the stored colours both have it; it is droidtop's chrome over the
-theme that is tinted (menus, rows, focus, buttons), not the themed gamelist and carousel views, which draw the
-theme's own variables. With Gaming theme as the source there is nothing to tint with: the row says it has no effect,
+`GamingThemeMapping.tint`), so Gaming's palette and the stored colours both have it, and droidtop's chrome over the
+theme (menus, rows, focus, buttons) is tinted. The themed gamelist and carousel views draw the theme's own values, so
+the loaded theme is tinted too (2026-10-31, #844; `GamingThemeMapping.tintTheme`, applied in `ThemeAssets` after the
+parse, with the tint in the parse's cache key): every colour the theme declares in its accent (the one `map` reads,
+the first declared colour with real chroma) becomes the accent the chrome gets, matched on red, green and blue exactly
+and keeping its own alpha, so a selector bar and its glow change together. Colours the theme declares in any other
+shade, and its images, stay as they are. With Gaming theme as the source there is nothing to tint with: the row says it has no effect,
 and it has none. Its explanation warns that a theme can look off where its art has colours of its own.
 
 Decided on #844, not built yet: the theme browser's **Match my colours**, which compares each theme's colours with the
