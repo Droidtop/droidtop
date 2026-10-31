@@ -170,6 +170,8 @@ sealed interface FacetBody {
         val role: String = "build",
         /** False for an item the source marks unofficial (a thread's `*`). */
         val official: Boolean = true,
+        /** The build a game's link is for ("Steam Build", Droidtop/tracker#845); null for the default build. */
+        val build: String? = null,
     )
 
     /** One piece of a split release: an address, or a token only the plugin's `download` job understands. */
@@ -532,6 +534,7 @@ object Facets {
                         parts = parts,
                         role = e.optString("role", "build").let { if (it in DOWNLOAD_ROLES) it else "build" },
                         official = e.optBoolean("official", true),
+                        build = text("build", "label", e),
                     )
                 },
             ).takeIf { it.entries.isNotEmpty() }

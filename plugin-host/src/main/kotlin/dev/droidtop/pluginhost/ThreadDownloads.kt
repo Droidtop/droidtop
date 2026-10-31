@@ -38,6 +38,8 @@ object ThreadDownloads {
         val systems: List<String>,
         val role: Role,
         val official: Boolean,
+        /** The build a game's link is for, as its heading names it ("Steam Build"); null for the thread's default build. */
+        val build: String? = null,
     )
 
     data class Read(val version: String?, val entries: List<Entry>, val problem: Problem?)
@@ -130,7 +132,8 @@ object ThreadDownloads {
                 }
                 val itemLabel = if (lineRole == Role.BUILD) host else text.ifEmpty { host }
                 val official = !(starred || link.text.contains('*') || link.starredAfter)
-                if (url !in out) out[url] = Entry(section, host, itemLabel, url, systems, lineRole, official)
+                val named = build?.takeIf { lineRole == Role.BUILD && it.isNotBlank() }
+                if (url !in out) out[url] = Entry(section, host, itemLabel, url, systems, lineRole, official, named)
             }
         }
         return out.values.toList()
@@ -170,6 +173,7 @@ object ThreadDownloads {
                         .put("role", e.role.id)
                         .put("official", e.official)
                         .apply { if (e.systems.isNotEmpty()) put("systems", JSONArray(e.systems)) }
+                        .apply { e.build?.let { put("build", it) } }
                 },
             ),
         )

@@ -89,6 +89,8 @@ interface UpdateSources {
         val role: String = "build",
         /** False for an item the source marks unofficial. */
         val official: Boolean = true,
+        /** The build it is for, as the source names it ("Steam Build", Droidtop/tracker#845); null for the default build. */
+        val build: String? = null,
     ) {
         /** One piece: its page ([url]) or the source's token ([link]), and its size when the source knows it. */
         data class Part(val label: String, val url: String?, val link: String?, val size: Long?)

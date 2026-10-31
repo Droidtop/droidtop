@@ -62,4 +62,23 @@ class DownloadRowsTest {
         val ordered = DownloadPick.hostOrdered(group, HostOrder.DEFAULT) { it.host == "UPLOADHAVEN" }
         assertEquals(listOf("UPLOADHAVEN", "PIXELDRAIN", "GOFILE", "MEGA", "MIXDROP"), ordered.map { it.host })
     }
+    @Test
+    fun `a build the source names is used, and the heading only when it names none`() {
+        // Droidtop/tracker#845: a source that names its builds needs no "Steam Build · " heading for droidtop to tell them apart.
+        fun named(build: String?, host: String) =
+            UpdateSources.Download("Win/Linux", host, host, "", "https://${host.lowercase()}.example/${build ?: "main"}", listOf("windows", "linux"), build = build)
+        val record = UpdateSources.Record(
+            externalId = "2",
+            title = "Game",
+            downloads = listOf(named(null, "GOFILE"), named("Steam Build", "MEGA")).let { (a, b) -> listOf(a, b.copy(section = "Win/Linux (Steam)")) },
+        )
+        // One System choice, so no System row: only droidtop's own pick comes before the builds.
+        val rows = downloadRows(record, "windows", steamCopy = true).filterNot { it.action == RecordAction.GetBest }
+        assertEquals(listOf("MEGA", "Other builds", "GOFILE"), rows.map { it.title })
+        assertEquals("Your copy", rows[0].value)
+        assertEquals("The default build", rows[1].subtitle)
+        assertEquals("Steam Build", buildOf(record.downloads[1]))
+        assertEquals("Steam Build", buildOf(UpdateSources.Download("Steam Build · Win/Linux", "MEGA", "MEGA", "")))
+        assertNull(buildOf(record.downloads[0]))
+    }
 }

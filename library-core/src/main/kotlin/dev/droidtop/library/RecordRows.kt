@@ -113,6 +113,12 @@ fun partsLine(d: UpdateSources.Download): String? {
 fun buildOf(section: String): String? = section.substringBefore(" · ", "").trim().ifEmpty { null }
 
 /**
+ * The build [d] is for: the one the source names (`build`, Droidtop/tracker#845), else the one its heading names
+ * ([buildOf]), for a source that does not name it yet.
+ */
+fun buildOf(d: UpdateSources.Download): String? = d.build?.trim()?.ifEmpty { null } ?: buildOf(d.section)
+
+/**
  * A build's links as rows (Droidtop/tracker#838): one row per build and platform, its hosts listed under it, A trying
  * them in turn; a heading with one link is that link's row. Most games have one build and get just that. When a thread
  * has several ("Steam Build" beside the default one), the copy's build comes first, marked "Your copy" when droidtop
@@ -129,12 +135,14 @@ fun buildRows(downloads: List<UpdateSources.Download>, steamCopy: Boolean?): Lis
         }
         return if (mine) base.copy(value = "Your copy") else base
     }
-    val builds = groups.keys.map(::buildOf).distinct()
+    // A heading's build: the one its links name, else the one the heading names.
+    val buildOfSection = groups.mapValues { (_, list) -> buildOf(list.first()) }
+    val builds = groups.keys.map { buildOfSection.getValue(it) }.distinct()
     if (builds.size < 2) return groups.keys.map { row(it, mine = false) }
     val yours = steamCopy?.let { steam -> builds.firstOrNull { (it?.contains("steam", ignoreCase = true) == true) == steam } } ?: builds.first()
-    val (first, rest) = groups.keys.partition { buildOf(it) == yours }
+    val (first, rest) = groups.keys.partition { buildOfSection.getValue(it) == yours }
     return first.map { row(it, mine = steamCopy != null) } +
-        RecordRow("Other builds", subtitle = rest.map { buildOf(it) ?: "The default build" }.distinct().joinToString(", ")) +
+        RecordRow("Other builds", subtitle = rest.map { buildOfSection.getValue(it) ?: "The default build" }.distinct().joinToString(", ")) +
         rest.map { row(it, mine = false) }
 }
 

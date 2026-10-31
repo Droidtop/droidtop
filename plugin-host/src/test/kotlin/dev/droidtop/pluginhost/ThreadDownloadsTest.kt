@@ -55,6 +55,11 @@ class ThreadDownloadsTest {
             ),
         )
         assertEquals(listOf("Win/Linux", "Steam Build · Win/Linux", "Steam Build · Win/Linux"), read.entries.map { it.section })
+        // The build is named on its own too (Droidtop/tracker#845); the default build has none.
+        assertEquals(listOf(null, "Steam Build", "Steam Build"), read.entries.map { it.build })
+        val json = ThreadDownloads.toJson(read).getJSONArray("entries")
+        assertFalse(json.getJSONObject(0).has("build"))
+        assertEquals("Steam Build", json.getJSONObject(1).getString("build"))
     }
 
     /**

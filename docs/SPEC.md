@@ -14206,7 +14206,9 @@ reimplemented it as my own f95seeker code." So:
     under it. One function, `DownloadLines` (`library-core`), groups the
     downloads for every page that lists them: the record rows and the source
     item page now, droidtop's pick, Updates and the game page's Versions tab as
-    they move to it. The links for any system follow whichever system is picked,
+    they move to it. A download's build is the one its source names (`build`,
+    which `sources.parse_thread` gives for each link under a build's heading),
+    else the one its heading names ("Steam Build · Win/Linux"). The links for any system follow whichever system is picked,
     under their own heading (the owner: "It should show under every section,
     but it should have the description with it, under an "extras" or "other"
     section"): "Extras" for a walkthrough, a patch, a save file and the like,

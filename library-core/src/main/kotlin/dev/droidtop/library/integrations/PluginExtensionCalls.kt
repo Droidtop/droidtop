@@ -843,6 +843,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
                         systems = dev.droidtop.pluginhost.DownloadSystems.of(dev.droidtop.pluginhost.DownloadSystems.read(d.optJSONArray("systems")), section),
                         role = d.optString("role", "build").takeIf { it == "patch" || it == "extra" } ?: "build",
                         official = d.optBoolean("official", true),
+                        build = d.optString("build").trim().take(80).ifEmpty { null },
                     )
                 }
             }.orEmpty().let(ItemPageFacets::distinctDownloads)
