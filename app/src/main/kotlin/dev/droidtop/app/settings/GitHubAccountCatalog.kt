@@ -474,9 +474,14 @@ object GitHubAccountCatalog {
             title = repo,
             subtitle = "Origin ${entry.origin}, key ${fingerprintOf(entry.keyBase64)}",
             groups = { context ->
-                // What the last check saw: no network here, a screen's rows are rebuilt on every change.
-                val (last, latest) = withContext(Dispatchers.IO) {
-                    PluginRepoUpdates.lastResult(context, repo) to PluginRepoUpdates.cachedRelease(context, repo)
+                // What the last check saw: no network here, a screen's rows are rebuilt on every change. Its updates are the
+                // ones the Updates page lists for this repository, from the same answer (Droidtop/tracker#837).
+                val (last, latest, updates) = withContext(Dispatchers.IO) {
+                    Triple(
+                        PluginRepoUpdates.lastResult(context, repo),
+                        PluginRepoUpdates.cachedRelease(context, repo),
+                        PluginRepoUpdates.pendingUpdates(context).filter { PluginRepos.sameRepo(it.repo.repo, repo) }.associateBy { it.bundle.assetName },
+                    )
                 }
                 listOf(
                     CatalogGroup(
@@ -503,10 +508,16 @@ object GitHubAccountCatalog {
                         id = "repo_bundles",
                         title = "In the latest release${latest?.let { " (${it.first})" }.orEmpty()}",
                         items = latest?.second?.map { assetName ->
+                            val update = updates[assetName]
                             AsyncActionItem(
                                 id = "repo_install_$assetName",
-                                title = assetName.removeSuffix(".droidplugin.tar.xz"),
-                                subtitle = "Install it. A new plugin arrives unapproved and runs only after you approve it",
+                                title = update?.installed?.manifest?.label ?: assetName.removeSuffix(".droidplugin.tar.xz"),
+                                subtitle = if (update != null) {
+                                    "Update ${dev.droidtop.library.GameUpdates.step(update.installed.manifest.version, update.version)}"
+                                } else {
+                                    "Install it. A new plugin arrives unapproved and runs only after you approve it"
+                                },
+                                value = if (update != null) "Update" else null,
                                 run = { ctx, onStatus ->
                                     onStatus("Downloading...")
                                     PluginRepoUpdates.installFromRepo(ctx, entry, assetName) { pluginId ->
@@ -516,7 +527,7 @@ object GitHubAccountCatalog {
                                             context = ctx,
                                             opens = { dev.droidtop.library.settings.SettingsScreenRegistry.get(AppSettingsCatalogs.SCREEN_PLUGINS, pluginId) },
                                         )
-                                    }
+                                    }.line
                                 },
                             )
                         } ?: listOf(ActionItem(id = "repo_no_release", title = "Nothing listed yet", subtitle = "Check for updates to see what its latest release carries")),
