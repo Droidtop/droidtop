@@ -847,9 +847,10 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
                     )
                 }
             }.orEmpty().let(ItemPageFacets::distinctDownloads)
-            val tags = row.optJSONArray("tags")?.let { array ->
+            fun words(key: String) = row.optJSONArray(key)?.let { array ->
                 (0 until array.length()).mapNotNull { array.optString(it).trim().takeIf { t -> t.isNotEmpty() && t.length <= 40 } }.distinct().take(MAX_TAGS)
             }.orEmpty()
+            val tags = words("tags")
             return dev.droidtop.library.UpdateSources.Record(
                 externalId = id,
                 title = text("title") ?: "#$id",
@@ -860,6 +861,9 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
                 rating = row.optDouble("rating").takeIf { !it.isNaN() && it in 0.0..1.0 },
                 votes = row.optInt("votes", -1).takeIf { it >= 0 },
                 tags = tags,
+                platforms = words("platforms"),
+                languages = words("languages"),
+                contentNotes = words("contentNotes"),
                 updatedEpochMs = row.optLong("updated", 0L).takeIf { it > 0 },
                 cover = text("cover", MAX_LINK)?.takeIf { it.startsWith("https://") },
                 overview = text("overview", MAX_TEXT),

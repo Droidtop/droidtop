@@ -81,4 +81,13 @@ class DownloadRowsTest {
         assertEquals("Steam Build", buildOf(UpdateSources.Download("Steam Build · Win/Linux", "MEGA", "MEGA", "")))
         assertNull(buildOf(record.downloads[0]))
     }
+    @Test
+    fun `a record's platforms, languages and content notes are a row each, and none when the source states none`() {
+        val record = UpdateSources.Record("3", "Game", platforms = listOf("Windows", "Linux"), languages = listOf("English"), contentNotes = listOf("Uncensored"))
+        assertEquals(
+            listOf(RecordRow("Platforms", "Windows, Linux"), RecordRow("Languages", "English"), RecordRow("Content", subtitle = "Uncensored")),
+            factRows(record),
+        )
+        assertEquals(emptyList<RecordRow>(), factRows(UpdateSources.Record("4", "Bare")))
+    }
 }

@@ -110,6 +110,10 @@ interface UpdateSources {
         val rating: Double? = null,
         val votes: Int? = null,
         val tags: List<String> = emptyList(),
+        /** The platforms the game is for, its languages and its content notes, as the source states them (#845). */
+        val platforms: List<String> = emptyList(),
+        val languages: List<String> = emptyList(),
+        val contentNotes: List<String> = emptyList(),
         val updatedEpochMs: Long? = null,
         val cover: String? = null,
         val overview: String? = null,

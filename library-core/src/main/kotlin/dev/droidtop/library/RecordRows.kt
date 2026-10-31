@@ -68,6 +68,16 @@ fun signInRow(sourceLabel: String, record: UpdateSources.Record, signedOut: Bool
 /** One row; [on] is an on/off row's state, drawn as a switch rather than said (show, then say: Droidtop/tracker#738). */
 data class RecordRow(val title: String, val value: String? = null, val subtitle: String? = null, val action: RecordAction? = null, val on: Boolean? = null)
 
+/**
+ * What the source states of the game besides its version (Droidtop/tracker#845): its platforms, its languages and its
+ * content notes, a row each when it states them. Shared by every page that shows a record's facts. Pure.
+ */
+fun factRows(record: UpdateSources.Record): List<RecordRow> = listOfNotNull(
+    record.platforms.takeIf { it.isNotEmpty() }?.let { RecordRow("Platforms", it.joinToString(", ")) },
+    record.languages.takeIf { it.isNotEmpty() }?.let { RecordRow("Languages", it.joinToString(", ")) },
+    record.contentNotes.takeIf { it.isNotEmpty() }?.let { RecordRow("Content", subtitle = it.joinToString(", ")) },
+)
+
 /** "4.3 of 5 (1,234 votes)" for a 0-to-1 rating; null when the source gives none. */
 fun ratingLine(rating: Double?, votes: Int?): String? {
     rating ?: return null
