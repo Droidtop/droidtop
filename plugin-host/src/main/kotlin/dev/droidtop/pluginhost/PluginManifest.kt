@@ -235,7 +235,7 @@ data class PluginManifest(
         if (kind == PluginKind.APP_INTERFACE) {
             if (app == null) add("an app_interface plugin must name its app: {\"package\", \"service\"}")
             if (payload.isNotEmpty() || entryClass != null) add("an app_interface plugin carries no payload or entryClass: its code is its app")
-            if (contractVersion < 2) add("an app_interface plugin must be contract 2 or later")
+            if (contractVersion < AppInterfaceTrust.MIN_APP_CONTRACT) add("an app_interface plugin must be contract ${AppInterfaceTrust.MIN_APP_CONTRACT} or later")
             // docs/plugin-api.md 1.3: the app never runs in a droidtop process, so nothing that reaches past one applies.
             v2.permissions.filter { it.id == PluginTiers.FULL_TRUST || it.id == "gpu.render" }.forEach {
                 add("an app_interface plugin cannot ask for ${it.id}: its app never runs in droidtop's process")

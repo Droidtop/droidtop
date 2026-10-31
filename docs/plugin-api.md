@@ -497,6 +497,15 @@ store". Its adapter is the app itself:
     - **Refused**: one sentence saying why (an old-style signature, two
       signers, a signer Android reports but the APK does not carry, a
       manifest that is not this app's).
+    - **A plugin this droidtop cannot speak** says which side needs
+      updating, read from the manifest's own `contractVersion`
+      (Droidtop/tracker#854, Enginehost missing from Plugins): "<App>
+      needs an update to work with this droidtop" (older than contract 2,
+      or a kind or shape droidtop cannot read), or "<App> is made for a
+      newer droidtop" (newer than this build's contract).
+    - **An installed plugin whose record no longer reads** is listed in
+      Installed with "Needs an update to work with this droidtop" and
+      Remove, never left out of the list.
     - An app already added is in Installed, not here. It shows here again
       when the app changed, as **Review the new version**. The same key
       keeps the approval; the new version's new items wait as any update's.
@@ -2593,9 +2602,14 @@ exist:
   never fetches anything, and `catalogCheckedAtMs` (0: never) says how
   old the catalog part is. droidtop keeps at most 200 cores per app.
 - **When:** at droidtop's start, when the app connects through the door,
-  and after each `engines report_changed`. Never on a timer. The last
-  answer is kept in droidtop's files, so a decision made before the app
-  connects still has it.
+  after each `engines report_changed`, and when the app is installed or
+  updated (droidtop's package watch). Never on a timer. The last answer
+  is kept in droidtop's files, so a decision made before the app connects
+  still has it. An app that cannot be asked now (waiting for approval,
+  turned off, needing an update) keeps its last answer; it is dropped
+  only when the plugin is removed or no longer provides the point
+  (Droidtop/tracker#854: a dropped list made a game page offer "Get …
+  support" for a core that was installed).
 - **The plugin tells droidtop:** `engines report_changed {}` →
   `{accepted}`: a core was installed, removed or updated, or the catalog
   changed. droidtop asks `list_cores` again, off the caller's thread.

@@ -4,8 +4,10 @@ import android.content.Context
 import android.util.AtomicFile
 import android.util.Log
 import dev.droidtop.library.EnginehostCapabilities
+import dev.droidtop.pluginhost.PluginBundleInstaller
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginKind
+import dev.droidtop.pluginhost.PluginStore
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
@@ -97,6 +99,15 @@ object EngineCoresProtocol {
      * caller then keeps what it measured before. An installed core wins over an installable one; among installable
      * ones the first listed.
      */
+    /**
+     * Whether a plugin's last list is kept when it cannot be asked now (Droidtop/tracker#854). [installed]: its record
+     * is still in droidtop's plugins; [declares]: whether that record still provides [POINT], null when droidtop cannot
+     * read the record (an app plugin made for another droidtop). Only a plugin removed, or one that no longer
+     * provides the point, loses its list: Enginehost waiting for approval, turned off or needing an update keeps the
+     * cores it listed, so a game page does not offer "Get … support" for a core that is installed. Pure.
+     */
+    fun keepsUnasked(installed: Boolean, declares: Boolean?): Boolean = installed && declares != false
+
     fun verdict(answers: Collection<EngineCoreAnswer>, rowId: String, version: String?): CoreVerdict? {
         if (answers.isEmpty()) return null
         val serving = answers.flatMap { it.cores }.filter { rowId in it.rows && it.runs(version) }
@@ -176,7 +187,10 @@ object EngineCoreList {
         }
     }
 
-    /** One `list_cores` to [pluginId]; a failed call keeps its last answer, and a plugin gone or no longer providing is dropped. */
+    /**
+     * One `list_cores` to [pluginId]; a failed call keeps its last answer. A plugin that cannot be asked now keeps it
+     * too, unless it is removed or no longer provides the point ([EngineCoresProtocol.keepsUnasked]).
+     */
     suspend fun refresh(context: Context, pluginId: String) {
         lock.withLock {
             load(context)
@@ -184,6 +198,13 @@ object EngineCoreList {
                 .firstOrNull { (record, _) -> record.manifest.id == pluginId && record.manifest.kind == PluginKind.APP_INTERFACE }
                 ?.first
             if (record == null) {
+                val root = PluginStore.root(context)
+                val installed = File(root, "$pluginId/record.json").isFile
+                val declares = PluginBundleInstaller.readRecord(root, pluginId)?.manifest?.v2?.provides?.any { it.point == EngineCoresProtocol.POINT }
+                if (EngineCoresProtocol.keepsUnasked(installed, declares)) {
+                    if (answers.containsKey(pluginId)) Log.i("droidtop.engines", "$pluginId cannot be asked now; its last list of engine cores is kept")
+                    return
+                }
                 if (answers.remove(pluginId) != null) save(context)
                 return
             }

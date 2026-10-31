@@ -72,4 +72,12 @@ class EngineCoresProtocolTest {
         val answer = EngineCoresProtocol.answer(reply)
         assertEquals(answer, EngineCoresProtocol.answer(EngineCoresProtocol.toJson(answer)))
     }
+    @Test
+    fun `a list is kept while its plugin cannot be asked, and dropped only when it is removed or stops providing`() {
+        // Droidtop/tracker#854: a list dropped while Enginehost could not be asked offered "Get … support" for an installed core.
+        assertTrue(EngineCoresProtocol.keepsUnasked(installed = true, declares = true))
+        assertTrue(EngineCoresProtocol.keepsUnasked(installed = true, declares = null))
+        assertFalse(EngineCoresProtocol.keepsUnasked(installed = true, declares = false))
+        assertFalse(EngineCoresProtocol.keepsUnasked(installed = false, declares = null))
+    }
 }

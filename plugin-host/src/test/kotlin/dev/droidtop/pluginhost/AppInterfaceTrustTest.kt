@@ -119,4 +119,27 @@ class AppInterfaceTrustTest {
         assertEquals(emptySet<String>(), UserOriginKeys.appCerts(file, "dev.enginehost"))
         assertEquals(mapOf<String, String>(), UserOriginKeys.appEntries(file))
     }
+    @Test
+    fun `an app whose plugin this droidtop cannot speak says which side needs updating`() {
+        // Enginehost was missing from Plugins altogether (Droidtop/tracker#854).
+        fun bytes(json: String) = json.toByteArray(Charsets.UTF_8)
+        val newer = AppInterfaceTrust.mismatch("Enginehost", bytes("""{"kind":"app_interface","contractVersion":4}"""), null)
+        assertEquals(
+            "Enginehost is made for a newer droidtop (its plugin is contract 4; this droidtop speaks 2 to $PLUGIN_MANIFEST_CONTRACT_VERSION). Update droidtop to use it",
+            newer,
+        )
+        val older = AppInterfaceTrust.mismatch("Enginehost", bytes("""{"kind":"app_interface","contractVersion":1}"""), null)
+        assertTrue(older!!, older.startsWith("Enginehost needs an update to work with this droidtop (its plugin is contract 1;"))
+        assertEquals(
+            "Enginehost needs an update to work with this droidtop (droidtop can't read its plugin's manifest)",
+            AppInterfaceTrust.mismatch("Enginehost", bytes("""{"kind":"some_new_kind"}"""), null),
+        )
+        assertEquals(
+            "Enginehost needs an update to work with this droidtop (droidtop can't read its plugin's manifest)",
+            AppInterfaceTrust.mismatch("Enginehost", bytes("not json"), null),
+        )
+        // No manifest asset at all is a different refusal, and a readable one in range is no mismatch.
+        assertNull(AppInterfaceTrust.mismatch("Enginehost", null, null))
+        assertNull(AppInterfaceTrust.mismatch("Enginehost", bytes("""{"kind":"app_interface","contractVersion":3}"""), manifest()!!))
+    }
 }

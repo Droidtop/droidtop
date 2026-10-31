@@ -145,6 +145,7 @@ private val pluginLabels = java.util.concurrent.ConcurrentHashMap<String, String
 internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
     val installed = PluginStore.installed(context)
     installed.forEach { pluginLabels[it.manifest.id] = it.manifest.label }
+    val unreadable = PluginStore.unreadable(context)
     // Read once here, off the main thread; valueLabel below is a
     // plain (non-suspend) closure the renderer may call on the main
     // thread, so it must not touch the key store itself.
@@ -182,9 +183,15 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
         getPluginsGroup(catalogsSummary),
         CatalogGroup(
             id = "plugins_installed",
-            title = if (installed.isEmpty()) null else "Installed",
+            title = if (installed.isEmpty() && unreadable.isEmpty()) null else "Installed",
             items = buildList {
+                // A plugin droidtop cannot read is listed, never hidden (Droidtop/tracker#854: Enginehost was nowhere).
+                val unreadableRows = unreadable.map { unreadableRow(it) }
                 if (installed.isEmpty()) {
+                    if (unreadableRows.isNotEmpty()) {
+                        addAll(unreadableRows)
+                        return@buildList
+                    }
                     add(
                         ActionItem(
                             id = "plugins_none",
@@ -250,6 +257,7 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                     add(ActionItem(id = "plugins_filter_none", title = "No plugin ${pluginFilter.none}"))
                 }
                 shown.forEach { (_, _, card) -> add(card) }
+                addAll(unreadableRows)
             },
         ),
     ) + listOfNotNull(appInterfacesGroup(context, installed)) + providedByGroups(resolution, providerChoices) + listOf(
@@ -302,12 +310,31 @@ internal fun AppSettingsCatalogs.appInterfacesGroup(context: Context, installed:
     return CatalogGroup(id = "plugins_apps", title = "In your apps", items = items)
 }
 
+/** An installed plugin whose record this droidtop cannot read: what it is, what to do, and Remove behind a question. */
+internal fun AppSettingsCatalogs.unreadableRow(plugin: PluginStore.Unreadable): CatalogItem = AsyncActionItem(
+    id = "plugins_unreadable_${plugin.id}",
+    title = plugin.label,
+    subtitle = "Needs an update to work with this droidtop: droidtop can't read it as it was installed. " +
+        "Remove it, then add it again from its app or its catalog",
+    value = "Remove",
+    confirmTitle = "Remove ${plugin.label}? Its data and permissions go with it",
+    run = { ctx, _ ->
+        withContext(Dispatchers.IO) { PluginStore.uninstall(ctx, plugin.id) }
+        pluginsChanged(ctx)
+        "${plugin.label} is removed"
+    },
+)
+
 /** One app that carries a plugin, as "In your apps" shows it: what droidtop decided about it, and how to add it. */
 internal fun AppSettingsCatalogs.appInterfaceRow(app: dev.droidtop.pluginhost.AppInterfaces.Found, update: Boolean): CatalogItem {
     val verdict = app.verdict
     val fingerprint = dev.droidtop.pluginhost.AppInterfaceTrust.certOf(verdict)?.let { PluginDangers.groupsOfFour(it) }
     val refusal = (verdict as? dev.droidtop.pluginhost.AppInterfaceTrust.Verdict.Refused)?.reason ?: app.problem
     val id = "plugins_app_${app.packageName}"
+    // An app whose plugin this droidtop cannot speak says which side needs updating, never only why it was refused.
+    dev.droidtop.pluginhost.AppInterfaceTrust.mismatch(app.appLabel, app.manifestBytes, app.manifest)?.let { words ->
+        return ActionItem(id = id, title = app.appLabel, subtitle = words)
+    }
     if (refusal != null) {
         return ActionItem(id = id, title = app.appLabel, subtitle = "Can't be added: $refusal")
     }

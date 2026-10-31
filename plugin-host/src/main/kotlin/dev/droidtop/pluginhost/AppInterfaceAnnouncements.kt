@@ -30,6 +30,7 @@ object AppInterfaceAnnouncements {
     private const val PREFS = "droidtop_app_interfaces"
     private const val KEY_SEQUENCE = "changed_sequence"
     private const val NOTICED_PREFIX = "noticed:"
+    private const val ENGINE_CORES = "engines.cores"
 
     /** How long a knock from one app waits before another is looked at: an app cannot nag by knocking. */
     const val KNOCK_GAP_MS = 60_000L
@@ -71,7 +72,13 @@ object AppInterfaceAnnouncements {
         val service = runCatching { pm.queryIntentServices(Intent(AppInterfaceTrust.ACTION).setPackage(packageName), 0) }
             .getOrNull()?.firstOrNull()?.serviceInfo ?: return
         val updatedAt = runCatching { pm.getPackageInfo(packageName, 0).lastUpdateTime }.getOrDefault(0L)
-        PluginStore.root(context)
+        // An app plugin already added that lists engine cores is asked for them again when its app changes
+        // (Droidtop/tracker#854): an update can bring cores, and a list from before would offer "Get … support" for one
+        // that is installed.
+        PluginStore.installed(context)
+            .filter { it.manifest.kind == PluginKind.APP_INTERFACE && it.manifest.app?.packageName == packageName }
+            .filter { record -> record.manifest.v2.provides.any { it.point == ENGINE_CORES } }
+            .forEach { PluginBrokers.enginesChanged(it.manifest.id) }
         val found = AppInterfaces.inspect(context, packageName, service.name)
         val usable = found.problem == null && found.verdict !is AppInterfaceTrust.Verdict.Refused
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -52,6 +52,25 @@ object PluginStore {
         return ids.mapNotNull { PluginBundleInstaller.readRecord(dir, it) }.sortedBy { it.manifest.label.lowercase() }
     }
 
+    /** A plugin whose record this droidtop cannot read: its id, and the name its record gives (the id when none). */
+    data class Unreadable(val id: String, val label: String)
+
+    /**
+     * The plugins [installed] leaves out because their record does not read (Droidtop/tracker#854): an app's plugin
+     * made for another droidtop, a kind or shape this build does not know. Listed, never dropped silently, so the
+     * person sees it and can remove it. Reads every record: off the main thread.
+     */
+    fun unreadable(context: Context): List<Unreadable> {
+        val dir = root(context)
+        val ids = dir.listFiles { f -> f.isDirectory }?.map { it.name } ?: return emptyList()
+        return ids.mapNotNull { id ->
+            val file = File(dir, "$id/record.json")
+            if (!file.isFile || PluginBundleInstaller.readRecord(dir, id) != null) return@mapNotNull null
+            val label = runCatching { org.json.JSONObject(file.readText()).optString("label") }.getOrNull()?.takeIf { it.isNotBlank() }
+            Unreadable(id, label ?: id)
+        }.sortedBy { it.label.lowercase() }
+    }
+
     /** Installed, approved, enabled and re-verified plugins that declared [capability] -- what an actual call site (a status tile row, a metadata pass) should iterate. */
     fun runnableFor(context: Context, capability: PluginCapability): List<PluginRecord> {
         val dir = root(context)

@@ -23900,6 +23900,9 @@ and work with each other over the plugin API so no matter what, saves go where t
   - An unknown key: its fingerprint, and Trust and add, asked first. The key is kept for that app alone, under "Apps
     you trust" in Keys you trust.
   - Refused: why, in one sentence.
+  - A plugin this droidtop cannot speak: which side needs updating, by the manifest's own contract ("<App> needs an
+    update to work with this droidtop", or "is made for a newer droidtop"). An installed plugin whose record no longer
+    reads is listed in Installed with the same sentence and Remove, never hidden (Droidtop/tracker#854).
 
   An app already added is in Installed, and shows here again only when the app changed ("Review the new version").
   An app announces itself by knocking on the door when it starts, and droidtop also notices installs and updates by

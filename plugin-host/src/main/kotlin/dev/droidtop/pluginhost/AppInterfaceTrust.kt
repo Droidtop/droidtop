@@ -115,6 +115,32 @@ object AppInterfaceTrust {
         else -> manifest.structuralProblems().firstOrNull()
     }
 
+    /** The oldest contract an app's plugin may be (docs/plugin-api.md 1.3). */
+    const val MIN_APP_CONTRACT = 2
+
+    /**
+     * What to tell the person when an app carries a plugin this droidtop cannot speak (Droidtop/tracker#854), or null
+     * when it can: Enginehost was missing from Plugins altogether. [manifestBytes] is its `droidtop-plugin.json` as
+     * read, [manifest] what droidtop made of it (null when it could not read it: a kind or shape it does not know).
+     * The contract is read from the bytes themselves, so a plugin made for a newer droidtop says so and is not told to
+     * update. Pure.
+     */
+    fun mismatch(label: String, manifestBytes: ByteArray?, manifest: PluginManifest?): String? {
+        val contract = manifestBytes?.let { bytes ->
+            runCatching { org.json.JSONObject(String(bytes, Charsets.UTF_8)).optInt("contractVersion", -1) }.getOrNull()
+        }?.takeIf { it >= 0 }
+        val speaks = "this droidtop speaks $MIN_APP_CONTRACT to $PLUGIN_MANIFEST_CONTRACT_VERSION"
+        return when {
+            contract != null && contract > PLUGIN_MANIFEST_CONTRACT_VERSION ->
+                "$label is made for a newer droidtop (its plugin is contract $contract; $speaks). Update droidtop to use it"
+            contract != null && contract < MIN_APP_CONTRACT ->
+                "$label needs an update to work with this droidtop (its plugin is contract $contract; $speaks)"
+            manifestBytes != null && manifest == null ->
+                "$label needs an update to work with this droidtop (droidtop can't read its plugin's manifest)"
+            else -> null
+        }
+    }
+
     /**
      * Whether a record already installed for this plugin carries its approval to [cert]: the same certificate it was
      * approved with. A changed certificate is a new trust decision, as a changed bundle key is (docs/SPEC.md 12a).
