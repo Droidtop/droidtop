@@ -56,8 +56,9 @@ object DownloadPick {
     /** A link droidtop serves without a page first, then the person's [order], then the hosts it does not name. */
     private fun hostRank(d: UpdateSources.Download, order: List<String>, served: (UpdateSources.Download) -> Boolean): Int {
         if (served(d)) return -1
-        val host = d.host.lowercase()
-        return order.indexOfFirst { host.contains(it) }.let { if (it < 0) order.size else it }
+        // By the host's one name, so BZZHR ranks as BuzzHeavier (HostNames, Droidtop/tracker#859).
+        val host = HostNames.key(d.host)
+        return order.indexOfFirst { host.contains(HostNames.key(it)) }.let { if (it < 0) order.size else it }
     }
 }
 
