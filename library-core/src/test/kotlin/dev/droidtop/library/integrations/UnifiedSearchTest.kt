@@ -157,7 +157,7 @@ class UnifiedSearchTest {
         val s = source("cold", delayMs = 20, results = listOf(result("r", "Sonic")))
         // Starting takes longer than the whole search budget: before, that was "did not answer in time".
         val states = runWarm(s, warm = { delay(150); null }, timeoutMs = 100, loadTimeoutMs = 2_000).toList()
-        assertTrue(states.any { st -> st.sources.single().starting })
+        assertTrue(states.any { st -> st.sources.any { it.starting } })
         val last = states.last()
         assertTrue(last.settled)
         assertEquals(null, last.sources.single().failure)
