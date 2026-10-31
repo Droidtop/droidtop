@@ -54,12 +54,13 @@ class PluginJobsScreenTest {
     }
 
     @Test
-    fun `jobs fall into Current, Waiting, Paused and Finished, with Clear finished last`() {
+    fun `jobs fall into Current, Waiting, Paused and Finished, with Clear finished heading Finished`() {
         val held = job("h", 10, paused = true).copy(hold = "Waiting for Wi-Fi")
         val finished = job("f", 100, done = true).copy(finishedAtMs = 5L)
         val groups = PluginJobsScreen.groupsFor(listOf(job("a", 10), held, job("p", 5, paused = true), finished), nowMs = 0L)
         assertEquals(listOf("Current (1)", "Waiting (1)", "Paused (1)", "Finished (1)"), groups.map { it.title })
-        assertEquals("plugin_jobs_clear_finished", groups.last().items.last().id)
+        assertEquals("plugin_jobs_clear_finished", groups.last().items.first().id)
+        assertEquals("plugin_job_f", groups.last().items[1].id)
     }
 
     @Test

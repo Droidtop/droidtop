@@ -194,18 +194,21 @@ object PluginJobsScreen {
             // Held by the download rules, or waiting for the connection or for a retry: none of them is the person's pause.
             section("plugin_jobs_waiting", "Waiting", snapshot.filter { it.state in WAITING }, nowMs),
             section("plugin_jobs_paused", "Paused", snapshot.filter { it.state == JobState.PAUSED }, nowMs),
+            // Clear finished heads the section (the owner, 2026-10-31: "can we put a clear button whenever we have a list
+            // of events or tasks that are completed? I want to remove all the syncthing spam from the downloads list"):
+            // at its foot it was under as many as FINISHED_KEPT rows, where nobody found it.
             section("plugin_jobs_done", "Finished", finished, nowMs)?.let { group ->
-                group.copy(items = group.items + clearFinishedItem())
+                group.copy(items = listOf(clearFinishedItem(finished.size)) + group.items)
             },
         )
     }
 
     private val WAITING = setOf(JobState.HELD, JobState.WAITING_FOR_NETWORK, JobState.WAITING_TO_RETRY)
 
-    private fun clearFinishedItem(): CatalogItem = ActionItem(
+    private fun clearFinishedItem(count: Int): CatalogItem = ActionItem(
         id = "plugin_jobs_clear_finished",
         title = "Clear finished",
-        subtitle = "Forgets every finished job and what it did",
+        subtitle = "Removes the $count finished from this list; droidtop's log keeps what each did",
         confirmTitle = "Clear every finished job from this list?",
         run = { PluginJobsCenter.clearFinished() },
     )

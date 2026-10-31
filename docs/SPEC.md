@@ -7021,7 +7021,12 @@ one:
   `nativeKind`, as the download rules do; they read `kind`, which is "native" for every job droidtop runs itself,
   so no native download showed in either.
   **The Downloads place reads it (2026-10-22).** Its sections are Current, Waiting (held by the download rules),
-  Paused and Finished, each with its count, and Finished ends with "Clear finished". A running row's bar says how
+  Paused and Finished, each with its count, and Finished starts with "Clear finished" (moved from its foot
+  2026-10-31; the owner: "can we put a clear button whenever we have a list of events or tasks that are completed? I
+  want to remove all the syncthing spam from the downloads list": under up to 200 kept rows nobody found it). Clear and
+  Clear finished take jobs off the list only; each cleared job's last line goes to droidtop's log (`droidtop.jobs`),
+  so what it did is still on record. Every list of finished things gets the same: a clear action at its head, a row
+  like any other so pad, touch and pointer all reach it. A running row's bar says how
   far and its line says where it stands or the time left (`JobPace`, below), never a figure that changes with each
   report (decided 2026-10-24, Droidtop/tracker#643; owner: "The current 'flickery numbers for download progress', for
   instance, is bad"; "text explains on demand"). The figures ("42%, 120 MB of 300 MB, 4 MB/s", "12 of 40",

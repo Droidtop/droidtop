@@ -799,10 +799,14 @@ object PluginJobsCenter {
         update(jobId) { it.copy(retryable = true) }
     }
 
-    /** Forgets a finished job and its report (the row's Clear). False for a job still running or paused. */
+    /**
+     * Takes a finished job and its report off the list (the row's Clear). False for a job still running or paused. Its
+     * last line goes to the log first ([logCleared]), so what it did is still on record.
+     */
     fun clear(jobId: String): Boolean {
         val entry = find(jobId) ?: return false
         if (!entry.done) return false
+        logCleared(entry)
         clearedIds += jobId
         state.update { list -> list.filterNot { it.jobId == jobId } }
         finishedSpecs.remove(jobId)
@@ -811,13 +815,21 @@ object PluginJobsCenter {
         return true
     }
 
-    /** Forgets every finished job (Clear finished). */
+    /** Takes every finished job off the list (Clear finished), each logged first ([logCleared]). */
     fun clearFinished() {
-        state.value.filter { it.done }.forEach { clearedIds += it.jobId }
+        state.value.filter { it.done }.forEach {
+            logCleared(it)
+            clearedIds += it.jobId
+        }
         state.update { list -> list.filterNot { it.done } }
         finishedSpecs.clear()
         retryHandlers.clear()
         persist()
+    }
+
+    /** A cleared job's record in the log: who ran it, what it was, and its last line. */
+    private fun logCleared(entry: Entry) {
+        android.util.Log.i("droidtop.jobs", "cleared: ${entry.pluginLabel}: ${entry.title}: ${entry.statusLine}")
     }
 
     /**
