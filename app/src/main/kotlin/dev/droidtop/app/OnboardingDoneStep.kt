@@ -177,7 +177,7 @@ internal fun DoneStep(
     // Each line names the Settings section it lives in.
     val skipped = buildList {
         if (homeChoice != HomeImplementation.NONE && !homeHeld) {
-            add("Home button (Home still opens another app): Settings")
+            add("Home button (Home still opens another app): Settings > Home screen")
         }
         if (gamingConfigured && !storageGranted) add("File access for your game folders: Game folders")
         if (desktopOffered && !desktopConfigured) add("Desktop (no Linux system chosen yet): Desktop")

@@ -76,7 +76,7 @@ object DroidtopWideSettings {
                     title = "Home screen",
                     category = "Modes",
                     items = listOf(
-                        // STANDARD <-> NONE only: a person on ALTERNATIVE
+                        // DROIDTOP <-> NONE only: a person on ALTERNATIVE
                         // (another launcher droidtop forwards to) chose that
                         // in onboarding, and leaves it there too.
                         // On means droidtop's launcher IS what Home opens, as
@@ -87,20 +87,23 @@ object DroidtopWideSettings {
                         // screen, the only place that choice is made.
                         ToggleItem(
                             id = "pref_global_home_role",
-                            title = "Use droidtop as home screen",
+                            title = "droidtop is your home screen",
                             subtitle = homeRoleSubtitle(context),
                             current = HomeRolePrefs.activeHomeImplementation(context) ==
-                                HomeRolePrefs.HomeImplementation.STANDARD && HomeRolePrefs.isDroidtopHome(context),
+                                HomeRolePrefs.HomeImplementation.DROIDTOP && HomeRolePrefs.isDroidtopHome(context),
                             onToggle = { ctx, on ->
                                 HomeRolePrefs.setActiveHomeImplementation(
                                     ctx,
-                                    if (on) HomeRolePrefs.HomeImplementation.STANDARD else HomeRolePrefs.HomeImplementation.NONE,
+                                    if (on) HomeRolePrefs.HomeImplementation.DROIDTOP else HomeRolePrefs.HomeImplementation.NONE,
                                 )
                                 if (on && !HomeRolePrefs.isDroidtopHome(ctx)) {
                                     SettingsLaunch.start(ctx, HomeRolePrefs.homeSettingsIntent())
                                 }
                             },
                         ),
+                        // Which of droidtop's UIs Home opens, beside the row that makes droidtop Home
+                        // (Droidtop/tracker#571 row 11).
+                        defaultModeItem(context),
                     ) + listOfNotNull(usersItem(context)),
                 ),
                 CatalogGroup(
@@ -108,7 +111,6 @@ object DroidtopWideSettings {
                     title = "Modes",
                     category = "Modes",
                     items = listOf(
-                        defaultModeItem(context),
                         modeToggle(context, Mode.DESKTOP),
                         modeToggle(context, Mode.GAMING),
                         dev.droidtop.library.settings.NestedScreenItem(
@@ -538,8 +540,8 @@ object DroidtopWideSettings {
         }
         return ChoiceItem(
             id = "pref_global_default_mode",
-            title = "Default mode",
-            subtitle = "Where droidtop opens, and where the Home button takes you",
+            title = "Home opens",
+            subtitle = "Which of droidtop's screens droidtop opens on, and the Home button takes you to",
             options = options,
             current = Modes.defaultMode(context)?.takeIf { id -> options.any { it.value == id } } ?: "",
             onSelect = { ctx, value -> Modes.setDefaultMode(ctx, Mode.byId(value.ifEmpty { null })) },
@@ -673,11 +675,26 @@ object DroidtopWideSettings {
         )
     }
 
-    private fun homeRoleSubtitle(context: Context): String = when {
-        HomeRolePrefs.isDroidtopHome(context) -> "droidtop's own launcher is what the Home button opens"
-        HomeRolePrefs.activeHomeImplementation(context) == HomeRolePrefs.HomeImplementation.STANDARD ->
-            "Another app is the Home app. Turn this on to choose droidtop in Android's Default home app screen"
-        else -> "Turn this on to choose droidtop's own launcher in Android's Default home app screen"
+    private fun homeRoleSubtitle(context: Context): String {
+        if (HomeRolePrefs.isDroidtopHome(context)) return "The Home button opens droidtop"
+        // Who holds Home now, by name: the Mobile settings row it replaces said "???" when nothing resolved.
+        val other = currentHomeLabel(context)
+        return if (other != null) {
+            "$other is your home screen. Turn this on to choose droidtop in Android's Default home app screen"
+        } else {
+            "Turn this on to choose droidtop in Android's Default home app screen"
+        }
+    }
+
+    /** The app Android resolves Home to now, by its label; null when it asks each time or nothing resolves. */
+    private fun currentHomeLabel(context: Context): String? {
+        val pm = context.packageManager
+        val info = pm.resolveActivity(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+            android.content.pm.PackageManager.MATCH_DEFAULT_ONLY,
+        ) ?: return null
+        if (info.activityInfo.packageName == "android" || info.activityInfo.packageName == context.packageName) return null
+        return info.loadLabel(pm).toString().takeIf { it.isNotBlank() }
     }
 
     private fun modeToggle(context: Context, mode: Mode) = ToggleItem(

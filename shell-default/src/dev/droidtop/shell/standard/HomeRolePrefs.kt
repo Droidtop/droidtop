@@ -57,17 +57,17 @@ object HomeRolePrefs {
         return roles?.createRequestRoleIntent(RoleManager.ROLE_HOME)
     }
 
-    enum class HomeImplementation { STANDARD, ALTERNATIVE, NONE }
+    enum class HomeImplementation { DROIDTOP, ALTERNATIVE, NONE }
 
     fun setActiveHomeImplementation(context: Context, implementation: HomeImplementation) {
         val pm = context.packageManager
-        setHomeComponent(pm, context.packageName, StandardComponents.HOME_TRAMPOLINE, implementation == HomeImplementation.STANDARD)
+        setHomeComponent(pm, context.packageName, StandardComponents.HOME_TRAMPOLINE, implementation == HomeImplementation.DROIDTOP)
         setHomeComponent(pm, context.packageName, StandardComponents.ALTERNATIVE, implementation == HomeImplementation.ALTERNATIVE)
     }
 
     /**
      * Changes a HOME activity's state only when it really changes (Droidtop/tracker#736). Every write is a package
-     * change Android re-reads the Home candidates on, and onboarding, the "Use droidtop as home screen" row and the
+     * change Android re-reads the Home candidates on, and onboarding, the "droidtop is your home screen" row and the
      * Alternative forwarder all called this with the state already in place: the trampoline written ENABLED over its
      * manifest default of enabled. Reading first keeps those calls from touching the HOME set at all, so only turning
      * droidtop's home off and on again asks Android to choose a Home anew.
@@ -85,7 +85,7 @@ object HomeRolePrefs {
         val pm = context.packageManager
         return when {
             isEnabled(pm, context.packageName, StandardComponents.ALTERNATIVE) -> HomeImplementation.ALTERNATIVE
-            isEnabled(pm, context.packageName, StandardComponents.HOME_TRAMPOLINE) -> HomeImplementation.STANDARD
+            isEnabled(pm, context.packageName, StandardComponents.HOME_TRAMPOLINE) -> HomeImplementation.DROIDTOP
             else -> HomeImplementation.NONE
         }
     }

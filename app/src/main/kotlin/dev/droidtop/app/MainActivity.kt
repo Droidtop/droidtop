@@ -791,7 +791,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
      * Prefers an explicit [BackButtonMenu.EXTRA_MODE] (a real user choice,
      * from [BackButtonMenu] or Launcher's own cold-boot redirect — see the
      * "droidtop patch" in `Launcher.onCreate`); then a real, user-set
-     * [Modes.defaultMode] (Global settings' own "Default mode" picker),
+     * [Modes.defaultMode] (Settings' own "Home opens" picker),
      * if one is set and its mode is still enabled — a disabled mode can't
      * silently become the resolved mode just because it's still saved as
      * the default; falls back to [Modes]'s last app-hosted mode when

@@ -386,7 +386,9 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
             ?: oldMode?.takeIf { it != Mode.LAUNCHER }
             ?: if (oldDesktop && !oldGaming) Mode.DESKTOP else Mode.GAMING
         alsoOther.value = saved.optBoolean("also", oldGaming && oldDesktop)
-        homeChoice.value = HomeImplementation.entries.firstOrNull { it.name == saved.optString("home") }
+        // "STANDARD" is DROIDTOP's name from before Droidtop/tracker#571 row 11, in a run saved by an older build.
+        val savedHome = saved.optString("home").let { if (it == "STANDARD") HomeImplementation.DROIDTOP.name else it }
+        homeChoice.value = HomeImplementation.entries.firstOrNull { it.name == savedHome }
             ?: HomeImplementation.NONE
         homeShowsHomeScreen.value = saved.optBoolean("homeShowsHomeScreen", oldMode == Mode.LAUNCHER)
         homeAlternative.value = saved.optString("homeAlternative").ifEmpty { null }?.let(ComponentName::unflattenFromString)
@@ -974,7 +976,7 @@ internal fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: ()
                 // droidtop's one icon on the home screen it just set up, so
                 // the way into Gaming or Desktop is in sight rather than in
                 // a drawer or behind a gesture (SPEC 2c).
-                if (home == HomeImplementation.STANDARD) HomeRolePrefs.placeDroidtopIcon(context)
+                if (home == HomeImplementation.DROIDTOP) HomeRolePrefs.placeDroidtopIcon(context)
                 if (default == Mode.LAUNCHER) {
                     // The home screen is not a MainActivity shell. Sent
                     // there with "standard", MainActivity skipped it as

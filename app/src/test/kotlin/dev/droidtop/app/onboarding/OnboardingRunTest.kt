@@ -73,13 +73,13 @@ class OnboardingRunTest {
             before = SetupBefore(
                 enabled = setOf(Mode.GAMING, Mode.DESKTOP, Mode.LAUNCHER),
                 defaultMode = Mode.LAUNCHER,
-                home = HomeRolePrefs.HomeImplementation.STANDARD,
+                home = HomeRolePrefs.HomeImplementation.DROIDTOP,
                 alternative = null,
             ),
         )
         assertEquals(Mode.GAMING, rerun.opensInto.value)
         assertEquals(true, rerun.alsoOther.value)
-        assertEquals(HomeRolePrefs.HomeImplementation.STANDARD, rerun.homeChoice.value)
+        assertEquals(HomeRolePrefs.HomeImplementation.DROIDTOP, rerun.homeChoice.value)
         // "Opens into Android" is the Home step's "droidtop's home screen" row now.
         assertEquals(true, rerun.homeShowsHomeScreen.value)
         assertEquals(Mode.LAUNCHER, rerun.defaultMode)
@@ -98,7 +98,7 @@ class OnboardingRunTest {
         assertEquals(listOf(OnboardingStep.MODE, OnboardingStep.HOME), run.history.toList())
         assertEquals(Mode.GAMING, run.opensInto.value)
         assertEquals(true, run.alsoOther.value)
-        assertEquals(HomeRolePrefs.HomeImplementation.STANDARD, run.homeChoice.value)
+        assertEquals(HomeRolePrefs.HomeImplementation.DROIDTOP, run.homeChoice.value)
         assertEquals(true, run.homeShowsHomeScreen.value)
         assertEquals(Mode.LAUNCHER, run.defaultMode)
     }
@@ -108,7 +108,7 @@ class OnboardingRunTest {
         val run = OnboardingRun()
         run.start(startStep = null, controllerAttached = false)
         run.opensInto.value = Mode.DESKTOP
-        run.homeChoice.value = HomeRolePrefs.HomeImplementation.STANDARD
+        run.homeChoice.value = HomeRolePrefs.HomeImplementation.DROIDTOP
         run.step.value = OnboardingStep.DESKTOP_SETUP
         run.history.addAll(listOf(OnboardingStep.MODE, OnboardingStep.HOME))
 
@@ -117,7 +117,7 @@ class OnboardingRunTest {
         assertEquals(OnboardingStep.DESKTOP_SETUP, again.step.value)
         assertEquals(listOf(OnboardingStep.MODE, OnboardingStep.HOME), again.history.toList())
         assertEquals(Mode.DESKTOP, again.opensInto.value)
-        assertEquals(HomeRolePrefs.HomeImplementation.STANDARD, again.homeChoice.value)
+        assertEquals(HomeRolePrefs.HomeImplementation.DROIDTOP, again.homeChoice.value)
         assertEquals(false, again.homeShowsHomeScreen.value)
         assertEquals(Mode.DESKTOP, again.defaultMode)
         assertEquals(false, again.controllerAttachedAtEntry)

@@ -159,7 +159,7 @@ object BackButtonMenu {
     @JvmStatic
     fun homeIntent(context: Context, implementation: HomeRolePrefs.HomeImplementation): Intent {
         val activityName = when (implementation) {
-            HomeRolePrefs.HomeImplementation.STANDARD -> StandardComponents.LAUNCHER
+            HomeRolePrefs.HomeImplementation.DROIDTOP -> StandardComponents.LAUNCHER
             HomeRolePrefs.HomeImplementation.ALTERNATIVE -> StandardComponents.ALTERNATIVE
             HomeRolePrefs.HomeImplementation.NONE -> null
         }

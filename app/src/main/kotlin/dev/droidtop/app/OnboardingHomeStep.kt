@@ -164,14 +164,14 @@ internal fun HomeStep(
         SelectableRow(
             title = "droidtop",
             supporting = "Home opens $mode. Android asks you to confirm.",
-            selected = choice == HomeImplementation.STANDARD && !showsHomeScreen,
-            onClick = { onSelect(HomeImplementation.STANDARD, false, null) },
+            selected = choice == HomeImplementation.DROIDTOP && !showsHomeScreen,
+            onClick = { onSelect(HomeImplementation.DROIDTOP, false, null) },
         )
         SelectableRow(
             title = "droidtop's home screen",
             supporting = "Its own app drawer and widgets",
-            selected = choice == HomeImplementation.STANDARD && showsHomeScreen,
-            onClick = { onSelect(HomeImplementation.STANDARD, true, null) },
+            selected = choice == HomeImplementation.DROIDTOP && showsHomeScreen,
+            onClick = { onSelect(HomeImplementation.DROIDTOP, true, null) },
         )
         launchers?.forEach { launcher ->
             SelectableRow(
