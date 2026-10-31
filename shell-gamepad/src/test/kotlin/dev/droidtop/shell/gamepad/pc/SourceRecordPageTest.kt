@@ -60,10 +60,11 @@ class SourceRecordPageTest {
                 s("Walkthrough", "WALKTHROUGH"), s("Compressed", "MIXDROP"),
             ),
         )
-        assertEquals(listOf("windows", "linux", "mac", "android"), downloadSystems(tagged))
+        // The thread's own groupings (Droidtop/tracker#845): Win/Linux is one choice, not two.
+        assertEquals(listOf("windows+linux", "mac", "android"), downloadSystems(tagged))
         // Windows first; the links for it and the ones for any system.
         val first = recordRows(tagged, RecordTab.DOWNLOADS) { "" }.also { assertEquals(RecordAction.GetBest, it.first().action) }.drop(1)
-        assertEquals(RecordRow("System", "Windows", "Left and Right show another system's links", RecordAction.PickSystem), first.first())
+        assertEquals(RecordRow("System", "Windows/Linux", "Left and Right show another system's links", RecordAction.PickSystem), first.first())
         // The links for any system follow under their own headings, each with its description.
         assertEquals(listOf("MEGA", "Extras", "WALKTHROUGH", "Other", "MIXDROP"), first.drop(1).map { it.title })
         assertEquals("Walkthrough", first.first { it.title == "WALKTHROUGH" }.subtitle)
@@ -73,7 +74,9 @@ class SourceRecordPageTest {
         assertEquals("This will not be trackable by us. Windows or Linux is recommended.", android[1].title)
         assertNull(android[1].action)
         assertEquals(listOf("GOFILE", "Extras", "WALKTHROUGH", "Other", "MIXDROP"), android.drop(2).map { it.title })
-        assertEquals("windows", nextSystem(downloadSystems(tagged), "android", 1))
+        assertEquals("windows+linux", nextSystem(downloadSystems(tagged), "android", 1))
+        // A pick kept from before the groupings ("windows") still lands on the choice that holds it.
+        assertEquals("mac", nextSystem(downloadSystems(tagged), "windows", 1))
         assertEquals("android", nextSystem(downloadSystems(tagged), null, -1))
         // Links that are all for one system: no picker, but Android still says so.
         val onlyAndroid = record.copy(downloads = listOf(s("Android", "GOFILE", "android")))

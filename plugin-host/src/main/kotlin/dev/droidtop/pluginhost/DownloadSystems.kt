@@ -49,15 +49,6 @@ object DownloadSystems {
     /** The systems of one entry: the ones it names, else the ones its heading names. */
     fun of(named: List<String>, heading: String): List<String> = named.ifEmpty { fromHeading(heading) }
 
-    /**
-     * The systems [entries] (each one's systems) are for, in droidtop's order. The page offers a picker when there are
-     * two or more; with one, it is the picked system all the same, so its notice still shows.
-     */
-    fun offered(entries: List<List<String>>): List<String> {
-        val all = entries.flatten().toSet()
-        return ALL.filter { it in all }
-    }
-
     private val EXTRAS = Regex("""(?i)\b(extras?|walkthrough|guide|patch(es)?|fix(es)?|saves?|save ?files?|mods?|bonus|dlc|ost|soundtrack|art ?books?|gallery|cheats?|translation)\b""")
 
     /**
@@ -65,7 +56,4 @@ object DownloadSystems {
      * "Extras" on the Downloads tab, any other under "Other" (the owner, 2026-10-23, Droidtop/tracker#617).
      */
     fun isExtra(heading: String): Boolean = EXTRAS.containsMatchIn(heading)
-
-    /** The system the picker starts on: Windows, then Linux, then the first offered. */
-    fun first(offered: List<String>): String? = offered.firstOrNull { it == WINDOWS } ?: offered.firstOrNull { it == LINUX } ?: offered.firstOrNull()
 }

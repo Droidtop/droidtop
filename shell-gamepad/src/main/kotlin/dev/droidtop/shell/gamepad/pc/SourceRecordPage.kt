@@ -46,7 +46,6 @@ import dev.droidtop.library.downloadSystems
 import dev.droidtop.library.pressedState
 import dev.droidtop.library.ratingLine
 import dev.droidtop.library.signInRow
-import dev.droidtop.pluginhost.DownloadSystems
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
@@ -233,7 +232,7 @@ private suspend fun tryInTurn(
 /** The system [step] away from [picked] among [offered], wrapping round. */
 internal fun nextSystem(offered: List<String>, picked: String?, step: Int): String? {
     if (offered.isEmpty()) return null
-    val at = offered.indexOf(picked ?: DownloadSystems.first(offered)).coerceAtLeast(0)
+    val at = offered.indexOf(dev.droidtop.library.DownloadLines.picked(offered, picked)).coerceAtLeast(0)
     return offered[(at + step + offered.size) % offered.size]
 }
 
