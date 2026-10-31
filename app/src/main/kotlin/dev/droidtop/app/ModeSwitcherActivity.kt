@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import dev.droidtop.shell.gamepad.ModeSwitcherChoice
 import dev.droidtop.shell.gamepad.ModeSwitcherSheet
 import dev.droidtop.shell.standard.BackButtonMenu
@@ -36,6 +37,9 @@ class ModeSwitcherActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The switcher is open: Mobile's "Press and hold Home" hint has done its job (Droidtop/tracker#829).
+        val app = applicationContext
+        dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.library.settings.Hints.markDone(app, dev.droidtop.library.settings.Hints.HOLD_HOME) }
         // Over Gaming or Desktop, which hide Android's bars, the sheet hides them too (Droidtop/tracker#750); over
         // Standard, Android's home screen, they stay.
         val immersive = dev.droidtop.library.settings.Modes.lastMode(this) != dev.droidtop.library.settings.Mode.LAUNCHER.id

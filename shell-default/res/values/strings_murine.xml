@@ -249,6 +249,7 @@
     <string name="pref_global_settings_desc">Modes, your home screen and setup</string>
     <!-- droidtop: an open folder's options (Droidtop/tracker#564). -->
     <string name="folder_options">Folder options</string>
+    <string name="hint_hold_home">Press and hold Home to switch modes</string>
     <string name="folder_option_swipe_to_open">Tap opens the first app, swipe up opens the folder</string>
     <string name="folder_option_cover">Show the first app\'s icon</string>
     <!-- droidtop: the app drawer's tabs (Droidtop/tracker#564). -->

@@ -1128,7 +1128,13 @@ name from Gaming's Quick Menu, System tab ("Switch mode"), and the Desktop taskb
 has no route of its own (owner, 2026-10-30, Droidtop/tracker#827: "Long pressing HOME is what gets the mode switcher.
 Why do we need other routes, we've made the home button the sole controller"): its long-press menu lost its "droidtop
 modes" row, and the left menu Start opens there has no Switch mode. Whether long-press Back, the Quick Menu's row and
-the Desktop taskbar's go too is with the owner; until then they stay and no route is added. A surface with no
+the Desktop taskbar's go too is with the owner; until then they stay and no route is added. Long-press Home alone is
+invisible to a newcomer, so Mobile's home screen teaches it in place (Droidtop/tracker#829, the owner: "a hover thing
+at the bottom that instructs the user to press and hold the home button for the mode switcher"): once setup is done,
+"Press and hold Home to switch modes" sits at the foot of the home screen (`HomeHints`, the in-place hint of
+DESIGN-LANGUAGE "Guidance") until the mode switcher has opened (`ModeSwitcherActivity` marks `Hints.HOLD_HOME` done)
+or the person taps Got it. The routes #829 removes go only after the rig shows `input keyevent --longpress
+KEYCODE_HOME` reaches the switcher. A surface with no
 Activity of its own to hand opens it through `ModeSwitcherActivity`. Over Gaming or Desktop, which hide Android's
 bars, the sheet's window hides them too, so it draws as the shell's own
 sheet; over Mobile (Android's home screen) they stay (console

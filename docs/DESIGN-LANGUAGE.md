@@ -213,6 +213,15 @@ something is unread, Friends only while a service reports presence, and one acti
 whatever is happening now, drawn as its icon in a ring, with a count when several run. An icon that would only repeat
 a button (Search is Y) is not drawn.
 
+### Guidance
+Owner, 2026-10-30 (#829): "That popup hints system is probably a good rule of thumb for EVERYTHING. Draw a circle
+around on-screen controls when needed. minimally intrusive guidance telling users how to do certain things." Teaching
+is done in place, not by tours: one short line where the thing is done (`InPlaceHint` in `:ui-shared`, a small pill
+with Got it; `HintViews` for View surfaces), and where it is about an on-screen control, that control circled
+(`Modifier.hintRing`). A hint never takes the cursor or the screen, and it shows until the person has done the thing
+or tapped Got it. What is done is kept in the one "seen" store update onboarding's steps use (`Hints`, over
+`FeatureSteps`). Gaming has no tour: it is intuitive enough.
+
 ### One component set
 Page frame, sheet (left, right, bottom), anchored menu, work panel, dialog, row (nav, action, toggle, choice, slider,
 info, text, progress), group header, tile (cover, wide, plate; host badge bottom-left, plugin badge bottom-right),

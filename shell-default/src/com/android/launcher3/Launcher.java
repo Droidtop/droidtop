@@ -1198,6 +1198,9 @@ public class Launcher extends StatefulActivity<LauncherState>
         // droidtop patch: droidtop's own icon, asked for at the end of
         // setup, is queued here, where the queue can place it.
         dev.droidtop.shell.standard.HomeRolePrefs.placePendingIcon(this);
+        // droidtop patch: the home screen's in-place hint, long-press Home for the
+        // mode switcher, until it is done (Droidtop/tracker#829).
+        dev.droidtop.shell.standard.HomeHints.onHomeShown(this);
         // Process any items that were added while Launcher was away.
         ItemInstallQueue.INSTANCE.get(this)
                 .resumeModelPush(FLAG_ACTIVITY_PAUSED);
