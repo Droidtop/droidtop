@@ -2,6 +2,7 @@ package dev.droidtop.runtime.windows.utils
 
 import android.content.Context
 import com.winlator.container.Container
+import dev.droidtop.library.GameLanguage
 import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.library.stores.StorePlayer
 import java.io.File
@@ -118,6 +119,7 @@ object SteamworksShim {
         gameRoot: File,
         workingDir: File,
         arguments: List<String>,
+        language: GameLanguage? = null,
     ): Launch = withContext(Dispatchers.IO) {
         release.ensureInstalled(context) {}
         val steamDir = File(container.rootDir, ".wine/drive_c/Program Files (x86)/Steam").apply { mkdirs() }
@@ -128,7 +130,7 @@ object SteamworksShim {
             ?: runCatching { StoreLibraries.byId("steam")?.player(context, need.appId.toString()) }.getOrNull()
         val dlc = player?.dlc?.takeIf { it.isNotEmpty() } ?: installedDlcFromManifest(gameRoot, need.appId)
         val settings = File(steamDir, "steam_settings").apply { mkdirs() }
-        writeIfChanged(File(settings, "configs.user.ini"), userIni(player, language()))
+        writeIfChanged(File(settings, "configs.user.ini"), userIni(player, language(language)))
         writeIfChanged(File(settings, "configs.app.ini"), appIni(dlc))
 
         val drives = container.drivesIterator().map { it[0] to it[1] }
@@ -246,34 +248,9 @@ object SteamworksShim {
         }
     }.getOrDefault(true)
 
-    /** The device's language as a Steam API language code (partner.steamgames.com, "Languages"); English when Steam has none for it. */
-    internal fun language(locale: Locale = Locale.getDefault()): String = when (locale.language) {
-        "de" -> "german"
-        "fr" -> "french"
-        "it" -> "italian"
-        "es" -> if (locale.country in setOf("ES", "")) "spanish" else "latam"
-        "pt" -> if (locale.country == "BR") "brazilian" else "portuguese"
-        "ru" -> "russian"
-        "pl" -> "polish"
-        "nl" -> "dutch"
-        "sv" -> "swedish"
-        "da" -> "danish"
-        "fi" -> "finnish"
-        "nb", "no" -> "norwegian"
-        "cs" -> "czech"
-        "hu" -> "hungarian"
-        "ro" -> "romanian"
-        "tr" -> "turkish"
-        "uk" -> "ukrainian"
-        "el" -> "greek"
-        "bg" -> "bulgarian"
-        "th" -> "thai"
-        "vi" -> "vietnamese"
-        "id" -> "indonesian"
-        "ja" -> "japanese"
-        "ko" -> "koreana"
-        "zh" -> if (locale.country in setOf("TW", "HK", "MO") || locale.script == "Hant") "tchinese" else "schinese"
-        "ar" -> "arabic"
-        else -> "english"
-    }
+    /**
+     * The language the shim reports as a Steam API code: the game's own ([GameLanguage], Game properties) when it
+     * has one, else the device's ([GameLanguage.of]), English when Steam has none for it.
+     */
+    internal fun language(own: GameLanguage? = null, locale: Locale = Locale.getDefault()): String = (own ?: GameLanguage.of(locale)).steam
 }

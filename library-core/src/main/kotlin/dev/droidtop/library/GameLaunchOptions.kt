@@ -122,4 +122,16 @@ object GameLaunchOptions {
      */
     fun launchEnvironment(stored: Map<String, String>): String =
         formatEnvironment(stored.filter { (name, value) -> isAllowedEnvName(name) && isAllowedEnvValue(value) })
+
+    /**
+     * Everything [settings] adds to one launch's environment: the locale of the game's own language
+     * ([GameLanguage.environment], from droidtop's fixed table, so not asked of the allowlist), then the person's own
+     * variables as [launchEnvironment] keeps them. The launch and the "What will run" read-out both use this.
+     */
+    fun launchEnvironment(settings: WineGameSettings?): String {
+        val language = GameLanguage.bySteam(settings?.language)?.environment.orEmpty()
+        return listOf(formatEnvironment(language), launchEnvironment(settings?.environment.orEmpty()))
+            .filter { it.isNotEmpty() }
+            .joinToString(" ")
+    }
 }

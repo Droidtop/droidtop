@@ -6,17 +6,22 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.ChoiceItem
+import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.TextInputItem
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * One Windows game's own properties as a settings screen (docs/SPEC.md 7i,
  * "Game properties", Droidtop/tracker#228): the launch options the person
- * types after the program, the environment variables they set for it, and
- * the rows that say exactly what will run. The page every guide ends with
+ * types after the program, the environment variables they set for it, the
+ * game's language and its pad layout, and the rows that say exactly what
+ * will run. The page every guide ends with
  * ("add this flag", "set DXVK_HUD"), reachable from the game's menu and
  * written through the one place the launch reads, [WineGameSettings].
  *
@@ -27,6 +32,8 @@ import kotlinx.coroutines.withContext
  */
 object GameProperties {
     const val SCREEN_ID = "windows_game_properties"
+    private const val DEVICE_LANGUAGE = "device"
+    private const val GAMEPAD = "gamepad"
 
     /** What the last environment edit refused, by game, until the next edit: a text field cannot answer itself. */
     private val refusals = ConcurrentHashMap<String, String>()
@@ -43,7 +50,35 @@ object GameProperties {
         val settings = WineGameSettingsPrefs.get(context, entryId)
         val options = settings?.launchOptions.orEmpty()
         val environment = settings?.environment.orEmpty()
+        val controls = GameControlsPrefs.layout(context, entryId)
         val edit = buildList<CatalogItem> {
+            add(
+                ChoiceItem(
+                    id = "properties_language",
+                    title = "Language",
+                    subtitle = "The language the game and Steamworks are told; a download's own is set at install",
+                    options = listOf(ChoiceOption(DEVICE_LANGUAGE, "Device language")) +
+                        GameLanguage.entries.map { ChoiceOption(it.steam, it.label) },
+                    current = GameLanguage.bySteam(settings?.language)?.steam ?: DEVICE_LANGUAGE,
+                    onSelect = { ctx, value ->
+                        val language = GameLanguage.bySteam(value)?.steam
+                        CoroutineScope(Dispatchers.IO).launch { WineGameSettingsPrefs.edit(ctx, entryId) { it.copy(language = language) } }
+                    },
+                ),
+            )
+            add(
+                ChoiceItem(
+                    id = "properties_controls",
+                    title = "Controls",
+                    subtitle = "How the pad plays this game; the running game's L2 sheet changes it too",
+                    options = listOf(ChoiceOption(GAMEPAD, GameControls.GAMEPAD_LABEL)) +
+                        GameControls.entries.map { ChoiceOption(it.id, it.label) },
+                    current = controls?.id ?: GAMEPAD,
+                    onSelect = { ctx, value ->
+                        CoroutineScope(Dispatchers.IO).launch { GameControlsPrefs.setLayout(ctx, entryId, GameControls.byId(value)) }
+                    },
+                ),
+            )
             add(
                 TextInputItem(
                     id = "properties_launch_options",
@@ -117,7 +152,7 @@ object GameProperties {
                 ActionItem(
                     "properties_command_env",
                     "Environment",
-                    GameLaunchOptions.launchEnvironment(environment).ifEmpty { "None of its own; the prefix's variables apply" },
+                    GameLaunchOptions.launchEnvironment(settings).ifEmpty { "None of its own; the prefix's variables apply" },
                 ),
             )
         }
