@@ -15,6 +15,7 @@ import dev.droidtop.library.OwnGameScreens
 import dev.droidtop.library.PcGameRuntime
 import dev.droidtop.library.PcLaunchResult
 import dev.droidtop.library.PcPrefixState
+import dev.droidtop.library.GameLanguage
 import dev.droidtop.library.GameLaunchOptions
 import dev.droidtop.library.PcProvisionResult
 import dev.droidtop.library.WineGameSettingsPrefs
@@ -457,12 +458,11 @@ class DroidtopPcGameRuntime(
         // saved settings are not touched.
         val overrides = withContext(Dispatchers.IO) { WineOptions.launchOverrides(context, entryId, container) }
 
-        // The variables the person set for this game (docs/SPEC.md 7i, "Game
-        // properties"): laid over this one launch with the Steamworks shim's,
-        // never into the prefix.
-        val ownEnv = withContext(Dispatchers.IO) {
-            entryId?.let { WineGameSettingsPrefs.get(context, it) }?.environment?.let(GameLaunchOptions::launchEnvironment).orEmpty()
-        }
+        // The game's own language and the variables the person set for it
+        // (docs/SPEC.md 7i, "Game properties"): laid over this one launch with
+        // the Steamworks shim's, never into the prefix.
+        val gameSettings = withContext(Dispatchers.IO) { entryId?.let { WineGameSettingsPrefs.get(context, it) } }
+        val ownEnv = GameLaunchOptions.launchEnvironment(gameSettings)
 
         // A game Steam owns starts through the shim in the prefix unless it
         // turned it off, and any other game when it turned it on
@@ -471,7 +471,10 @@ class DroidtopPcGameRuntime(
         val shim = withContext(Dispatchers.IO) { WineOptions.steamworksNeed(context, entryId, gameRoot) }
         if (shim != null) {
             val launch = runCatching {
-                SteamworksShim.prepare(context, container, shim, entryId, executable, gameRoot, workingDir, arguments)
+                SteamworksShim.prepare(
+                    context, container, shim, entryId, executable, gameRoot, workingDir, arguments,
+                    GameLanguage.bySteam(gameSettings?.language),
+                )
             }.getOrElse {
                 return PcLaunchResult(false, "couldn't set up Steamworks for this game: ${it.message ?: it}")
             }

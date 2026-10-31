@@ -18054,12 +18054,28 @@ folder, environment) comes from `WindowsLaunchResolver.forEntry`, the same
 function the launch uses (a store's own play task included), so it cannot say
 anything the launch would not do. **Not offered, on purpose:** pre-launch and
 post-exit commands (droidtop runs no script from text a person pastes, §7e3),
-and loader or path variables. **Not built, open for the owner:** a per-game
-language and a per-game controller template. Steam's language is the
-download's and every store's content language is chosen when the game is
-installed (`StoreLanguage`), and a game's controls belong to its prefix's
-controller tab (§5b) with no per-game store of their own; each is a design,
-not a field.
+and loader or path variables. **Language** (Droidtop/tracker#228, built
+2026-10-29) picks the language the game runs in: "Device language" (the
+default) or one of the languages Steam's API names (`GameLanguage`, the one
+table, which the prefix's own language and the Steamworks shim now read too).
+It is stored in `WineGameSettings.language` (Steam's code) and kept when the
+program changes. At launch it sets `LANG` and `LC_ALL` to that language's
+locale on the one launch's `Container.LAUNCH_ENV`, after the prefix's own
+locale, so Wine takes its Windows locale from it for this game only, and the
+Steamworks shim's `configs.user.ini` answers it to `GetCurrentGameLanguage`
+in place of the device's. These two variables come from droidtop's fixed
+table, never from typed text, so they do not widen the allowlist above; the
+**What will run** read-out shows them (`GameLaunchOptions.launchEnvironment`,
+the same function the launch uses). A store's download language is not this:
+it is chosen when the game is installed (`StoreLanguage`), and a game that
+ships one language's files speaks that language whatever is picked here.
+**Controls** sets the game's pad layout before a launch: Gamepad (the pad
+reaches the game as a pad), Keyboard and mouse, or Mouse only (§5b,
+"Controller layouts"). It is the same per-game choice the running game's
+L2 sheet's Controls row steps through while the game runs (`GameControlsPrefs`,
+`:library-core`, which both read and write); the layouts' files stay with the
+runtime. A game's own remapped layout is not offered here: the prefix's
+controller tab (§5b) remains where bindings are edited.
 
 ## 7j. Portrait and touch-first chrome (directed 2026-09-10)
 
