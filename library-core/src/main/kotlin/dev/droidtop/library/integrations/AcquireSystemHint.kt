@@ -4,6 +4,7 @@ import android.content.Context
 import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.SystemFolders
+import dev.droidtop.library.consoles.canResolveFromFolder
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
