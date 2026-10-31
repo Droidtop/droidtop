@@ -75,17 +75,38 @@ class WirelessDebuggingOps(context: Context) : ElevatedBackend {
     /**
      * Pairs with the code Android shows under "Pair device with pairing code". The pairing service's port is found on
      * the device itself (`_adb-tls-pairing._tcp`), so the person types only the six digits. Throws with a reason the
-     * person can read when it fails.
+     * person can read when it fails. Every step is bounded and logged (Droidtop/tracker#851: the notification spun for
+     * over 40 s with nothing in the log when no pairing service answered): finding the service by [timeoutMs], the
+     * pairing itself by [PAIR_MS].
      */
     fun pair(code: String, timeoutMs: Long = DISCOVER_MS) {
         check(supported) { "Wireless debugging needs Android 11 or later" }
-        val port = discoverPort(PAIRING_SERVICE, timeoutMs) ?: error("No pairing code is showing. Open Pair device with pairing code first")
+        Log.i(TAG, "pairing: looking for the pairing service")
+        val port = discoverPort(PAIRING_SERVICE, timeoutMs) ?: run {
+            Log.w(TAG, "pairing: no pairing service found within ${timeoutMs} ms")
+            error(NO_PAIRING_SERVICE)
+        }
+        Log.i(TAG, "pairing: service on port $port, pairing")
         ensureKey()
-        // A false answer and an exception both mean the code was not taken.
-        val answer: Any? = runCatching { manager.pair(LOCALHOST, port, code.trim()) }
-            .getOrElse { throw IllegalStateException("That code didn't pair. Check it and try again", it) }
-        check(answer != false) { "That code didn't pair. Check it and try again" }
+        // A false answer and an exception both mean the code was not taken; no answer at all is bounded.
+        val pairing = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "droidtop-adb-pair").apply { isDaemon = true } }
+        val answer: Any? = try {
+            pairing.submit<Any?> { manager.pair(LOCALHOST, port, code.trim()) }.get(PAIR_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (e: java.util.concurrent.TimeoutException) {
+            Log.w(TAG, "pairing: no answer from the pairing service within $PAIR_MS ms")
+            throw IllegalStateException(PAIRING_NO_ANSWER, e)
+        } catch (e: java.util.concurrent.ExecutionException) {
+            Log.w(TAG, "pairing: refused", e.cause)
+            throw IllegalStateException(CODE_NOT_TAKEN, e.cause ?: e)
+        } finally {
+            pairing.shutdownNow()
+        }
+        if (answer == false) {
+            Log.w(TAG, "pairing: the service did not take the code")
+            error(CODE_NOT_TAKEN)
+        }
         pairedFile.writeText(System.currentTimeMillis().toString())
+        Log.i(TAG, "pairing: paired")
     }
 
     /**
@@ -209,6 +230,14 @@ class WirelessDebuggingOps(context: Context) : ElevatedBackend {
         const val PAIRING_SERVICE = "_adb-tls-pairing._tcp"
         const val CONNECT_SERVICE = "_adb-tls-connect._tcp"
         private const val DISCOVER_MS = 8_000L
+
+        /** The pairing handshake's bound: with discovery, well inside a background broadcast's minute. */
+        private const val PAIR_MS = 30_000L
+
+        const val NO_PAIRING_SERVICE =
+            "Couldn't find this device's pairing service. Check that wireless debugging is on, Pair device with pairing code is open, and the device is on Wi-Fi"
+        const val PAIRING_NO_ANSWER = "The pairing service didn't answer. Close and reopen Pair device with pairing code, then reply with the new code"
+        const val CODE_NOT_TAKEN = "That code didn't pair. Check it and try again"
         private const val DAY_MS = 86_400_000L
         private const val CERT_VALID_MS = 30L * 365 * DAY_MS
         internal const val EXIT_MARK = "__droidtop_exit:"
