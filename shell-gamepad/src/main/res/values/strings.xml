@@ -167,4 +167,5 @@
     <string name="gamepad_keep_these_saves">Keep these saves</string>
     <string name="gamepad_bringing_back">Bringing back…</string>
     <string name="gamepad_kept_copy_files_x">%1$d files, kept when a save conflict was settled</string>
+    <string name="gamepad_app_update_key_differs">From %1$s, signed by a different key than the installed app, so Android refuses it</string>
 </resources>

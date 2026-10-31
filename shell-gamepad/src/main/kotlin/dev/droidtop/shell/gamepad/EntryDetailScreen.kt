@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -18,6 +19,7 @@ import dev.droidtop.library.consoles.EmulatorResolution
 import dev.droidtop.library.consoles.GameEmulatorChoice
 import dev.droidtop.library.consoles.SwitchContentHandoff
 import dev.droidtop.library.friendlyLocation
+import dev.droidtop.library.integrations.AppCatalogs
 import dev.droidtop.library.integrations.Integration
 import dev.droidtop.library.integrations.IntegrationCapability
 import dev.droidtop.library.integrations.IntegrationStore
@@ -28,10 +30,13 @@ import dev.droidtop.library.itemName
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notices
+import dev.droidtop.library.settings.UpdatesWaiting
 import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.shell.gamepad.pc.FullScreenOverlay
 import dev.droidtop.shell.gamepad.pc.GamePageFrame
 import dev.droidtop.shell.gamepad.pc.PageFact
+import dev.droidtop.shell.gamepad.pc.PageKind
+import dev.droidtop.shell.gamepad.pc.PageOptionRows
 import dev.droidtop.shell.gamepad.pc.PageTab
 import dev.droidtop.shell.gamepad.pc.PcPlayState
 import dev.droidtop.shell.gamepad.pc.PluginPageScreen
@@ -59,17 +64,20 @@ import kotlinx.coroutines.withContext
  * What this page knows, and where the frame puts it:
  * - **The action band**: Play (Open for an app) runs [onLaunch]; Edit metadata (a console game only) holds Scrape and
  *   then the full editor ([GameMetadataEditor]); Options holds the ones this game has of Saves, Sign in for
- *   achievements, Choose match, View media and Collections, or an app's App info and Uninstall; the star is
- *   Favourite. L2 and Select open Options: a console game has no other menu of its own.
- * - **The status row**: ready to play with which emulator, or that none is installed, the saves, the achievements
- *   and not scraped yet ([pageStatuses], the PC page's own).
- * - **The tabs** ([consolePageRows]): Overview has the description and how long to beat or how an emulator runs it;
- *   Versions a Switch game's update and DLC; Activity the play record and the achievements; Extras the manual, the
- *   video, the person's own "open with" hooks (docs/SPEC.md 12) and the rows plugins add ([rememberPluginPageRows]);
- *   Details the system, the emulator, the file and the scraped facts.
+ *   achievements, Choose match, View media and Collections, or an app's App info, Hide from droidtop, Mark as game
+ *   and Uninstall (the Apps tab's own, [setAppHidden], [setAppIsGame], [startUninstall]); the star is Favourite. L2
+ *   and Select open Options: a console game has no other menu of its own.
+ * - **The status row**: ready to play with which emulator, or that none is installed, an app's update, the saves,
+ *   the achievements and not scraped yet ([pageStatuses], the PC page's own).
+ * - **The tabs** ([consolePageRows], and [appPageRows] for an app): Overview has the description and how long to beat
+ *   or how an emulator runs it; Versions a Switch game's update and DLC, or an app's installed version and its update;
+ *   Activity the play record (an app's last use too) and the achievements; Extras the manual, the video, the person's
+ *   own "open with" hooks (docs/SPEC.md 12) and the rows plugins add ([rememberPluginPageRows]); Details the system,
+ *   the emulator, the file and the scraped facts, or an app's package, source and dates.
  *
- * Nothing here reads a disk while drawing: the emulators, the media, the hooks, the plugins and the game's facts from
- * outside the library are each asked for once, off the main thread, when the page opens.
+ * Every word the frame draws names the page's [PageKind]: "this app" on an app's page, "this game" on a game's.
+ * Nothing here reads a disk while drawing: the emulators, the media, the hooks, the plugins, an app's package facts
+ * and the game's facts from outside the library are each asked for once, off the main thread, when the page opens.
  */
 @Composable
 internal fun EntryDetailScreen(
@@ -85,6 +93,7 @@ internal fun EntryDetailScreen(
     // Console ROMs and native apps only: a PC or engine game opens its own page (PcGamePage).
     val isRomEntry = entry.kind == LibraryEntryKind.CONSOLE_ROM
     val isApp = entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP
+    val kind = PageKind.of(entry)
 
     var editingMetadata by remember(entry.id) { mutableStateOf(false) }
     var viewingMedia by remember(entry.id) { mutableStateOf(false) }
@@ -92,9 +101,14 @@ internal fun EntryDetailScreen(
     var editingCollections by remember(entry.id) { mutableStateOf(false) }
     var scrapeStatus by remember(entry.id) { mutableStateOf<String?>(null) }
     var infoScreen by remember(entry.id) { mutableStateOf<CatalogScreen?>(null) }
+    // An app's update while it runs: its line on the Update row; the facts are read again once it ends.
+    var appUpdateStatus by remember(entry.id) { mutableStateOf<String?>(null) }
+    var appFactsToken by remember(entry.id) { mutableIntStateOf(0) }
     // The star shows the press at once; the list learns it through [onEntryChanged].
     var favourite by remember(entry.id, entry.favorite) { mutableStateOf(entry.favorite) }
     val shown = if (favourite == entry.favorite) entry else entry.copy(favorite = favourite)
+    // An app hidden or shown here: its row says so at once, wherever the page was opened from.
+    var hidden by remember(entry.id, entry.hidden) { mutableStateOf(entry.hidden) }
 
     // Everything scraped for this game, for Options' View media: listed on IO once per entry, never while drawing.
     val media by produceState(emptyList<Pair<String, String>>(), entry) {
@@ -142,8 +156,24 @@ internal fun EntryDetailScreen(
     val emulators = rememberSystemEmulators(entry)
     val emulator = emulators?.let { EmulatorResolution.matchGameChoice(it.candidates, entry.altEmulator) ?: it.withoutGameChoice?.player }
     val systemName = emulators?.system?.displayName
-    val play = remember(isApp, emulators, emulator) {
-        consolePlayState(isApp = isApp, emulatorsKnown = emulators != null, emulator = emulator?.name, systemName = systemName)
+    val play = remember(kind, emulators, emulator) {
+        consolePlayState(kind = kind, emulatorsKnown = emulators != null, emulator = emulator?.name, systemName = systemName)
+    }
+    // An app's version, dates, last use and update, read once on IO (an app only).
+    val app = rememberAppPageFacts(entry, enabled = isApp, token = appFactsToken)
+
+    // An app's Update: the Updates page's own start ([AppCatalogs.update]); its line is the row's while it runs, what
+    // it said a notice, and the Updates page's count is read again after.
+    fun updateApp(state: AppCatalogs.UpdateState.Available) {
+        if (appUpdateStatus != null) return
+        appUpdateStatus = "Starting…"
+        scope.launch {
+            val (line, _) = withContext(Dispatchers.IO) { AppCatalogs.update(context, state) { status -> appUpdateStatus = status } }
+            appUpdateStatus = null
+            appFactsToken++
+            Notices.flash(line, context = context)
+            UpdatesWaiting.refresh?.invoke(context)
+        }
     }
 
     val infoFacts = remember(gameInfo) {
@@ -177,22 +207,29 @@ internal fun EntryDetailScreen(
             }
         }
     }
-    val rowsByTab = remember(entry, systemName, emulators, infoFacts, openWithFacts, pluginRows.facts) {
+    val rowsByTab = remember(entry, systemName, emulators, infoFacts, openWithFacts, pluginRows.facts, app, appUpdateStatus) {
+        val now = System.currentTimeMillis()
+        val appRows = app?.let { facts ->
+            appPageRows(entry, facts, now, appUpdateStatus) {
+                (facts.update as? AppCatalogs.UpdateState.Available)?.let { updateApp(it) }
+            }
+        }.orEmpty()
         groupRowsByTab(
             consolePageRows(
                 entry,
                 systemName = systemName,
                 emulator = emulators?.let { GameEmulatorChoice.summary(it, entry.altEmulator) },
-                now = System.currentTimeMillis(),
+                now = now,
                 // A Switch game with an update or DLC beside it: opens its emulator and names the files to pick.
                 onAddSwitchContent = {
                     scope.launch { Notices.flash(SwitchContentHandoff.open(context, entry), context = context) }
                 },
-            ) + infoFacts + openWithFacts + pluginRows.facts,
+                usedElsewhere = app?.lastUsed,
+            ) + appRows + infoFacts + openWithFacts + pluginRows.facts,
             emptyList(),
         )
     }
-    val statuses = remember(entry, play, emulator, savesInfo, achievementsInfo, signInInfo) {
+    val statuses = remember(entry, play, emulator, savesInfo, achievementsInfo, signInInfo, app) {
         pageStatuses(
             entry = entry,
             play = play,
@@ -201,9 +238,10 @@ internal fun EntryDetailScreen(
             saves = savesInfo?.value,
             achievements = achievementsInfo?.value,
             achievementsSignIn = signInInfo != null,
+            update = if (isApp) app?.availableUpdate else entry.availableUpdate,
         )
     }
-    val strip = remember(entry, emulator) { factsStrip(entry, folderSizeBytes = null, installedVersion = null, runsWith = emulator?.name) }
+    val strip = remember(entry, emulator, app) { factsStrip(entry, folderSizeBytes = null, installedVersion = app?.version, runsWith = emulator?.name) }
 
     // The console scrape, for this one game (docs/SPEC.md 7h): its line is the Scrape row's while it runs, and what
     // it said is a flash.
@@ -225,6 +263,47 @@ internal fun EntryDetailScreen(
             Notices.flash(said, source = GameNaming.displayName(entry.title), context = context)
         }
     }
+
+    // An app's own Options rows, each the Apps tab's own mechanism: Android's App info screen, Hide from droidtop
+    // ([setAppHidden]; the shell's list follows through [onEntryChanged]), Mark as game ([setAppIsGame], once the
+    // category rules are read) and Android's uninstall prompt, which asks its own confirmation.
+    fun appOptionRows(close: () -> Unit): List<ActionRow> = listOfNotNull(
+        ActionRow("App info", "Android's page for this app") {
+            close()
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.fromParts("package", entry.id, null),
+                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+        },
+        if (entry.appFacts != null) {
+            hideAppRow(hidden) {
+                close()
+                val nowHidden = !hidden
+                hidden = nowHidden
+                onEntryChanged(shown.copy(hidden = nowHidden))
+                scope.launch { setAppHidden(context, entry, nowHidden) }
+            }
+        } else {
+            null
+        },
+        app?.takeIf { entry.appFacts != null }?.let { facts ->
+            markGameRow(facts.isGame) {
+                close()
+                scope.launch {
+                    setAppIsGame(context, entry, !facts.isGame)
+                    appFactsToken++
+                }
+            }
+        },
+        uninstallRow(entry) {
+            close()
+            startUninstall(context, entry.id)
+        },
+    )
 
     if (editingMetadata) {
         GameMetadataEditor(
@@ -262,19 +341,19 @@ internal fun EntryDetailScreen(
             val signIn = signInInfo?.run
             listOfNotNull(
                 savesScreen?.let { screen ->
-                    ActionRow("Saves", savesInfo?.value) {
+                    PageOptionRows.saves(savesInfo?.value) {
                         close()
                         infoScreen = screen
                     }
                 },
                 signIn?.let { step ->
-                    ActionRow("Sign in for achievements", "Shows your RetroAchievements progress on this game") {
+                    PageOptionRows.signIn(kind) {
                         close()
                         step(context)
                     }
                 },
                 if (isRomEntry) {
-                    ActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong") {
+                    PageOptionRows.chooseMatch(kind) {
                         close()
                         pickingMatch = true
                     }
@@ -282,7 +361,7 @@ internal fun EntryDetailScreen(
                     null
                 },
                 if (media.size > 1) {
-                    ActionRow("View media", "${media.size} images and videos scraped for this game") {
+                    PageOptionRows.viewMedia(kind, media.size) {
                         close()
                         viewingMedia = true
                     }
@@ -290,38 +369,14 @@ internal fun EntryDetailScreen(
                     null
                 },
                 if (isRomEntry) {
-                    ActionRow("Collections", "Which of your collections this game is in") {
+                    PageOptionRows.collections(kind) {
                         close()
                         editingCollections = true
                     }
                 } else {
                     null
                 },
-                // An app's own actions: Android's screens do the work, and Uninstall asks its own confirmation.
-                if (isApp) {
-                    ActionRow("App info", "Android's page for this app") {
-                        close()
-                        runCatching {
-                            context.startActivity(
-                                android.content.Intent(
-                                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                    android.net.Uri.fromParts("package", entry.id, null),
-                                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        }
-                    }
-                } else {
-                    null
-                },
-                if (isApp) {
-                    ActionRow("Uninstall") {
-                        close()
-                        startUninstall(context, entry.id)
-                    }
-                } else {
-                    null
-                },
-            )
+            ) + if (isApp) appOptionRows(close) else emptyList()
         },
         onPrimary = onLaunch,
         onToggleFavorite = {
@@ -361,26 +416,27 @@ internal fun EntryDetailScreen(
 }
 
 /**
- * What the console page's primary action says: Open for an app; Play for a console game, ready with the emulator
- * the launch resolves ([emulator]), or not ready when its system's emulators are known ([emulatorsKnown]) and none is
- * installed. Still pressable then: the launch says what is missing and how to get it. Pure.
+ * What the console page's primary action says, in its [kind]'s word ([PageKind.primary]): Open for an app; Play for a
+ * console game, ready with the emulator the launch resolves ([emulator]), or not ready when its system's emulators
+ * are known ([emulatorsKnown]) and none is installed. Still pressable then: the launch says what is missing and how
+ * to get it. Pure.
  */
-internal fun consolePlayState(isApp: Boolean, emulatorsKnown: Boolean, emulator: String?, systemName: String?): PcPlayState = when {
-    isApp -> PcPlayState(verb = "Open", detail = "", pressable = true, ready = true)
-    emulator != null -> PcPlayState(verb = "Play", detail = "Runs with $emulator", pressable = true, ready = true)
+internal fun consolePlayState(kind: PageKind, emulatorsKnown: Boolean, emulator: String?, systemName: String?): PcPlayState = when {
+    kind == PageKind.APP -> PcPlayState(verb = kind.primary, detail = "", pressable = true, ready = true)
+    emulator != null -> PcPlayState(verb = kind.primary, detail = "Runs with $emulator", pressable = true, ready = true)
     emulatorsKnown -> PcPlayState(
-        verb = "Play",
+        verb = kind.primary,
         detail = "No emulator installed for ${systemName ?: "this system"}",
         pressable = true,
         ready = false,
     )
-    else -> PcPlayState(verb = "Play", detail = "", pressable = true, ready = true)
+    else -> PcPlayState(verb = kind.primary, detail = "", pressable = true, ready = true)
 }
 
 /**
  * The console page's own rows, each under its tab (docs/SPEC.md 7i, "The page's frame"): Overview the description,
  * Versions a Switch game's update and DLC ([onAddSwitchContent] when there are files to add), Activity droidtop's
- * play record ([activityRows]), Extras the manual, the video, the game's links and where the facts came from, Details
+ * play record ([activityRows], with an app's last use outside droidtop, [usedElsewhere]), Extras the manual, the video, the game's links and where the facts came from, Details
  * the kind, the system, the emulator ([emulator], its summary), the file or the app's package, and the scraped facts.
  * Only facts that exist. Pure.
  */
@@ -390,6 +446,7 @@ internal fun consolePageRows(
     emulator: String?,
     now: Long,
     onAddSwitchContent: () -> Unit,
+    usedElsewhere: Long? = null,
 ): List<PageFact> = buildList {
     if (!entry.hideMetadata) {
         entry.description?.takeIf { it.isNotBlank() }?.let { add(PageFact("About", subtitle = it, tab = PageTab.OVERVIEW)) }
@@ -408,7 +465,7 @@ internal fun consolePageRows(
             ),
         )
     }
-    addAll(activityRows(entry, now))
+    addAll(activityRows(entry, now, usedElsewhere))
     entry.manualUri?.let { add(PageFact("Manual", "Available", tab = PageTab.EXTRAS)) }
     entry.videoUri?.let { add(PageFact("Video", "Available", tab = PageTab.EXTRAS)) }
     if (!entry.hideMetadata) {

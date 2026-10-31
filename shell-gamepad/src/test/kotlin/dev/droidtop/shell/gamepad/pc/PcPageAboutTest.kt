@@ -260,7 +260,7 @@ class PcPageAboutTest {
         assertEquals(emptyList<PageFact>(), activityRows(entry(), now))
         // Played on another device too: the total, with where under it (Droidtop/tracker#469).
         val desktop = dev.droidtop.library.computers.ComputerLibrary.PlayElsewhere("DESKTOP", 36000, 0)
-        val elsewhere = activityRows(played, now, listOf(desktop)).single { it.title == "Play time" }
+        val elsewhere = activityRows(played, now, playedElsewhere = listOf(desktop)).single { it.title == "Play time" }
         assertEquals("11 h" to "Here 1 h · DESKTOP 10 h", elsewhere.value to elsewhere.subtitle)
     }
 
@@ -270,7 +270,7 @@ class PcPageAboutTest {
             listOf("Overview", "Versions", "Activity", "Extras", "Details", "Show thread"),
             PageTab.values().map { it.label },
         )
-        assertTrue(PageTab.values().all { it.emptyLine.isNotBlank() })
+        assertTrue(PageTab.values().all { tab -> PageKind.values().all { tab.emptyLine(it).isNotBlank() } })
         // Nothing at all still gives every tab, each with no rows.
         val byTab = groupRowsByTab(emptyList(), emptyList())
         assertEquals(PageTab.values().toList(), byTab.keys.toList())
