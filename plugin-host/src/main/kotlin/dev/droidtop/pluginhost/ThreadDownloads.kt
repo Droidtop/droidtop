@@ -102,10 +102,10 @@ object ThreadDownloads {
         val facts = facts(lines.map { it.text })
         val texts = lines.map { it.text }
         val sections = sections(texts)
-        val post = texts.filter { it.isNotEmpty() }.joinToString("\n").take(MAX_POST_TEXT).ifEmpty { null }
+        val postText = texts.filter { it.isNotEmpty() }.joinToString("\n").take(MAX_POST_TEXT).ifEmpty { null }
         val start = lines.indexOfFirst { it.links.isEmpty() && DOWNLOAD_HEADING.matches(it.text.trim().trimEnd('*').trim()) }
         if (start < 0) {
-            return Read(version, emptyList(), if (GUEST_LINKS.containsMatchIn(post) || guestPage(page)) Problem.MEMBERS else Problem.NO_DOWNLOADS, facts, sections, post)
+            return Read(version, emptyList(), if (GUEST_LINKS.containsMatchIn(post) || guestPage(page)) Problem.MEMBERS else Problem.NO_DOWNLOADS, facts, sections, postText)
         }
         val entries = entries(lines.drop(start + 1))
         val problem = when {
@@ -113,7 +113,7 @@ object ThreadDownloads {
             GUEST_LINKS.containsMatchIn(post) || guestPage(page) -> Problem.MEMBERS
             else -> Problem.NO_DOWNLOADS
         }
-        return Read(version, entries, problem, facts, sections, post)
+        return Read(version, entries, problem, facts, sections, postText)
     }
 
     /**
