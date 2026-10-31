@@ -76,7 +76,6 @@ import dev.droidtop.library.EngineGameProvider
 import dev.droidtop.library.Library
 import dev.droidtop.runtime.tasks.TaskManager
 import dev.droidtop.library.AppCategoryRules
-import dev.droidtop.library.AppGameMarks
 import dev.droidtop.library.AppUsageAccess
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.PcSource
@@ -197,6 +196,8 @@ internal fun AppsSection(
     onShowDetail: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
     onToggleFavorite: (LibraryEntry) -> Unit = {},
+    // An app changed here (hidden or shown), for the list the shell holds, as the app's page reports its own changes.
+    onEntryChanged: (LibraryEntry) -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -206,13 +207,6 @@ internal fun AppsSection(
     // is current); nothing polls while this tab is not showing.
     val running by TaskManager.snapshot.collectAsState()
     val runningPackages = remember(running) { running?.apps?.mapTo(HashSet()) { it.packageName }.orEmpty() }
-
-    // Apps hidden or shown from the options menu in this visit: the list follows at once, and the
-    // launcher's own hidden list (written off the main thread) is what the next scan reads.
-    var hiddenNow by remember { mutableStateOf(emptyMap<String, Boolean>()) }
-    val apps = remember(entries, hiddenNow) {
-        if (hiddenNow.isEmpty()) entries else entries.map { e -> hiddenNow[e.id]?.let { e.copy(hidden = it) } ?: e }
-    }
 
     var query by remember { mutableStateOf(LibraryQuery()) }
     var queryLoaded by remember { mutableStateOf(false) }
@@ -238,14 +232,14 @@ internal fun AppsSection(
     }
     val scope = remember(rules, usage, runningPackages) { appsQueryScope(rules, usage, runningPackages) }
 
-    val shown by produceState<List<LibraryEntry>?>(null, apps, query, scope) {
-        value = withContext(Dispatchers.Default) { query.applyTo(apps, scope) }
+    val shown by produceState<List<LibraryEntry>?>(null, entries, query, scope) {
+        value = withContext(Dispatchers.Default) { query.applyTo(entries, scope) }
     }
-    val total = remember(apps, query, scope) { query.totalIn(apps, scope) }
+    val total = remember(entries, query, scope) { query.totalIn(entries, scope) }
     // The strip's views and their counts (docs/SPEC.md 7j).
     val views = remember(savedViews.views) { appsStripViews(savedViews.views) }
-    val counts by produceState(emptyMap<String, Int>(), apps, scope, views) {
-        value = withContext(Dispatchers.Default) { appsViewCounts(apps, scope, views) }
+    val counts by produceState(emptyMap<String, Int>(), entries, scope, views) {
+        value = withContext(Dispatchers.Default) { appsViewCounts(entries, scope, views) }
     }
     // Opening on a view that holds nothing lands on All instead, once the counts are in.
     var landed by remember { mutableStateOf(false) }
@@ -263,13 +257,12 @@ internal fun AppsSection(
     // Where the tile whose menu is open is on the screen, so the menu opens beside it (Droidtop/tracker#827).
     var optionsAnchor by remember { mutableStateOf<AnchorRect?>(null) }
 
+    // Hidden or shown from the options menu: the shell's list follows at once ([onEntryChanged]), and the launcher's
+    // own hidden list, written off the main thread, is what the next scan reads.
     val toggleHidden: (LibraryEntry) -> Unit = { entry ->
         val nowHidden = !entry.hidden
-        hiddenNow = hiddenNow + (entry.id to nowHidden)
-        coroutineScope.launch {
-            withContext(Dispatchers.IO) { dev.droidtop.library.AppHiding.set(context, entry.id, nowHidden) }
-            dev.droidtop.library.settings.Notices.flash(if (nowHidden) "${entry.title} hidden" else "${entry.title} shown", context = context)
-        }
+        onEntryChanged(entry.copy(hidden = nowHidden))
+        coroutineScope.launch { setAppHidden(context, entry, nowHidden) }
     }
 
     // "Mark as game" from a long press and from the app's options: the
@@ -278,9 +271,8 @@ internal fun AppsSection(
         if (entry.appFacts != null) {
             val nowGame = !rules.isGame(entry.id, entry.appFacts)
             coroutineScope.launch {
-                withContext(Dispatchers.IO) { AppGameMarks.set(context, entry.id, nowGame) }
+                setAppIsGame(context, entry, nowGame)
                 marksTick++
-                dev.droidtop.library.settings.Notices.flash(if (nowGame) "${entry.title} marked as a game" else "${entry.title} is not a game", context = context)
             }
         }
     }
@@ -375,10 +367,10 @@ internal fun AppsSection(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text(
-                        appsEmptyMessage(apps.isNotEmpty(), views.getOrNull(activeView)?.name),
+                        appsEmptyMessage(entries.isNotEmpty(), views.getOrNull(activeView)?.name),
                         color = MenuTokens.OnSurfaceMuted,
                     )
-                    if (apps.isEmpty()) GetAppsChip()
+                    if (entries.isEmpty()) GetAppsChip()
                 }
             }
         } else {
@@ -448,7 +440,7 @@ internal fun AppsSection(
         )
         LibraryFilterSheet(
             scope = scope,
-            base = apps,
+            base = entries,
             query = query,
             savedViews = savedViews.views,
             onQueryChange = { query = it },

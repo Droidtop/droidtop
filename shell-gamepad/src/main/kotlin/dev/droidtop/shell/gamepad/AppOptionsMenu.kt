@@ -5,8 +5,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import dev.droidtop.library.AppGameMarks
+import dev.droidtop.library.AppHiding
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.Notices
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Select on an app: the focused app's own menu (docs/SPEC.md 7j, "Filters,
@@ -81,31 +86,34 @@ private fun AppOptionsSheet(
             }
             add(ActionRow(if (entry.favorite) "Remove from favourites" else "Add to favourites", onSelect = onToggleFavorite))
             // Only an installed app has a category to mark; the other kinds of this tab have none.
-            if (entry.appFacts != null && onMarkGame != null) {
-                add(
-                    if (isGame) {
-                        ActionRow("Not a game", "Takes it out of Games in the Category filter", onSelect = onMarkGame)
-                    } else {
-                        ActionRow("Mark as game", "Puts it under Games in the Category filter", onSelect = onMarkGame)
-                    },
-                )
-            }
-            if (entry.appFacts != null && onToggleHidden != null) {
-                add(
-                    if (hidden) {
-                        ActionRow("Show in droidtop", onSelect = onToggleHidden)
-                    } else {
-                        ActionRow("Hide from droidtop", "Filter, then Hidden, brings it back", onSelect = onToggleHidden)
-                    },
-                )
-            }
-            // Android refuses to uninstall a system app, so the row is only for the ones it will take.
-            if (entry.appFacts?.system == false && onUninstall != null) add(ActionRow("Uninstall", onSelect = onUninstall))
+            if (entry.appFacts != null && onMarkGame != null) add(markGameRow(isGame, onMarkGame))
+            if (entry.appFacts != null && onToggleHidden != null) add(hideAppRow(hidden, onToggleHidden))
+            if (onUninstall != null) uninstallRow(entry, onUninstall)?.let(::add)
             add(ActionRow("Close", onSelect = onDismiss))
         }
     }
     AnchoredMenu(anchor = anchor, title = entry.title, rows = options, onDismiss = onDismiss)
 }
+
+/** Mark as game, or Not a game for one that is: the same row on the Apps tab's menu and on the app's page. */
+internal fun markGameRow(isGame: Boolean, onSelect: () -> Unit): ActionRow =
+    if (isGame) {
+        ActionRow("Not a game", "Takes it out of Games in the Category filter", onSelect = onSelect)
+    } else {
+        ActionRow("Mark as game", "Puts it under Games in the Category filter", onSelect = onSelect)
+    }
+
+/** Hide from droidtop, or Show in droidtop for a hidden app: the same row on the Apps tab's menu and on the app's page. */
+internal fun hideAppRow(hidden: Boolean, onSelect: () -> Unit): ActionRow =
+    if (hidden) {
+        ActionRow("Show in droidtop", onSelect = onSelect)
+    } else {
+        ActionRow("Hide from droidtop", "Filter, then Hidden, brings it back", onSelect = onSelect)
+    }
+
+/** Uninstall, only for an app Android will take it for: it refuses a system app. */
+internal fun uninstallRow(entry: LibraryEntry, onSelect: () -> Unit): ActionRow? =
+    if (entry.appFacts?.system == false) ActionRow("Uninstall", onSelect = onSelect) else null
 
 /** Android's own uninstall prompt for [packageName]; it asks its own confirmation and refuses a system app. */
 internal fun startUninstall(context: android.content.Context, packageName: String) {
@@ -117,4 +125,23 @@ internal fun startUninstall(context: android.content.Context, packageName: Strin
             ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
+}
+
+/**
+ * Hides an app from droidtop's lists, or shows it again: the launcher's own hidden list (written off the main thread),
+ * which the next scan reads, then the notice. The one way the Apps tab's menu and the app's page do it; the caller
+ * shows the change at once through the list it holds.
+ */
+internal suspend fun setAppHidden(context: android.content.Context, entry: LibraryEntry, hidden: Boolean) {
+    withContext(Dispatchers.IO) { AppHiding.set(context, entry.id, hidden) }
+    Notices.flash(if (hidden) "${entry.title} hidden" else "${entry.title} shown", context = context)
+}
+
+/**
+ * The person's "Mark as game" or "Not a game" answer for an app (docs/SPEC.md 7j), stored off the main thread, then the
+ * notice. The one way the Apps tab and the app's page do it; the caller reloads its category rules after.
+ */
+internal suspend fun setAppIsGame(context: android.content.Context, entry: LibraryEntry, game: Boolean) {
+    withContext(Dispatchers.IO) { AppGameMarks.set(context, entry.id, game) }
+    Notices.flash(if (game) "${entry.title} marked as a game" else "${entry.title} is not a game", context = context)
 }

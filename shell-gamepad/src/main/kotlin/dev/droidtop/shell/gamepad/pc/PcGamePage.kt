@@ -486,23 +486,23 @@ internal fun PcGamePage(
                     val signIn = signInInfo?.run
                     listOfNotNull(
                         savesScreen?.let { screen ->
-                            ActionRow("Saves", savesInfo?.value) {
+                            PageOptionRows.saves(savesInfo?.value) {
                                 close()
                                 infoScreen = screen
                             }
                         },
                         signIn?.let { step ->
-                            ActionRow("Sign in for achievements", "Shows your RetroAchievements progress on this game") {
+                            PageOptionRows.signIn(PageKind.GAME) {
                                 close()
                                 step(context)
                             }
                         },
-                        ActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong") {
+                        PageOptionRows.chooseMatch(PageKind.GAME) {
                             close()
                             pickingMatch = true
                         },
                         if (media.size > 1) {
-                            ActionRow("View media", "${media.size} images and videos scraped for this game") {
+                            PageOptionRows.viewMedia(PageKind.GAME, media.size) {
                                 close()
                                 viewingMedia = true
                             }
@@ -510,7 +510,7 @@ internal fun PcGamePage(
                             null
                         },
                         if (library != null) {
-                            ActionRow("Collections", "Which of your collections this game is in") {
+                            PageOptionRows.collections(PageKind.GAME) {
                                 close()
                                 editingCollections = true
                             }
@@ -1168,16 +1168,21 @@ internal fun heroCaption(entry: LibraryEntry, now: Long): String {
 /**
  * Activity's rows from droidtop's own record (docs/SPEC.md 7i, "The game page"; Droidtop/tracker#845): when it was
  * last played, play time, and how many times, only the ones that exist, so a game never played shows Activity's
- * empty line. A store's or a service's achievements join them as their own row. Pure.
+ * empty line. A store's or a service's achievements join them as their own row. [usedElsewhere] is a later use
+ * droidtop did not start (Android's usage record of an app, read with Usage access); the later of the two is the
+ * last. Worded for the page's [PageKind] ("Last played", "Last opened"). Pure.
  */
-internal fun activityRows(entry: LibraryEntry, now: Long): List<PageFact> = listOfNotNull(
-    entry.lastPlayedEpochMs?.let {
-        PageFact("Last played", dev.droidtop.library.format.ValueFormat.daysAgo(now, it).replaceFirstChar { c -> c.uppercase() }, tab = PageTab.ACTIVITY)
-    },
-    // Play time is time; how many times is "Times played", said once (Droidtop/tracker#662).
-    entry.playtimeSeconds.takeIf { it > 0 }?.let { PageFact("Play time", dev.droidtop.library.format.ValueFormat.duration(it), tab = PageTab.ACTIVITY) },
-    entry.playCount.takeIf { it > 0 }?.let { PageFact("Times played", it.toString(), tab = PageTab.ACTIVITY) },
-)
+internal fun activityRows(entry: LibraryEntry, now: Long, usedElsewhere: Long? = null): List<PageFact> {
+    val kind = PageKind.of(entry)
+    return listOfNotNull(
+        listOfNotNull(entry.lastPlayedEpochMs, usedElsewhere).maxOrNull()?.let {
+            PageFact("Last ${kind.done}", dev.droidtop.library.format.ValueFormat.daysAgo(now, it).replaceFirstChar { c -> c.uppercase() }, tab = PageTab.ACTIVITY)
+        },
+        // Play time is time; how many times is "Times played", said once (Droidtop/tracker#662).
+        entry.playtimeSeconds.takeIf { it > 0 }?.let { PageFact(kind.timeTitle, dev.droidtop.library.format.ValueFormat.duration(it), tab = PageTab.ACTIVITY) },
+        entry.playCount.takeIf { it > 0 }?.let { PageFact("Times ${kind.done}", it.toString(), tab = PageTab.ACTIVITY) },
+    )
+}
 
 /**
  * The game's versions on the person's other devices, on Versions

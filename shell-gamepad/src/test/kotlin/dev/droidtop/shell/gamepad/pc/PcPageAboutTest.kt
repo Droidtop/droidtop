@@ -260,7 +260,7 @@ class PcPageAboutTest {
             listOf("Overview", "Versions", "Activity", "Extras", "Details", "Show thread"),
             PageTab.values().map { it.label },
         )
-        assertTrue(PageTab.values().all { it.emptyLine.isNotBlank() })
+        assertTrue(PageTab.values().all { tab -> PageKind.values().all { tab.emptyLine(it).isNotBlank() } })
         // Nothing at all still gives every tab, each with no rows.
         val byTab = groupRowsByTab(emptyList(), emptyList())
         assertEquals(PageTab.values().toList(), byTab.keys.toList())

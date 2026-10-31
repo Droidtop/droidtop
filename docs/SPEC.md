@@ -17211,7 +17211,8 @@ status of each thing. Keep "edit metadata" as a button, put "scrape" IN the edit
 to an options menu. This means we can confirm saves are synced, achievements are available, etc, visually". So:
 
 - **Six tabs, always drawn** (`PageTab`): Overview, Versions, Activity, Extras, Details, Show thread. An empty tab is
-  still on the strip and says its one line (`PageTab.emptyLine`); nothing filters the strip.
+  still on the strip and says its one line (`PageTab.emptyLine`, worded for the page's kind, "Apps on the page"
+  below); nothing filters the strip.
 - **Activity** is how the game has been played: droidtop's own Last played, Play time and Times played
   (`activityRows`; they left the facts strip and Overview, not copied), and the Achievements row (a service's or a
   store's, `GameInfoKind.ACHIEVEMENTS`). A store's profile data (Steam's play time and the like) joins it with
@@ -17266,9 +17267,38 @@ elsewhere) draws it as it is. On a console game's page:
 - **Plugins** add rows to it as to a PC game's page (`rememberPluginPageRows`): a section's rows under the tab it
   names and each context action a row of Extras. The detail screen's own chip per section and per action is gone.
 
-An Android app opened from the Apps tab's Info gets the same page: Open, Options with App info and Uninstall, the
-star, Details with its package; it has no Edit metadata button, and the cursor never stops on a button that is
-not drawn (`pageButtons`).
+**Apps on the page (decided 2026-10-31, Droidtop/tracker#845, slice U3).** The owner: "One page for every kind of
+game, apps and the source record. Apps get their information filled in from app stores (Play Store listing,
+F-Droid, Obtainium sources and so on)." An Android app opened from the Apps tab's Info (or anywhere else that opens
+its page) gets the same frame, drawn by `EntryDetailScreen`:
+
+- **The words are the kind's.** The frame has one rule for what it calls the thing the page is about, `PageKind`
+  (`GAME` or `APP`, read from the entry: an installed Android app is an app, everything else a game). Every word the
+  frame draws itself takes it: each tab's empty line (`PageTab.emptyLine(kind)`: "Nothing is known about this app
+  yet", "You have not opened this app yet"), the status row's labels ("Ready to open"), the primary action ("Open"),
+  Activity's rows ("Last opened", "Times opened", "Time used"), the L2 hint ("App options") and Options' shared rows
+  (`PageOptionRows`: View media, Collections, Choose match, Sign in for achievements, Saves, worded "this app" or
+  "this game"). No page keeps its own copy of these words. An app's status row has no "not scraped yet": its facts
+  come from Android, not a scrape.
+- **The band**: Open, Options and the star; no Edit metadata button (an app has no metadata of its own to edit), and
+  the cursor never stops on a button that is not drawn (`pageButtons`). The facts strip names its installed version.
+- **Options** has the Apps tab's own actions for an installed app, each through the mechanism the Apps tab's menu
+  uses (`AppOptionsMenu.kt`): App info (Android's page for it), Hide from droidtop or Show in droidtop
+  (`setAppHidden`, the launcher's own hidden list; the shell's list follows at once, from the menu and from the page
+  alike), Mark as game or Not a game (`setAppIsGame`, the Category filter's override) and Uninstall (Android's own
+  prompt, only for an app that is not a system app). L2 and Select open Options.
+- **The tabs**, from what droidtop already has, read once off the main thread when the page opens (`AppPageFacts`):
+  Overview the description when the entry has one; Versions the installed version (Android's version name, its
+  version code under it) and, when an app catalog offers a newer one (the cached offers the Updates page lists,
+  `AppCatalogs.updateFor`), an Update row that starts it through the Updates page's own start (`AppCatalogs.update`,
+  its line the row's while it runs, what it said a notice) or says Android would refuse a version signed by another
+  key; Activity when it was last opened (droidtop's own record, or Android's usage record with Usage access, the later
+  of the two); Details the kind, the package, where it came from (the installing store, the installer's package the
+  tip), when it was installed and last updated, and how many permissions it asks for. Plugins' rows and context
+  actions join it as on any game's page (`rememberPluginPageRows`, the target an `app`).
+- **Not there yet**, for the plugins lane: no plugin gives an installed app's listing (its description, screenshots,
+  rating) from a store yet, so Overview says its empty line for most apps; an app catalog's `get_app` answers that for
+  a catalog app and is where that would come from. Its size on the device is not read anywhere yet.
 
 Droidtop/tracker#254, 2026-10-02. The page keeps one job, "everything about
 this game and the one thing you most likely want to do", and has this

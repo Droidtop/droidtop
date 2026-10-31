@@ -69,6 +69,7 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.isUnscraped
 import dev.droidtop.shell.gamepad.ActionRow
 import dev.droidtop.shell.gamepad.AnchoredMenu
@@ -122,6 +123,10 @@ import dev.droidtop.ui.shared.Motion
  * - **The tab's rows** ([rowsByTab]): Settings' rows ([MenuRow]), an empty tab saying its [PageTab.emptyLine], and
  *   while the cursor is in them the selected row's full text in the detail strip under the list.
  *
+ * Every word the frame draws itself (each tab's empty line, the status row's labels, the L2 hint, the shared Options
+ * rows) names what the page is about by its [PageKind], read from the entry: "this game", or "this app" on an Android
+ * app's page (the owner, Droidtop/tracker#845: "One page for every kind of game, apps and the source record").
+ *
  * The pad comes through one `onPad` handler on the frame's root, which moves ONE cursor through three zones (the
  * band's buttons, the tabs, the tab's rows): Up and Down between zones and rows, Left and Right along the buttons
  * or the tabs, L1/R1 the tab from anywhere, A presses what the cursor is on, X is the primary action, Y Favourite,
@@ -159,6 +164,7 @@ internal fun GamePageFrame(
 ) {
     val window = LocalShellWindow.current
     val tabs = remember { PageTab.values() }
+    val kind = PageKind.of(entry)
     val hasEditMetadata = editMetadataRows != null
     val buttons = remember(hasEditMetadata) { pageButtons(hasEditMetadata) }
     var editOpen by remember(entry.id) { mutableStateOf(false) }
@@ -234,7 +240,7 @@ internal fun GamePageFrame(
     // bar); the page draws no hint row of its own. L1/R1 are named by the
     // glyphs at the tab strip's ends.
     val verb = play.verb
-    val hints = remember(zone, selectedButton, row, tab, verb, play.pressable, play.chooseEngine, current) {
+    val hints = remember(zone, selectedButton, row, tab, verb, play.pressable, play.chooseEngine, current, kind) {
         listOf(
             HintBinding(GamepadAction.A, if (zone == PageZone.ACTIONS) pageActionLabel(selectedButton, verb) else "Select") {
                 when (zone) {
@@ -245,7 +251,7 @@ internal fun GamePageFrame(
             },
             HintBinding(GamepadAction.X, verb) { play.pressable || play.chooseEngine },
             HintBinding(GamepadAction.Y, "Favourite"),
-            HintBinding(GamepadAction.L2, "Game options"),
+            HintBinding(GamepadAction.L2, kind.optionsHint),
             HintBinding(GamepadAction.SELECT, "Copy options") { zone == PageZone.CONTENT && current.getOrNull(row)?.onOptions != null },
             HintBinding(GamepadAction.B, "Back"),
         )
@@ -421,7 +427,7 @@ internal fun GamePageFrame(
                             modifier = Modifier.fillMaxWidth().padding(vertical = Space.Xxxl),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(tabs[tab].emptyLine, color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
+                            Text(tabs[tab].emptyLine(kind), color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
                         }
                     }
                 } else {
@@ -522,19 +528,50 @@ private const val PAGE_PLATE_SHADOW_BLUR_DP = 8
 private const val PAGE_PLATE_SHADOW_ALPHA = 0.5f
 
 /**
- * The page's tabs, in the order the strip draws them (docs/SPEC.md 7i, "The
- * game page"). [emptyLine] is what a tab with no row says, so an empty tab
- * is an answer and not a blank.
+ * What a page is about, and so the words the frame uses for it (docs/SPEC.md 7i, "Apps on the page"): a game, or an
+ * Android app (the owner, Droidtop/tracker#845: "One page for every kind of game, apps and the source record"). The
+ * one place those words are chosen: the tabs' empty lines, the status row, Activity's rows, the L2 hint and Options'
+ * shared rows all read them from here, so no page keeps its own copy. [noun] is "this game"'s word, [verb] the
+ * primary action's ("Play", "Open"), [done] what Activity says was done with it.
  */
-internal enum class PageTab(val label: String, val emptyLine: String) {
-    OVERVIEW("Overview", "Nothing is known about this game yet"),
-    VERSIONS("Versions", "No version information for this game"),
+internal enum class PageKind(val noun: String, val verb: String, val done: String, val timeTitle: String) {
+    GAME("game", "play", "played", "Play time"),
+    APP("app", "open", "opened", "Time used"),
+    ;
+
+    /** The primary action's word on the band ("Play", "Open"). */
+    val primary: String get() = verb.replaceFirstChar { it.uppercase() }
+
+    /** What L2 opens, as the footer names it. */
+    val optionsHint: String get() = noun.replaceFirstChar { it.uppercase() } + " options"
+
+    companion object {
+        /** An installed Android app's page is an app's; every other entry's is a game's. */
+        fun of(entry: LibraryEntry): PageKind = if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) APP else GAME
+    }
+}
+
+/** The page's tabs, in the order the strip draws them (docs/SPEC.md 7i, "The game page"). */
+internal enum class PageTab(val label: String) {
+    OVERVIEW("Overview"),
+    VERSIONS("Versions"),
     // How the person has played it (the owner, Droidtop/tracker#845: an Activity tab).
-    ACTIVITY("Activity", "You have not played this game yet"),
-    EXTRAS("Extras", "No extras for this game yet"),
-    DETAILS("Details", "No details for this game yet"),
+    ACTIVITY("Activity"),
+    EXTRAS("Extras"),
+    DETAILS("Details"),
     // The source's own thread (the owner, Droidtop/tracker#845: "put a "show thread" tab"); its first post comes later.
-    THREAD("Show thread", "No thread is linked to this game"),
+    THREAD("Show thread"),
+    ;
+
+    /** What this tab says with no row, so an empty tab is an answer and not a blank, worded for [kind]. Pure. */
+    fun emptyLine(kind: PageKind): String = when (this) {
+        OVERVIEW -> "Nothing is known about this ${kind.noun} yet"
+        VERSIONS -> "No version information for this ${kind.noun}"
+        ACTIVITY -> "You have not ${kind.done} this ${kind.noun} yet"
+        EXTRAS -> "No extras for this ${kind.noun} yet"
+        DETAILS -> "No details for this ${kind.noun} yet"
+        THREAD -> "No thread is linked to this ${kind.noun}"
+    }
 }
 
 /** One fact on the page: a row title, what it says, and what A does on it when it does anything. */
@@ -604,9 +641,37 @@ internal const val SCRAPING = "Looking it up…"
 internal fun scrapeRow(entry: LibraryEntry, status: String?, sources: String, onScrape: () -> Unit): ActionRow =
     ActionRow(
         SCRAPE_ROW,
-        status ?: if (entry.isUnscraped()) "Not scraped yet. Looks this game up in $sources" else "Looks this game up in $sources again",
+        status ?: PageKind.of(entry).noun.let { noun ->
+            if (entry.isUnscraped()) "Not scraped yet. Looks this $noun up in $sources" else "Looks this $noun up in $sources again"
+        },
         onSelect = if (status == SCRAPING) null else onScrape,
     )
+
+/**
+ * The Options rows every page offers in the same words, each worded for what the page is about ([PageKind]), so no
+ * page keeps its own copy of them. Each takes the press; the page closes its menu and opens what the row names.
+ */
+internal object PageOptionRows {
+    private const val SAVES = "Saves"
+    private const val SIGN_IN = "Sign in for achievements"
+    private const val CHOOSE_MATCH = "Choose match"
+    private const val VIEW_MEDIA = "View media"
+    private const val COLLECTIONS = "Collections"
+
+    fun saves(value: String?, onSelect: () -> Unit) = ActionRow(SAVES, value, onSelect = onSelect)
+
+    fun signIn(kind: PageKind, onSelect: () -> Unit) =
+        ActionRow(SIGN_IN, "Shows your RetroAchievements progress on this ${kind.noun}", onSelect = onSelect)
+
+    fun chooseMatch(kind: PageKind, onSelect: () -> Unit) =
+        ActionRow(CHOOSE_MATCH, "Pick the right ${kind.noun} by hand when the scraper guessed wrong", onSelect = onSelect)
+
+    fun viewMedia(kind: PageKind, count: Int, onSelect: () -> Unit) =
+        ActionRow(VIEW_MEDIA, "$count images and videos scraped for this ${kind.noun}", onSelect = onSelect)
+
+    fun collections(kind: PageKind, onSelect: () -> Unit) =
+        ActionRow(COLLECTIONS, "Which of your collections this ${kind.noun} is in", onSelect = onSelect)
+}
 
 /** The A hint on the action band: what the button under the cursor does. */
 internal fun pageActionLabel(button: PageButton, primaryVerb: String): String = when (button) {
@@ -908,9 +973,11 @@ internal data class PageStatus(
  * The status row under the title (the owner, Droidtop/tracker#845: "a set of icons to indicate the status of each
  * thing ... so we can confirm saves are synced, achievements are available, etc, visually"), from what the page
  * already knows, in this order: whether it is ready to play ([runsWith] what runs it: a runner, an emulator), an
- * update, the store's cloud saves ([cloudSaves], its words and glyph), droidtop's view of its saves ([saves], their
- * value), its achievements ([achievements], their value; [achievementsSignIn] when signing in would show them), and
- * that it is not scraped yet. The same for every kind of game. Pure.
+ * update ([update]: the game's own, or the version an app catalog offers for an app), the store's cloud saves
+ * ([cloudSaves], its words and glyph), droidtop's view of its saves ([saves], their value), its achievements
+ * ([achievements], their value; [achievementsSignIn] when signing in would show them), and that it is not scraped yet
+ * (a game's: an app's facts come from Android, not a scrape). The same for every kind of game, its words for the
+ * page's [PageKind] ("Ready to play", "Ready to open"). Pure.
  */
 internal fun pageStatuses(
     entry: LibraryEntry,
@@ -920,29 +987,37 @@ internal fun pageStatuses(
     saves: String?,
     achievements: String?,
     achievementsSignIn: Boolean,
-): List<PageStatus> = listOfNotNull(
-    if (play.ready) {
-        PageStatus(PageStatusKind.READY, runsWith?.takeIf { it.isNotBlank() }?.let { "Ready to play with $it" } ?: "Ready to play", PageStatusTone.GOOD)
-    } else {
-        PageStatus(PageStatusKind.READY, "Not ready to play: " + play.detail.ifBlank { play.verb }, PageStatusTone.WAITING)
-    },
-    entry.availableUpdate?.let { PageStatus(PageStatusKind.UPDATE, "Update: " + GameUpdates.line(it), PageStatusTone.GOOD) },
-    cloudSaves?.let { (line, mark) ->
-        PageStatus(
-            PageStatusKind.CLOUD_SAVES,
-            "Cloud saves: $line",
-            if (mark == dev.droidtop.library.settings.StatusMark.SYNCED) PageStatusTone.GOOD else PageStatusTone.WAITING,
-            mark,
-        )
-    },
-    saves?.let { PageStatus(PageStatusKind.SAVES, "Saves: $it", PageStatusTone.PLAIN) },
-    when {
-        achievements != null -> PageStatus(PageStatusKind.ACHIEVEMENTS, "Achievements: $achievements", PageStatusTone.GOOD)
-        achievementsSignIn -> PageStatus(PageStatusKind.ACHIEVEMENTS, "Achievements: sign in to see them", PageStatusTone.WAITING)
-        else -> null
-    },
-    if (entry.isUnscraped()) PageStatus(PageStatusKind.NOT_SCRAPED, "Not scraped yet", PageStatusTone.WAITING) else null,
-)
+    update: String? = entry.availableUpdate,
+): List<PageStatus> {
+    val kind = PageKind.of(entry)
+    return listOfNotNull(
+        if (play.ready) {
+            PageStatus(
+                PageStatusKind.READY,
+                runsWith?.takeIf { it.isNotBlank() }?.let { "Ready to ${kind.verb} with $it" } ?: "Ready to ${kind.verb}",
+                PageStatusTone.GOOD,
+            )
+        } else {
+            PageStatus(PageStatusKind.READY, "Not ready to ${kind.verb}: " + play.detail.ifBlank { play.verb }, PageStatusTone.WAITING)
+        },
+        update?.let { PageStatus(PageStatusKind.UPDATE, "Update: " + GameUpdates.line(it), PageStatusTone.GOOD) },
+        cloudSaves?.let { (line, mark) ->
+            PageStatus(
+                PageStatusKind.CLOUD_SAVES,
+                "Cloud saves: $line",
+                if (mark == dev.droidtop.library.settings.StatusMark.SYNCED) PageStatusTone.GOOD else PageStatusTone.WAITING,
+                mark,
+            )
+        },
+        saves?.let { PageStatus(PageStatusKind.SAVES, "Saves: $it", PageStatusTone.PLAIN) },
+        when {
+            achievements != null -> PageStatus(PageStatusKind.ACHIEVEMENTS, "Achievements: $achievements", PageStatusTone.GOOD)
+            achievementsSignIn -> PageStatus(PageStatusKind.ACHIEVEMENTS, "Achievements: sign in to see them", PageStatusTone.WAITING)
+            else -> null
+        },
+        if (kind == PageKind.GAME && entry.isUnscraped()) PageStatus(PageStatusKind.NOT_SCRAPED, "Not scraped yet", PageStatusTone.WAITING) else null,
+    )
+}
 
 /** The status row's glyphs, each saying its words to a screen reader ([PageStatus.label]); nothing here is pressed. */
 @Composable

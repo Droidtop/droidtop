@@ -101,7 +101,7 @@ no). The screen beneath stays visible under a scrim and keeps its focus; one ove
 restores the exact item and scroll position; the hint bar stays and shows the overlay's hints. Depth: left menu, item
 menu and Select sheet one level; Quick Menu section then panel; Settings category then pane; the game page one page with
 tabs, the same page for every kind of game (`GamePageFrame`: a PC or store game, a console game, an app;
-Droidtop/tracker#845).
+Droidtop/tracker#845), whose own words name what it is about ("this game", "this app": `PageKind`).
 
 The anchored menu is `AnchoredMenu` in `:ui-shared` (`ui-shared/.../gamepad/AnchoredMenu.kt`, Droidtop/tracker#827):
 the sheet of choices' body placed below the item, or above it where there is no room, held inside the window's

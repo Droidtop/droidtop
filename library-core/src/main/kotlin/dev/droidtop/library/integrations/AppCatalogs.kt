@@ -340,6 +340,33 @@ object AppCatalogs {
         }
     }
 
+    /**
+     * What the cached offers hold for the one installed [packageName] ([updates] over that app alone): an app's page
+     * asks this for its Versions tab, the Updates page asks [updates] for every app. Null when it is not installed or
+     * no catalog offers a newer version. Disk and the package manager: off the main thread.
+     */
+    fun updateFor(context: Context, packageName: String): UpdateState? {
+        val installed = AppPackages.installedFacts(context, packageName) ?: return null
+        val cached = cachedOffers(context)
+        if (cached.isEmpty()) return null
+        return updates(cached, mapOf(packageName to installed), context.packageName).firstOrNull()
+    }
+
+    /**
+     * Installs the newer version [state] offers, through the catalog that offered it ([install]): the one start the
+     * Updates page's Update and an app's page share. Its line, and whether it worked.
+     */
+    suspend fun update(context: Context, state: UpdateState.Available, onStatus: (String) -> Unit): Pair<String, Boolean> {
+        val record = providers(context).firstOrNull { it.manifest.id == state.pluginId }
+            ?: return "${state.offer.name}: ${state.pluginLabel} is no longer installed or allowed" to false
+        val result = install(context, record, state.offer.id, state.offer.versionCode, state.offer.name, onStatus)
+        return if (result.ok) {
+            (result.values["summary"] ?: "${state.offer.name} updated") to true
+        } else {
+            "${state.offer.name}: ${result.error ?: "it failed"}" to false
+        }
+    }
+
     // ------------------------------------------------------------------
     // The cached offers (one file; the Updates place reads only this).
     // ------------------------------------------------------------------

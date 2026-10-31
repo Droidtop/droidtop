@@ -945,6 +945,12 @@ internal fun GamepadShellBody(
     // right away, without waiting on a full rescan round-trip. null means
     // this entry's kind has no real favorite concept (see
     // Library.toggleFavorite's own doc comment) -- a no-op, not an error.
+    // An entry changed on its page or in Apps' menu (an edited Sort name, title or favourite, an app hidden or shown):
+    // the held lists show it at once, as a favourite's toggle does, before the next scan reads it.
+    val onEntryChanged: (LibraryEntry) -> Unit = { changed ->
+        gameEntries = gameEntries?.map { if (it.id == changed.id) changed else it }
+        appEntries = appEntries?.map { if (it.id == changed.id) changed else it }
+    }
     val onToggleFavorite: (LibraryEntry) -> Unit = { entry ->
         scope.launch {
             val newFavorite = library.toggleFavorite(entry) ?: return@launch
@@ -1333,11 +1339,7 @@ internal fun GamepadShellBody(
                             library = library,
                             onLaunch = { onLaunch(entry); nav.back() },
                             onClose = { nav.back() },
-                            // An edited Sort name, title or favourite shows in the list at once, as a favourite's toggle does.
-                            onEntryChanged = { changed ->
-                                gameEntries = gameEntries?.map { if (it.id == changed.id) changed else it }
-                                appEntries = appEntries?.map { if (it.id == changed.id) changed else it }
-                            },
+                            onEntryChanged = onEntryChanged,
                         )
                         // Get new games (Droidtop/tracker#612, #621): a page of Updates that opens on what is
                         // new for the person, with Search first, never on a blank search bar; leaving it goes back to
@@ -1493,6 +1495,7 @@ internal fun GamepadShellBody(
                                     onShowDetail = { nav.openDetail(it.id) },
                                     onFocusedEntryChanged = onFocusedEntryChanged,
                                     onToggleFavorite = onToggleFavorite,
+                                    onEntryChanged = onEntryChanged,
                                 )
                             }
                             // SETTINGS is handled above, before the loading gate --

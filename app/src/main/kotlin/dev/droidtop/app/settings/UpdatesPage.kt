@@ -527,11 +527,10 @@ object UpdatesPage {
         }
     }
 
+    /** The one app update start, shared with an app's page ([AppCatalogs.update]). */
     private suspend fun updateApp(context: Context, state: AppCatalogs.UpdateState.Available, onStatus: (String) -> Unit): Done {
-        val record = AppCatalogs.providers(context).firstOrNull { it.manifest.id == state.pluginId }
-            ?: return Done("${state.offer.name}: ${state.pluginLabel} is no longer installed or allowed", ok = false)
-        val result = AppCatalogs.install(context, record, state.offer.id, state.offer.versionCode, state.offer.name, onStatus)
-        return if (result.ok) Done(result.values["summary"] ?: "${state.offer.name} updated", ok = true) else Done("${state.offer.name}: ${result.error ?: "it failed"}", ok = false)
+        val (line, ok) = AppCatalogs.update(context, state, onStatus)
+        return Done(line, ok)
     }
 
     /**

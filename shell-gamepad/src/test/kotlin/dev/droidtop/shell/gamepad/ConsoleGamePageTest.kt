@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.SwitchGameFacts
+import dev.droidtop.shell.gamepad.pc.PageKind
 import dev.droidtop.shell.gamepad.pc.PageStatusKind
 import dev.droidtop.shell.gamepad.pc.PageStatusTone
 import dev.droidtop.shell.gamepad.pc.PageTab
@@ -79,22 +80,22 @@ class ConsoleGamePageTest {
         val details = groupRowsByTab(consolePageRows(app, systemName = null, emulator = null, now = 0, onAddSwitchContent = {}), emptyList())
             .getValue(PageTab.DETAILS)
         assertEquals(listOf("Kind" to "Android app", "Package" to "org.example.reader"), details.map { it.title to it.value })
-        assertEquals("Open", consolePlayState(isApp = true, emulatorsKnown = false, emulator = null, systemName = null).verb)
+        assertEquals("Open", consolePlayState(kind = PageKind.APP, emulatorsKnown = false, emulator = null, systemName = null).verb)
     }
 
     @Test
     fun playSaysWhichEmulatorRunsItOrThatNoneIsInstalled() {
-        val ready = consolePlayState(isApp = false, emulatorsKnown = true, emulator = "Snes9x", systemName = "Super Nintendo")
+        val ready = consolePlayState(kind = PageKind.GAME, emulatorsKnown = true, emulator = "Snes9x", systemName = "Super Nintendo")
         assertEquals("Play", ready.verb)
         assertTrue(ready.ready)
         assertEquals("Runs with Snes9x", ready.detail)
-        val missing = consolePlayState(isApp = false, emulatorsKnown = true, emulator = null, systemName = "Super Nintendo")
+        val missing = consolePlayState(kind = PageKind.GAME, emulatorsKnown = true, emulator = null, systemName = "Super Nintendo")
         assertFalse(missing.ready)
         // Still pressable: the launch says what is missing and how to get it.
         assertTrue(missing.pressable)
         assertEquals("No emulator installed for Super Nintendo", missing.detail)
         // Not yet read: the page claims nothing it does not know.
-        assertTrue(consolePlayState(isApp = false, emulatorsKnown = false, emulator = null, systemName = null).ready)
+        assertTrue(consolePlayState(kind = PageKind.GAME, emulatorsKnown = false, emulator = null, systemName = null).ready)
 
         val statuses = pageStatuses(rom, missing, runsWith = null, cloudSaves = null, saves = "None found yet", achievements = "4 of 10", achievementsSignIn = false)
         assertEquals(listOf(PageStatusKind.READY, PageStatusKind.SAVES, PageStatusKind.ACHIEVEMENTS), statuses.map { it.kind })
