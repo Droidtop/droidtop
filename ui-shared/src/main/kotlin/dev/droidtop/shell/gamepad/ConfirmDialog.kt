@@ -17,10 +17,20 @@ import androidx.compose.ui.unit.dp
  * it, all I can do is confirm it"). [question] over two choices: Cancel first and under the cursor, then [action] in the
  * danger tone. A on Cancel, B, or Back cancel ([onCancel]); only A on [action] runs [onConfirm]. It replaced every
  * "press A again" row, where a first A armed the row and only a second one, or leaving the whole menu, ended it.
+ * Each choice says what it does: [keep] names the safe one ("Keep downloading"), and the two never read the same
+ * ([safeChoice]; the owner on the console: a download's cancel asked with two buttons both called "Cancel").
  */
 @Composable
-fun ConfirmDialog(question: String, action: String, onConfirm: () -> Unit, onCancel: () -> Unit, detail: String? = null) {
-    val groups = remember(action) { listOf(listOf(DialogChoice(CANCEL)), listOf(DialogChoice(action, danger = true))) }
+fun ConfirmDialog(
+    question: String,
+    action: String,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+    detail: String? = null,
+    keep: String? = null,
+) {
+    val safe = safeChoice(keep, action)
+    val groups = remember(action, safe) { listOf(listOf(DialogChoice(safe)), listOf(DialogChoice(action, danger = true))) }
     var selected by remember { mutableIntStateOf(0) }
     val choose: (Int) -> Unit = { index -> if (index == 1) onConfirm() else onCancel() }
     val window = LocalShellWindow.current
@@ -48,6 +58,17 @@ fun ConfirmDialog(question: String, action: String, onConfirm: () -> Unit, onCan
         }
     }
 }
+
+/**
+ * The safe choice's name beside [action]: [keep] when given, else "Cancel", and never the same words as [action]
+ * (an action itself called Cancel gets "Keep it"). Pure.
+ */
+fun safeChoice(keep: String?, action: String): String {
+    val chosen = keep?.takeIf { it.isNotBlank() } ?: CANCEL
+    return if (chosen.equals(action.trim(), ignoreCase = true)) KEEP_IT else chosen
+}
+
+private const val KEEP_IT = "Keep it"
 
 /** A row's action waiting for its [ConfirmDialog]: what it asks, its action's name, and what it does. */
 class PendingConfirm(val question: String, val action: String, val run: () -> Unit)

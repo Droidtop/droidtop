@@ -468,14 +468,17 @@ object PluginJobsScreen {
             add(
                 ActionItem(
                     id = "plugin_job_${jobId}_cancel",
-                    title = "Cancel",
+                    // Named for what it stops, and its question's safe answer for what it keeps (the owner on the
+                    // console: both buttons said "Cancel", the first meaning keep downloading).
+                    title = if (dev.droidtop.pluginhost.PluginJobsCenter.isDownloadKind(entry.nativeKind)) "Cancel download" else "Cancel job",
+                    confirmKeep = if (dev.droidtop.pluginhost.PluginJobsCenter.isDownloadKind(entry.nativeKind)) "Keep downloading" else "Keep it running",
                     subtitle = when (entry.nativeKind) {
                         null -> "Best effort: the plugin decides whether it actually stops"
                         // A store install's cancel deletes its partial files too (StoreInstallJob.discard).
                         DownloadJobs.KIND, dev.droidtop.library.stores.StoreInstallJob.KIND -> "Stops the download and deletes what was downloaded so far"
                         else -> "Stops at the next game"
                     },
-                    confirmTitle = "Cancel this job?",
+                    confirmTitle = if (dev.droidtop.pluginhost.PluginJobsCenter.isDownloadKind(entry.nativeKind)) "Cancel this download?" else "Cancel this job?",
                     run = { PluginJobsCenter.cancel(jobId) },
                 ),
             )
