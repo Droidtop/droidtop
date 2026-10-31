@@ -1,6 +1,5 @@
 package dev.droidtop.library.integrations
 
-import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginKind
@@ -79,11 +78,14 @@ class SourceItemPageTest {
 
     @Test
     fun `a release in parts is one download row, its parts counted`() {
-        // Two mirrors under one heading are one row that tries them in turn (Droidtop/tracker#838).
+        // Two mirrors under one heading are one row (Droidtop/tracker#838), which opens its hosts with Try in order first
+        // (Droidtop/tracker#859).
         val downloads = page()!!.groups[1].items
-        val repack = downloads.single() as AsyncActionItem
+        val repack = downloads.single() as dev.droidtop.library.settings.NestedScreenItem
         assertEquals("Repack", repack.title)
         assertEquals("Magnet, FuckingFast", repack.subtitle)
+        val hosts = kotlinx.coroutines.runBlocking { repack.inline!!.groups(context) }.single().items
+        assertEquals(listOf("Try in order", "Magnet", "FuckingFast"), hosts.map { it.title })
         // On its own, the release in parts is its own row, its parts counted.
         val onlyParts = JSONObject(reply.toString()).apply {
             val dl = getJSONArray("facets").getJSONObject(facetIndex("dl"))
