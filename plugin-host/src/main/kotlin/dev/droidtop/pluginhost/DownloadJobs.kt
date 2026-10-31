@@ -117,6 +117,12 @@ object DownloadJobs {
     /** [POST_MOVE_TO]'s argument: the absolute path the file is moved to. */
     const val ARG_TARGET_PATH = "targetPath"
 
+    /**
+     * The update a download is for, as the Updates page names it: its row's id and the version offered
+     * ("updates_plugin_x@1.3"). The page reads each row's state from its job ([updateJobs]); nothing else reads it.
+     */
+    const val ARG_UPDATE_FOR = "updateFor"
+
     const val DIGEST_MISMATCH = "the downloaded file does not match its published digest"
 
     private const val ARG_URL = "url"
@@ -674,6 +680,19 @@ object DownloadJobs {
         val marker = if (HostDecryption.SECRET in headers) mapOf(HostDecryption.PENDING to "1") else emptyMap()
         return plain.associate { it.key to it.value } + marker
     }
+
+    /**
+     * The newest download job for each update, by its [ARG_UPDATE_FOR] tag: running, held, or ended and still listed
+     * (Droidtop/tracker#833). One pass over the jobs, for a whole page of rows.
+     */
+    fun updateJobs(
+        entries: List<PluginJobsCenter.Entry> = PluginJobsCenter.entries().value,
+        argsOf: (jobId: String) -> Map<String, String>? = PluginJobsCenter::keptArgsOf,
+    ): Map<String, PluginJobsCenter.Entry> =
+        entries.filter { it.nativeKind == KIND }
+            .mapNotNull { entry -> argsOf(entry.jobId)?.get(ARG_UPDATE_FOR)?.let { it to entry } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, jobs) -> jobs.maxBy { it.startedAtMs } }
 
     /** The most files one download job has. */
     const val MAX_FILES = 16

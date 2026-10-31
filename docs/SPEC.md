@@ -19640,8 +19640,14 @@ menu still list every `listed` place.
   ("All · 5", "Plugins · 2", "Games · 1", "Apps · 1", "droidtop · 1"). Every row is the same shape whatever it updates:
   its icon or cover, its name, one line "installed → available · size · from where" ("v0.37 → v0.38 · 12 MB ·
   from the F95zone catalog"; `GameUpdates.step`, "unknown → v0.38" when the version here is not known, "a newer
-  build" when neither is), and one value that is its state: **Update**, **Updating** (with the moving bar),
-  **Waiting** (queued by Update all) or **Failed · Retry**. A folder game whose source names a newer version opens
+  build" when neither is), and one value that is its state, read from the update's own job (Droidtop/tracker#833):
+  **Update**; **Starting** while a press has no job yet; the job's percent with its bar while it downloads;
+  **Waiting** with the job's reason (its pool's queue, a download rule, the network); **Paused**; **Installing**
+  after the download while its install step runs; **Failed · Retry** with the job's own line. The page keeps no state
+  of its own: every update's download job carries its update's name (`DownloadJobs.ARG_UPDATE_FOR`, `UpdateTags`:
+  the plugin's or app's id and the version offered), a store game's row follows its store job
+  (`StoreInstallJob.lastFor`), and droidtop's follows its APK download and its update pass. So an update started
+  anywhere, Update all, its row, the Plugins page or an automatic update, shows the same on its row. A folder game whose source names a newer version opens
   that source's record in place (its downloads and its changelog); the other kinds have no changelog to show yet,
   so their rows have none. **One count** (`UpdatesWaiting`) is what every way in says: the "Updates · N available" row
   heading Downloads and Updates and the Quick Menu's Downloads tab (the owner, 2026-10-30: "An updates link should be
@@ -19655,7 +19661,9 @@ menu still list every `listed` place.
     kind: droidtop's build (recorded, never installed here), every plugin catalog, the trusted plugin repositories
     (which install by themselves when that is on), and every app catalog. Every check of droidtop, the scheduled one,
     Check now or Update, records what it saw (`AppSelfUpdate.recordSeen`) or that it failed (`recordFailure`).
-  - **Update all** when two or more can be installed from here, each the way its own Update does, one after another.
+  - **Update all** when two or more can be installed from here, each the way its own Update does, all started at once
+    as their own jobs: their pools put them in order, so each row shows its own place (Waiting, then its bar), not a
+    list the page keeps. A row already under way is not started again; with every row under way the button says so.
   - **One row per update**, each naming both versions in words (owner, 2026-10-24, Droidtop/tracker#639: "the
     updates page should show current and newest available version, in a way that makes it obvious which is which"):
     the version on offer in the value column, emphasised ("Available: v0.38"), and the version here first on the
@@ -19679,9 +19687,9 @@ menu still list every `listed` place.
   - **Live, and quick to show** (Droidtop/tracker#748; the owner: "It not auto-refreshing is a ux bug"). On the
     console each plugin of an Update all said it was ready in a notice while its row still read "Available" until the
     whole run ended, and the page took about 10 s to show anything. Now the screen is live (`CatalogScreen.live`): a
-    row whose update is running says Updating with the moving bar (#738), and the moment its update returns its kind
-    is read again, so the row goes or says what is left; Update all is those same updates, one after another, so each
-    row changes on its own. The slow kind (apps from the package manager) is read in the background and kept for 30 s:
+    row follows its job as the job changes, and the moment its update returns its kind is read again, so the row goes
+    or says what is left. A store game's row kept its bar only until its job started and then read Update again
+    (#833); it now follows that job to its end. The slow kind (apps from the package manager) is read in the background and kept for 30 s:
     the page draws at once from what is known, and until it is read it is one loading row of its own ("Checking your
     apps"). Check now reads every kind again when it ends. Plugins are read each time the rows are, from both of
     their sources, each exactly as Settings reads it: the catalogs on file, as Settings > Plugins reads them

@@ -345,7 +345,7 @@ object PluginCatalog {
             sha256 = release.bundle.sha256,
             maxBytes = MAX_BUNDLE_BYTES,
             headers = headers,
-            extra = mapOf(ARG_LABEL to plugin.label, ARG_VERSION to release.version),
+            extra = mapOf(ARG_LABEL to plugin.label, ARG_VERSION to release.version, DownloadJobs.ARG_UPDATE_FOR to UpdateTags.plugin(plugin.id, release.version)),
             onStatus = onStatus,
         )
         when {

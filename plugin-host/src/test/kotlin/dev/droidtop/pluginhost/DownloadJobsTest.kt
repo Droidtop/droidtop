@@ -660,4 +660,25 @@ class DownloadJobsTest {
         assertEquals(30, DownloadJobs.unpackPercent(0, 0, 3, 10))
         assertEquals(0, DownloadJobs.unpackPercent(0, 0, 0, 0))
     }
+
+    @Test
+    fun `each update's newest download job is found by its tag, ended ones still listed included`() {
+        fun job(id: String, at: Long, kind: String = DownloadJobs.KIND, done: Boolean = false) = PluginJobsCenter.Entry(
+            jobId = id, pluginId = "droidtop", pluginLabel = "Downloads", capability = null, title = id, startedAtMs = at,
+            nativeKind = kind, done = done,
+        )
+        val args = mapOf(
+            "old" to mapOf(DownloadJobs.ARG_UPDATE_FOR to "plugin:x@1.3"),
+            "new" to mapOf(DownloadJobs.ARG_UPDATE_FOR to "plugin:x@1.3"),
+            "app" to mapOf(DownloadJobs.ARG_UPDATE_FOR to "app:y@7"),
+            "plain" to mapOf("name" to "file.bin"),
+            "other" to mapOf(DownloadJobs.ARG_UPDATE_FOR to "plugin:z@1"),
+        )
+        val found = DownloadJobs.updateJobs(
+            listOf(job("old", 1, done = true), job("new", 2), job("app", 3, done = true), job("plain", 4), job("other", 5, kind = "store_install")),
+        ) { args[it] }
+        assertEquals(setOf("plugin:x@1.3", "app:y@7"), found.keys)
+        assertEquals("new", found.getValue("plugin:x@1.3").jobId)
+        assertEquals("app", found.getValue("app:y@7").jobId)
+    }
 }

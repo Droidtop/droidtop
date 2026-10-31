@@ -1,6 +1,8 @@
 package dev.droidtop.app.settings
 
+import dev.droidtop.pluginhost.JobState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** The Updates page's one row shape, its state and its views (Droidtop/tracker#792). */
@@ -13,13 +15,31 @@ class UpdatesPageRowsTest {
     }
 
     @Test
-    fun `one state model for every kind, the running one first`() {
-        val id = "updates_plugin_x"
-        assertEquals(UpdatesPage.State.AVAILABLE, UpdatesPage.stateOf(id, emptySet(), emptySet(), emptySet()))
-        assertEquals(UpdatesPage.State.DOWNLOADING, UpdatesPage.stateOf(id, setOf(id), setOf(id), setOf(id)))
-        assertEquals(UpdatesPage.State.WAITING, UpdatesPage.stateOf(id, emptySet(), setOf(id), setOf(id)))
-        assertEquals(UpdatesPage.State.FAILED, UpdatesPage.stateOf(id, emptySet(), emptySet(), setOf(id)))
+    fun `a row's state is its job's, and its press only covers the moments with no job running`() {
+        // No job: offered, or starting while its press resolves where to download from.
+        assertEquals(UpdatesPage.State.AVAILABLE, UpdatesPage.stateOf(null, pressed = false))
+        assertEquals(UpdatesPage.State.STARTING, UpdatesPage.stateOf(null, pressed = true))
+        // A job: its own state, whoever started it (Update all, the row, an automatic update).
+        assertEquals(UpdatesPage.State.DOWNLOADING, UpdatesPage.stateOf(JobState.RUNNING, pressed = false))
+        assertEquals(UpdatesPage.State.WAITING, UpdatesPage.stateOf(JobState.HELD, pressed = true))
+        assertEquals(UpdatesPage.State.WAITING, UpdatesPage.stateOf(JobState.WAITING_FOR_NETWORK, pressed = false))
+        assertEquals(UpdatesPage.State.PAUSED, UpdatesPage.stateOf(JobState.PAUSED, pressed = false))
+        assertEquals(UpdatesPage.State.FAILED, UpdatesPage.stateOf(JobState.FAILED, pressed = false))
         assertEquals("Failed · Retry", UpdatesPage.State.FAILED.label)
+        // Retry pressed: the new attempt, not the old failure.
+        assertEquals(UpdatesPage.State.STARTING, UpdatesPage.stateOf(JobState.FAILED, pressed = true))
+        // The download ended: installing while the press runs, then whatever the next read says.
+        assertEquals(UpdatesPage.State.INSTALLING, UpdatesPage.stateOf(JobState.DONE, pressed = true))
+        assertEquals(UpdatesPage.State.AVAILABLE, UpdatesPage.stateOf(JobState.DONE, pressed = false))
+    }
+
+    @Test
+    fun `a downloading row draws its job's own percent, never a bar that only says busy once the size is known`() {
+        assertEquals(0.38f, UpdatesPage.progressOf(UpdatesPage.State.DOWNLOADING, 38)!!, 0.0001f)
+        assertEquals(-1f, UpdatesPage.progressOf(UpdatesPage.State.DOWNLOADING, -1)!!, 0f)
+        assertEquals(-1f, UpdatesPage.progressOf(UpdatesPage.State.INSTALLING, 100)!!, 0f)
+        assertNull(UpdatesPage.progressOf(UpdatesPage.State.WAITING, 10))
+        assertNull(UpdatesPage.progressOf(UpdatesPage.State.AVAILABLE, -1))
     }
 
     @Test

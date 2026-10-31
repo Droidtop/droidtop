@@ -453,6 +453,9 @@ object PluginJobsCenter {
     /** A native job's arguments (its size and whether it is automatic ride in them), or null for any other job. */
     fun argsOf(jobId: String): Map<String, String>? = nativeSpecs[jobId]?.args
 
+    /** A native job's arguments while it runs, and after it ended for as long as its row is kept; null for any other job. */
+    fun keptArgsOf(jobId: String): Map<String, String>? = nativeSpecs[jobId]?.args ?: finishedSpecs[jobId]?.args
+
     /**
      * The download policy holds [jobId] for [reason]: a running job is paused (it resumes from what it has),
      * a job already held only changes its reason. A job the person paused is theirs and is left alone, as is one
