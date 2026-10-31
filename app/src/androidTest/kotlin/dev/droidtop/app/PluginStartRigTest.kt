@@ -1,7 +1,6 @@
 package dev.droidtop.app
 
 import android.os.SystemClock
-import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.droidtop.pluginhost.DroidtopPlugin
@@ -30,8 +29,8 @@ import java.security.MessageDigest
  * How long a contained plugin takes to start (docs/plugin-api.md 5.3, "The rigs"): on the BlueStacks rig every plugin
  * process waited a constant 10 s at its first app library load, so the first search after a start ran out of time.
  * A second plugin, in a process of its own, must start within [BUDGET_MS]; on BlueStacks it does not yet, and this
- * says by how much. Run by hand with
- * `am instrument`, never in CI:
+ * says by how much. Run on the CI emulator (scripts/emulator-tests.sh, reported only) and by hand with
+ * `am instrument`:
  *
  *     adb shell am instrument -w -e class dev.droidtop.app.PluginStartRigTest \
  *         dev.droidtop.app.test/androidx.test.runner.AndroidJUnitRunner
@@ -79,7 +78,7 @@ class PluginStartRigTest {
     fun aContainedPluginStartsWithinItsBudget() {
         val first = start(FIRST)
         val second = start(SECOND)
-        Log.i("droidtop.plugin", "rig start: first contained plugin $first ms, second $second ms")
+        instrumentation.rigLine("first contained plugin $first ms, second $second ms")
         assertTrue("a second contained plugin took $second ms to start (budget $BUDGET_MS ms; the first took $first ms)", second <= BUDGET_MS)
     }
 

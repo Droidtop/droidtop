@@ -4178,7 +4178,9 @@ with it:
   aborted with "libbinder ProcessState can not be used after fork" (rig,
   release 0.2.0-dev.2097, Droidtop/tracker#218). The wait per plugin
   process stands until a start path that avoids it is found;
-  `PluginStartRigTest` (by hand) measures it.
+  `PluginStartRigTest` measures it, and `PythonPluginStartRigTest` measures
+  a python plugin's start step by step (Droidtop/tracker#848); both run on
+  the CI emulator, reported only, and by hand on the rig.
 
 **ui.main in the sandbox (plugin-enforce-8, emulator-5560 and BlueStacks).**
 A contained plugin's own screen stayed black for two reasons, both rules of

@@ -7,7 +7,9 @@
 #
 # Fails when the contained-files test fails or droidtop does not start. PluginStartRigTest is run and reported, and
 # does not fail the run: it holds a start-time budget that the BlueStacks rig itself does not yet meet, and a CI
-# emulator's speed is not the rig's. PrivPackagesRigTest is not run: it needs the installed Shizuku plugin and a
+# emulator's speed is not the rig's. PythonPluginStartRigTest is run and reported the same way: it times each step of a
+# contained python plugin's start (the runtime's download on a clean emulator included), and every "rig start:" line a
+# test prints is copied into the summary. PrivPackagesRigTest is not run: it needs the installed Shizuku plugin and a
 # console's privileged package service, which a stock emulator has neither of.
 set -u
 
@@ -68,6 +70,8 @@ instrument() {
       status=1
     fi
   done
+  # The numbers a rig test measured (Droidtop/tracker#848), in the summary: the uploaded results are not the only place.
+  grep '^rig start: ' "$log" | tr -d '\r' | while IFS= read -r line; do say "  - ${line#rig start: }"; done
   if [ "$status" != 0 ] || [ -n "$failing" ]; then
     # What failed and where, in the log and the summary: the full output is only in the uploaded results.
     { echo '```'; sed -n '/^There w\|^Error in\|INSTRUMENTATION_RESULT: shortMsg\|^java\.\|^junit\.\|^Caused by/,$p' "$log" | head -45; echo '```'; } | tee -a "$summary"
@@ -98,6 +102,7 @@ adb logcat -c
 
 instrument dev.droidtop.app.ContainedFilesRigTest || failed=1
 instrument dev.droidtop.app.PluginStartRigTest || say "  (reported only: this test's start-time budget is the rig's, not an emulator's)"
+instrument dev.droidtop.app.PythonPluginStartRigTest || say "  (reported only: it times the python start path, which the console runs, not this emulator)"
 
 # The smoke test: start droidtop the way a launcher would and see that its process is still there, with no crash of
 # its own in the log, after the time a first start takes.

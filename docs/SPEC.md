@@ -24274,7 +24274,10 @@ the secondary path for sources that publish no key.
   known failing under Droidtop/tracker#741 (the contained plugin folder failed in an isolated process on stock Android
   13 and 14, the first run of those tests anywhere): they are reported and do not fail the run, and one of them passing
   fails it, so the entry (`KNOWN_FAILING` in the script) is removed when #741 is fixed. `PluginStartRigTest` is run and reported without failing the run,
-  since the start-time budget it holds is the rig's and not an emulator's. `PrivPackagesRigTest` is not run: it needs
+  since the start-time budget it holds is the rig's and not an emulator's. `PythonPluginStartRigTest` is run and
+  reported the same way: it times a contained python plugin's start step by step (the runtime's download and extract,
+  the first plugin, a second in its own process, a warm call, four at once), Droidtop/tracker#848. Each number a rig test
+  measures is a "rig start:" line in `am instrument`'s output, copied into the job's summary. `PrivPackagesRigTest` is not run: it needs
   the installed Shizuku plugin and a console's privileged package service. The rig tests stay "run by hand" for
   what only the rig has.
 - **Plugin bundles are signed by CI (owner, 2026-10-07).** Official plugin
