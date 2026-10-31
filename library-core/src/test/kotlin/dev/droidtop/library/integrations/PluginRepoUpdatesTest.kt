@@ -102,4 +102,134 @@ class PluginRepoUpdatesTest {
         assertTrue(PluginRepoUpdates.isNotable(RepoCheckResult.Processed("v2", listOf(RepoUpdateOutcome.NeedsApproval("Tool", "1")), emptyList())))
         assertTrue(PluginRepoUpdates.isNotable(RepoCheckResult.Processed("v2", emptyList(), listOf("a: failed."))))
     }
+
+    // ----- pending updates from what the last pass read (Droidtop/tracker#837) -----
+
+    private fun installed(id: String, version: String, origin: String = "maker") = dev.droidtop.pluginhost.PluginRecord(
+        manifest = dev.droidtop.pluginhost.PluginManifest(
+            id = id,
+            origin = origin,
+            label = "Label $id",
+            description = null,
+            version = version,
+            kind = dev.droidtop.pluginhost.PluginKind.NATIVE_BUNDLE,
+            capabilities = setOf(dev.droidtop.pluginhost.PluginCapability.STATUS_TILE),
+            contractVersion = 1,
+            requestsRoot = false,
+            abis = emptySet(),
+            entryClass = "x",
+            payload = emptyList(),
+        ),
+        archiveDigest = "a".repeat(64),
+        trust = dev.droidtop.pluginhost.PluginTrustState.APPROVED,
+        enabled = true,
+        rootApproved = false,
+        disabledReason = null,
+    )
+
+    private val trusted = mapOf(
+        "maker" to dev.droidtop.pluginhost.UserOriginKey(origin = "maker", keyBase64 = "k", source = null, repo = "Owner/plugins"),
+        "other" to dev.droidtop.pluginhost.UserOriginKey(origin = "other", keyBase64 = "k2", source = null, repo = "else/where"),
+    )
+
+    private fun read(version: String, id: String = "tool", prerelease: Boolean = false, tag: String = "v$version") =
+        RepoReleaseRead(tag, prerelease, listOf(RepoBundleRead("$id.droidplugin.tar.xz", id, version, 2048)))
+
+    private fun pending(
+        installed: List<dev.droidtop.pluginhost.PluginRecord>,
+        reads: Map<String, RepoReleaseRead>,
+        includePrereleases: Boolean = false,
+        catalogVersions: Map<String, String> = emptyMap(),
+    ) = PluginRepoUpdates.pending(installed, trusted, { repo -> reads[repo] }, includePrereleases, catalogVersions)
+
+    @Test
+    fun aNewerReleaseOfAnInstalledPluginIsPending() {
+        val found = pending(listOf(installed("tool", "1.0")), mapOf("Owner/plugins" to read("1.1")))
+        assertEquals(1, found.size)
+        val update = found.single()
+        assertEquals("tool", update.installed.manifest.id)
+        assertEquals("1.1", update.version)
+        assertEquals("v1.1", update.tag)
+        assertEquals("Owner/plugins", update.repo.repo)
+        assertEquals("tool.droidplugin.tar.xz", update.bundle.assetName)
+    }
+
+    @Test
+    fun theSameVersionIsNotPending() {
+        assertTrue(pending(listOf(installed("tool", "1.1")), mapOf("Owner/plugins" to read("1.1"))).isEmpty())
+    }
+
+    @Test
+    fun anOlderVersionIsNotPending() {
+        assertTrue(pending(listOf(installed("tool", "1.2")), mapOf("Owner/plugins" to read("1.1"))).isEmpty())
+    }
+
+    @Test
+    fun aPluginThatIsNotInstalledIsNotAnUpdate() {
+        assertTrue(pending(listOf(installed("other-tool", "1.0")), mapOf("Owner/plugins" to read("1.1"))).isEmpty())
+        assertTrue(pending(emptyList(), mapOf("Owner/plugins" to read("1.1"))).isEmpty())
+    }
+
+    @Test
+    fun aPluginInstalledFromAnotherOriginIsNotThisRepositorysToUpdate() {
+        assertTrue(pending(listOf(installed("tool", "1.0", origin = "other")), mapOf("Owner/plugins" to read("1.1"))).isEmpty())
+    }
+
+    @Test
+    fun aPrereleaseCountsOnlyWhenPrereleasesAreOn() {
+        val reads = mapOf("Owner/plugins" to read("1.1-beta", prerelease = true))
+        assertTrue(pending(listOf(installed("tool", "1.0")), reads, includePrereleases = false).isEmpty())
+        assertEquals("1.1-beta", pending(listOf(installed("tool", "1.0")), reads, includePrereleases = true).single().version)
+    }
+
+    @Test
+    fun aRepositoryNotReadYetOffersNothing() {
+        assertTrue(pending(listOf(installed("tool", "1.0")), emptyMap()).isEmpty())
+    }
+
+    @Test
+    fun aCatalogOfferWithTheSameOrAHigherVersionIsTheOneShown() {
+        val here = listOf(installed("tool", "1.0"))
+        val reads = mapOf("Owner/plugins" to read("1.1"))
+        assertTrue(pending(here, reads, catalogVersions = mapOf("tool" to "1.1")).isEmpty())
+        assertTrue(pending(here, reads, catalogVersions = mapOf("tool" to "1.2")).isEmpty())
+        assertEquals("1.1", pending(here, reads, catalogVersions = mapOf("tool" to "1.0.5")).single().version)
+        assertEquals("1.1", pending(here, reads, catalogVersions = mapOf("elsewhere" to "9.0")).single().version)
+    }
+
+    @Test
+    fun onePluginIsOneUpdateAtItsHighestVersionInInstalledOrder() {
+        val reads = mapOf(
+            "Owner/plugins" to RepoReleaseRead(
+                "v2",
+                false,
+                listOf(
+                    RepoBundleRead("b.droidplugin.tar.xz", "b", "2.0", 1),
+                    RepoBundleRead("a-old.droidplugin.tar.xz", "a", "1.1", 1),
+                    RepoBundleRead("a.droidplugin.tar.xz", "a", "1.3", 1),
+                ),
+            ),
+        )
+        val found = pending(listOf(installed("a", "1.0"), installed("b", "1.0")), reads)
+        assertEquals(listOf("a" to "1.3", "b" to "2.0"), found.map { it.installed.manifest.id to it.version })
+    }
+
+    @Test
+    fun whatThePassReadSurvivesItsPreference() {
+        val kept = RepoReleaseRead(
+            "v1.2",
+            true,
+            listOf(RepoBundleRead("a.droidplugin.tar.xz", "a", "1.2", 4096), RepoBundleRead("b.droidplugin.tar.xz", "b", "0.3", -1)),
+        )
+        assertEquals(kept, PluginRepoUpdates.decodeRead(PluginRepoUpdates.encodeRead(kept)))
+        assertNull(PluginRepoUpdates.decodeRead(""))
+        // A field that would break the line is dropped, not carried into another bundle's line.
+        val broken = RepoReleaseRead("v1", false, listOf(RepoBundleRead("a\tb", "a", "1", 1)))
+        assertTrue(PluginRepoUpdates.decodeRead(PluginRepoUpdates.encodeRead(broken))!!.bundles.isEmpty())
+    }
+
+    @Test
+    fun anUpdateLeftForThePersonSaysWhereToInstallIt() {
+        assertEquals("Tool 1.2.0 is available. Update it from Updates.", PluginRepoUpdates.describe(RepoUpdateOutcome.Available("Tool", "1.2.0")))
+    }
 }

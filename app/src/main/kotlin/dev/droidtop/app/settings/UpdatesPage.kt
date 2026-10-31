@@ -16,6 +16,7 @@ import dev.droidtop.library.integrations.AppCatalogs
 import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.integrations.PluginCatalog
 import dev.droidtop.library.integrations.PluginJobsScreen
+import dev.droidtop.library.integrations.PluginRepoUpdates
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.ButtonRole
 import dev.droidtop.library.settings.CatalogLayout
@@ -189,7 +190,8 @@ object UpdatesPage {
      * time the rows are; the slow one (the package manager's apps) is read in the background and kept, so the page shows
      * at once and it fills in its own rows when it is ready (Droidtop/tracker#748). Plugins are read the way Settings >
      * Plugins reads them, from the catalogs on file each time: a kept copy missed updates the Plugins list showed
-     * (Droidtop/tracker#837).
+     * (Droidtop/tracker#837). The trusted plugin repositories are the plugins' second source, read the same way from
+     * what their last check found ([PluginRepoUpdates.pendingUpdates]).
      */
     private enum class Section(val kind: Kind, val checking: String) {
         APPS(Kind.APPS, "Checking your apps"),
@@ -407,25 +409,56 @@ object UpdatesPage {
         )
     }
 
-    /** Installed plugins with a newer release in a catalog, as last fetched. */
+    /**
+     * Installed plugins with a newer version, from both of their sources as last read: a catalog (what Settings > Plugins
+     * reads) and a trusted plugin repository (what its screen under Plugin repositories reads), Droidtop/tracker#837. A
+     * plugin both offer is one row, the higher version's, the catalog's on a tie ([PluginRepoUpdates.pendingUpdates]).
+     */
     private fun plugins(context: Context): List<Update> {
         val installed = PluginStore.installed(context)
-        val offers = PluginCatalog.offersFor(installed, PluginCatalog.listings(context), UserOriginKeys.load(UserOriginKeys.storeFile(context)))
-        return offers.map { (record, offer) ->
+        val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
+        val offers = PluginCatalog.offersFor(installed, PluginCatalog.listings(context), userKeys)
+        val fromRepos = PluginRepoUpdates.pendingUpdates(
+            context,
+            installed,
+            userKeys,
+            catalogVersions = offers.associate { (record, offer) -> record.manifest.id to offer.release.version },
+        ).associateBy { it.installed.manifest.id }
+        val fromCatalogs = offers.filter { (record, _) -> record.manifest.id !in fromRepos }.associateBy { (record, _) -> record.manifest.id }
+        return installed.mapNotNull { record ->
             val id = "updates_plugin_${record.manifest.id}"
-            Update(
-                kind = Kind.PLUGINS,
-                id = id,
-                title = record.manifest.label,
-                step = GameUpdates.step(record.manifest.version, offer.release.version),
-                sizeBytes = offer.release.bundle.size,
-                from = if (offer.source.official) "droidtop's catalog" else "${offer.source.name}, unofficial",
-                iconFile = PluginStore.iconFile(context, record),
-                install = tracked(id, null) { ctx, onStatus ->
-                    val outcome = PluginCatalog.installOutcome(ctx, offer.plugin, offer.release) { status -> onStatus("${record.manifest.label}: $status") }
-                    Done("${record.manifest.label}: ${outcome.line}", outcome.installed)
-                },
-            )
+            val label = record.manifest.label
+            fromCatalogs[record.manifest.id]?.let { (_, offer) ->
+                Update(
+                    kind = Kind.PLUGINS,
+                    id = id,
+                    title = label,
+                    step = GameUpdates.step(record.manifest.version, offer.release.version),
+                    sizeBytes = offer.release.bundle.size,
+                    from = if (offer.source.official) "droidtop's catalog" else "${offer.source.name}, unofficial",
+                    iconFile = PluginStore.iconFile(context, record),
+                    install = tracked(id, null) { ctx, onStatus ->
+                        val outcome = PluginCatalog.installOutcome(ctx, offer.plugin, offer.release) { status -> onStatus("$label: $status") }
+                        Done("$label: ${outcome.line}", outcome.installed)
+                    },
+                )
+            } ?: fromRepos[record.manifest.id]?.let { update ->
+                Update(
+                    kind = Kind.PLUGINS,
+                    id = id,
+                    title = label,
+                    step = GameUpdates.step(record.manifest.version, update.version),
+                    sizeBytes = update.bundle.sizeBytes,
+                    from = "${update.repo.repo} on GitHub",
+                    iconFile = PluginStore.iconFile(context, record),
+                    // The repository's own install, the one its screen's rows run: the latest release's bundle, verified again.
+                    install = tracked(id, null) { ctx, onStatus ->
+                        onStatus("$label: downloading...")
+                        val outcome = withContext(Dispatchers.IO) { PluginRepoUpdates.installFromRepo(ctx, update.repo, update.bundle.assetName) }
+                        Done(if (outcome.installed) outcome.line else "$label: ${outcome.line}", outcome.installed)
+                    },
+                )
+            }
         }
     }
 

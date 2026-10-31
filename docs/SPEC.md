@@ -19596,9 +19596,24 @@ menu still list every `listed` place.
     is read again, so the row goes or says what is left; Update all is those same updates, one after another, so each
     row changes on its own. The slow kind (apps from the package manager) is read in the background and kept for 30 s:
     the page draws at once from what is known, and until it is read it is one loading row of its own ("Checking your
-    apps"). Check now reads every kind again when it ends. Plugins are read each time the rows are, from the catalogs
-    on file, exactly as Settings > Plugins reads them: a kept copy showed none while the Plugins list had updates
-    waiting, which the owner then installed from there (#837). One source, so the two lists never disagree.
+    apps"). Check now reads every kind again when it ends. Plugins are read each time the rows are, from both of
+    their sources, each exactly as Settings reads it: the catalogs on file, as Settings > Plugins reads them
+    (`PluginCatalog.offersFor`: a kept copy showed none while the Plugins list had updates waiting, which the owner
+    then installed from there, #837), and the trusted plugin repositories, as their screens under Plugin repositories
+    read them (`PluginRepoUpdates.pendingUpdates`: what each repository's last check read of its latest release,
+    preferences only; the owner still saw no plugin updates in Downloads and Updates after the first fix, #837, and
+    a repository's update was never listed there). A repository's row is "installed → version · from owner/name on
+    GitHub", and Update installs it with the repository's own install (`PluginRepoUpdates.installFromRepo`, the one
+    its screen's rows run, verified again by the installer). A plugin both offer is one row: the higher version's,
+    the catalog's when they are the same. One source per kind, so no two lists disagree. For a repository's update to
+    be listed it has to have been read: with Plugins on "Ask before installing" the repository pass now reads each
+    new release on an unmetered network (downloading its bundles to read their manifests, as the automatic pass
+    does) and installs nothing, where before it did not run at all; with "Install automatically" it installs as
+    before, and only what it could not install is left listed. A release only read is read once; it is installed by
+    the first pass that installs. The release list's ETag is kept only once its newest release is dealt with, so a
+    release deferred on a metered network is fetched by the next unmetered pass instead of hiding behind GitHub's 304.
+    Enginehost's engine cores ("update … waiting" on its plugin page) are not listed: droidtop can only read that
+    list (`engines.cores@1` has no install operation), so the update is Enginehost's own to install.
   - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
     Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a
     privilege allows a silent install), after the jobs. Get apps and Get new games are Downloads and Updates' Get games
@@ -24322,7 +24337,12 @@ the secondary path for sources that publish no key.
   per release, 512 MiB each, checked against GitHub's own sha256 when it gives one)
   are downloaded only on an UNMETERED connection; on a metered one the pass
   leaves the release for the next pass on an unmetered one. Pre-releases are
-  ignored unless the person turns them on. A bundle is applied only when ALL of
+  ignored unless the person turns them on. With the switch off (Plugins on "Ask
+  before installing") the pass still runs and reads each new release the same way
+  but installs nothing: what each bundle carries is kept (`PluginRepoUpdates.releaseRead`)
+  and an installed plugin it has a newer version of is listed in Updates
+  (`PluginRepoUpdates.pendingUpdates`, 10b "The Updates page", Droidtop/tracker#837),
+  where Update installs it by hand. A bundle is applied only when ALL of
   this holds (`PluginRepos.decide`): it is signed for the origin this repository was
   trusted for, the signature verifies against the key the person confirmed, the
   plugin is already installed from that origin, and the version is newer. A
