@@ -421,4 +421,48 @@ class DebridTest {
             DebridChoice.reset()
         }
     }
+
+    /** A hoster TorBox has not fetched yet, served once it has (Droidtop/tracker#638: Bare Witness's GoFile mirror). */
+    private class Fetching(private val calls: MutableList<String>) : DebridProvider {
+        override val name = "TorBox"
+        override val id = "torbox"
+        private var asked = 0
+        override fun check(key: String): String? = null
+        override fun cached(key: String, torrent: TorrentRef): Boolean? = null
+        override fun request(key: String, torrent: TorrentRef): DebridState = DebridState.NotCached
+        override fun hosts(key: String) = setOf("gofile.io", "mixdrop.ag")
+        override fun linkCached(key: String, link: String) = false
+        override fun unrestrict(key: String, link: String): DebridState {
+            calls += link
+            return if (asked++ == 0) DebridState.Ready(listOf(DebridFile("BareWitness.zip", 9, "https://cdn.torbox.example/bw"))) else DebridState.NotCached
+        }
+    }
+
+    @Test
+    fun aHosterLinkTorBoxHasNotFetchedYetIsFetchedNotSkippedAndASkipSaysWhy() {
+        DebridChoice.reset()
+        val before = DebridLinks.accounts
+        val calls = mutableListOf<String>()
+        DebridLinks.accounts = { listOf(Fetching(calls) to "bare-witness-key") }
+        try {
+            // Not cached: before, "Wait for the service" (a torrent setting, off by default) skipped it in silence.
+            val served = DebridLinks.resolve("https://gofile.io/d/bw")!!
+            assertEquals("via your TorBox", served.single().via)
+            assertEquals(listOf("https://gofile.io/d/bw"), calls)
+            // A host the account does not list is passed over, and says so.
+            val told = mutableListOf<String>()
+            assertEquals(null, DebridLinks.resolve("https://uploadhaven.com/download/x", skipped = { told += it }))
+            assertEquals(listOf("TorBox doesn't serve uploadhaven.com"), told)
+            // Its host list, fetched once, makes a masked mirror's host name count before the link is opened.
+            DebridLinks.prime()
+            assertTrue(DebridLinks.servesName("GOFILE"))
+            assertTrue(DebridLinks.servesName("MixDrop"))
+            assertTrue(!DebridLinks.servesName("UPLOADHAVEN"))
+            assertTrue(DebridLinks.serves("https://gofile.io/d/other"))
+            assertTrue(dev.droidtop.pluginhost.hosts.HostLinks.served("https://gofile.io/d/other"))
+        } finally {
+            DebridLinks.accounts = before
+            DebridChoice.reset()
+        }
+    }
 }
