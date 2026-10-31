@@ -31,7 +31,9 @@ import kotlinx.coroutines.launch
 /**
  * The page's row for a linked source's own page (Droidtop/tracker#397 slice
  * E): it opens the link in the browser and fetches nothing. The page shows
- * only the link's host; the whole link is the row's tip.
+ * only the link's host; the whole link is the row's tip. It is the Show
+ * thread tab's row (Droidtop/tracker#845) until that tab draws the thread's
+ * first post.
  */
 internal const val OPEN_SOURCE_ROW = "Open source page"
 
@@ -43,9 +45,10 @@ internal fun linkHost(url: String?): String? =
 internal const val SOURCE_LINK_HELP = "A link or id; blank unlinks"
 
 /**
- * The game's update sources as rows: under Versions one per source (A links or changes it), and on the Overview, for
- * each linked one whose page is known, "View thread" with the page's host (Droidtop/tracker#859; the owner: "there's no
- * "view thread" button"). [onOpen] opens that page in droidtop's web view with the source's session. Pure, for the tests.
+ * The game's update sources as rows: under Versions one per source (A links or changes it), and under Show thread
+ * (Droidtop/tracker#845), for each linked one whose page is known, "View thread" with the page's host
+ * (Droidtop/tracker#859; the owner: "there's no "view thread" button"). [onOpen] opens that page in droidtop's web view
+ * with the source's session. Pure, for the tests.
  */
 internal fun sourceRows(
     sources: List<UpdateSources.Source>,
@@ -71,7 +74,7 @@ internal fun sourceRows(
                     subtitle = source.label.takeIf { sources.size > 1 },
                     onActivate = { onOpen(source, url) },
                     tip = url,
-                    tab = PageTab.OVERVIEW,
+                    tab = PageTab.THREAD,
                 )
             }
         },
