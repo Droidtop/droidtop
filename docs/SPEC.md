@@ -4195,8 +4195,11 @@ the `ContainerRuntime` interface that already exists (§3):
     as does B or the menu's own close; another chord replaces it.
   - HOME + R2 is the shell's own Quick Menu (`QuickMenuStandalone`, the one Desktop's tray and Mobile's gesture
     open), not a copy. Its sheets and pages are `ShellDialog`s, the shell's one modal window: Compose's Dialog in
-    droidtop's own windows, and inside an overlay (`LocalInGameOverlay`) a focusable Popup filling the overlay, a
-    sub-window of it, since a Dialog has no activity to belong to over another app. The UI rule `bare-dialog` fails a
+    droidtop's own windows, and inside an overlay (`LocalInGameOverlay`) a layer of the overlay's own window
+    (`OverlayLayerHost`: newest on top over its scrim, Back closing it), since a Dialog has no activity to belong to
+    over another app. It was a focusable Popup sub-window until 2026-10-31: over DuckStation the window manager named
+    that Popup the focus while the input dispatcher had no focused window, and leaving touch mode was refused, so the
+    R2 Quick Menu took no pad at all (#820, dev.2778). One window, so it owns the focus. The UI rule `bare-dialog` fails a
     Compose `Dialog(` anywhere else in the shell.
   - The overlay window is focusable, so the pad reaches it, and the sheet it opens, by Android's own focus (as the
     launch watchdog's card does), rather than through `OverlayRequests.keys`, which delivers to one view and not to a

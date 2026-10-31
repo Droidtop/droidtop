@@ -232,7 +232,11 @@ internal object InGameOverlays {
                     dev.droidtop.shell.gamepad.hosted.ProvideOverlayOwners {
                         CompositionLocalProvider(LocalInGameOverlay provides true) {
                             // An overlay window holds its own focus: its first D-pad press moves it (Droidtop/tracker#820).
-                            dev.droidtop.shell.gamepad.PadFocusHolder(androidx.compose.ui.Modifier.fillMaxSize(), content = content)
+                            // Its sheets are layers of this same window, never Popup sub-windows, which get no pad over
+                            // another app (OverlayLayerHost).
+                            dev.droidtop.shell.gamepad.OverlayLayerHost(androidx.compose.ui.Modifier.fillMaxSize()) {
+                                dev.droidtop.shell.gamepad.PadFocusHolder(androidx.compose.ui.Modifier.fillMaxSize(), content = content)
+                            }
                         }
                     }
                 }
