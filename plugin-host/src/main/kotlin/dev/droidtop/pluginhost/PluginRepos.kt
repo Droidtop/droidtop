@@ -180,7 +180,13 @@ object PluginRepos {
         if (current.manifest.origin != manifest.origin) {
             return UpdateDecision.Refused("\"${manifest.id}\" is installed from origin \"${current.manifest.origin}\"")
         }
-        if (Versions.compareLoose(manifest.version, current.manifest.version) <= 0) return UpdateDecision.UpToDate
+        if (!isNewer(manifest.version, current)) return UpdateDecision.UpToDate
         return UpdateDecision.Apply(current, PermissionDiff.between(current.manifest, manifest))
     }
+
+    /**
+     * Whether [version] from a trusted repository updates [installed]: the one version rule, for the pass that installs
+     * ([decide]) and for the updates listed from what it read (`PluginRepoUpdates.pending`).
+     */
+    fun isNewer(version: String, installed: PluginRecord): Boolean = Versions.compareLoose(version, installed.manifest.version) > 0
 }
