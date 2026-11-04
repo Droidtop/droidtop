@@ -21967,8 +21967,8 @@ owner's Sandustry from his Windows desktop to the Retroid Pocket 5.
 
 - **Forget goes back.** "Forget this computer" and "Forget this handheld" are
   `ActionItem`s with `leaves = true`: once done, the surface goes back one
-  screen (`CatalogNavigator`, and the launcher's preference screens through
-  the back dispatcher) to the paired devices, instead of a page saying it is
+  screen (`CatalogNavigator`, and the launcher's preference screens'
+  `CatalogPreferenceNavigator.pop`, the step Back takes) to the paired devices, instead of a page saying it is
   no longer paired. A screen opened on a device that is gone still says so,
   and says to go back.
 - **"It no longer knows this device."** A computer that was told to forget
