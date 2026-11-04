@@ -689,6 +689,33 @@ private fun PcGameMenuSheet(
             }
         }
     }
+    // "Stream from <computer>" for each paired computer that has this game (Droidtop/tracker#860, docs/SPEC.md 7o):
+    // the computer starts it and its window shows here. Files read, so on IO.
+    val streamKey = dev.droidtop.library.computers.ComputerLaunch.keyOf(entry.id, entry.pcInfo?.storeId)
+    val streamFrom by produceState(emptyList<dev.droidtop.net.peer.Computer>(), entry.id) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val computers = dev.droidtop.net.peer.Computers.list(context)
+                dev.droidtop.library.computers.ComputerLaunch.order(
+                    dev.droidtop.library.computers.ComputerLibrary.computersWith(context, streamKey, computers),
+                )
+            }.getOrNull().orEmpty()
+        }
+    }
+    val streamRows = streamFrom.map { pc ->
+        ActionRow(
+            dev.droidtop.library.computers.ComputerLaunch.streamTitle(pc),
+            "Starts it on ${pc.name} and shows it here, with its sound and your controls",
+            onSelect = {
+                scope.launch {
+                    status = "Starting it on ${pc.name}…"
+                    status = withContext(Dispatchers.IO) {
+                        dev.droidtop.library.computers.ComputerLaunch.stream(context, pc, streamKey, GameNaming.displayName(entry.title))
+                    }
+                }
+            },
+        )
+    }
     val ownStoreRows = ownStore?.let { store ->
         val key = entry.pcInfo?.storeId ?: entry.id
         val gameId = key.substringAfter(':')
@@ -798,6 +825,7 @@ private fun PcGameMenuSheet(
     val actions = rememberPcActions(
         titleRows = titleRows,
         storeRows = ownStoreRows,
+        streamRows = streamRows,
         group = group,
         currentId = entry.id,
         onOpenOther = onOpenOther,
@@ -1431,6 +1459,8 @@ private fun rememberPcActions(
     titleRows: List<ActionRow>,
     // A store game: its store's rows. Null for a game no store owns.
     storeRows: StoreRows?,
+    // "Stream from <computer>", one per paired computer that has the game.
+    streamRows: List<ActionRow>,
     group: dev.droidtop.library.LibraryGameGroup?,
     currentId: String,
     onOpenOther: (LibraryEntry) -> Unit,
@@ -1474,9 +1504,9 @@ private fun rememberPcActions(
         onOpenProperties = onOpenProperties,
     )
     return PcMenuSections(
-        // The top: the store's other ways to play (Steam Link), the page, and the favourite. The primary action and
-        // Play without updating are added where the play state is known.
-        play = storeRows?.play.orEmpty() + listOfNotNull(
+        // The top: the store's other ways to play (Steam Link), streaming from a computer, the page, and the favourite.
+        // The primary action and Play without updating are added where the play state is known.
+        play = storeRows?.play.orEmpty() + streamRows + listOfNotNull(
             onOpenPage?.let { ActionRow("Game page", "Its artwork, facts and the one Play button", onSelect = it) },
             ActionRow(
                 if (favorite) "Remove from favourites" else "Add to favourites",

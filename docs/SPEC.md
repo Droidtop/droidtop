@@ -21891,9 +21891,9 @@ docs/DESIGN.md section 17, "Games the host starts").
   `launch_game`, orders the computers and turns each answer into words.
   "Stream with Steam Link" uses it as well.
 - **Where it starts.** Opening a computer's game in the library
-  (`COMPUTER_GAME`, "On <computer>") whose key is not Steam's asks that
-  computer, the one the entry is filed under. A Steam game opened there says
-  that Stream with Steam Link is in its menu. An application (`REMOTE_STREAM`)
+  (`COMPUTER_GAME`, "On <computer>") asks that computer, the one the entry is
+  filed under, to start it and stream it (Stream from <computer>, below;
+  Steam games too since #860). An application (`REMOTE_STREAM`)
   is not asked: launch_host covers the host's games. It opens the stream screen
   on its computer, at a window named like the application, and says so; the
   application must already be open there.
@@ -21920,7 +21920,46 @@ docs/DESIGN.md section 17, "Games the host starts").
 - **Not built:** the host sending its windowcast address in the answer (an
   `address` beside `stream`; Pythia), so a host whose windowcast does not
   listen on 47100 is named correctly. Until then such a host is tried on 47100
-  and is not reached.
+  and is not reached. The agent's own embedded host listens on 47100 and sends
+  no address (Stream from <computer>, below).
+
+### Starting a game on a computer: Stream from <computer> (Droidtop/tracker#860)
+
+Owner, 2026-10-31: "the droidtop agent has to implement the windowcast library.
+the windowcast host application is a reference application. Once the droidtop
+agent implements it, pythia inherits it." The agent embeds windowcast's host
+(droidtop-agent docs/DESIGN.md section 22; Windows only for now), so the game
+the computer starts for this device streams to it. The acceptance test is the
+owner's Sandustry from his Windows desktop to the Retroid Pocket 5.
+
+- **The row.** A game's menu lists "Stream from <computer>" in its Play part
+  for each paired computer whose library lists the game as installed
+  (`ComputerLibrary.computersWith`, the one met most recently first), on any
+  game a computer has, Steam's or not. Opening a computer's own game in the
+  library (`COMPUTER_GAME`, "On <computer>") does the same for that computer,
+  Steam games included: they no longer only point at Steam Link.
+  "Stream with Steam Link" stays in a Steam game's menu as Steam's own way.
+- **One path.** `ComputerLaunch.stream` (`:library-core`) sends `launch_game`
+  with `stream {via: windowcast, viewer}`, words the answer as every launch is
+  worded, and opens the stream screen (`RemoteStreamActivity`, 7a) at the
+  game's window on `started` with `stream: windowcast`.
+- **No PIN.** `viewer` is this device's windowcast client identity, the one
+  the stream screen connects with (`filesDir/windowcast/client-identity.key`,
+  made in windowcast's form by `ComputerLaunch.viewerId` when the screen has
+  not made it yet). The computer's agent trusts it because this device is
+  paired with it and allowed to start games there; droidtop adds the
+  computer's id to windowcast's trusted hosts
+  (`filesDir/windowcast/client-trusted-hosts`) before opening the screen, and
+  the screen still checks that the host answers with that id. A computer
+  streamed from before by PIN keeps working as it did.
+- **Honest states.** Besides the launch's own (7o above), an agent that does
+  not state the `stream` feature (too old, or not on Windows) is not asked to
+  start anything: the line says the computer cannot stream yet and to update
+  droidtop-agent there. A computer that has not allowed this device names
+  the agent's place for it: Settings, Offered, Starting games here.
+- **Not built:** streaming from away (the stream travels on the home network
+  only), a computer other than Windows, and showing only the game's own
+  windows (droidtop-agent DESIGN section 22).
 
 ### Transports
 

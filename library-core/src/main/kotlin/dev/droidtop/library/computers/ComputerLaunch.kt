@@ -2,9 +2,12 @@ package dev.droidtop.library.computers
 
 import android.content.Context
 import android.content.Intent
+import dev.droidtop.net.peer.AgentNative
 import dev.droidtop.net.peer.Computer
 import dev.droidtop.net.peer.Computers
 import org.json.JSONObject
+import timber.log.Timber
+import java.io.File
 
 /**
  * Asking a paired computer to start one of its games (docs/SPEC.md 7o,
@@ -14,6 +17,13 @@ import org.json.JSONObject
  * (droidtop-agent docs/DESIGN.md section 17); a Steam key is started by Steam
  * there, any other by the program hosting the agent (Pythia), which answers
  * `stream: windowcast` when windowcast shows the game's window.
+ *
+ * "Stream from <computer>" ([stream]) asks to watch as well
+ * (Droidtop/tracker#860, droidtop-agent docs/DESIGN.md section 22): the
+ * request names this device's windowcast viewer, which the computer's agent
+ * trusts because this device is paired with it, so no PIN is asked; the
+ * agent starts windowcast's host and the game, and the stream screen opens
+ * at the game's window.
  *
  * Every answer becomes one line in plain words with the next step.
  */
@@ -65,9 +75,13 @@ object ComputerLaunch {
                 streamAddress = reply.optString("address").takeIf { isHostPort(it) },
             )
             "agent_too_old" -> Outcome(false, "droidtop-agent on $computer is too old to start games. Update it on the computer.")
+            "cannot_stream" -> Outcome(
+                false,
+                "$computer can't stream games yet: droidtop-agent streams from Windows only, and an older one not at all. Update it on the computer.",
+            )
             "not_allowed" -> Outcome(
                 false,
-                "$computer hasn't allowed $handheld to start games. On $computer open droidtop-agent, Settings, Start games, and tick $handheld.",
+                "$computer hasn't allowed $handheld to start games. On $computer open droidtop-agent, Settings, Offered, and turn on Starting games here for $handheld.",
             )
             "unknown_game" -> Outcome(
                 false,
@@ -99,11 +113,92 @@ object ComputerLaunch {
         return last
     }
 
-    /** Asks [candidates] in order to start the game [key]. Network work: never on the main thread. */
-    fun start(context: Context, candidates: List<Computer>, key: String, title: String): Pair<Computer, Outcome>? =
-        ask(candidates, title, Computers.deviceName(context), key) { pc ->
-            Computers.call(context, pc, "launch_game", JSONObject().put("game", JSONObject().put("key", key).put("title", title)))
+    /**
+     * Asks [candidates] in order to start the game [key]; with [viewer] (this device's windowcast viewer id) it asks
+     * to watch it too. Network work: never on the main thread.
+     */
+    fun start(context: Context, candidates: List<Computer>, key: String, title: String, viewer: String? = null): Pair<Computer, Outcome>? =
+        ask(candidates, title, Computers.deviceName(context), key) { pc -> Computers.call(context, pc, "launch_game", launchArgs(key, title, viewer)) }
+
+    /** The `launch_game` arguments: the game, and with [viewer] the ask to watch it through windowcast. */
+    fun launchArgs(key: String, title: String, viewer: String?): JSONObject = JSONObject()
+        .put("game", JSONObject().put("key", key).put("title", title))
+        .also { args -> viewer?.let { args.put("stream", JSONObject().put("via", STREAM_WINDOWCAST).put("viewer", it)) } }
+
+    /** The row's title for streaming from [computer]. */
+    fun streamTitle(computer: Computer): String = "Stream from ${computer.name}"
+
+    /** The library key of a game entry: a computer's entry (`computer:<id>:<key>`) carries the key after its computer. */
+    fun keyOf(entryId: String, storeId: String?): String =
+        if (entryId.startsWith("computer:")) entryId.removePrefix("computer:").substringAfter(':') else storeId ?: entryId
+
+    /**
+     * "Stream from <computer>": starts [key] on [computer] and shows it here through windowcast, and returns the one line
+     * to show. Network and file work: never on the main thread.
+     */
+    fun stream(context: Context, computer: Computer, key: String, title: String): String {
+        val viewer = viewerId(context) ?: return "This device's windowcast identity could not be opened, so nothing can be streamed."
+        val (_, outcome) = start(context, listOf(computer), key, title, viewer) ?: return "${computer.name} could not be asked."
+        if (!outcome.started) {
+            Timber.w("Stream from %s (%s): %s", computer.name, key, outcome.line)
+            return outcome.line
         }
+        if (outcome.stream != STREAM_WINDOWCAST) {
+            return "${outcome.line} It shows on ${computer.name}'s screen; nothing here streams it."
+        }
+        // The agent trusts this device's viewer; this device trusts the computer it paired with, so no PIN is asked.
+        runCatching { trustHost(context, computer.id) }.onFailure { Timber.w(it, "Stream from %s: could not trust it for windowcast", computer.name) }
+        return openWindowcast(context, computer, outcome.streamAddress, title, outcome.line)
+    }
+
+    /** droidtop's windowcast client folder: its identity and the hosts it trusts. The stream screen opens the same one. */
+    fun windowcastDir(context: Context): File = File(context.filesDir, "windowcast")
+
+    /** The identity file windowcast's client keeps in its folder (windowcast `client-core`, `Client::new`): the 32-byte seed. */
+    private const val CLIENT_IDENTITY = "client-identity.key"
+
+    /** The hosts windowcast's client trusts, one id in hex per line (windowcast `client-core`, `TrustStore`). */
+    private const val CLIENT_TRUSTED_HOSTS = "client-trusted-hosts"
+
+    /**
+     * This device's windowcast viewer id (hex): the identity the stream screen connects with, made here the first time
+     * in windowcast's own form when the screen has not made it yet. Files and the agent library: never on the main thread.
+     */
+    @Synchronized
+    fun viewerId(context: Context): String? {
+        val dir = windowcastDir(context).apply { mkdirs() }
+        val file = File(dir, CLIENT_IDENTITY)
+        val seed = if (file.length() == 32L) {
+            file.readBytes().joinToString("") { "%02x".format(it) }
+        } else {
+            val made = AgentNative.call("identity_new").optString("seed").takeIf { it.length == 64 } ?: return null
+            val tmp = File(dir, "$CLIENT_IDENTITY.tmp")
+            tmp.writeBytes(made.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
+            if (!tmp.renameTo(file)) return null
+            made
+        }
+        return AgentNative.call("identity_id", JSONObject().put("seed", seed)).optString("id").takeIf { it.length == 64 }
+    }
+
+    /** Lets windowcast's client resume with [hostId] without a PIN: the computer's id, pinned when it was paired. Files. */
+    @Synchronized
+    fun trustHost(context: Context, hostId: String) {
+        val dir = windowcastDir(context).apply { mkdirs() }
+        val file = File(dir, CLIENT_TRUSTED_HOSTS)
+        val next = trustedHostsWith(if (file.isFile) file.readText() else "", hostId) ?: return
+        val tmp = File(dir, "$CLIENT_TRUSTED_HOSTS.tmp")
+        tmp.writeText(next)
+        if (!tmp.renameTo(file)) error("could not write $file")
+    }
+
+    /** [current] (windowcast's trusted-host list) with [hostId] added, or null when it is already there or not an id. */
+    fun trustedHostsWith(current: String, hostId: String): String? {
+        val id = hostId.lowercase()
+        if (!Regex("^[0-9a-f]{64}$").matches(id)) return null
+        val lines = current.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        if (lines.any { it.equals(id, ignoreCase = true) }) return null
+        return (lines + id).joinToString("\n", postfix = "\n")
+    }
 
     /** Whether [text] is `HOST:PORT` as the stream screen takes it: an IPv6 host in brackets, a port from 1 to 65535, nothing else. */
     fun isHostPort(text: String): Boolean = HOST_PORT.matchEntire(text)?.groupValues?.get(2)?.toIntOrNull()?.let { it in 1..65535 } == true

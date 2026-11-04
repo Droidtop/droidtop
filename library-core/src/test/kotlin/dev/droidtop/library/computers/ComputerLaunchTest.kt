@@ -24,6 +24,7 @@ class ComputerLaunchTest {
             """{"result":"steam_not_running"}""",
             """{"result":"failed","message":"x"}""",
             """{"result":"agent_too_old"}""",
+            """{"result":"cannot_stream"}""",
             """{"error":"boom"}""",
             """{"unreachable":"it did not answer on this network"}""",
             """{"result":"something_new"}""",
@@ -32,7 +33,7 @@ class ComputerLaunchTest {
 
     @Test
     fun `each failure names the computer and the next step`() {
-        assertTrue(say("""{"result":"not_allowed"}""").line.let { "DESKTOP" in it && "Retroid" in it && "Start games" in it })
+        assertTrue(say("""{"result":"not_allowed"}""").line.let { "DESKTOP" in it && "Retroid" in it && "Starting games here" in it })
         assertTrue("Update it on the computer" in say("""{"result":"agent_too_old"}""").line)
         assertTrue("Start Steam there and sign in" in say("""{"result":"steam_not_running"}""").line)
         assertTrue("Portal" in say("""{"result":"unknown_game"}""").line)
@@ -119,5 +120,40 @@ class ComputerLaunchTest {
         assertFalse(ComputerLaunch.isHostPort("pc:65536"))
         assertFalse(ComputerLaunch.isHostPort("pc"))
         assertFalse(ComputerLaunch.isHostPort("a b:1"))
+    }
+
+    @Test
+    fun `a computer that cannot stream says so and how to fix it`() {
+        val line = say("""{"result":"cannot_stream"}""").line
+        assertTrue(line, "DESKTOP" in line && "Windows" in line && "Update it" in line)
+    }
+
+    @Test
+    fun `asking to watch names the viewer, and a plain start does not`() {
+        val plain = ComputerLaunch.launchArgs("steam:400", "Portal", null)
+        assertFalse(plain.has("stream"))
+        assertEquals("steam:400", plain.getJSONObject("game").getString("key"))
+        val watch = ComputerLaunch.launchArgs("steam:400", "Portal", "ab".repeat(32)).getJSONObject("stream")
+        assertEquals("windowcast", watch.getString("via"))
+        assertEquals("ab".repeat(32), watch.getString("viewer"))
+    }
+
+    @Test
+    fun `a computer's entry streams by the key after its computer`() {
+        val pcId = "c".repeat(64)
+        assertEquals("steam:400", ComputerLaunch.keyOf("computer:$pcId:steam:400", "steam:400"))
+        assertEquals("title:sandustry", ComputerLaunch.keyOf("computer:$pcId:title:sandustry", null))
+        assertEquals("steam:400", ComputerLaunch.keyOf("pc:whatever", "steam:400"))
+        assertEquals("local:x", ComputerLaunch.keyOf("local:x", null))
+    }
+
+    @Test
+    fun `the computer joins windowcast's trusted hosts once`() {
+        val id = "A".repeat(64)
+        assertEquals("${"a".repeat(64)}\n", ComputerLaunch.trustedHostsWith("", id))
+        val other = "b".repeat(64)
+        assertEquals("$other\n${"a".repeat(64)}\n", ComputerLaunch.trustedHostsWith("$other\n\n", id))
+        assertNull(ComputerLaunch.trustedHostsWith("${"a".repeat(64)}\n", id))
+        assertNull(ComputerLaunch.trustedHostsWith("", "not an id"))
     }
 }

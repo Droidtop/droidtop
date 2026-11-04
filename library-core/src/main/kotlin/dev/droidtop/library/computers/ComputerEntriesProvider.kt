@@ -8,12 +8,10 @@ import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.PcSource
-import dev.droidtop.net.peer.Computer
 import dev.droidtop.net.peer.Computers
 import dev.droidtop.net.peer.DeviceIdentity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import timber.log.Timber
 
 /**
  * What the person's paired computers have that this device does not, in this
@@ -75,11 +73,10 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
 
     /**
      * Nothing here runs it: it is on the computer (docs/SPEC.md 7o, "Starting
-     * a game on a computer"). A game that is not Steam's is asked of that
-     * computer through [ComputerLaunch]; the program hosting its agent
-     * (Pythia) starts its own games, and droidtop's stream screen opens (windowcast's
-     * library) when it says windowcast shows the game. A Steam game is streamed with the Steam
-     * module's "Stream with Steam Link", in its menu. An application opens the
+     * a game on a computer"). Opening a computer's game streams it from that
+     * computer ([ComputerLaunch.stream], Droidtop/tracker#860): its agent starts
+     * the game, Steam's or the program hosting it's (Pythia), and droidtop's stream
+     * screen (windowcast's library) opens at its window. An application opens the
      * same stream screen on its computer, at a window named like it (7a).
      */
     override suspend fun launch(entry: LibraryEntry) {
@@ -96,21 +93,8 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
             computer != null && entry.kind == LibraryEntryKind.REMOTE_STREAM ->
                 ComputerLaunch.openWindowcast(context, computer, null, entry.title, "${entry.title} is installed on $name; its window is shown if it is open there.")
             computer == null || entry.kind != LibraryEntryKind.COMPUTER_GAME -> "${entry.title} is installed on $name, not on this device"
-            key.startsWith("steam:") -> "${entry.title} is installed on $name, not on this device. Stream with Steam Link is in its menu."
-            else -> startOn(computer, key, entry.title)
-        }
-    }
-
-    private fun startOn(computer: Computer, key: String, title: String): String {
-        val (_, outcome) = ComputerLaunch.start(context, listOf(computer), key, title) ?: return "${computer.name} could not be asked."
-        if (!outcome.started) {
-            Timber.w("Start on a computer: %s (%s): %s", computer.name, key, outcome.line)
-            return outcome.line
-        }
-        return when (outcome.stream) {
-            ComputerLaunch.STREAM_WINDOWCAST -> ComputerLaunch.openWindowcast(context, computer, outcome.streamAddress, title, outcome.line)
-            // Started, with nothing on this device to show it (no windowcast host there).
-            else -> "${outcome.line} It shows on ${computer.name}'s screen; nothing here streams it."
+            // Opening a computer's game streams it from there (Droidtop/tracker#860): Steam's too, through windowcast.
+            else -> ComputerLaunch.stream(context, computer, key, entry.title)
         }
     }
 
