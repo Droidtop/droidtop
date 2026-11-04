@@ -56,7 +56,7 @@ object ComponentCatalog {
         migrate(context)
         val prefs = prefs(context)
         // A copy taken before this build pinned the signing root (or under another anchor) is not trusted.
-        val trusted = DroidtopSigningRoot.keySha256()?.let { prefs.getString(KEY_VERIFIED_WITH, "") == it } ?: true
+        val trusted = DroidtopSigningRoot.keySha256s().let { roots -> roots.isEmpty() || prefs.getString(KEY_VERIFIED_WITH, "") in roots }
         val cached = if (trusted) parse(prefs.getString(KEY_JSON, null)) else null
         if (cached != null && System.currentTimeMillis() - prefs.getLong(KEY_FETCHED_AT, 0) < ONE_DAY_MS) {
             return@withContext cached
@@ -69,11 +69,11 @@ object ComponentCatalog {
     /** Fetches the catalog now, checks its signature when the signing root is pinned, and keeps it; throws when it cannot. Network. */
     suspend fun refresh(context: Context): ManifestData = withContext(Dispatchers.IO) {
         val bytes = RuntimeDownloads.bytes(CATALOG_URL)
-        val anchor = DroidtopSigningRoot.anchor()
+        val anchors = DroidtopSigningRoot.anchors()
         val verdict = CatalogSignature.verify(
             catalogBytes = bytes,
-            jws = anchor?.let { runCatching { RuntimeDownloads.bytes(SIGNATURE_URL).toString(Charsets.UTF_8) }.getOrNull() },
-            anchor = anchor,
+            jws = anchors.takeIf { it.isNotEmpty() }?.let { runCatching { RuntimeDownloads.bytes(SIGNATURE_URL).toString(Charsets.UTF_8) }.getOrNull() },
+            anchors = anchors,
         )
         if (verdict is CatalogSignature.Verdict.Refused) error("the component catalog was refused: ${verdict.reason}")
         val text = bytes.toString(Charsets.UTF_8)

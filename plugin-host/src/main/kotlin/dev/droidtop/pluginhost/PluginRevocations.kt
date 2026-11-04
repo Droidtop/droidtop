@@ -11,8 +11,8 @@ import org.json.JSONObject
 
 /**
  * The revocation lists in force (docs/SPEC.md 12a "Revocation"): droidtop's
- * own, signed under droidtop's signing root, which applies to every chain that
- * ends at that root, and per user-trusted origin the list of the catalog the person
+ * own, signed under any of droidtop's signing roots in force, which applies to every chain that
+ * ends at one of them, and per user-trusted origin the list of the catalog the person
  * trusted it through ([byOrigin]), which applies to that origin alone.
  */
 data class PluginRevocationList(
@@ -62,11 +62,11 @@ object PluginRevocations {
     fun load(pluginsRoot: File): PluginRevocationList = PluginRevocationList(official(pluginsRoot), originLists(pluginsRoot))
 
     private fun official(pluginsRoot: File): RevocationList {
-        val anchor = DroidtopSigningRoot.anchor() ?: return RevocationList.NONE
+        val anchors = DroidtopSigningRoot.anchors().ifEmpty { return RevocationList.NONE }
         val file = File(pluginsRoot, FILE_NAME)
         if (!file.isFile) return RevocationList.NONE
         val text = runCatching { file.readText() }.getOrNull() ?: return RevocationList.NONE
-        return RevocationList.parse(text, anchor, OFFICIAL_CATALOG_ID) ?: RevocationList.NONE
+        return RevocationList.parse(text, anchors, OFFICIAL_CATALOG_ID) ?: RevocationList.NONE
     }
 
     /**
@@ -75,8 +75,8 @@ object PluginRevocations {
      * write leaves the previous list in force.
      */
     fun accept(pluginsRoot: File, jws: String): Boolean {
-        val anchor = DroidtopSigningRoot.anchor() ?: return false
-        val offered = RevocationList.parse(jws, anchor, OFFICIAL_CATALOG_ID) ?: return false
+        val anchors = DroidtopSigningRoot.anchors().ifEmpty { return false }
+        val offered = RevocationList.parse(jws, anchors, OFFICIAL_CATALOG_ID) ?: return false
         if (offered.sequence <= official(pluginsRoot).sequence) return false
         return runCatching { AtomicWrite.text(File(pluginsRoot, FILE_NAME), jws); true }.getOrDefault(false)
     }

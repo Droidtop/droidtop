@@ -24977,6 +24977,40 @@ implements the same format against its own root.
      index's `catalog.key` (`algorithm` `droidtop-chain-v1`); a revocation
      list adds a `.3` leaf naming the same catalog. A self-signed signing
      certificate alone (the root and leaf in one) is also accepted.
+- **Root rotation, 2026-11-04 (Droidtop/tracker#876, #550): the new root is
+  pinned, the old one is trusted for 7 days only.** droidtop's signing root
+  was re-derived. The owner, verbatim: "Pin the old key for 7 days, then
+  expire it. That should give time for users to organically move off the old
+  cores". The new root, SPKI SHA-256
+  `8cdc33ff62270360db0fe7aecbf3beb486dbd9d3f27c7d056c6e49906105b9e7`,
+  is `droidtop-signing-root.pub` and is trusted with no end. The root it
+  replaced (SHA-256 `45734d88d1d1bda4bd2b0b9f78181f19d773bc763b44dfee79615ef7045eb23c`)
+  moved to `droidtop-signing-root-previous.pub` and is trusted only until
+  `DroidtopSigningRoot.OLD_ROOT_EXPIRES_AT` = 2026-11-11T23:59:59Z (the
+  one constant; that second is the last good instant, a second later the
+  old root is gone). One mechanism: `DroidtopSigningRoot.anchors()` answers
+  the roots in force at the clock's time (injectable in tests), and every
+  caller takes its anchors from it: plugin bundles at install, update and the
+  re-verification before activation (`BundleSignature.verifyBundle` through
+  `PluginOriginKeys.anchorsFor`), catalogs (`CatalogSignature.verify`), and
+  droidtop's own revocation list (`PluginRevocations`, `RevocationList.parse`),
+  each trying the anchors through `ChainAnchors.verify` (the shared
+  `ChainSignature` is untouched). After the instant a chain that ends at the
+  old root is refused everywhere; an installed plugin signed under it stops
+  at its next activation until its publisher ships a release under the new
+  root; and a person cannot keep the old root alive by trusting its key
+  under Keys you trust (`anchorForKey` answers null for it). While both are
+  in force, droidtop's `revocations.jws` is accepted under either root and
+  applies to chains ending at either; the coordinator publishes a list
+  revoking the old leaves before the instant passes. Approval carries over:
+  `PluginOriginKeys.officialAnchorFingerprints()` holds both roots while the
+  old one is in force, so a plugin approved under the old root keeps its
+  approval when its update verifies under the new one; after the instant the
+  old fingerprint is not in the set and carries nothing over (an official
+  plugin still approved under it asks once more after its update). A
+  component catalog copy verified under the old root is trusted only while
+  that root is, and is fetched again afterwards. Tests:
+  `SigningRootRotationTest`.
 - **Revocation: a signed list carried with the catalog, no CRL or OCSP**
   (decided 2026-10-15). The device may be offline, and the catalog fetch is
   the one network moment droidtop already has. droidtop's list is

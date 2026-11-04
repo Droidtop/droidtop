@@ -47,8 +47,12 @@ data class RevocationList(
          * The list in [jws] when it verifies under [anchor], its signer names [catalogId] and its payload says the
          * same; otherwise null.
          */
-        fun parse(jws: String, anchor: ChainSignature.Anchor, catalogId: String): RevocationList? {
-            val verified = ChainSignature.verify(jws, ChainSignature.Purpose.REVOCATIONS, anchor, null)
+        fun parse(jws: String, anchor: ChainSignature.Anchor, catalogId: String): RevocationList? =
+            parse(jws, listOf(anchor), catalogId)
+
+        /** [parse] under any of [anchors]: droidtop's list is accepted when signed under any root in force ([DroidtopSigningRoot.anchors]). */
+        fun parse(jws: String, anchors: List<ChainSignature.Anchor>, catalogId: String): RevocationList? {
+            val verified = ChainAnchors.verify(jws, ChainSignature.Purpose.REVOCATIONS, anchors, null)
                 as? ChainSignature.Result.Verified ?: return null
             if (!ChainSignature.names(verified.leaf, ChainSignature.CATALOG_URN, catalogId)) return null
             return runCatching {

@@ -579,7 +579,7 @@ origin:
 | Level | Key | Who holds it | What droidtop does with it |
 | --- | --- | --- | --- |
 | 1 | Droidtop Core | the owner's CA; only ever derived from | nothing: never pinned, never read |
-| 2 | Per-app roots, each derived from Core separately: droidtop's signing root, Enginehost's, gamegrab's | offline, with the owner (a third party's root with that publisher) | droidtop pins its own root (`DroidtopSigningRoot`); any other root is an anchor the person chose in Keys you trust |
+| 2 | Per-app roots, each derived from Core separately: droidtop's signing root, Enginehost's, gamegrab's | offline, with the owner (a third party's root with that publisher) | droidtop pins its own root (`DroidtopSigningRoot`; since 2026-11-04 the new root, SPKI SHA-256 `8cdc33ff...05b9e7`, with the previous root also trusted until 2026-11-11T23:59:59Z and refused after that, SPEC 12a "Root rotation"); any other root is an anchor the person chose in Keys you trust |
 | 3 | Leaves issued by a root: one per plugin repository (EKU `...946.1`), per catalog (`.2`) and for a revocation list (`.3`) | the repository's CI secrets (`PLUGIN_SIGNING_KEY` and `PLUGIN_SIGNING_CERT`; `CATALOG_SIGNING_KEY` and `CATALOG_SIGNING_CERT`) | the chain from the leaf must end at the origin's root |
 
 A plugin-signing leaf is CA:FALSE with keyUsage digitalSignature, the EKU

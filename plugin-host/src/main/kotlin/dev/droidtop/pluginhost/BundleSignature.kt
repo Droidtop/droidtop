@@ -1,6 +1,7 @@
 package dev.droidtop.pluginhost
 
 import dev.droidtop.shared.trust.ChainSignature
+import dev.droidtop.runtime.util.ChainAnchors
 import dev.droidtop.runtime.util.DroidtopSigningRoot
 import java.security.PublicKey
 import java.security.cert.X509Certificate
@@ -35,7 +36,9 @@ object PluginOriginKeys {
     fun isOfficial(origin: String): Boolean = origin == OFFICIAL_ORIGIN
 
     /**
-     * The fingerprints official approval is bound to: the signing root's and the
+     * The fingerprints official approval is bound to: the signing roots in force
+     * (the new one, and the previous one until [DroidtopSigningRoot.OLD_ROOT_EXPIRES_AT],
+     * after which its fingerprint is no longer here and lets nothing through) and the
      * legacy anchors' ([LegacyBundleSignature.officialFingerprints]). An
      * official plugin approved under any of them keeps its approval across an
      * update verified under another, so moving it to the certificate format is
@@ -43,7 +46,7 @@ object PluginOriginKeys {
      * updates").
      */
     fun officialAnchorFingerprints(): Set<String> =
-        (listOfNotNull(DroidtopSigningRoot.keySha256()) + LegacyBundleSignature.officialFingerprints()).toSet()
+        (DroidtopSigningRoot.keySha256s() + LegacyBundleSignature.officialFingerprints()).toSet()
 
     /** Whether approval under [approved] carries over to a bundle verified under [verified]: the same anchor, or both official anchors. */
     fun sameTrustAnchor(approved: String, verified: String): Boolean {
@@ -54,27 +57,28 @@ object PluginOriginKeys {
     }
 
     /**
-     * The ONE resolution path for the anchor an origin's chains must end at:
-     * droidtop's signing root for the official origin, checked FIRST (null while this
-     * build pins none), otherwise the user-trusted key `userKeys` carries
-     * (origin -> SPKI base64, from [UserOriginKeys.loadBase64] -- nothing is
-     * trusted from anywhere else) through [anchorForKey].
+     * The ONE resolution path for the anchors an origin's chains may end at:
+     * droidtop's signing roots in force for the official origin, checked FIRST
+     * (empty while this build pins none), otherwise the user-trusted key
+     * `userKeys` carries (origin -> SPKI base64, from
+     * [UserOriginKeys.loadBase64] -- nothing is trusted from anywhere else)
+     * through [anchorForKey]. Empty when there is none.
      */
-    fun anchorFor(origin: String, userKeys: Map<String, String> = emptyMap()): ChainSignature.Anchor? {
-        val core = DroidtopSigningRoot.anchor()
-        if (isOfficial(origin)) return core
-        return userKeys[origin]?.let(::anchorForKey)
+    fun anchorsFor(origin: String, userKeys: Map<String, String> = emptyMap()): List<ChainSignature.Anchor> {
+        if (isOfficial(origin)) return DroidtopSigningRoot.anchors()
+        return listOfNotNull(userKeys[origin]?.let(::anchorForKey))
     }
 
     /**
-     * The anchor for a trusted key (an origin's, or an added catalog's master): the pinned signing root's anchor
-     * when it is the root's own key, so the chain must stop below it; otherwise the key itself. Null when it is not a key
-     * droidtop can use.
+     * The anchor for a trusted key (an origin's, or an added catalog's master): a pinned anchor when it is one of
+     * droidtop's roots in force, so the chain must stop below it; otherwise the key itself. Null when it is not a key
+     * droidtop can use, and for a droidtop root whose time has passed ([DroidtopSigningRoot.isExpiredRoot]): a person
+     * cannot keep it alive by trusting it as their own key.
      */
     fun anchorForKey(keyBase64: String): ChainSignature.Anchor? {
         val key = parseSpki(keyBase64) ?: return null
-        val core = DroidtopSigningRoot.anchor()
-        return if (core != null && key.encoded.contentEquals(core.key.encoded)) core else ChainSignature.Anchor(key)
+        if (DroidtopSigningRoot.isExpiredRoot(key)) return null
+        return if (DroidtopSigningRoot.isRoot(key)) ChainSignature.Anchor(key, pinned = true) else ChainSignature.Anchor(key)
     }
 
     /**
@@ -122,7 +126,7 @@ object BundleSignature {
      *
      * Revocation: droidtop's own list ([PluginRevocationList] built from
      * `revocations.jws` signed under the root) applies to every chain that
-     * ends at droidtop's signing root; an origin's own catalog list
+     * ends at one of droidtop's signing roots in force; an origin's own catalog list
      * ([PluginRevocationList.forOrigin]) applies to that origin alone.
      */
     fun verifyBundle(
@@ -133,17 +137,20 @@ object BundleSignature {
         userKeys: Map<String, String> = emptyMap(),
         revocations: PluginRevocationList = PluginRevocationList.NONE,
     ): BundleVerdict {
-        val anchor = PluginOriginKeys.anchorFor(origin, userKeys) ?: return BundleVerdict.Refused(
-            if (PluginOriginKeys.isOfficial(origin)) {
-                "this build of droidtop pins no signing root to check official plugins with"
-            } else {
-                "no key you trust for origin \"$origin\""
-            },
-        )
-        val core = anchor.pinned
+        val anchors = PluginOriginKeys.anchorsFor(origin, userKeys)
+        if (anchors.isEmpty()) {
+            return BundleVerdict.Refused(
+                if (PluginOriginKeys.isOfficial(origin)) {
+                    "this build of droidtop pins no signing root to check official plugins with"
+                } else {
+                    "no key you trust for origin \"$origin\""
+                },
+            )
+        }
+        val core = anchors.any { it.pinned }
         val own = revocations.forOrigin(origin)
         val revoked = { cert: X509Certificate -> (core && revocations.revokes(cert)) || own.revokes(cert) }
-        val result = ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, anchor, manifestBytes, revoked)
+        val result = ChainAnchors.verify(jws, ChainSignature.Purpose.PLUGIN, anchors, manifestBytes, revoked)
         val verified = when (result) {
             is ChainSignature.Result.Refused -> return BundleVerdict.Refused("${result.reason} (origin \"$origin\")")
             is ChainSignature.Result.Verified -> result
@@ -154,6 +161,6 @@ object BundleSignature {
         if (!ChainSignature.coversPlugin(verified.leaf, pluginId)) {
             return BundleVerdict.Refused("the signing certificate is not for \"$pluginId\"")
         }
-        return BundleVerdict.Verified(anchor.sha256, verified.leaf)
+        return BundleVerdict.Verified(verified.anchor.sha256, verified.leaf)
     }
 }

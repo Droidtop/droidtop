@@ -202,7 +202,7 @@ class UserOriginKeysTest {
 
         assertTrue(outcome is AddKeyOutcome.Added)
         assertEquals(spkiBase64(pair), UserOriginKeys.load(file)["acme"]?.keyBase64)
-        assertNotNull(PluginOriginKeys.anchorFor("acme", UserOriginKeys.loadBase64(file)))
+        assertEquals(1, PluginOriginKeys.anchorsFor("acme", UserOriginKeys.loadBase64(file)).size)
     }
 
     @Test

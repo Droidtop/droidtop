@@ -592,7 +592,7 @@ object PluginCatalog {
                 error("the catalog lists its own origin \"$own\" under a key other than its master, so it was not read")
             }
         }
-        val master = PluginOriginKeys.anchorForKey(declared)!!
+        val master = PluginOriginKeys.anchorForKey(declared) ?: error("the catalog's master key is a droidtop root that is no longer trusted")
         val signature = sibling(PluginCatalogSources.INDEX_SIGNATURE_FILE)
         if (signature == null) {
             if (expected?.indexSigned == true) error("the catalog's index was signed before and this copy is not, so it was not read")

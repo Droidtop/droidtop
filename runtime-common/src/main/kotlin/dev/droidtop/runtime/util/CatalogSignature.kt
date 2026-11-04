@@ -42,14 +42,22 @@ object CatalogSignature {
         jws: String?,
         anchor: ChainSignature.Anchor?,
         catalogId: String = CATALOG_ID,
+    ): Verdict = verify(catalogBytes, jws, listOfNotNull(anchor), catalogId)
+
+    /** [verify] against several anchors (the roots in force, [DroidtopSigningRoot.anchors]); none means unpinned. */
+    fun verify(
+        catalogBytes: ByteArray,
+        jws: String?,
+        anchors: List<ChainSignature.Anchor>,
+        catalogId: String = CATALOG_ID,
     ): Verdict {
-        if (anchor == null) return Verdict.Unpinned
+        if (anchors.isEmpty()) return Verdict.Unpinned
         if (jws.isNullOrBlank()) return Verdict.Refused("the catalog has no signature beside it, and one is required")
-        return when (val result = ChainSignature.verify(jws, ChainSignature.Purpose.CATALOG, anchor, catalogBytes)) {
+        return when (val result = ChainAnchors.verify(jws, ChainSignature.Purpose.CATALOG, anchors, catalogBytes)) {
             is ChainSignature.Result.Refused -> Verdict.Refused(result.reason)
             is ChainSignature.Result.Verified ->
                 if (ChainSignature.names(result.leaf, ChainSignature.CATALOG_URN, catalogId)) {
-                    Verdict.Verified(anchor.sha256)
+                    Verdict.Verified(result.anchor.sha256)
                 } else {
                     Verdict.Refused("the catalog's signing certificate is not for $catalogId")
                 }
