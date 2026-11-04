@@ -21441,7 +21441,9 @@ with the handheld and keeps three things in step, both ways:
   data: each side makes a whole new copy current in one rename, so a sync
   that stops part way changes nothing on either side.
 
-It never streams or remote-controls anything; that stays windowcast's (7a).
+It holds no streaming code: a game the computer starts for this device is
+streamed by windowcast's host, which the agent embeds (Stream from
+<computer>, below), to droidtop's windowcast client (7a).
 
 ### What droidtop carries, and where
 
