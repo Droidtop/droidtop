@@ -1,0 +1,59 @@
+name: GPL source of the last Windows runtime prebuilts
+
+# Builds before Droidtop/tracker#857 packaged GameNative's binaries from
+# droidtop's fork (Droidtop/gamenative-tux) at 0f08762e, published as the
+# windows-runtime-prebuilt-0f08762e release of this repository. The fork is
+# being deleted, so the corresponding source of those builds goes onto that
+# release: the fork's tree at that commit with its submodules, as one archive
+# (docs/SPEC.md 9, "The Windows runtime off GameNative's fork").
+#
+# Run once, on main, before the fork is deleted. A release that already holds
+# the archive is left as it is, so a later run does nothing. Once the archive
+# is there, this workflow has done its job and can be removed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/gpl-source-0f08762e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FORK_REF: 0f08762e192ef51a0bbce0f23f6e96ae896e2f37
+  TAG: windows-runtime-prebuilt-0f08762e
+  ASSET: gamenative-tux-0f08762e-source.tar.gz
+
+jobs:
+  attach:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Already attached?
+        id: have
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' | grep -qx "$ASSET"; then
+            echo "done=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout the fork at FORK_REF
+        if: steps.have.outputs.done != 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: Droidtop/gamenative-tux
+          ref: ${{ env.FORK_REF }}
+          path: gamenative-tux-0f08762e
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Pack and attach
+        if: steps.have.outputs.done != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tar --exclude-vcs -czf "$ASSET" gamenative-tux-0f08762e
+          sha256sum "$ASSET" | tee "$ASSET.sha256"
+          gh release upload "$TAG" "$ASSET" "$ASSET.sha256" -R "$GITHUB_REPOSITORY"
