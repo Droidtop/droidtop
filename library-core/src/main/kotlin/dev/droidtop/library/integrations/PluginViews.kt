@@ -286,11 +286,13 @@ object PluginViews {
         args: JSONObject,
         title: String,
         onStatus: (String) -> Unit,
+        // Told the job's id when it failed, so its row can offer another way through (PluginJobsCenter.offerInstead).
+        onFailed: ((jobId: String) -> Unit)? = null,
     ): PluginResult {
         val capability = LegacyManifest.jobCapabilityFor(point)
         val call = newCall(point, op, SURFACE, args, 0L)
         val done = CompletableDeferred<PluginResult>()
-        PluginJobsCenter.start(
+        val jobId = PluginJobsCenter.start(
             context = context,
             record = record,
             capability = capability,
@@ -301,7 +303,7 @@ object PluginViews {
             // A page's button: the person started it.
             userInitiated = true,
         ) ?: return PluginResult.failure("${record.manifest.label} could not start this task")
-        return done.await()
+        return done.await().also { if (!it.ok) onFailed?.invoke(jobId) }
     }
 
     /** A status facet's state as the host's status glyph; null for a quiet state or a plain fact. Pure. */

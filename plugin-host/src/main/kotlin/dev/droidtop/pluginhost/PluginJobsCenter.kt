@@ -118,6 +118,11 @@ object PluginJobsCenter {
         val finishedAtMs: Long? = null,
         /** A finished native job can be run again with its arguments ([retry]). */
         val retryable: Boolean = false,
+        /**
+         * The words of a failed job's other way through ([offerInstead]): "Open thread" on a source's download that got no
+         * file (Droidtop/tracker#862). Null when it has none. Not kept over a restart, as its handler is not.
+         */
+        val instead: String? = null,
         /** Why a running job is not moving right now; null while it moves ([JobWait]). */
         val wait: JobWait? = null,
     ) {
@@ -802,6 +807,25 @@ object PluginJobsCenter {
         update(jobId) { it.copy(retryable = true) }
     }
 
+    /** A failed job's other way through: the row's [title] and [subtitle], and what it does ([run]). */
+    class Instead(val title: String, val subtitle: String, val run: (Context) -> Unit)
+
+    private val insteadHandlers = ConcurrentHashMap<String, Instead>()
+
+    /**
+     * Offers [instead] on [jobId], beside Retry and Clear: another way to get what the job did not (Droidtop/tracker#862,
+     * the owner: "If it can't find it, it should still let the user load the thread manually to override it"). It stays
+     * offered as long as the row is, and goes with Clear.
+     */
+    fun offerInstead(jobId: String, instead: Instead) {
+        if (find(jobId) == null) return
+        insteadHandlers[jobId] = instead
+        update(jobId) { it.copy(instead = instead.title) }
+    }
+
+    /** [jobId]'s other way through, if it was offered one ([offerInstead]). */
+    fun instead(jobId: String): Instead? = insteadHandlers[jobId]
+
     /**
      * Takes a finished job and its report off the list (the row's Clear). False for a job still running or paused. Its
      * last line goes to the log first ([logCleared]), so what it did is still on record.
@@ -814,6 +838,7 @@ object PluginJobsCenter {
         state.update { list -> list.filterNot { it.jobId == jobId } }
         finishedSpecs.remove(jobId)
         retryHandlers.remove(jobId)
+        insteadHandlers.remove(jobId)
         persist()
         return true
     }
@@ -827,6 +852,7 @@ object PluginJobsCenter {
         state.update { list -> list.filterNot { it.done } }
         finishedSpecs.clear()
         retryHandlers.clear()
+        insteadHandlers.clear()
         persist()
     }
 

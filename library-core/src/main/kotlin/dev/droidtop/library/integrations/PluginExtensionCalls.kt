@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.toLibraryEntryKind
@@ -479,6 +480,9 @@ object PluginTiles {
  * (docs/SPEC.md 7g, "Getting an update").
  */
 class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources {
+    /** Where a failed job's Open thread runs: it outlives the jobs page that was pressed (Droidtop/tracker#862). */
+    private val threadScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
     private val app = context.applicationContext
 
     private fun providers(): List<Pair<PluginRecord, ProvidedPoint>> =
@@ -726,18 +730,69 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         val (placement, name) = placementFor(label, gameName, version, newest).getOrElse { return it.message ?: "The update has nowhere to go" }
         val args = JSONObject().put("source", source).put("id", externalId).put("link", link).apply { version?.let { put("version", it) } }
         val title = "Download $name"
-        val result = PluginViews.runJob(app, record, POINT, "download", args, title, onStatus)
+        // A job that failed has nothing to place: its row offers Open thread, the person's way past it (Droidtop/tracker#862).
+        val offer: (String) -> Unit = { jobId -> offerThread(jobId, source, externalId, label, version, gameName, newest) }
+        val result = PluginViews.runJob(app, record, POINT, "download", args, title, onStatus, onFailed = offer)
+        // A job that failed or named no file started nothing: the pick tries the next mirror (Droidtop/tracker#862).
         if (!result.ok) {
             Log.w(TAG, "update $source/$externalId: the source's download job for $link failed: ${result.error}")
-            return "${record.manifest.label}: ${result.error ?: "the download did not start"}"
+            return dev.droidtop.library.DownloadPick.broughtNothing("${record.manifest.label}: ${result.error ?: "the download did not start"}")
         }
         val descriptors = dev.droidtop.pluginhost.AcquireDownloads.parse(result.values) ?: run {
             Log.w(TAG, "update $source/$externalId: the source's download job for $link named no file")
-            return "$label named no file to download"
+            return dev.droidtop.library.DownloadPick.broughtNothing("$label named no file to download")
         }
         val done = AcquireDownload.run(app, record, title, JSONObject(), result.values, descriptors, onStatus, update = placement)
         if (!done.ok) Log.w(TAG, "update $source/$externalId: the download for $link failed: ${done.error}")
         return if (done.ok) done.values["summary"] ?: "Added $name" else "${record.manifest.label}: ${done.error ?: "the download failed"}"
+    }
+
+    /**
+     * Open thread on [jobId], a source's download job that got no file (Droidtop/tracker#862; the owner: "If it can't
+     * find it, it should still let the user load the thread manually to override it"): the record's page opens in
+     * droidtop's web view with the source's session ([openThread]), and whatever the person starts there is placed as
+     * this game's update. Nothing when droidtop holds no page for the record.
+     */
+    private fun offerThread(
+        jobId: String,
+        source: String,
+        externalId: String,
+        label: String,
+        version: String?,
+        gameName: String,
+        newest: dev.droidtop.library.LibraryEntry,
+    ) {
+        if (savedRecord(source, externalId)?.record?.url?.startsWith("https://") != true) return
+        dev.droidtop.pluginhost.PluginJobsCenter.offerInstead(
+            jobId,
+            dev.droidtop.pluginhost.PluginJobsCenter.Instead(
+                title = dev.droidtop.library.OPEN_THREAD,
+                subtitle = "Start the download on $label's page yourself; droidtop places it as this game's update",
+            ) { _ ->
+                threadScope.launch {
+                    val said = openThread(source, externalId, version, gameName, newest) { line -> Log.i(TAG, "open thread $source/$externalId: $line") }
+                    Log.i(TAG, "open thread $source/$externalId: $said")
+                }
+            },
+        )
+    }
+
+    /**
+     * The record's own page ([source]'s thread for [externalId]) in droidtop's web view with the source's session; what
+     * the person starts there is placed as the update of the game whose newest version is [newest], as a picked link's
+     * download is ([openDownload]). Droidtop/tracker#862: the person's override when droidtop cannot get a file itself.
+     */
+    override suspend fun openThread(
+        source: String,
+        externalId: String,
+        version: String?,
+        gameName: String,
+        newest: dev.droidtop.library.LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String {
+        val page = (savedRecord(source, externalId)?.record ?: record(source, externalId).record)?.url?.takeIf { it.startsWith("https://") }
+            ?: return "The source gives no page for this game"
+        return openDownload(source, externalId, page, null, version, gameName, newest, onStatus)
     }
 
     /**

@@ -489,8 +489,8 @@ object PluginJobsScreen {
     }
 
     /**
-     * A finished job's page: how it ended, then Open (what it made), Retry (a native job, with the same arguments)
-     * and Clear, then what it did, a section per outcome, failures first (docs/SPEC.md "Jobs and their results").
+     * A finished job's page: how it ended, then Open (what it made), another way through when the job offered one
+     * (Open thread, [PluginJobsCenter.offerInstead]), Retry (a native job, with the same arguments) and Clear, then what it did, a section per outcome, failures first (docs/SPEC.md "Jobs and their results").
      */
     private fun finishedControls(jobId: String, entry: PluginJobsCenter.Entry): List<CatalogItem> = buildList {
         add(
@@ -502,6 +502,9 @@ object PluginJobsScreen {
         )
         entry.open?.takeIf { JobOpen.available }?.let { target ->
             add(ActionItem(id = "plugin_job_${jobId}_open", title = JobOpen.label(target), run = { ctx -> JobOpen.open(ctx, target) }))
+        }
+        PluginJobsCenter.instead(jobId)?.let { instead ->
+            add(ActionItem(id = "plugin_job_${jobId}_instead", title = instead.title, subtitle = instead.subtitle, run = { ctx -> instead.run(ctx) }))
         }
         if (entry.retryable) {
             add(

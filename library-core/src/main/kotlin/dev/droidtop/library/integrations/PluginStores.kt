@@ -259,7 +259,8 @@ class PluginStoreLibrary internal constructor(
         progress.report(-1f, "Asking $label for ${game.title}")
         val answer = PluginViews.runJob(
             context, record, PluginStores.POINT, "install", JSONObject().put("store", id).put("id", gameId), game.title,
-        ) { line -> progress.report(-1f, line) }
+            onStatus = { line -> progress.report(-1f, line) },
+        )
         check(answer.ok) { answer.error ?: "$label did not say where ${game.title} is" }
         val descriptors = AcquireDownloads.parse(answer.values)?.takeIf { it.isNotEmpty() }
             ?: error("$label did not give a download for ${game.title}")

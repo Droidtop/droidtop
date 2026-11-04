@@ -1,6 +1,8 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.DownloadPick
 import dev.droidtop.library.GameLinks
+import dev.droidtop.library.OPEN_THREAD
 import dev.droidtop.library.SourceAnswer
 import dev.droidtop.library.SourceLink
 import dev.droidtop.library.UpdateSources
@@ -45,7 +47,7 @@ class SourceRecordPageTest {
         assertEquals(RecordAction.GetBest, all.first().action)
         // One row per heading (Droidtop/tracker#838): Win/Linux's three links tried in turn, Mac's one link as itself.
         val rows = all.drop(1)
-        assertEquals(listOf("Win/Linux", "MEGA"), rows.map { it.title })
+        assertEquals(listOf("Win/Linux", "MEGA", OPEN_THREAD), rows.map { it.title })
         assertEquals("MEGA, PIXELDRAIN", rows.first().subtitle)
         assertEquals(3, (rows.first().action as RecordAction.Group).downloads.size)
         assertTrue(rows[1].action is RecordAction.Download)
@@ -66,22 +68,27 @@ class SourceRecordPageTest {
         val first = recordRows(tagged, RecordTab.DOWNLOADS) { "" }.also { assertEquals(RecordAction.GetBest, it.first().action) }.drop(1)
         assertEquals(RecordRow("System", "Windows/Linux", "Left and Right show another system's links", RecordAction.PickSystem), first.first())
         // The links for any system follow under their own headings, each with its description.
-        assertEquals(listOf("MEGA", "Extras", "WALKTHROUGH", "Other", "MIXDROP"), first.drop(1).map { it.title })
+        assertEquals(listOf("MEGA", "Extras", "WALKTHROUGH", "Other", "MIXDROP", OPEN_THREAD), first.drop(1).map { it.title })
         assertEquals("Walkthrough", first.first { it.title == "WALKTHROUGH" }.subtitle)
         assertNull(first.first { it.title == "Extras" }.action)
         // Android: droidtop's word first, then only Android's link.
         val android = recordRows(tagged, RecordTab.DOWNLOADS, "android") { "" }.drop(1)
         assertEquals("This will not be trackable by us. Windows or Linux is recommended.", android[1].title)
         assertNull(android[1].action)
+<<<<<<< HEAD
         assertEquals(listOf("GOFILE", "Extras", "WALKTHROUGH", "Other", "MIXDROP"), android.drop(2).map { it.title })
         assertEquals("windows+linux", nextSystem(downloadSystems(tagged), "android", 1))
         // A pick kept from before the groupings ("windows") still lands on the choice that holds it.
         assertEquals("mac", nextSystem(downloadSystems(tagged), "windows", 1))
+=======
+        assertEquals(listOf("GOFILE", "Extras", "WALKTHROUGH", "Other", "MIXDROP", OPEN_THREAD), android.drop(2).map { it.title })
+        assertEquals("windows", nextSystem(downloadSystems(tagged), "android", 1))
+>>>>>>> f683a0912 (Updates: a mirror the source could not get gives way to the next; Open thread on the record and the failed job)
         assertEquals("android", nextSystem(downloadSystems(tagged), null, -1))
         // Links that are all for one system: no picker, but Android still says so.
         val onlyAndroid = record.copy(downloads = listOf(s("Android", "GOFILE", "android")))
         val rows = recordRows(onlyAndroid, RecordTab.DOWNLOADS) { "" }.drop(1)
-        assertEquals(listOf("This will not be trackable by us. Windows or Linux is recommended.", "GOFILE"), rows.map { it.title })
+        assertEquals(listOf("This will not be trackable by us. Windows or Linux is recommended.", "GOFILE", OPEN_THREAD), rows.map { it.title })
     }
 
     @Test
@@ -161,9 +168,30 @@ class SourceRecordPageTest {
         assertEquals("2 parts", partsLine(split.copy(parts = listOf(parts[0], parts[1].copy(size = null)))))
         assertNull(partsLine(d("Win", "MEGA")))
         val rows = recordRows(record.copy(downloads = listOf(split)), RecordTab.DOWNLOADS) { "" }.drop(1)
-        assertEquals(1, rows.size)
-        assertEquals("4 parts, 12.0 GB", rows.single().value)
-        assertEquals(RecordAction.Download(split), rows.single().action)
+        assertEquals(listOf(RecordAction.Download(split), RecordAction.OpenThread), rows.map { it.action })
+        assertEquals("4 parts, 12.0 GB", rows.first().value)
     }
 
+    @Test
+    fun theDownloadsEndWithOpenThreadWhenTheRecordHasAPage() {
+        // Droidtop/tracker#862: the person's way past a mirror droidtop cannot get, on every Downloads tab with a page.
+        val rows = recordRows(record, RecordTab.DOWNLOADS) { "" }
+        assertEquals(RecordRow(OPEN_THREAD, subtitle = rows.last().subtitle, action = RecordAction.OpenThread), rows.last())
+        // A record with no page has nothing to open; one with no links still offers its page.
+        assertTrue(recordRows(record.copy(url = null), RecordTab.DOWNLOADS) { "" }.none { it.action == RecordAction.OpenThread })
+        val bare = record.copy(downloads = emptyList())
+        assertEquals(listOf("No downloads listed", OPEN_THREAD), recordRows(bare, RecordTab.DOWNLOADS) { "" }.map { it.title })
+    }
+
+    @Test
+    fun aMirrorTheSourceCouldNotGetGivesWayToTheNext() {
+        // Droidtop/tracker#862: the source's job failing ("no PIXELDRAIN link now") is a mirror that brought nothing.
+        assertTrue(DownloadPick.startedNothing(DownloadPick.NOTHING_STARTED))
+        val failed = DownloadPick.broughtNothing("F95zone: The thread page has no PIXELDRAIN link now; try another mirror")
+        assertTrue(DownloadPick.startedNothing(failed))
+        assertTrue(failed.endsWith("no PIXELDRAIN link now; try another mirror"))
+        // A download that started, or a check not passed, is the answer.
+        assertTrue(!DownloadPick.startedNothing("Added Sample Game v0.6"))
+        assertTrue(!DownloadPick.startedNothing("F95zone's check was not passed, so nothing was downloaded"))
+    }
 }

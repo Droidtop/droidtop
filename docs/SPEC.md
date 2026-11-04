@@ -14168,6 +14168,21 @@ it over the screen it is on and never navigates away to reach it:
 
 The rows below it stay pickable by hand, and a source result's page (a new game) lists its links as before.
 
+**A mirror the source could not get gives way too; Open thread is the person's way past it (2026-11-04,
+Droidtop/tracker#862).** The owner, from the console, after Bare Witness stopped at "The thread page has no PIXELDRAIN
+link now": "It also didn't try to fix it. That thread DOES have a pixeldrain link" and "If it can't find it, it
+should still let the user load the thread manually to override it. There's no "open thread" button, no override,
+nothing." So:
+- a source's `download` job that fails, or names no file, brought nothing (`DownloadPick.broughtNothing`): tried in
+  turn, the next mirror goes next, as for a link that started nothing. Picked by hand, the source's page opens for the
+  person, with the source's reason on the status line;
+- **Open thread** ends the Downloads tab of the record page and the Updates record screen whenever the record has a
+  page. It opens that page in droidtop's web view with the source's session, and whatever the person starts there is
+  placed as this game's update (`Library.openUpdateThread`, the same capture and placement as a picked link). A source
+  result's page (a new game) leaves it out: its Links already open the page the same way;
+- a failed source download job offers Open thread on its row, beside Retry and Clear
+  (`PluginJobsCenter.offerInstead`). It lasts as long as the row in this run of droidtop; Clear removes it.
+
 **One row per build and platform (2026-10-30, Droidtop/tracker#838).** The rows below Get the update are one per
 heading the source gave ("Win/Linux", "Steam Build · Win/Linux"), not one per link. Each row:
 - lists its hosts under it ("GOFILE, MEGA, MIXDROP, PIXELDRAIN, UPLOADHAVEN"); a screen that draws chips draws one per host;

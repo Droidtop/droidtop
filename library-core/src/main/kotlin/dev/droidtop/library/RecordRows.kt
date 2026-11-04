@@ -22,6 +22,12 @@ sealed interface RecordAction {
      */
     data class Group(val downloads: List<UpdateSources.Download>) : RecordAction
     data class Open(val url: String) : RecordAction
+
+    /**
+     * Open thread (Droidtop/tracker#862): the record's own page in droidtop's web view with the source's session, and
+     * what the person starts there is placed as this game's download. The person's way past a mirror droidtop cannot get.
+     */
+    data object OpenThread : RecordAction
     data object Relink : RecordAction
 
     /** The Downloads tab's system row: A, Left and Right move to the next or the previous system. */
@@ -253,7 +259,9 @@ fun buildRows(downloads: List<UpdateSources.Download>, steamCopy: Boolean?): Lis
  * under it as its description. [steamCopy] is whether the copy being updated is a Steam copy, null with no copy.
  */
 fun downloadRows(record: UpdateSources.Record, picked: String?, steamCopy: Boolean? = null): List<RecordRow> {
-    if (record.downloads.isEmpty()) return listOf(RecordRow("No downloads listed", subtitle = "The source lists no links for this version"))
+    if (record.downloads.isEmpty()) {
+        return listOfNotNull(RecordRow("No downloads listed", subtitle = "The source lists no links for this version"), openThreadRow(record))
+    }
     val lines = DownloadLines.of(record.downloads, picked)
     // droidtop's own pick first (Droidtop/tracker#838): one press, no link to choose; the rows below stay for picking by hand.
     val get = listOfNotNull(
@@ -261,7 +269,7 @@ fun downloadRows(record: UpdateSources.Record, picked: String?, steamCopy: Boole
             .takeIf { DownloadPick.offers(record.downloads) },
     )
     // Links that do not differ by system: the source's own list, as it gives it.
-    val choice = lines.picked ?: return get + buildRows(lines.builds, steamCopy) + apart(lines.apart, subtitle = null)
+    val choice = lines.picked ?: return get + buildRows(lines.builds, steamCopy) + apart(lines.apart, subtitle = null) + listOfNotNull(openThreadRow(record))
     val label = DownloadLines.label(choice)
     val head = listOfNotNull(
         if (lines.options.size >= 2) {
@@ -272,7 +280,8 @@ fun downloadRows(record: UpdateSources.Record, picked: String?, steamCopy: Boole
         lines.notice?.let { RecordRow(it) },
     )
     val links = buildRows(lines.builds, steamCopy)
-    return get + head + links.ifEmpty { listOf(RecordRow("No links for $label")) } + apart(lines.apart, subtitle = "For any system")
+    return get + head + links.ifEmpty { listOf(RecordRow("No links for $label")) } + apart(lines.apart, subtitle = "For any system") +
+        listOfNotNull(openThreadRow(record))
 }
 
 /** Patches, extras and the rest, each under its own heading, link by link: offered, never part of a build's row. */
@@ -283,6 +292,14 @@ private fun apart(downloads: List<UpdateSources.Download>, subtitle: String?): L
         if (list.isEmpty()) emptyList() else listOf(RecordRow(title, subtitle = subtitle, heading = true)) + linkRows(groupedDownloads(list))
     return group("Patches", patches) + group("Extras", extras) + group("Other", other)
 }
+
+/** The row that opens the record's own page for the person to start the download there (Droidtop/tracker#862). */
+const val OPEN_THREAD = "Open thread"
+
+/** The Downloads tab's last row, when the record has a page: [OPEN_THREAD]. Null for a record with no page. Pure. */
+fun openThreadRow(record: UpdateSources.Record): RecordRow? =
+    RecordRow(OPEN_THREAD, subtitle = "Start the download on the page yourself; droidtop places it as this game's", action = RecordAction.OpenThread)
+        .takeIf { record.url?.startsWith("https://") == true }
 
 /** Where a record's Downloads keep the system last picked per source. */
 const val RECORD_PREFS = "source_record_page"

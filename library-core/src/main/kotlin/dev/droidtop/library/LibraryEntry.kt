@@ -1516,6 +1516,19 @@ class Library(
             .getOrElse { it.message ?: "The download failed" }
     }
 
+    /** Open thread (Droidtop/tracker#862): [source]'s page for [externalId], where what the person starts is placed. */
+    suspend fun openUpdateThread(
+        source: String,
+        externalId: String,
+        version: String?,
+        gameName: String,
+        newest: LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String = withContext(Dispatchers.IO) {
+        runCatching { updateSources.openThread(source, externalId, version, gameName, newest, onStatus) }
+            .getOrElse { it.message ?: "The page could not be opened" }
+    }
+
     /**
      * Downloads the version [link] of [source]'s record names and places it as a new version folder beside [newest]
      * (docs/SPEC.md 7g, "Getting an update"). Returns the job's last line; the library learns of the folder from the job.

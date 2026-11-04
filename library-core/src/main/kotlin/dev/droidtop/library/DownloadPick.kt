@@ -17,6 +17,19 @@ object DownloadPick {
     /** What a link that started no download comes back as: the one sentence the pick reads as "try the next mirror". */
     const val NOTHING_STARTED = "Nothing was downloaded from that page"
 
+    /** How [broughtNothing] marks its sentence, so [startedNothing] knows it. */
+    private const val BROUGHT_NOTHING = "Nothing started: "
+
+    /**
+     * What a mirror the source could not get comes back as: its job failed before naming any file ("The thread page has
+     * no PIXELDRAIN link now"). It is a mirror that brought nothing, so the pick tries the next one, as for
+     * [NOTHING_STARTED] (Droidtop/tracker#862: the job stopped at the first mirror). [why] is the source's reason.
+     */
+    fun broughtNothing(why: String): String = BROUGHT_NOTHING + why
+
+    /** Whether [outcome] is a mirror that brought nothing ([NOTHING_STARTED], [broughtNothing]): try the next. Pure. */
+    fun startedNothing(outcome: String): Boolean = outcome == NOTHING_STARTED || outcome.startsWith(BROUGHT_NOTHING)
+
     /** The systems droidtop runs [entry] with, best first: an Android app's own, else Windows (through Wine) then Linux. */
     fun systemsFor(entry: LibraryEntry): List<String> =
         if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) listOf("android") else listOf("windows", "linux")

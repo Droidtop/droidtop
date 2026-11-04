@@ -125,8 +125,11 @@ object SourceItemPage {
         } else {
             null
         }
-        // Get the update is an update's (Droidtop/tracker#838); a source result's page lists its links as they are.
-        val rows = downloadRows(found, picked).filterNot { it.action == RecordAction.PickSystem || it.action == RecordAction.GetBest }.mapIndexed { index, row ->
+        // Get the update is an update's (Droidtop/tracker#838); a source result's page lists its links as they are. Open
+        // thread is the record page's (#862): here the page's Links open it, with the same capture.
+        val rows = downloadRows(found, picked).filterNot {
+            it.action == RecordAction.PickSystem || it.action == RecordAction.GetBest || it.action == RecordAction.OpenThread
+        }.mapIndexed { index, row ->
             val id = "item_download_$index"
             when (val action = row.action) {
                 is RecordAction.Download -> AsyncActionItem(
@@ -163,7 +166,7 @@ object SourceItemPage {
                                                 var outcome = DownloadPick.NOTHING_STARTED
                                                 for (d in ordered) {
                                                     outcome = get.download(ctx, d, onStatus)
-                                                    if (outcome != DownloadPick.NOTHING_STARTED) break
+                                                    if (!DownloadPick.startedNothing(outcome)) break
                                                 }
                                                 outcome
                                             },

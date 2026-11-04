@@ -240,6 +240,13 @@ object SourceRecordScreen {
                     dev.droidtop.library.Links.open(ctx, action.url)
                 },
             )
+            // Open thread (Droidtop/tracker#862): the source's page in droidtop's web view; what the person starts is placed.
+            RecordAction.OpenThread -> AsyncActionItem(
+                id = id,
+                title = row.title,
+                subtitle = row.subtitle,
+                run = { _, onStatus -> library.openUpdateThread(facet.source.key, record.externalId, record.version, facet.gameName, facet.entry, onStatus) },
+            )
             // A switch is the settings switch; the source's answer is shown when the screen is opened again.
             is RecordAction.Control -> if (action.control.kind == UpdateSources.Control.Kind.TOGGLE) {
                 ToggleItem(

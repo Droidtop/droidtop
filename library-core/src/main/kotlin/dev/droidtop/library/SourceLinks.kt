@@ -197,6 +197,19 @@ interface UpdateSources {
     ): String = "This source cannot open a download"
 
     /**
+     * Opens the record's own page (a forum thread) in droidtop's web view with the source's session; whatever the person
+     * starts there is placed as [openDownload] places it (Droidtop/tracker#862, Open thread). Returns the last line.
+     */
+    suspend fun openThread(
+        source: String,
+        externalId: String,
+        version: String?,
+        gameName: String,
+        newest: LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String = "This source cannot open its page"
+
+    /**
      * Downloads the version [link] names (the person picked it on the record page) as the source's `download` job and
      * places it as a new version folder of the game whose newest version is [newest], named for [gameName] and
      * [version]. Returns the job's last line.

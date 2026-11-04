@@ -148,6 +148,12 @@ internal suspend fun getDownload(
     if (url == null && sitePage != null && outcome.contains("checks the browser first")) {
         return if (pageFallback) pickOnSitePage() else DownloadPick.NOTHING_STARTED
     }
+    // A mirror picked by hand that the source could not get ("no PIXELDRAIN link now"): the thread opens for the person
+    // to start it there, and what they start is placed (Droidtop/tracker#862). Tried in turn, the next mirror goes first.
+    if (url == null && sitePage != null && pageFallback && DownloadPick.startedNothing(outcome)) {
+        say(outcome.removePrefix(DownloadPick.broughtNothing("")))
+        return pickOnSitePage()
+    }
     // Asked again right after a pass, with no page to open instead: said once, plainly, and the check is not opened again.
     return if (checked && outcome.contains("checks the browser first")) {
         "${source.label}'s site still asked for its check after it was passed, so nothing was downloaded"
@@ -230,7 +236,8 @@ private suspend fun tryInTurn(
     for ((index, candidate) in candidates.withIndex()) {
         say(if (index == 0) "Trying ${candidate.host}" else "${candidates[index - 1].host} started nothing. Trying ${candidate.host}")
         val outcome = getDownload(library, source, record, candidate, gameName, newest, say, pageFallback = false)
-        if (outcome != DownloadPick.NOTHING_STARTED) return outcome
+        // A mirror the source could not get (its job failed: "no PIXELDRAIN link now") gives way too (Droidtop/tracker#862).
+        if (!DownloadPick.startedNothing(outcome)) return outcome
     }
     val page = record.url?.takeIf { it.startsWith("https://") } ?: return "No mirror started a download (${candidates.size} tried)"
     say("No mirror started a download (${candidates.size} tried). Pick one on ${source.label}'s page")
@@ -347,6 +354,13 @@ internal fun SourceRecordPage(
         when (val action = row.action) {
             null -> Unit
             is RecordAction.Open -> onOpen(action.url)
+            // Open thread (Droidtop/tracker#862): the source's page with its session; what the person starts is placed.
+            RecordAction.OpenThread -> {
+                val current = record ?: return
+                onClose()
+                say("Opening ${source.label}'s page: start the download there")
+                scope.launch { say(library.openUpdateThread(source.key, current.externalId, current.version, gameName, newest, say)) }
+            }
             RecordAction.Relink -> onRelink()
             RecordAction.PickSystem -> pickSystem(1)
             RecordAction.SignIn -> scope.launch {
