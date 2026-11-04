@@ -281,14 +281,12 @@ private suspend fun applyGeneralPatches(
 }
 
 private fun refreshComponentsFiles(context: Context) {
-    // The modules and pactl must match the CPU the daemon runs on. An app
-    // that ships an x86_64 set packs it as pulseaudio-gamenative-x86_64.tzst
-    // (droidtop builds one); without it the aarch64 set is all there is.
-    val x86_64Pulse = "pulseaudio-gamenative-x86_64.tzst"
-    val pulseAsset = if (X86_64GuestLibs.isX86_64Host() && context.assets.list("")?.contains(x86_64Pulse) == true) {
-        x86_64Pulse
+    // The modules and pactl must match the CPU the daemon runs on: droidtop
+    // builds one set per ABI (build-scripts/build-vendor-deps.sh), named for it.
+    val pulseAsset = if (X86_64GuestLibs.isX86_64Host()) {
+        "pulseaudio-gamenative-x86_64.tzst"
     } else {
-        "pulseaudio-gamenative-20260612.tzst"
+        "pulseaudio-gamenative-arm64-v8a.tzst"
     }
     val extractionPairs = listOf(
         pulseAsset to File(context.filesDir, "pulseaudio")

@@ -5,7 +5,7 @@ name: x86_64 guest libraries
 # (runtime-windows/.../utils/X86_64GuestLibs.kt pins the tag and the SHA-256), the
 # same way the arm64 base system is a download rather than part of the APK.
 #
-# Moved from droidtop's GameNative fork (Droidtop/gamenative-tux) with the
+# Moved from GameNative (by way of droidtop's former fork of it) with the
 # Windows runtime (docs/SPEC.md 9). A run on main publishes a prerelease of
 # this repository (prerelease so the app's update check, which reads this
 # repository's releases, never mistakes it for a build); the pin in the code

@@ -32,7 +32,7 @@ import kotlinx.coroutines.withContext
  * build-scripts/build-vendor-deps.sh's "PulseAudio 13.0" section) --
  * `libpulseaudio.so` packaged for both ABIs
  * (runtime-windows/src/main/jniLibs/<abi>), its modules and `pactl` in the
- * matching `pulseaudio-gamenative-*.tzst` asset (also runtime-windows,
+ * matching `pulseaudio-gamenative-<abi>.tzst` asset (also runtime-windows,
  * merged into the one app-wide assets/nativeLibraryDir every module
  * shares -- this class needs no build dependency on that module for
  * either). gamenative's own [com.winlator.xenvironment.components.
@@ -203,11 +203,7 @@ internal class HostAudioServer(private val context: Context) {
         if (!current.waitFor(STOP_GRACE_S, TimeUnit.SECONDS)) current.destroyForcibly()
     }
 
-    /**
-     * Unpacks the modules asset into [modulesDir] once, then the Desktop's
-     * own modules asset over it where this ABI has one
-     * ([desktopAssetNameFor]); a no-op once they are there.
-     */
+    /** Unpacks the modules asset into [modulesDir] once; a no-op once they are there. */
     private fun extractModulesIfNeeded(abi: String) {
         // Re-extracted after an app update: the modules asset can gain modules
         // (the microphone's pipe source did), and an old extraction lacks them.
@@ -221,7 +217,6 @@ internal class HostAudioServer(private val context: Context) {
             ?: throw IOException("no PulseAudio modules asset packaged for $abi")
         modulesDir.mkdirs()
         unpack(assetName)
-        desktopAssetNameFor(assetNames, abi)?.let { unpack(it) }
         marker.writeText(installed)
     }
 
@@ -254,36 +249,18 @@ internal class HostAudioServer(private val context: Context) {
         private const val AAUDIO_SINK_MODULE = "module-aaudio-sink.so"
         private const val STOP_GRACE_S = 2L
 
-        private val ARM64_ASSET = Regex("""pulseaudio-gamenative-\d+\.tzst""")
-        private const val X86_64_ASSET = "pulseaudio-gamenative-x86_64.tzst"
+        private val PACKAGED_ABIS = setOf("arm64-v8a", "x86_64")
 
         /**
-         * Which packaged asset holds [abi]'s modules and pactl, picked
-         * from the app's actual asset list rather than a hardcoded date:
-         * the arm64 one is upstream gamenative's own file, named for the
-         * day it was rebuilt there, and droidtop does not own that name.
-         * The x86_64 one is droidtop's own build
-         * (build-scripts/build-vendor-deps.sh), named without a date so
-         * this lookup has one fixed name to check. Pure so it is testable
+         * Which packaged asset holds [abi]'s modules and pactl:
+         * `pulseaudio-gamenative-<abi>.tzst`, droidtop's own build for both
+         * ABIs (build-scripts/build-vendor-deps.sh, Droidtop/tracker#857),
+         * module-pipe-source included. Null for an ABI droidtop does not
+         * package or a build without the asset. Pure so it is testable
          * without an AssetManager.
          */
-        internal fun assetNameFor(assetNames: List<String>, abi: String): String? = when (abi) {
-            "x86_64" -> assetNames.firstOrNull { it == X86_64_ASSET }
-            "arm64-v8a" -> assetNames.firstOrNull { ARM64_ASSET.matches(it) }
-            else -> null
-        }
-
-        /**
-         * The Desktop's own modules for [abi], unpacked over [assetNameFor]'s,
-         * or null where that asset already holds everything. Only arm64 has
-         * one: the upstream arm64 asset has no [PIPE_SOURCE_MODULE], so
-         * build-scripts/build-vendor-deps.sh builds that one module from the
-         * same PulseAudio and configure line and packs it alone
-         * (Droidtop/tracker#132). The x86_64 asset is droidtop's own build and
-         * already holds it.
-         */
-        internal fun desktopAssetNameFor(assetNames: List<String>, abi: String): String? =
-            "pulseaudio-desktop-$abi.tzst".takeIf { it in assetNames }
+        internal fun assetNameFor(assetNames: List<String>, abi: String): String? =
+            "pulseaudio-gamenative-$abi.tzst".takeIf { abi in PACKAGED_ABIS && it in assetNames }
 
         /**
          * The whole of the server's config: a Unix socket at [socketPath],

@@ -5,30 +5,39 @@ This project is distributed under the GNU General Public License v3.0 (see
 
 ## Vendored / forked sources
 
-- **GameNative** — droidtop's fork https://github.com/Droidtop/gamenative-tux
-  (a standalone app project; no longer a submodule here) of
-  https://github.com/utkarshdalal/GameNative — GPL-3.0.
-  `runtime-windows` carries GameNative's Windows runtime, lifted from the
-  fork at `0f08762e` (docs/SPEC.md §9): its `com.winlator` tree (Winlator's
+- **GameNative** — https://github.com/utkarshdalal/GameNative — GPL-3.0.
+  `runtime-windows` carries GameNative's Windows runtime, lifted from
+  droidtop's former fork of it (Droidtop/gamenative-tux, retired,
+  Droidtop/tracker#857) at `0f08762e` (docs/SPEC.md §9); the source of
+  that commit is attached to the `windows-runtime-prebuilt-0f08762e`
+  release of this repository, beside the last builds that carried its
+  binaries. What was lifted: its `com.winlator` tree (Winlator's
   runtime as GameNative ships it, package and headers unchanged) and the
   GameNative-authored files that runtime uses (container utilities, the
   component-list model and its installer, the prefix setup helpers from
   `XServerScreen.kt`, the x86_64 guest-library and graphics pins, the
   downloaders, the folder scanner, `TouchGestureConfig`, a cut-down
-  `PrefManager`), moved to `dev.droidtop.runtime.windows.*`.
-  Its native sources (winlator, extras, asurfacerenderer, xconnectorpatch,
-  evshim) are copied into `runtime-windows/native/upstream/`, and its prebuilt
-  arm64 libraries and asset payloads are re-hosted unmodified as a release of
-  this repository (`build-scripts/windows-runtime-prebuilt.sh`); some of those
-  libraries (`libvortekrenderer`, `libredirect-bionic-wx`, the Adreno hook
-  libraries) are upstream binaries without published source. The x86_64
-  guest-library and software-Vulkan recipes (`build-scripts/x86_64-*`) moved
-  from the fork too.
+  `PrefManager`), moved to `dev.droidtop.runtime.windows.*`; its data
+  assets (the JSON lists, input-control profiles and icons, Box64 presets)
+  in `runtime-windows/src/main/assets`. Its native sources (winlator,
+  extras, asurfacerenderer, xconnectorpatch, evshim) are copied into
+  `runtime-windows/native/upstream/` and built by droidtop for both ABIs.
+  GameNative's Box64, FEXCore and WowBox64 builds and its Wine input DLLs
+  are re-hosted unmodified in Droidtop/droidtop-components (`windows-runtime`
+  release, from GameNative at `ce378f01`), with the binaries that have no
+  published source: `libvortekrenderer`, `libkgslshim`, `libredirect`,
+  `libredirect-bionic` and `libredirect-bionic-wx`. The x86_64
+  guest-library and software-Vulkan recipes (`build-scripts/x86_64-*`)
+  moved from the fork too.
 - **virglrenderer** — `runtime-windows/native/upstream/virglrenderer`, as
   GameNative carries it — MIT.
-- **libadrenotools** — https://github.com/bylaws/libadrenotools (GameNative's
-  copy, Pipetto-crypto/libadrenotools) — BSD-2-Clause. Its headers only, in
-  `runtime-windows/native/upstream/extras/adrenotools/include` (LICENSE beside them).
+- **libadrenotools** — https://github.com/bylaws/libadrenotools, as
+  GameNative pins it: Pipetto-crypto/libadrenotools at `8483dfda`, with
+  liblinkernsbypass — BSD-2-Clause. Vendored as a submodule at
+  `vendor/libadrenotools`; droidtop builds its static library (linked into
+  the arm64 libextras and libvulkan_renderer) and its hook libraries
+  libhook_impl and libmain_hook. `runtime-windows/native/upstream/extras/adrenotools`
+  points at it, where GameNative's sources include its headers from.
 - **talloc** — `build-scripts/talloc`, Samba's talloc as GameNative's proot
   tree carried it — LGPL-3.0-or-later. Linked into droidtop's proot build.
   The `stores` module is GameNative's Epic, GOG, Amazon Games and itch.io
@@ -95,14 +104,14 @@ This project is distributed under the GNU General Public License v3.0 (see
   (BSD-3-Clause). Built into `libhev-socks5-tunnel.so`, the userspace IP
   stack behind droidtop's device VPN.
 - **PulseAudio** — `vendor/pulseaudio` (v13.0), https://github.com/pulseaudio/pulseaudio —
-  LGPL-2.1-or-later (the libraries and modules built here). Built for x86_64 by
+  LGPL-2.1-or-later (the libraries and modules built here). Built for both ABIs by
   `build-scripts/build-vendor-deps.sh` with Termux's Android patches and its
   `module-aaudio-sink.c` (termux-packages, https://github.com/termux/termux-packages,
   `packages/pulseaudio` at 39437706663c), kept in `build-scripts/pulseaudio-patches/`.
 - **libsndfile** — `vendor/libsndfile` (1.0.28), https://github.com/libsndfile/libsndfile — LGPL-2.1-or-later.
 - **libltdl** — GNU libtool's libltdl, from the build host's `libltdl-dev` — LGPL-2.1-or-later.
 - **SDL2** — `vendor/SDL2` (release-2.32.10), https://github.com/libsdl-org/SDL — zlib.
-  Headers only, for building gamenative's `libevshim.so` for x86_64.
+  Headers only, for building GameNative's `libevshim.so`.
   Also the source of the controller vendor and product ids droidtop classifies external pads by:
   `library-core/src/main/kotlin/dev/droidtop/library/controller/SdlControllerIds.kt` is generated by
   `build-scripts/gen_sdl_controller_families.py` from SDL's `src/joystick/controller_list.h`

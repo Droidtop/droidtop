@@ -1,9 +1,9 @@
 package com.winlator.linux;
 
 /**
- * The real swap point per direction: gamenative-tux ships and defaults to
- * {@link DefaultProotContainerBackend} (real, working standalone), but a
- * host app -- droidtop, wiring this fork in as a library -- can call
+ * The real swap point per direction: the runtime defaults to
+ * {@link DefaultProotContainerBackend} (real, working on its own), but a
+ * host app -- droidtop -- can call
  * {@link #set} once at startup to replace it with its own backend (its
  * real `runtime-linux-noroot` proot implementation or `runtime-linux-root`
  * droidspaces/namespace implementation), and every real caller (currently

@@ -315,7 +315,7 @@ data class GameLink(val label: String, val url: String) {
  * own vocabulary stays ES-DE's metadata schema (docs/SPEC.md §7g).
  *
  * Produced by `:runtime-windows`'s `PcLibrary` from the vendored
- * gamenative-tux data layer. Null for everything that is not a PC game.
+ * GameNative data layer. Null for everything that is not a PC game.
  */
 @Serializable
 data class PcInfo(

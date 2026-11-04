@@ -22,20 +22,15 @@ android {
     defaultConfig {
         minSdk = 26
 
-        // The arm64-v8a natives are GameNative's prebuilt set, re-hosted
-        // (prebuilt/, below). The x86_64 half of the fat APK (docs/SPEC.md
-        // 10b) is built here, from GameNative's sources (native/upstream) or
-        // a shim per library; native/CMakeLists.txt says which and why.
+        // Both halves of the fat APK (docs/SPEC.md 10b) are built here, from
+        // GameNative's native sources (native/upstream), libadrenotools
+        // (vendor/libadrenotools, arm64) or a shim per library (x86_64);
+        // native/CMakeLists.txt says which and why. Every shared library
+        // that project defines ships, so it names no targets.
         externalNativeBuild {
             cmake {
-                abiFilters += "x86_64"
-                targets += listOf(
-                    "virglrenderer", "asurface_renderer", "ahbimage", "xconnectorpatch",
-                    "winlator", "winlator_11", "extras", "vulkan_renderer",
-                    "hook_impl", "main_hook", "kgslshim", "vortekrenderer", "evshim",
-                )
-                // libc++_shared.so is in the arm64 set; the NDK's own copy
-                // for x86_64 is packaged when the STL is the shared one.
+                abiFilters += listOf("arm64-v8a", "x86_64")
+                // The NDK's own libc++_shared.so is packaged for each ABI.
                 arguments += "-DANDROID_STL=c++_shared"
             }
         }
@@ -52,20 +47,19 @@ android {
 
     sourceSets {
         getByName("main") {
-            // GameNative's arm64 native libraries and the runtime's asset
-            // payloads (box64/FEXCore/WowBox64 builds, input DLLs, the
-            // redirect libraries, the JSON lists the runtime reads with
-            // getAssets()), re-hosted unmodified as a release of this
-            // repository and fetched by build-scripts/
-            // fetch-windows-runtime-prebuilt.sh against prebuilt.pin
-            // (docs/SPEC.md 9). What is packed and what is left out:
-            // build-scripts/windows-runtime-prebuilt.sh.
-            jniLibs.srcDir("prebuilt/jniLibs")
+            // The files droidtop does not build: the arm64 libvortekrenderer
+            // and libkgslshim (no source exists) and the asset payloads
+            // (Box64, FEXCore and WowBox64 builds, the input DLLs, the
+            // redirect libraries). Re-hosted unmodified in
+            // Droidtop/droidtop-components and fetched by
+            // build-scripts/fetch-windows-runtime-components.sh against
+            // components.pin (docs/SPEC.md 9).
+            jniLibs.srcDir("components/jniLibs")
             // The lsfg-vk Vulkan layer, both ABIs, built by
             // .github/workflows/lsfg-vk-layer.yml and fetched against
             // lsfg-layer.pin (build-scripts/fetch-lsfg-layer.sh).
             jniLibs.srcDir("lsfg/jniLibs")
-            assets.srcDir("prebuilt/assets")
+            assets.srcDir("components/assets")
         }
     }
 

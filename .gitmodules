@@ -53,3 +53,6 @@
 [submodule "vendor/droidtop-shared"]
 	path = vendor/droidtop-shared
 	url = https://github.com/Droidtop/droidtop-shared
+[submodule "vendor/libadrenotools"]
+	path = vendor/libadrenotools
+	url = https://github.com/Pipetto-crypto/libadrenotools.git

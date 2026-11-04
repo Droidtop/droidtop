@@ -378,12 +378,13 @@ echo "=== hev-socks5-tunnel ($ABI) ==="
 )
 
 echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
-# The audio half of gamenative's Windows runtime (docs/SPEC.md 10b). Its
-# arm64 set is prebuilt upstream (libpulse*, libsndfile, libltdl in the
-# fork's jniLibs, the daemon as libpulseaudio.so, and modules + pactl in
-# the pulseaudio-gamenative asset); x86_64 is built here, with the same
-# file names: the ABI picker compares names, and PulseAudioComponent
-# execs nativeLibraryDir/libpulseaudio.so.
+# The audio half of the Windows runtime (docs/SPEC.md 10b) and the
+# Desktop's audio bridge (HostAudioServer), built here for both ABIs with
+# the file names GameNative's prebuilt arm64 set used (libpulse*,
+# libsndfile, libltdl, the daemon as libpulseaudio.so; modules and pactl in
+# an asset): the ABI picker compares names, and PulseAudioComponent execs
+# nativeLibraryDir/libpulseaudio.so. arm64 was GameNative's prebuilt set
+# until Droidtop/tracker#857 took droidtop off its GameNative fork.
 #
 #   libltdl      the standalone libltdl tree libltdl-dev installs under
 #                /usr/share/libtool (already on the apt list).
@@ -392,8 +393,8 @@ echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
 #                Termux's Android patches of its 13.0 package and its
 #                module-aaudio-sink.c (build-scripts/pulseaudio-patches,
 #                the sink extended with the arguments GameNative passes).
-#                Configured as the arm64 set was: no speex or soxr (its
-#                libpulsecore has no speex resampler), no memfd.
+#                Configured as GameNative's arm64 set was: no speex or
+#                soxr (its libpulsecore has no speex resampler), no memfd.
 #                ac_cv_header_glob_h=no: bionic has glob() only from
 #                API 28, and PulseAudio uses it only for scache
 #                directories, behind HAVE_GLOB_H.
@@ -406,21 +407,11 @@ echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
 # out of nativeLibraryDir, so every output's soname and NEEDED entries
 # lose the version and its RUNPATH goes (patchelf, on the apt list).
 #
-# Outputs: runtime-windows/src/main/jniLibs/x86_64/ (the six libraries)
-# and runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst
-# (modules/ and pactl, laid out like the arm64 asset).
-#
-# arm64 builds the same tree for one module only. The upstream arm64 asset
-# has no module-pipe-source (it holds libprotocol-native,
-# module-aaudio-sink, module-native-protocol-unix and pactl), and the
-# Desktop microphone loads it (Droidtop/tracker#132). The module comes from
-# the same PulseAudio version and configure line as the arm64 set it loads
-# into, and needs only that set's libpulsecore-13.0, libpulsecommon-13.0
-# and libpulse, the names the asset's own module-aaudio-sink.so needs. It
-# ships alone in runtime-linux-noroot/src/main/assets/
-# pulseaudio-desktop-arm64-v8a.tzst, which the Desktop audio bridge
-# unpacks beside the upstream modules; the Windows runtime's arm64 audio
-# stays the upstream set.
+# Outputs: runtime-windows/src/main/jniLibs/$ABI/ (the six libraries)
+# and runtime-windows/src/main/assets/pulseaudio-gamenative-$ABI.tzst
+# (modules/ and pactl, laid out like GameNative's arm64 asset, plus
+# module-pipe-source, which the Desktop microphone loads,
+# Droidtop/tracker#132).
 (
     export PATH="$TOOLCHAIN_BIN:$PATH"
     export CC CXX AR=llvm-ar RANLIB=llvm-ranlib STRIP=llvm-strip NM=llvm-nm
@@ -474,19 +465,6 @@ echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
         llvm-strip --strip-unneeded "$1"
     }
 
-    if [ "$ABI" = "arm64-v8a" ]; then
-        make -C src -j"$(nproc)" module-pipe-source.la
-        PA_DESKTOP="$PA_WORK/desktop-asset"
-        mkdir -p "$PA_DESKTOP/modules"
-        cp -L src/.libs/module-pipe-source.so "$PA_DESKTOP/modules/"
-        patch_android_elf "$PA_DESKTOP/modules/module-pipe-source.so"
-        patchelf --print-needed "$PA_DESKTOP/modules/module-pipe-source.so"
-        mkdir -p "$REPO_ROOT/runtime-linux-noroot/src/main/assets"
-        tar -C "$PA_DESKTOP" -I 'zstd -19' -cf \
-            "$REPO_ROOT/runtime-linux-noroot/src/main/assets/pulseaudio-desktop-arm64-v8a.tzst" modules
-        exit 0
-    fi
-
     make -C src -j"$(nproc)" \
         libpulsecommon-13.0.la libpulse.la libpulsecore-13.0.la pulseaudio pactl \
         libprotocol-native.la module-native-protocol-unix.la module-aaudio-sink.la module-pipe-source.la
@@ -506,7 +484,7 @@ echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
     done
     mkdir -p "$REPO_ROOT/runtime-windows/src/main/assets"
     tar -C "$PA_ASSET" -I 'zstd -19' -cf \
-        "$REPO_ROOT/runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst" modules pactl
+        "$REPO_ROOT/runtime-windows/src/main/assets/pulseaudio-gamenative-$ABI.tzst" modules pactl
 )
 
 echo "=== Done. Deps installed under $DEPS_DIR ==="

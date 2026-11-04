@@ -25,7 +25,7 @@ data class PcProvisionResult(val succeeded: Boolean, val detail: String)
  * knows how to obtain. Rather than duplicate that knowledge, `:app` installs an
  * implementation into [PcGameRuntimeRegistry] at startup and every
  * caller here goes through this interface -- the same swappable-seam
- * pattern [LaunchDisplay.chooser] and gamenative-tux's own
+ * pattern [LaunchDisplay.chooser] and GameNative's own
  * `LinuxContainerBackend` already use.
  *
  * Real gap this closed: [GameLaunchStrategy.WINE_PREFIX] and

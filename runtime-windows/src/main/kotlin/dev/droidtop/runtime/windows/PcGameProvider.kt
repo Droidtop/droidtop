@@ -64,7 +64,7 @@ class PcGameProvider(
 
     /**
      * The whole PC library, not just Wine prefixes: every game the
-     * vendored gamenative-tux data layer knows about from Steam, GOG,
+     * vendored GameNative data layer knows about from Steam, GOG,
      * Epic, Amazon and scanned folders (via [PcLibrary]), plus the Wine
      * shortcuts this provider always listed.
      *

@@ -29,7 +29,7 @@ import java.security.MessageDigest
  *     identity across a version bump", Droidtop/tracker#397 slice E). Only a
  *     folder that VANISHED is matched, so two version folders side by side
  *     stay two games;
- *  3. a `.gamenative` file left by an earlier build or by gamenative-tux
+ *  3. a `.gamenative` file left by an earlier build or by GameNative
  *     itself, READ through [legacyRead] only: it is adopted into this
  *     store and never written back or deleted.
  *

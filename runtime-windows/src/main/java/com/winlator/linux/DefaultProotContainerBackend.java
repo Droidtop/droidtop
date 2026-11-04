@@ -15,8 +15,7 @@ import java.io.File;
  * GuestProgramLauncherComponent.exec()} already built inline (bundled
  * {@code libproot.so}, {@code --rootfs}/{@code --bind}/{@code --cwd},
  * {@code PROOT_LOADER}/{@code PROOT_TMP_DIR} env vars), moved here
- * unchanged so gamenative-tux keeps working standalone with zero behavior
- * change. {@link GuestProgramLauncherComponent} still owns building the
+ * unchanged so the default path has zero behavior change. {@link GuestProgramLauncherComponent} still owns building the
  * Wine-specific guest env (TZ/HOME/PATH/LD_LIBRARY_PATH/etc.) -- only the
  * generic "run this command inside this rootfs via proot" mechanics moved,
  * which is the actual real seam a host app needs to swap, not the Wine

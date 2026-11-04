@@ -1980,7 +1980,7 @@ backends selected automatically by root availability:
 
 ### The no-root backend: `ProotRuntime` (built 2026-09-24)
 
-The earlier plan here was to port gamenative-tux's
+The earlier plan here was to port GameNative's (droidtop's fork's)
 `com.winlator.linux.DefaultProotContainerBackend` and its bundled proot
 binaries. Checked against the vendor tree, neither can run a stock distro
 on droidtop's targets:
@@ -2411,8 +2411,8 @@ treating an unrooted device as unable to run Desktop mode.
 **The installed ABI must be the kernel's own.** An app's native libraries
 are one ABI's, picked by the package manager at install time, and proot is
 an executable. Android-x86 derivatives with ARM translation pick arm64-v8a
-when an APK's arm64 set is the fuller one, and droidtop's is (gamenative's
-prebuilt natives exist for arm64 only): on the BlueStacks rig
+when an APK's arm64 set is the fuller one, and droidtop's was (gamenative's
+prebuilt natives existed for arm64 only until §10b's x86_64 build): on the BlueStacks rig
 (`abilist x86_64,x86,arm64-v8a,...`) builds 571 and 572 installed as
 arm64-v8a, and exec'ing the ARM proot on the x86_64 kernel fell through to
 `/system/bin/sh` reading the ELF as a script ("libproot.so[1]: syntax
@@ -3446,7 +3446,11 @@ the `ContainerRuntime` interface that already exists (§3):
   audio does not change. Where the module is still missing the desktop log
   says "microphone not bridged" and audio out is unaffected. plugin-api
   D9's refusal of `audio.record` to plugins is a different question and
-  stands.
+  stands. Since Droidtop/tracker#857 (2026-11-04) the arm64 PulseAudio set
+  is droidtop's own build too, its asset `pulseaudio-gamenative-arm64-v8a.tzst`
+  carries `module-pipe-source`, and the separate
+  `pulseaudio-desktop-arm64-v8a.tzst` is gone: one modules asset per ABI,
+  for the Windows runtime and the Desktop alike.
   **Settings operations stay asynchronous (decided 2026-10-01, Droidtop/tracker#47).**
   Catalog toggle and folder-pick handlers are suspend functions. Both settings
   renderers invoke them from a screen-lifecycle coroutine, show "Working..."
@@ -7660,7 +7664,7 @@ picked it. They are now real launches, through a seam:
 
 - `library-core` declares `PcGameRuntime` + `PcGameRuntimeRegistry` —
   the same swappable-seam pattern `LaunchDisplay.chooser` and
-  gamenative-tux's own `LinuxContainerBackend` already use. It exists
+  the Windows runtime's own `LinuxContainerBackend` already use. It exists
   because `library-core` cannot depend on the runtime modules, and the
   native-Linux half needs Desktop mode's container session, which only
   the app layer can obtain. The Wine half needs no session (§5b).
@@ -7890,11 +7894,11 @@ rumble pollers spun a core each for as long as a game ran (3.2 of the rig's
 4 cores, Droidtop/tracker#304); a session whose memory cannot be mapped now
 runs without rumble instead. A separate JNI call (`attachSharedMemory`,
 2026-10-03 to 2026-10-15) did the same from Java, but only the x86_64
-library is built from this source; the arm64 one is GameNative's prebuilt,
+library was built from this source; the arm64 one was GameNative's prebuilt,
 which has no such symbol, so every Windows launch on the console failed with
 `UnsatisfiedLinkError` (Droidtop/tracker#249, rig 2026-10-15). A native
 method droidtop adds is only callable where the library is built from
-source; the arm64 set must be rebuilt first.
+source. Since Droidtop/tracker#857 (2026-11-04) both ABIs are (§9).
 
 **Milestone 1 is met.** On build 388 the ImageFs rootfs installs for the
 first time: 175MB base system downloaded and extracted to a 947MB rootfs
@@ -8458,8 +8462,8 @@ install only GameNative's Steam knew, and droidtop now has its own,
   publishes it as a prerelease (`lsfg-vk-layer-<commit>`);
   `runtime-windows/lsfg-layer.pin` names the release and SHA-256 and
   `build-scripts/fetch-lsfg-layer.sh` puts it into `runtime-windows/lsfg/jniLibs`
-  (`android-setup`). It is separate from the Windows runtime's re-hosted
-  prebuilts (`prebuilt.pin`), which still leave the old arm64 layer out.
+  (`android-setup`). The Windows runtime's re-hosted files
+  (`components.pin`, §9) leave GameNative's old arm64 layer out.
 - **The DLL** is Lossless Scaling's own `Lossless.dll`, from the person's own
   install of Lossless Scaling (Steam app 993090) that droidtop's Steam
   (`:stores`) put in their game folders. droidtop never downloads that game for
@@ -15802,9 +15806,9 @@ identity line.
 - **droidtop never writes into a user's game folder to remember a game
   (directed 2026-10-01, tracker#269).** The vendored gamenative scanner
   gives every PC game folder a numeric id and, by default, keeps it in a
-  `.gamenative` file inside the folder. gamenative-tux as its own app
+  `.gamenative` file inside the folder. GameNative as its own app
   keeps doing that (it detects games by those files and must work on its
-  own), so the fork makes the place an id is kept replaceable
+  own), so the lifted scanner makes the place an id is kept replaceable
   (`CustomGameIdStore`, default unchanged) and droidtop installs its own
   (`DroidtopGameIdStore`, backed by `GameFolderIds` in `:library-core`).
   The ids live in droidtop's own `pc-game-ids.tsv`; a scan leaves the
@@ -21891,8 +21895,10 @@ addresses only (the owner's decision above), and Tailscale is never required.
 
 ## 8. Licensing
 
-GameNative's code lifted into `:runtime-windows` and `:stores` (droidtop's
-fork Droidtop/gamenative-tux, no longer a submodule) and `vendor/droidspaces`
+GameNative's code lifted into `:runtime-windows` and `:stores` (by way of
+droidtop's former fork of it, retired in Droidtop/tracker#857; the source of
+its last commit used, `0f08762e`, is attached to the
+`windows-runtime-prebuilt-0f08762e` release) and `vendor/droidspaces`
 are GPL-3.0. Winlator itself is LGPL-2.1 and reaches droidtop only through
 GameNative's `com.winlator` tree in `:runtime-windows`; Lemuroid is GPL-3.0 and reaches it only through the
 four forked-in `romdetect` files and the bundled `libretro-db.sqlite`.
@@ -22030,30 +22036,85 @@ Application), Room's `PluviaDatabase` (`:stores` imported it), the unused
 droidtop runs started it), `BestConfigService`'s api.gamenative.app lookups,
 `GameCompatibilityCache` (LSFG frame generation came back, section 5c).
 
-**The runtime's native code and prebuilt binaries.** The x86_64 libraries are
-built by `runtime-windows/native` from GameNative's native sources, copied
-unmodified into `native/upstream/` (winlator, extras, asurfacerenderer,
-virglrenderer, xconnectorpatch, evshim, and libadrenotools' headers), plus
-droidtop's shims. The arm64 set is GameNative's prebuilt libraries (some,
-like `libvortekrenderer` and the Adreno hook libraries, exist only as
-binaries), and the asset payloads the runtime reads with `getAssets()`
-(box64/FEXCore/WowBox64 builds, input DLLs, redirect libraries, the arm64
-PulseAudio modules, the JSON lists): **re-hosted, not committed and not
-rebuilt.** `.github/workflows/windows-runtime-prebuilt.yml` packs them
-unmodified from the fork at a pinned commit
-(`build-scripts/windows-runtime-prebuilt.sh` says what is left out: the
-on-demand dxwrapper payloads, Steam-only files, the old LSFG layer (section 5c), the Quest OpenXR
-loader, SteamBootstrap, libpatchelf) and publishes them as a prerelease of
-this repository, the `build-toolchains` precedent; the build fetches that
-release by `runtime-windows/prebuilt.pin` (tag and SHA-256) into
-`runtime-windows/prebuilt/` (`build-scripts/fetch-windows-runtime-prebuilt.sh`,
-cached by `android-setup`). Both ABIs ship the same library names (Android's
-ABI picker compares names, "Fat APKs only" below). proot's talloc moved to
-`build-scripts/talloc`. The x86_64 guest-library and software-Vulkan recipes
-and their workflows moved to `build-scripts/x86_64-{guest-libs,lavapipe}` and
-`.github/workflows/`, publishing from `main` as prereleases of this
-repository; `X86_64GuestLibs`/`X86_64Graphics` pin droidtop's own releases
-(since 2026-10-08), so nothing the app downloads comes from the fork.
+**The runtime's native code and the files it does not build.** Both ABIs'
+native libraries are built by `runtime-windows/native` (AGP's CMake, every
+shared library the project defines ships) from GameNative's native sources,
+copied unmodified into `native/upstream/` (winlator, extras,
+asurfacerenderer, virglrenderer, xconnectorpatch, evshim); on arm64 also from
+`vendor/libadrenotools` (Pipetto-crypto/libadrenotools at `8483dfda`, the
+commit GameNative pins: the static adrenotools that extras and
+vulkan_renderer link, and the hook libraries hook_impl and main_hook), on
+x86_64 from droidtop's shims. PulseAudio 13.0, libsndfile and libltdl are
+built for both ABIs by `build-scripts/build-vendor-deps.sh`, their modules
+and `pactl` in `pulseaudio-gamenative-<abi>.tzst`. The data assets the
+runtime reads with `getAssets()` (the JSON lists, input-control profiles and
+icons, Box64 presets, `wincomponents.json`) are GameNative's source files,
+committed in `runtime-windows/src/main/assets`. What droidtop does not
+build is **re-hosted, not committed**, in the `windows-runtime` release of
+Droidtop/droidtop-components: GameNative's Box64 (0.3.2 to 0.4.2), FEXCore
+(2507 to 2605) and WowBox64 (0.3.4 to 0.4.2) builds, its Wine input DLL
+sets, and the binaries no source exists for (below). The build fetches
+them by `runtime-windows/components.pin` (path, SHA-256, maker's URL) into
+`runtime-windows/components/` (`build-scripts/fetch-windows-runtime-components.sh`,
+cached by `android-setup`), our copy first and the maker's second, and
+accepts only the pinned bytes. Both ABIs ship the same library names
+(Android's ABI picker compares names, "Fat APKs only" below). proot's
+talloc moved to `build-scripts/talloc`. The x86_64 guest-library and
+software-Vulkan recipes and their workflows moved to
+`build-scripts/x86_64-{guest-libs,lavapipe}` and `.github/workflows/`,
+publishing from `main` as prereleases of this repository;
+`X86_64GuestLibs`/`X86_64Graphics` pin droidtop's own releases (since
+2026-10-08), so nothing the app downloads comes from GameNative's fork.
+
+### The Windows runtime off GameNative's fork (decided 2026-11-04, Droidtop/tracker#857)
+
+Owner, 2026-10-31: "Kill gamenative-tux entirely. We can nuke it", and "we
+want to split our runtimes off. Relying on a gamenative fork for them when
+that fork isn't being maintained is a pretty terrible idea. Our runtimes are
+patched to be able to load games from arbitrary storage locations, so
+upstream wouldn't help with that." So nothing droidtop builds or ships
+reads from Droidtop/gamenative-tux. Until this change the arm64 natives and
+the asset payloads came from it, packed at `0f08762e` into this
+repository's `windows-runtime-prebuilt-0f08762e` release by a workflow and
+script that are now retired. Each piece moved to a source droidtop
+maintains:
+
+| Piece | Now |
+|---|---|
+| libwinlator, libwinlator_11, libextras, libvulkan_renderer, libvirglrenderer, libasurface_renderer, libahbimage, libxconnectorpatch, libevshim (arm64) | built from `native/upstream` (GameNative's sources, already the x86_64 build's) |
+| libhook_impl, libmain_hook (the Adreno hook libraries) | built from `vendor/libadrenotools`. This section used to say they exist only as binaries; their source is the libadrenotools GameNative pins as a submodule (`app/src/main/cpp/extras/adrenotools`) |
+| libc++_shared (arm64) | the NDK's, packaged by AGP as on x86_64 |
+| libpulse, libpulsecommon-13.0, libpulsecore-13.0, libpulseaudio, libsndfile, libltdl, and the modules asset (arm64) | built by `build-vendor-deps.sh`, as x86_64 already was; the Desktop's separate arm64 `module-pipe-source` asset is gone with it, the modules asset now carries it |
+| JSON lists, `inputcontrols/`, `box86_64/*.box64rc`, `wincomponents/` | committed as source in `runtime-windows/src/main/assets` |
+| Box64, FEXCore and WowBox64 `.tzst` builds | re-hosted in droidtop-components from utkarshdalal/GameNative at `ce378f01` (byte-identical to the fork's blobs); MIT. Built by GameNative from ptitSeb/box64 and FEX-Emu/FEX; droidtop does not build them |
+| `x86_64_input_dlls.tzst`, `arm64ec_input_dlls.tzst` | re-hosted the same way; Wine builtin DLLs (LGPL-2.1-or-later), source pointer GameNative/proton-wine, no commit named |
+| `libvortekrenderer.so`, `libkgslshim.so` (arm64), `redirect.tzst` (`libredirect.so`, `libredirect-bionic.so`), `libredirect-bionic-wx.so`, `libredirect-bionic-wx-minimal.so` | **no source exists anywhere**: GameNative and Winlator ship them as binaries only. Re-hosted unmodified with a licenceNote saying so. The x86_64 build uses droidtop's shims for the first two |
+
+Left out, as before, because the runtime never loads them: the dxwrapper
+payloads (fetched on demand), the Steam-only files, GameNative's LSFG
+layer (droidtop builds its own, section 5c), the Quest OpenXR loader,
+SteamBootstrap, libpatchelf and libdrawable.
+
+- **The GPL source offer for builds already shipped** stays: the source of
+  GameNative's fork at `0f08762e` is attached to the
+  `windows-runtime-prebuilt-0f08762e` release, beside the archive the
+  builds before this change packaged.
+- **Wine stays droidtop's own** (Droidtop/proton-wine-tux, the
+  shared-storage patches). The catalog defaults are not changed here.
+  `ContainerUtils` picks `proton-10.0-arm64ec-2` on every arm64 GPU path
+  and `proton-10.0-4-x86_64-1` on x86_64. Both are GameNative's Proton
+  builds (droidtop-components `wine` group, from downloads.gamenative.app),
+  as are the bundled `proton-9.0-*` base builds. droidtop's own builds are
+  the `droidtop` feed (proton-wine-tux's `proton-11.0-2-*` releases,
+  arm64ec and x86_64). Whether the defaults become proton-wine-tux builds,
+  so that games on shared storage and SD cards work without the person
+  picking a Wine, is proposed on #857 and waits for the owner's answer.
+- **Not verified from a cloud session**: that the arm64 libraries built
+  from source behave as GameNative's prebuilt ones did. The sources are the
+  ones GameNative builds from, but its checked-in `.so` files may predate
+  them (libevshim, libvulkan_renderer and libahbimage already differ
+  between the fork and upstream GameNative). The rig checks are in the
+  change's commit message.
 
 ### What droidtop-components may re-host, and the catalog's signature (decided 2026-10-08, Droidtop/tracker#319, #313)
 
@@ -22540,12 +22601,13 @@ reports while the splits exist and becomes a failing gate
 (`--require-complete`) in the change that removes them. On 2026-09-24
 (build of `ce75426`) 24 of the 39 arm64 libraries were missing, all
 gamenative's. `:runtime-windows` builds their x86_64 half with AGP's
-CMake, restricted to x86_64 so arm64 stays upstream's prebuilt set
-(`runtime-windows/native/CMakeLists.txt`, GameNative's sources in
-`native/upstream/`, shims in `native/shims/`; the arm64 set is re-hosted, §9).
+CMake (`runtime-windows/native/CMakeLists.txt`, GameNative's sources in
+`native/upstream/`, shims in `native/shims/`), and since
+Droidtop/tracker#857 the arm64 half too (§9).
 
-**The x86_64 Windows runtime (user, 2026-09-24).** arm64 keeps upstream
-GameNative's binaries untouched. An x86_64 device runs real x86_64 Wine,
+**The x86_64 Windows runtime (user, 2026-09-24).** arm64 kept upstream
+GameNative's binaries untouched (until Droidtop/tracker#857 built them from
+the same sources, §9). An x86_64 device runs real x86_64 Wine,
 not box64: `Droidtop/proton-wine-tux` already builds an Android/bionic
 x86_64 Proton (`--host=x86_64-linux-android28`) as the same `.wcp` module
 ContentsManager installs, and on x86_64 it runs natively. The arm64
@@ -22576,7 +22638,7 @@ gamenative's code actually calls:
   extended with the `volume`, `performance_mode` and `low_latency`
   arguments GameNative's `default.pa` passes; its modules and `pactl` go
   in `pulseaudio-gamenative-x86_64.tzst`, the x86_64 counterpart of the
-  arm64 asset.
+  arm64 asset (both droidtop's builds since Droidtop/tracker#857).
 
 **Inside the guest on x86_64 (decided 2026-10-02, Droidtop/tracker#242).**
 The list above is the app's own natives; the guest process needs its own

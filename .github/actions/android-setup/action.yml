@@ -204,7 +204,7 @@ runs:
           app/src/main/jniLibs
           runtime-windows/src/main/jniLibs
           runtime-windows/src/main/assets/pulseaudio-gamenative-x86_64.tzst
-          runtime-linux-noroot/src/main/assets/pulseaudio-desktop-arm64-v8a.tzst
+          runtime-windows/src/main/assets/pulseaudio-gamenative-arm64-v8a.tzst
           ${{ github.workspace }}/.android-deps
         # Keyed on every vendored submodule the script builds from, so a
         # submodule bump invalidates it. The suffix is bumped when what the
@@ -221,8 +221,10 @@ runs:
         # module-pipe-source (Droidtop/tracker#80): the script had gained the
         # module but the key had not moved, so releases kept the old asset;
         # v13 added the arm64 module-pipe-source asset for the Desktop
-        # microphone (Droidtop/tracker#132).
-        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', '.git/modules/vendor/pulseaudio/HEAD', '.git/modules/vendor/libsndfile/HEAD', 'build-scripts/proot-patches/**', 'build-scripts/pulseaudio-patches/**', 'build-scripts/talloc/**') }}-v13
+        # microphone (Droidtop/tracker#132); v14 builds the whole arm64
+        # PulseAudio set, which until then was GameNative's prebuilt one
+        # (Droidtop/tracker#857).
+        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', '.git/modules/vendor/pulseaudio/HEAD', '.git/modules/vendor/libsndfile/HEAD', 'build-scripts/proot-patches/**', 'build-scripts/pulseaudio-patches/**', 'build-scripts/talloc/**') }}-v14
 
     - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel, PulseAudio)
       if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -243,21 +245,22 @@ runs:
           bash build-scripts/build-vendor-deps.sh "$abi"
         done
 
-    - name: Cache the Windows runtime's prebuilts
-      id: winprebuilt-cache
+    - name: Cache the Windows runtime's re-hosted files
+      id: wincomponents-cache
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
-        path: runtime-windows/prebuilt
-        key: windows-runtime-prebuilt-${{ hashFiles('runtime-windows/prebuilt.pin') }}
+        path: runtime-windows/components
+        key: windows-runtime-components-${{ hashFiles('runtime-windows/components.pin') }}
 
-    - name: Fetch the Windows runtime's prebuilts
-      # GameNative's arm64 native libraries and asset payloads, re-hosted
-      # unmodified as a release of this repository
-      # (.github/workflows/windows-runtime-prebuilt.yml, docs/SPEC.md 9),
-      # checked against runtime-windows/prebuilt.pin.
-      if: steps.winprebuilt-cache.outputs.cache-hit != 'true'
+    - name: Fetch the Windows runtime's re-hosted files
+      # The files droidtop does not build (arm64 libvortekrenderer and
+      # libkgslshim, the Box64/FEXCore/WowBox64 builds, input DLLs, redirect
+      # libraries), from Droidtop/droidtop-components' windows-runtime
+      # release, checked against runtime-windows/components.pin
+      # (docs/SPEC.md 9).
+      if: steps.wincomponents-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: bash build-scripts/fetch-windows-runtime-prebuilt.sh
+      run: bash build-scripts/fetch-windows-runtime-components.sh
 
     - name: Cache the lsfg-vk layer
       id: lsfg-cache

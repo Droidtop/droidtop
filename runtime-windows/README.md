@@ -5,8 +5,8 @@ uid through `/system/bin/linker64` against an ImageFs root in app storage,
 no root and no container.
 
 - `src/main/java/com/winlator/` is Winlator's runtime as GameNative ships it
-  (GPL-3.0; Winlator itself LGPL-2.1), lifted from droidtop's fork
-  Droidtop/gamenative-tux with its package and headers unchanged. The few
+  (GPL-3.0; Winlator itself LGPL-2.1), lifted from GameNative (droidtop's former fork of it, at `0f08762e`)
+  with its package and headers unchanged. The few
   edits are marked `droidtop:`.
 - `src/main/kotlin/dev/droidtop/runtime/windows/` holds droidtop's own code
   (`WineEngine`, `WineXSession`, `WineGameActivity`, `WineOptions`,

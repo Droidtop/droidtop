@@ -6,10 +6,10 @@ import com.winlator.core.Callback;
 
 /**
  * Real, swappable seam for "run a guest command inside a Linux rootfs" --
- * per direction, gamenative-tux's own Linux backend needs to be modular so
- * it can use its own bundled proot implementation standalone ({@link
- * DefaultProotContainerBackend}), while droidtop (or any other host app
- * forking this in) can supply its own instead -- droidtop's own real
+ * per direction, the runtime's Linux backend is modular: its own bundled
+ * proot implementation is the default ({@link
+ * DefaultProotContainerBackend}), and droidtop (or any other host app)
+ * can supply its own instead -- droidtop's own real
  * proot (`runtime-linux-noroot`) or droidspaces/namespace (`runtime-linux-
  * root`) backends, so there's one real container-execution path shared
  * across Wine games, native Linux games, and droidtop's own container
