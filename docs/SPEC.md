@@ -8350,7 +8350,15 @@ pointer (a Unity configuration window, say) works without touching the screen:
 - the other buttons and the left stick still reach the game; the right stick does not;
 - both stick clicks held 0.6 s turn it on or off at any time, and the running game's L2 sheet has a Mouse mode row;
   a "Mouse mode" badge in the top corner shows while it is on, and TalkBack hears the change;
-- remembered per game (`WineControlsPrefs.mouseMode`, which still reads what `PadMousePrefs` kept); off by default.
+- remembered per game (`WineControlsPrefs.mouseMode`, which still reads what `PadMousePrefs` kept); a game with no
+  choice yet starts with it on when its genre is played with a pointer, otherwise off (Droidtop/tracker#618 C2, the
+  controls review: mouse mode never turned on by default, so a game that needs a pointer on a pad-only device looked
+  dead; owner, 2026-10-23, on the review: "Yep. Go for it"). The pointer genres (`MouseModeDefault.genreNeedsMouse`)
+  are point-and-click, hidden object, visual novel, strategy (RTS, turn-based), card and board games, matched as whole
+  words in the scraped genre, which the library's launch carries (`LaunchContext.genre`);
+- a game's first start shows how to reach it for eight seconds in the badge's place, on ("Mouse mode: hold both stick
+  clicks to turn it off") or off ("Hold both stick clicks for mouse mode"), once per game
+  (`WineControlsPrefs.firstMouseHint`), and the L2 sheet's row names the combination either way.
 
 Since Droidtop/tracker#618 C4 it is a controller layout like any other (5b "Controller layouts"): droidtop's own
 `res/raw/controls_mouse_mode.vdf`, in Steam's format, played by the one `MappingEngine` through the Wine sink

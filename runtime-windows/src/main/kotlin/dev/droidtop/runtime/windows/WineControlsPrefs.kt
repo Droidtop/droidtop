@@ -24,13 +24,26 @@ internal object WineControlsPrefs {
     /** Before #618 C4, mouse mode was kept as "on|stick|clicks" under this key in droidtop's main preferences. */
     private const val OLD_MOUSE_MODE = "droidtop_pad_mouse_"
 
-    /** Whether the game's pad is in mouse mode (docs/SPEC.md 5b, "Controller mouse mode"): off until turned on. */
-    fun mouseMode(context: Context, entryId: String): Boolean {
+    /**
+     * Whether the game's pad is in mouse mode (docs/SPEC.md 5b, "Controller mouse mode"): the person's choice for it,
+     * else [byDefault] (on for a game whose genre is played with a pointer, [MouseModeDefault]; Droidtop/tracker#618 C2).
+     */
+    fun mouseMode(context: Context, entryId: String, byDefault: Boolean = false): Boolean {
         val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         if (prefs.contains(MOUSE_MODE + entryId)) return prefs.getBoolean(MOUSE_MODE + entryId, false)
         val old = context.getSharedPreferences(dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-            .getString(OLD_MOUSE_MODE + entryId, null)
-        return old?.substringBefore('|') == "true"
+            .getString(OLD_MOUSE_MODE + entryId, null) ?: return byDefault
+        return old.substringBefore('|') == "true"
+    }
+
+    private const val MOUSE_HINT = "mouse_hint:"
+
+    /** True the first time a game asks, then never again: its first start shows how mouse mode is reached (#618 C2). */
+    fun firstMouseHint(context: Context, entryId: String): Boolean {
+        val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(MOUSE_HINT + entryId, false)) return false
+        prefs.edit().putBoolean(MOUSE_HINT + entryId, true).apply()
+        return true
     }
 
     fun setMouseMode(context: Context, entryId: String, on: Boolean) {
