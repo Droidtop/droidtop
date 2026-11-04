@@ -46,9 +46,16 @@ object HostLinks {
         val key = host?.let { accounts(it.id)?.trim()?.takeIf { k -> k.isNotEmpty() } }
         if (host != null && key != null) serve(host, link, key, "via your ${host.name}", refused)?.let { return it }
         // A debrid account passed over says why, as a host's own refusal does (Droidtop/tracker#638).
-        (debrid ?: { l -> DebridLinks.resolve(l, refused) })(link)?.let { return it }
-        return host?.let { serve(it, link, null, "direct from ${it.name}", refused) }
+        val skipped = mutableListOf<String>()
+        (debrid ?: { l -> DebridLinks.resolve(l) { why -> skipped += why; refused(why) } })(link)?.let { return it }
+        // Taken from the host itself while a debrid account was passed over: the job's line says why, so "it downloads
+        // everything directly" (the owner, 2026-11-04) is answered on the row itself.
+        return host?.let { serve(it, link, null, directLine(it.name, skipped), refused) }
     }
+
+    /** "direct from PixelDrain", with the first reason a debrid account was passed over when one was. Pure. */
+    fun directLine(hostName: String, skipped: List<String>): String =
+        "direct from $hostName" + (skipped.firstOrNull()?.let { " ($it)" } ?: "")
 
     /** [host]'s files for [link] as downloads, or null when it refuses, cannot be asked, or has more files than one job takes. */
     private fun serve(host: HostResolver, link: String, key: String?, via: String, refused: (String) -> Unit): List<WebSessionDownload>? {

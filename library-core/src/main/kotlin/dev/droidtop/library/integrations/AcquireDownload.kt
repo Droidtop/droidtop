@@ -99,7 +99,17 @@ internal object AcquireDownload {
                 torrent = swarm.torrent,
             )
         }
-        val parts = descriptors.mapIndexed { index, descriptor ->
+        // A plain address the source gave on a file host (not a page it started, not a GitHub asset) goes to the person's
+        // host and debrid accounts first, as a link opened in droidtop's view does (Droidtop/tracker#638; the owner,
+        // 2026-11-04: "torbox integration doesn't seem to be working, it downloads everything directly").
+        val routed = withContext(Dispatchers.IO) {
+            runCatching { dev.droidtop.pluginhost.debrid.DebridLinks.prime() }
+            HostRoute.route(descriptors, served = { dev.droidtop.pluginhost.hosts.HostLinks.served(it) }) { url ->
+                dev.droidtop.pluginhost.hosts.HostLinks.resolve(url, refused = { why -> onStatus(why) })
+            }
+        }
+        routed.firstNotNullOfOrNull { it.via }?.let { onStatus("Downloading $it") }
+        val parts = routed.map { it.descriptor }.mapIndexed { index, descriptor ->
             DownloadPart(
                 url = descriptor.url,
                 name = AcquireFileName.areaName(now + index, descriptor.fileName),
