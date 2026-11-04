@@ -496,7 +496,19 @@ internal fun PcGamePage(
             parts,
         )
     }
-    val strip = remember(entry, runner, folderSize, siblings, setVersion) {
+    // Play time on the person's other devices (Droidtop/tracker#469): one file read, on IO.
+    val playedElsewhere by produceState(emptyList<dev.droidtop.library.computers.ComputerLibrary.PlayElsewhere>(), entry.id) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                dev.droidtop.library.computers.ComputerLibrary.playElsewhere(
+                    context,
+                    dev.droidtop.library.computers.ComputerLibrary.keyOf(entry),
+                    dev.droidtop.net.peer.DeviceIdentity.id(context),
+                )
+            }.getOrNull().orEmpty()
+        }
+    }
+    val strip = remember(entry, runner, folderSize, siblings, setVersion, playedElsewhere) {
         factsStrip(
             entry = entry,
             now = System.currentTimeMillis(),
@@ -504,6 +516,7 @@ internal fun PcGamePage(
             installedVersion = installedVersions(entry, siblings, setVersion).firstOrNull(),
             runsWith = runner?.label,
             runsWithReason = runner?.reason,
+            playedElsewhere = playedElsewhere,
         )
     }
 
@@ -1824,14 +1837,30 @@ internal fun factsStrip(
     installedVersion: String?,
     runsWith: String?,
     runsWithReason: String? = null,
+    // Play time on the person's other devices, as the library sync last heard it (Droidtop/tracker#469).
+    playedElsewhere: List<dev.droidtop.library.computers.ComputerLibrary.PlayElsewhere> = emptyList(),
 ): List<StripFact> = listOfNotNull(
     StripFact("Last played", entry.lastPlayedEpochMs?.let { dev.droidtop.library.format.ValueFormat.daysAgo(now, it).replaceFirstChar { c -> c.uppercase() } } ?: "Never"),
     // Play time is time; how many times is Overview's "Times played", said once (Droidtop/tracker#662).
-    entry.playtimeSeconds.takeIf { it > 0 }?.let { StripFact("Play time", dev.droidtop.library.format.ValueFormat.duration(it)) },
+    playTimeFact(entry.playtimeSeconds, playedElsewhere),
     versionFact(installedVersion, entry.availableUpdate)?.let { StripFact("Version", it) },
     (folderSizeBytes ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { StripFact("Size", dev.droidtop.library.format.ValueFormat.size(it)) },
     runsWith?.takeIf { it.isNotBlank() }?.let { StripFact("Runs with", it, runsWithReason?.takeIf { r -> r.isNotBlank() }) },
 )
+
+/**
+ * Play time over every device (Droidtop/tracker#469): the total, with where it was played under it when another device
+ * played it ("Here 2 h · DESKTOP 10 h"). Only this device's time, as before, when no other device did. Pure.
+ */
+internal fun playTimeFact(hereSeconds: Long, elsewhere: List<dev.droidtop.library.computers.ComputerLibrary.PlayElsewhere>): StripFact? {
+    val others = elsewhere.filter { it.seconds > 0 }
+    val total = hereSeconds.coerceAtLeast(0) + others.sumOf { it.seconds }
+    if (total <= 0) return null
+    fun duration(seconds: Long) = dev.droidtop.library.format.ValueFormat.duration(seconds)
+    if (others.isEmpty()) return StripFact("Play time", duration(total))
+    val parts = listOfNotNull(hereSeconds.takeIf { it > 0 }?.let { "Here ${duration(it)}" }) + others.map { "${it.device} ${duration(it.seconds)}" }
+    return StripFact("Play time", duration(total), parts.joinToString(" · "))
+}
 
 /** The narrowest hero art the page's band crops to fill, in pixels; narrower art is drawn whole (#254). */
 internal const val HERO_MIN_WIDTH_PX = 320

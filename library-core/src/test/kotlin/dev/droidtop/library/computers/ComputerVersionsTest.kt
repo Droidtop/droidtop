@@ -38,4 +38,23 @@ class ComputerVersionsTest {
         assertEquals("0.9.6", derived.version)
         assertEquals(dev.droidtop.library.GameNaming.derive(entry.id).name, derived.name)
     }
+
+    @Test
+    fun `play time elsewhere is every other device's, most first`() {
+        val game = org.json.JSONObject(
+            """{"installs":{
+              "me":{"device_name":"Pocket","install":{"installed":true,"play_seconds":600}},
+              "pc":{"device_name":"DESKTOP","install":{"installed":true,"play_seconds":36000,"last_played_ms":5}},
+              "deck":{"device_name":"","install":{"installed":false,"play_seconds":7200}},
+              "new":{"device_name":"Laptop","install":{"installed":true,"play_seconds":0}}
+            }}""",
+        )
+        assertEquals(
+            listOf(
+                ComputerLibrary.PlayElsewhere("DESKTOP", 36000, 5),
+                ComputerLibrary.PlayElsewhere("Another device", 7200, 0),
+            ),
+            ComputerLibrary.playElsewhereIn(game, "me"),
+        )
+    }
 }

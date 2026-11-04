@@ -17382,7 +17382,14 @@ structure, top to bottom, drawn only from theme tokens:
   the Runner row's subtitle), only those that exist. It scrolls sideways rather than
   clipping at a large text size. Play time is time only, and only once some
   was recorded; how many times the game was played is Overview's "Times
-  played", said once (Droidtop/tracker#662). Under it the one line saying why the
+  played", said once (Droidtop/tracker#662). Play time is over every device
+  (Droidtop/tracker#469, owner 2026-10-10: one library across the person's
+  devices): the total of this device's and what the library sync last heard
+  from each paired device (`ComputerLibrary.playElsewhere`, the agent
+  library's `play_seconds` per install), with where under it ("Here 1 h ·
+  DESKTOP 10 h") when another device played it; this device's alone reads as
+  before. A computer reports play time only where its scan knows it (Lutris
+  today), so a computer's Steam hours are not counted yet. Under it the one line saying why the
   primary action is what it is. In portrait the strip sits under the
   buttons. While the cursor is in the rows the band has scrolled away.
   Store games have no installed or latest version until #222 gives them

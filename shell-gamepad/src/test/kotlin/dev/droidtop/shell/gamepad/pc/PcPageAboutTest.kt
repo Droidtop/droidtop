@@ -246,6 +246,17 @@ class PcPageAboutTest {
     }
 
     @Test
+    fun playTimeAddsUpEveryDeviceAndSaysWhere() {
+        val desktop = dev.droidtop.library.computers.ComputerLibrary.PlayElsewhere("DESKTOP", 36000, 0)
+        assertEquals(StripFact("Play time", "11 h", "Here 1 h · DESKTOP 10 h"), playTimeFact(3600, listOf(desktop)))
+        // Played only elsewhere: the total is that device's.
+        assertEquals(StripFact("Play time", "10 h", "DESKTOP 10 h"), playTimeFact(0, listOf(desktop)))
+        // Only here: as before, no line under it.
+        assertEquals(StripFact("Play time", "1 h"), playTimeFact(3600, emptyList()))
+        assertEquals(null, playTimeFact(0, emptyList()))
+    }
+
+    @Test
     fun heroArtNarrowerThan320PixelsIsNeverBlownUp() {
         assertTrue(isNarrowHeroArt(319f))
         assertFalse(isNarrowHeroArt(320f))

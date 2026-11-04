@@ -258,6 +258,31 @@ object ComputerLibrary {
             .sortedByDescending { it.atMs }
     }
 
+    /** Time played on another device, as the library sync last heard it: its name, seconds, and when it last played. */
+    data class PlayElsewhere(val device: String, val seconds: Long, val lastPlayedMs: Long)
+
+    /**
+     * The game [key]'s play time on the person's other devices (Droidtop/tracker#469: play time over every device), from
+     * the agent core's library ([me] is this device's id). Reads a file: never on the main thread.
+     */
+    fun playElsewhere(context: Context, key: String, me: String?): List<PlayElsewhere> {
+        val game = runCatching { JSONObject(stateFile(context).readText()).optJSONObject("games")?.optJSONObject(key) }.getOrNull()
+            ?: return emptyList()
+        return playElsewhereIn(game, me)
+    }
+
+    /** [playElsewhere] over one game's record of the state file. Pure. */
+    fun playElsewhereIn(game: JSONObject, me: String?): List<PlayElsewhere> {
+        val installs = game.optJSONObject("installs") ?: return emptyList()
+        return installs.keys().asSequence().filter { it != me }.mapNotNull { device ->
+            val on = installs.optJSONObject(device) ?: return@mapNotNull null
+            val install = on.optJSONObject("install") ?: return@mapNotNull null
+            val seconds = install.optLong("play_seconds")
+            if (seconds <= 0) return@mapNotNull null
+            PlayElsewhere(on.optString("device_name").ifBlank { "Another device" }, seconds, install.optLong("last_played_ms"))
+        }.sortedByDescending { it.seconds }.toList()
+    }
+
     /** A game installed on a computer, as the last exchange left it. */
     data class RemoteGame(val key: String, val title: String, val platform: String?, val sizeBytes: Long, val launcher: String?, val path: String?)
 
