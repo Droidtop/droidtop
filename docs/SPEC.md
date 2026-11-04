@@ -8485,6 +8485,13 @@ install only GameNative's Steam knew, and droidtop now has its own,
   `build-scripts/fetch-lsfg-layer.sh` puts it into `runtime-windows/lsfg/jniLibs`
   (`android-setup`). The Windows runtime's re-hosted files
   (`components.pin`, §9) leave GameNative's old arm64 layer out.
+  The layer links lsfg-vk-android's `thirdparty/dxbc` (DXVK's DXBC
+  compiler, zlib), pinned at PancakeTAS/dxbc `78ab59a8`. That repository is
+  gone (lsfg-vk left GitHub), so droidtop keeps the exact tree in
+  `build-scripts/lsfg-dxbc` (git tree `f19b5a7a`, identical to the
+  commit's; recovered 2026-11-04 from github.com/Username404-59/dxbc, which
+  still holds the commit). The workflow builds with that copy and checks
+  both the pin and the tree before it does (Droidtop/tracker#857).
 - **The DLL** is Lossless Scaling's own `Lossless.dll`, from the person's own
   install of Lossless Scaling (Steam app 993090) that droidtop's Steam
   (`:stores`) put in their game folders. droidtop never downloads that game for
@@ -22190,7 +22197,13 @@ SteamBootstrap, libpatchelf and libdrawable.
 - **The GPL source offer for builds already shipped** stays: the source of
   GameNative's fork at `0f08762e` is attached to the
   `windows-runtime-prebuilt-0f08762e` release, beside the archive the
-  builds before this change packaged.
+  builds before this change packaged. It holds every submodule at its
+  pinned commit, taken one by one; `SOURCE-NOTES.md` beside it says where
+  each came from. The fork's only submodule whose repository is gone,
+  lsfg-vk-android's `thirdparty/dxbc`, comes from droidtop's own copy
+  (`build-scripts/lsfg-dxbc`, section 5c "Frame generation"), the same
+  source droidtop's lsfg layer is built from. The fork itself never held
+  that source, only a pointer to it.
 - **Wine stays droidtop's own** (Droidtop/proton-wine-tux, the
   shared-storage patches). The catalog defaults are not changed here.
   `ContainerUtils` picks `proton-10.0-arm64ec-2` on every arm64 GPU path

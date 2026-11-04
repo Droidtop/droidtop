@@ -8,11 +8,19 @@ name: lsfg-vk layer
 # install of Lossless Scaling, and is never built, fetched or shipped here.
 # The build fetches the release by runtime-windows/lsfg-layer.pin (tag and
 # SHA-256, build-scripts/fetch-lsfg-layer.sh).
+#
+# lsfg-vk-android's thirdparty/dxbc submodule points at PancakeTAS/dxbc,
+# which no longer exists (lsfg-vk moved off GitHub). The exact tree of the
+# pinned commit 78ab59a8 is kept in build-scripts/lsfg-dxbc (zlib, DXVK's
+# DXBC compiler; git tree f19b5a7a, the same as that commit's), so this
+# build no longer depends on that repository (Droidtop/tracker#857). Its
+# other submodules (pe-parse, toml11, volk) still resolve upstream.
 
 on:
   push:
     paths:
       - '.github/workflows/lsfg-vk-layer.yml'
+      - 'build-scripts/lsfg-dxbc/**'
   workflow_dispatch:
 
 permissions:
@@ -38,8 +46,17 @@ jobs:
           repository: ${{ env.LSFG_REPO }}
           ref: ${{ env.LSFG_REF }}
           path: lsfg
-          submodules: recursive
           persist-credentials: false
+
+      - name: Third-party sources
+        run: |
+          # Every submodule but dxbc from upstream, at the commits lsfg-vk-android pins.
+          git -C lsfg submodule update --init --depth 1 thirdparty/pe-parse thirdparty/toml11 thirdparty/volk
+          # dxbc from droidtop's copy, checked against the commit lsfg-vk-android pins.
+          want=$(git -C lsfg ls-tree HEAD thirdparty/dxbc | awk '{print $3}')
+          [ "$want" = 78ab59a8aaeb43cd1b0a5e91ba86722433a10b78 ] || { echo "lsfg-vk-android pins dxbc $want, droidtop keeps 78ab59a8"; exit 1; }
+          [ "$(git rev-parse HEAD:build-scripts/lsfg-dxbc)" = f19b5a7a5c0e509f62c5d3518490e2f4a9367fdd ] || { echo "build-scripts/lsfg-dxbc is not dxbc 78ab59a8's tree"; exit 1; }
+          cp -a build-scripts/lsfg-dxbc/. lsfg/thirdparty/dxbc/
 
       - name: Cache Android NDK
         id: cache-ndk

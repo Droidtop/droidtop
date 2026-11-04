@@ -4,8 +4,16 @@ name: GPL source of the last Windows runtime prebuilts
 # droidtop's fork (Droidtop/gamenative-tux) at 0f08762e, published as the
 # windows-runtime-prebuilt-0f08762e release of this repository. The fork is
 # being deleted, so the corresponding source of those builds goes onto that
-# release: the fork's tree at that commit with its submodules, as one archive
+# release: the fork's tree at that commit with every submodule, as one
+# archive, plus SOURCE-NOTES.md saying where each submodule came from
 # (docs/SPEC.md 9, "The Windows runtime off GameNative's fork").
+#
+# Submodules are taken one by one, recursively, at the commits the tree pins.
+# One whose repository is gone does not stop the archive: dxbc
+# (PancakeTAS/dxbc, under lsfg-vk-android/thirdparty) is taken from droidtop's
+# own copy, build-scripts/lsfg-dxbc, whose git tree is checked against that
+# commit's; anything else that does not resolve is listed in the notes as
+# missing.
 #
 # Run once, on main, before the fork is deleted. A release that already holds
 # the archive is left as it is, so a later run does nothing. Once the archive
@@ -25,6 +33,9 @@ env:
   FORK_REF: 0f08762e192ef51a0bbce0f23f6e96ae896e2f37
   TAG: windows-runtime-prebuilt-0f08762e
   ASSET: gamenative-tux-0f08762e-source.tar.gz
+  TREE: gamenative-tux-0f08762e
+  DXBC_COMMIT: 78ab59a8aaeb43cd1b0a5e91ba86722433a10b78
+  DXBC_TREE: f19b5a7a5c0e509f62c5d3518490e2f4a9367fdd
 
 jobs:
   attach:
@@ -39,21 +50,78 @@ jobs:
             echo "done=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout the fork at FORK_REF
+      - name: Checkout (droidtop's copy of dxbc)
+        if: steps.have.outputs.done != 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: droidtop
+          persist-credentials: false
+
+      - name: Checkout the fork at FORK_REF, without submodules
         if: steps.have.outputs.done != 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: Droidtop/gamenative-tux
           ref: ${{ env.FORK_REF }}
-          path: gamenative-tux-0f08762e
-          submodules: recursive
+          path: ${{ env.TREE }}
           persist-credentials: false
+
+      - name: Every submodule, one by one
+        if: steps.have.outputs.done != 'true'
+        run: |
+          set -u
+          root="$GITHUB_WORKSPACE/$TREE"
+          notes="$GITHUB_WORKSPACE/SOURCE-NOTES.md"
+          [ "$(git -C droidtop rev-parse HEAD:build-scripts/lsfg-dxbc)" = "$DXBC_TREE" ] || { echo "droidtop's dxbc copy is not $DXBC_COMMIT's tree"; exit 1; }
+          {
+            echo "# Source of Droidtop/gamenative-tux at $FORK_REF"
+            echo
+            echo "The fork's tree at that commit, with every submodule at the commit it pins."
+            echo "Assembled by droidtop's .github/workflows/gpl-source-0f08762e.yml (Droidtop/tracker#857)."
+            echo
+            echo "| Submodule | Repository | Commit | Taken from |"
+            echo "|---|---|---|---|"
+          } > "$notes"
+          missing=0
+          walk() {
+            local repo="$1" rel="$2" path url sha
+            [ -f "$repo/.gitmodules" ] || return 0
+            git -C "$repo" config -f .gitmodules --get-regexp '^submodule\..*\.path$' | while read -r key path; do
+              name=${key#submodule.}; name=${name%.path}
+              url=$(git -C "$repo" config -f .gitmodules --get "submodule.$name.url")
+              sha=$(git -C "$repo" ls-tree HEAD "$path" | awk '{print $3}')
+              if [ -z "$sha" ]; then
+                echo "| $rel$path | $url | (no gitlink) | listed in .gitmodules only, nothing pinned |" >> "$notes"
+                continue
+              fi
+              if git -C "$repo" submodule update --init --depth 1 -- "$path" ||
+                 git -C "$repo" submodule update --init -- "$path"; then
+                echo "| $rel$path | $url | $sha | upstream |" >> "$notes"
+                walk "$repo/$path" "$rel$path/"
+              elif [ "$sha" = "$DXBC_COMMIT" ]; then
+                mkdir -p "$repo/$path"
+                cp -a "$GITHUB_WORKSPACE/droidtop/build-scripts/lsfg-dxbc/." "$repo/$path/"
+                echo "| $rel$path | $url | $sha | **repository gone**; droidtop's copy build-scripts/lsfg-dxbc (git tree $DXBC_TREE, identical to this commit's; recovered from github.com/Username404-59/dxbc, which still holds the commit) |" >> "$notes"
+              else
+                echo "| $rel$path | $url | $sha | **MISSING: the repository no longer serves this commit** |" >> "$notes"
+                echo "missing" >> "$GITHUB_WORKSPACE/missing.txt"
+              fi
+            done
+          }
+          walk "$root" ""
+          if [ -f "$GITHUB_WORKSPACE/missing.txt" ]; then
+            printf '\nSome submodules could not be fetched; their rows say so.\n' >> "$notes"
+          else
+            printf '\nEvery submodule is included.\n' >> "$notes"
+          fi
+          cp "$notes" "$root/SOURCE-NOTES.md"
+          cat "$notes"
 
       - name: Pack and attach
         if: steps.have.outputs.done != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tar --exclude-vcs -czf "$ASSET" gamenative-tux-0f08762e
+          tar --exclude=.git -czf "$ASSET" "$TREE"
           sha256sum "$ASSET" | tee "$ASSET.sha256"
-          gh release upload "$TAG" "$ASSET" "$ASSET.sha256" -R "$GITHUB_REPOSITORY"
+          gh release upload "$TAG" "$ASSET" "$ASSET.sha256" SOURCE-NOTES.md -R "$GITHUB_REPOSITORY"

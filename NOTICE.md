@@ -110,6 +110,12 @@ This project is distributed under the GNU General Public License v3.0 (see
   `packages/pulseaudio` at 39437706663c), kept in `build-scripts/pulseaudio-patches/`.
 - **libsndfile** — `vendor/libsndfile` (1.0.28), https://github.com/libsndfile/libsndfile — LGPL-2.1-or-later.
 - **libltdl** — GNU libtool's libltdl, from the build host's `libltdl-dev` — LGPL-2.1-or-later.
+- **dxbc** — DXVK's DXBC compiler as PancakeTAS/dxbc carried it for
+  lsfg-vk, at `78ab59a8` (that repository no longer exists) — zlib
+  (`build-scripts/lsfg-dxbc/LICENSE.md`). Kept as its exact tree in
+  `build-scripts/lsfg-dxbc` and linked into droidtop's lsfg-vk layer
+  (`.github/workflows/lsfg-vk-layer.yml`, from GameNative/lsfg-vk-android,
+  MIT).
 - **SDL2** — `vendor/SDL2` (release-2.32.10), https://github.com/libsdl-org/SDL — zlib.
   Headers only, for building GameNative's `libevshim.so`.
   Also the source of the controller vendor and product ids droidtop classifies external pads by:
