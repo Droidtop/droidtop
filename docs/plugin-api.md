@@ -2311,6 +2311,9 @@ talk over the API".
     - A source with no link for the game searches by `title` and by
       `folder.name`, and answers only exact matches, as droidtop's
       built-in sources match.
+    - A person's own search (2026-11-04, Droidtop/tracker#861; SPEC 7g, "The person's own search text"): the
+      match picker sends `asked: "person"` and the words the person typed as `title`, with no `fileName` and no
+      `folder`, so the source searches those words only.
     - The host takes the one most confident candidate at or above 0.5 (a
       candidate without a confidence counts as 0.5). When two or more
       share the top confidence, it takes none: the game goes to "Choose

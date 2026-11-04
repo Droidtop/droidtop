@@ -468,10 +468,11 @@ object PcScraper {
      * Candidates for one entry, for the manual picker. Never applies
      * anything: the user chooses, then [apply] writes.
      */
-    suspend fun candidates(context: Context, entry: LibraryEntry): Candidates = withContext(Dispatchers.IO) {
+    suspend fun candidates(context: Context, entry: LibraryEntry, query: String? = null): Candidates = withContext(Dispatchers.IO) {
         ScraperReadiness.pcSourceProblem(context)?.let { return@withContext Candidates.Unavailable(it) }
         val source = source(context) ?: return@withContext Candidates.Unavailable("No PC scraper source is configured.")
-        val title = searchTitleFor(entry)
+        // The person's own search text when they gave one (Droidtop/tracker#861), else the name droidtop reads.
+        val title = query?.trim()?.takeIf { it.isNotEmpty() } ?: searchTitleFor(entry)
         val lookup = runCatching { source.search(title) }.getOrElse { error ->
             return@withContext Candidates.Unavailable("${source.label} search failed: ${error.message}")
         }
@@ -947,7 +948,7 @@ object PcScraper {
     }
 
     /** The candidates metadata plugins offer for [entry], for the picker beside the PC source's. Never applies anything. */
-    suspend fun pluginCandidates(context: Context, entry: LibraryEntry): List<PluginPick> = withContext(Dispatchers.IO) {
+    suspend fun pluginCandidates(context: Context, entry: LibraryEntry, query: String? = null): List<PluginPick> = withContext(Dispatchers.IO) {
         val session = dev.droidtop.library.integrations.PluginMetadataSources.open(context) ?: return@withContext emptyList()
         try {
             // One rematch path, droidtop's (docs/plugin-api.md 1.11, Droidtop/tracker#784; the owner: "We need to be able
@@ -966,6 +967,13 @@ object PcScraper {
             val search = org.json.JSONObject(facts.toString()).apply {
                 remove("sourceLinks")
                 put("asked", "person")
+                // The person's own search text (Droidtop/tracker#861) is the one name searched: the folder's goes, so a
+                // source that also searches by the folder's name does not bring back what the person typed past.
+                query?.trim()?.takeIf { it.isNotEmpty() }?.let { text ->
+                    put("title", text)
+                    remove("fileName")
+                    remove("folder")
+                }
             }
             val found = session.candidates(search).map { (source, candidate) -> PluginPick(source, candidate) }
                 .filterNot { pick -> current.any { it.source.record.manifest.id == pick.source.record.manifest.id && sameIds(it.candidate.ids, pick.candidate.ids) } }
@@ -1243,6 +1251,13 @@ object PcScraper {
         if (!entry.gameName.isNullOrBlank()) return
         dev.droidtop.library.identity.MatchRecorder.pc(context, entry, source, by, searched, today, matches)
     }
+
+    /**
+     * What a search for [entry] starts from in a picker, for the person to change (Droidtop/tracker#861): the name droidtop
+     * reads from the game, as an automatic scrape searches it; a ROM's file name. Pure.
+     */
+    fun suggestedSearch(entry: LibraryEntry): String =
+        if (entry.isPcOrEngineGame) searchTitleFor(entry) else File(entry.id).nameWithoutExtension
 
     internal fun searchTitleFor(entry: LibraryEntry): String {
         entry.gameName?.takeIf { it.isNotBlank() }?.let { return it }

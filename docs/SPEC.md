@@ -14266,6 +14266,15 @@ reimplemented it as my own f95seeker code." So:
   linked, or from the record's own Change link; a source with no update page
   says so on the record page, with Change link under it, and never relinks
   by itself.
+- **The person's own search text (2026-11-04, Droidtop/tracker#861).** The owner: "manual search for all sources,
+  especially when matching, is a necessity. Right now, it forces you to use the folder name." Every search a person
+  starts from a game begins with the name droidtop reads (the folder's, cleaned as an automatic scrape cleans it) as
+  a suggestion, shown as the first row, "Search for: <text>". Pressing it opens the shell's text entry (the touch
+  keyboard or the pad's) over that text, and what the person types is searched instead; left blank, the suggestion
+  stands. This holds for the link sheet (`SourceLinkSheet`: the source's `match` gets the text as its title) and for
+  the manual match picker (`ManualMatchPicker`: the PC scraper source, TheGamesDB for a ROM, and every metadata
+  plugin, which are asked with the text as `title` and without the folder's `fileName` and `folder`, so the folder's
+  name brings nothing back the person typed past).
 - **Links are kept and opened, never fetched again (2026-10-22, Droidtop/tracker#599).** The owner: "We shouldn't be
   fetching links again ... we should cache links as well, and then use the webview to open them. The user can start
   the download, and it'll be kicked over automatically." droidtop saves each record the source gives

@@ -164,10 +164,12 @@ private suspend fun linkFound(
 }
 
 /**
- * The sheet that links the game to [source]: the source's own matches for
- * [gameTitle] first (best first), then "Type a link or id", then "Unlink"
- * when it is linked. Every row asks twice ([SameGamePicker]): linking
- * changes what the library tells the person about the game.
+ * The sheet that links the game to [source]: first the search, "Search for: <text>", which starts as [gameTitle] and
+ * which the person changes in the shell's text entry (the touch keyboard or the pad's), then the source's own matches
+ * for that text (best first), then "Type a link or id", then "Unlink" when it is linked. Every row asks twice
+ * ([SameGamePicker]): linking changes what the library tells the person about the game. Droidtop/tracker#861: the
+ * owner, "manual search for all sources, especially when matching, is a necessity. Right now, it forces you to use the
+ * folder name."
  */
 @Composable
 internal fun SourceLinkSheet(
@@ -183,6 +185,22 @@ internal fun SourceLinkSheet(
     onClose: () -> Unit,
 ) {
     var typing by remember(source.key) { mutableStateOf(false) }
+    var query by remember(source.key, gameTitle) { mutableStateOf(gameTitle) }
+    var editingQuery by remember(source.key) { mutableStateOf(false) }
+    if (editingQuery) {
+        TextEditDialog(
+            title = "Search ${source.label}",
+            subtitle = SEARCH_HELP,
+            initial = query,
+            search = true,
+            onCommit = { text ->
+                query = searchText(text, gameTitle)
+                editingQuery = false
+            },
+            onDismiss = { editingQuery = false },
+        )
+        return
+    }
     if (typing) {
         TextEditDialog(
             title = source.label,
@@ -196,12 +214,16 @@ internal fun SourceLinkSheet(
         )
         return
     }
-    val found by produceState<List<UpdateSources.Found>?>(null, source.key, gameTitle) {
-        value = library.sourceMatches(source.key, gameTitle, versions)
+    val found by produceState<List<UpdateSources.Found>?>(null, source.key, query) {
+        value = null
+        value = library.sourceMatches(source.key, query, versions)
     }
     val matches = found.orEmpty()
-    val typeIndex = matches.size
+    // The search first, then the matches, then the typed link and Unlink.
+    val first = 1
+    val typeIndex = first + matches.size
     val choices = buildList {
+        add(SameGameChoice(searchRowTitle(query), "Change what is searched for"))
         matches.forEach { match ->
             add(
                 SameGameChoice(
@@ -216,30 +238,32 @@ internal fun SourceLinkSheet(
     SameGamePicker(
         focusLabel = source.label,
         question = when {
-            found == null -> "Looking for $gameTitle on ${source.label}..."
-            matches.isEmpty() -> "${source.label} found nothing named like $gameTitle"
+            found == null -> "Looking for $query on ${source.label}..."
+            matches.isEmpty() -> "${source.label} found nothing named like $query"
             else -> "Which one is $gameTitle?"
         },
         choices = choices,
         confirmLine = { choice ->
             when (val index = choices.indexOf(choice)) {
+                0 -> "Press again to change the search"
                 typeIndex -> "Press again to type it"
                 typeIndex + 1 -> "Press again: ${source.label} stops checking this game"
-                else -> "Press again: link this game to ${matches[index].title ?: "#" + matches[index].externalId}"
+                else -> "Press again: link this game to ${matches[index - first].title ?: "#" + matches[index - first].externalId}"
             }
         },
         workingLine = "Linking...",
         onPick = { index ->
             var said: String? = null
             when (index) {
+                0 -> editingQuery = true
                 typeIndex -> typing = true
                 typeIndex + 1 -> linkSourceFromText(library, gameIds, source, "") { said = it }
-                else -> linkFound(library, gameIds, source, matches[index]) { said = it }
+                else -> linkFound(library, gameIds, source, matches[index - first]) { said = it }
             }
             said.orEmpty()
         },
         onDone = { message ->
-            if (!typing) {
+            if (!typing && !editingQuery) {
                 say(message.ifEmpty { null })
                 onClose()
             }
@@ -247,3 +271,12 @@ internal fun SourceLinkSheet(
         onDismiss = onClose,
     )
 }
+
+/** What a search row and its text entry say (Droidtop/tracker#861). */
+internal const val SEARCH_HELP = "Search with other words than the folder's name"
+
+/** The search row's title: what is searched for now. Pure. */
+internal fun searchRowTitle(query: String): String = "Search for: $query"
+
+/** The text to search with: what the person typed, trimmed, or [suggestion] when they left it blank. Pure. */
+internal fun searchText(typed: String, suggestion: String): String = typed.trim().ifEmpty { suggestion }

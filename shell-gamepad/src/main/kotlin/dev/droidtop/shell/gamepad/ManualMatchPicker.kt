@@ -67,15 +67,37 @@ internal fun ManualMatchPicker(
     var status by remember(entry) { mutableStateOf<String?>(null) }
     var focusIndex by remember(entry) { mutableIntStateOf(0) }
     var applying by remember(entry) { mutableStateOf(false) }
+    // What is searched for (Droidtop/tracker#861): the folder's name as droidtop reads it, until the person changes it.
+    val suggestion = remember(entry) { PcScraper.suggestedSearch(entry) }
+    var query by remember(entry) { mutableStateOf(suggestion) }
+    var editingQuery by remember(entry) { mutableStateOf(false) }
 
-    LaunchedEffect(entry) {
+    if (editingQuery) {
+        TextEditDialog(
+            title = "Search",
+            subtitle = dev.droidtop.shell.gamepad.pc.SEARCH_HELP,
+            initial = query,
+            search = true,
+            onCommit = { text ->
+                query = dev.droidtop.shell.gamepad.pc.searchText(text, suggestion)
+                editingQuery = false
+            },
+            onDismiss = { editingQuery = false },
+        )
+        return
+    }
+
+    LaunchedEffect(entry, query) {
+        candidates = null
+        status = null
+        focusIndex = 0
         if (entry.isPcOrEngineGame) {
             // The credential-shaped failures land in Unavailable: its
             // message names the setting to fill in, so an unconfigured
             // IGDB reads as an instruction rather than an empty list.
             // The PC source's candidates, then the metadata plugins' (an F95 thread, say): one list, the person picks.
-            val fromPlugins = PcScraper.pluginCandidates(context, entry).map { MatchCandidate.Plugin(it) }
-            when (val found = PcScraper.candidates(context, entry)) {
+            val fromPlugins = PcScraper.pluginCandidates(context, entry, query).map { MatchCandidate.Plugin(it) }
+            when (val found = PcScraper.candidates(context, entry, query)) {
                 is PcScraper.Candidates.Unavailable -> {
                     status = found.message.takeIf { fromPlugins.isEmpty() }
                     candidates = fromPlugins
@@ -102,7 +124,7 @@ internal fun ManualMatchPicker(
         }
         val lookup = withContext(Dispatchers.IO) {
             runCatching {
-                TheGamesDbClient.searchCandidates(apiKey, tgdbId, java.io.File(entry.id).nameWithoutExtension)
+                TheGamesDbClient.searchCandidates(apiKey, tgdbId, query)
             }
         }
         // A refusal and a failed request are not "no candidates": each
@@ -136,9 +158,10 @@ internal fun ManualMatchPicker(
             focusLabel = "Manual match",
             onPad = { press ->
                 val list = candidates.orEmpty()
+                // Row 0 is the search; the candidates follow it.
                 when (press.action) {
-                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, list.size, press)
-                    GamepadAction.A -> list.getOrNull(focusIndex)?.let { apply(it) }
+                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, list.size + 1, press)
+                    GamepadAction.A -> if (focusIndex == 0) editingQuery = true else list.getOrNull(focusIndex - 1)?.let { apply(it) }
                     GamepadAction.B -> onDismiss()
                     else -> Unit
                 }
@@ -151,6 +174,16 @@ internal fun ManualMatchPicker(
                 color = MenuTokens.OnSurface,
                 fontWeight = FontWeight.SemiBold,
             )
+            // The search first (Droidtop/tracker#861): A types other words, with the touch keyboard or the pad's.
+            MenuRow(
+                title = dev.droidtop.shell.gamepad.pc.searchRowTitle(query),
+                subtitle = "Change what is searched for",
+                selected = focusIndex == 0,
+                onClick = {
+                    focusIndex = 0
+                    editingQuery = true
+                },
+            )
             when {
                 candidates == null -> MenuRow(title = "Searching...")
                 candidates!!.isEmpty() -> MenuRow(title = status ?: "Nothing found")
@@ -158,9 +191,9 @@ internal fun ManualMatchPicker(
                     MenuRow(
                         title = candidate.name,
                         subtitle = candidate.subtitle,
-                        selected = index == focusIndex,
+                        selected = index + 1 == focusIndex,
                         onClick = {
-                            focusIndex = index
+                            focusIndex = index + 1
                             apply(candidate)
                         },
                     )
@@ -174,7 +207,7 @@ internal fun ManualMatchPicker(
     // never blocks input handling.
     LaunchedEffect(applying) {
         if (!applying) return@LaunchedEffect
-        val candidate = candidates?.getOrNull(focusIndex) ?: return@LaunchedEffect
+        val candidate = candidates?.getOrNull(focusIndex - 1) ?: return@LaunchedEffect
         val applied = when (candidate) {
             is MatchCandidate.Rom -> withContext(Dispatchers.IO) {
                 dev.droidtop.library.scraper.applyManualMatch(context, entry, candidate.candidate.id)
