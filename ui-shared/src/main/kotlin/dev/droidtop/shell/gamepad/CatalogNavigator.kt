@@ -631,7 +631,8 @@ fun CatalogNavigator(
                 }
                 confirmArmedId = null
                 item.run(context)
-                refresh()
+                // An action that ends what this screen is about goes back a screen (ActionItem.leaves).
+                if (item.leaves) pop() else refresh()
             }
             is AsyncActionItem -> {
                 val gate = item.gate

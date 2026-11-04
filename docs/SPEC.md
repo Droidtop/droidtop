@@ -21963,6 +21963,22 @@ owner's Sandustry from his Windows desktop to the Retroid Pocket 5.
   only), a computer other than Windows, and showing only the game's own
   windows (droidtop-agent DESIGN section 22).
 
+### Forgetting a computer, and a computer that forgot this device (Droidtop/tracker#531)
+
+- **Forget goes back.** "Forget this computer" and "Forget this handheld" are
+  `ActionItem`s with `leaves = true`: once done, the surface goes back one
+  screen (`CatalogNavigator`, and the launcher's preference screens through
+  the back dispatcher) to the paired devices, instead of a page saying it is
+  no longer paired. A screen opened on a device that is gone still says so,
+  and says to go back.
+- **"It no longer knows this device."** A computer that was told to forget
+  this device answers, right after the encrypted handshake, with `code:
+  not_paired` (droidtop-agent DESIGN section 4); the agent library returns
+  it as an `error` whose words say to pair again, which every computer
+  screen shows as its line, instead of "did not answer". On the home network
+  only: through WireGuard a forgotten device gets no answer at all. Needs the
+  agent library pin moved to an agent release that carries it.
+
 ### Transports
 
 The design's order (droidtop-agent docs/DESIGN.md section 10) holds:

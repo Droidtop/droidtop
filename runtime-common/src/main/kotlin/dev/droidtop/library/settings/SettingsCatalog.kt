@@ -245,6 +245,10 @@ class ActionItem(
     // What A does. A row given none is a fact or a state, not an action (Droidtop/tracker#587): no renderer promises A
     // on it ([inert]), and pressing it does nothing.
     val run: (Context) -> Unit = NOTHING,
+    // Once [run] is done the screen it is on has nothing left to show (Forget this computer: the computer is gone), so
+    // the surface goes back one screen instead of leaving a page about something that no longer exists
+    // (Droidtop/tracker#531).
+    val leaves: Boolean = false,
 ) : CatalogItem {
     /** Whether this row has nothing to do: a value, an empty state, a line that says what happened. */
     val inert: Boolean get() = run === NOTHING

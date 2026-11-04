@@ -248,7 +248,7 @@ object ComputersCatalog {
         groups = { context ->
             withContext(Dispatchers.IO) {
                 val device = Computers.devices(context).firstOrNull { it.id == id && it.handheld }
-                    ?: return@withContext listOf(CatalogGroup(id = "handheld_gone", title = null, items = listOf(ActionItem(id = "handheld_gone_row", title = "This handheld is no longer paired"))))
+                    ?: return@withContext listOf(CatalogGroup(id = "handheld_gone", title = null, items = listOf(ActionItem(id = "handheld_gone_row", title = "This handheld is no longer paired", subtitle = "Go back to see the devices paired with this one"))))
                 listOf(
                     CatalogGroup(
                         id = "handheld_state",
@@ -277,6 +277,7 @@ object ComputersCatalog {
                                         runCatching { PairedDevices.changed(ctx.applicationContext) }
                                     }
                                 },
+                                leaves = true,
                             ),
                         ),
                     ),
@@ -293,7 +294,7 @@ object ComputersCatalog {
 
     private suspend fun computerGroups(context: Context, id: String): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val computer = Computers.list(context).firstOrNull { it.id == id }
-            ?: return@withContext listOf(CatalogGroup(id = "computer_gone", title = null, items = listOf(ActionItem(id = "computer_gone_row", title = "This computer is no longer paired"))))
+            ?: return@withContext listOf(CatalogGroup(id = "computer_gone", title = null, items = listOf(ActionItem(id = "computer_gone_row", title = "This computer is no longer paired", subtitle = "Go back to see the computers paired with this device"))))
         val games = ComputerLibrary.gamesOn(context, computer)
         val apps = ComputerLibrary.appsOn(context, computer)
         val last = if (computer.lastSyncMs > 0) DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(computer.lastSyncMs)) else null
@@ -376,6 +377,8 @@ object ComputersCatalog {
                                 runCatching { PairedDevices.changed(ctx.applicationContext) }
                             }
                         },
+                        // Its page has nothing left to show: back to the list (Droidtop/tracker#531).
+                        leaves = true,
                     ),
                 ),
             ),

@@ -815,7 +815,8 @@ class CatalogPreferenceNavigator(
             setOnPreferenceClickListener {
                 confirmThen(context, item.confirmTitle) {
                     item.run(context)
-                    rebuild()
+                    // An action that ends what this screen is about goes back a screen (ActionItem.leaves).
+                    if (item.leaves) fragment.requireActivity().onBackPressedDispatcher.onBackPressed() else rebuild()
                 }
                 true
             }
