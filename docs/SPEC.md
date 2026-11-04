@@ -21414,6 +21414,9 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   it and publishes it with each release. droidtop fetches it against
   `net-core/agent-lib.pin` (tag and SHA-256,
   `build-scripts/fetch-agent-lib.sh`), the way it fetches the lsfg-vk layer.
+  The pin is build-130 (2026-11-04, Droidtop/tracker#794): the first release
+  with `sync_context_copy`, so a plugin's published context syncs as a copy;
+  under build-121 it only said droidtop needed updating.
   So droidtop's CI needs no Rust toolchain, and pairing, the session channel,
   the save rule and the merges are one implementation. `AgentNative` in
   `:net-core` is the one JNI entry point: an operation and its arguments as
