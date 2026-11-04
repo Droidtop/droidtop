@@ -63,6 +63,7 @@ class WhatsNewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val all = intent.getBooleanExtra(EXTRA_ALL, false)
+        val from = intent.getLongExtra(EXTRA_FROM, -1L).takeIf { it >= 0 }
         dev.droidtop.shell.gamepad.input.ControllerLayouts.attach(this)
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
@@ -73,35 +74,52 @@ class WhatsNewActivity : AppCompatActivity() {
                             val bundled = WhatsNew.builds(applicationContext)
                             if (all) {
                                 bundled
+                            } else if (from != null) {
+                                // Settings' "Changes since your last update": the range, read again any time.
+                                WhatsNew.since(bundled, from, AppSelfUpdate.installedVersionCode(applicationContext))
                             } else {
                                 WhatsNew.since(bundled, WhatsNew.lastSeen(applicationContext), AppSelfUpdate.installedVersionCode(applicationContext))
                             }
                         }
                     }
-                    BackHandler { close(all) }
-                    Box(Modifier.fillMaxSize().ownPadButtons { close(all) }) {
+                    BackHandler { close(all || from != null) }
+                    Box(Modifier.fillMaxSize().ownPadButtons { close(all || from != null) }) {
                         OnboardingScaffold(
                             title = "What's new",
                             body = null,
                             progress = null,
                             onBack = null,
-                            primary = StepAction("Done") { close(all) },
+                            primary = StepAction("Done") { close(all || from != null) },
                         ) {
                             val shown = builds
                             when {
                                 shown == null -> Unit
                                 shown.isEmpty() -> StepNote("This build carries no changelog")
-                                else -> shown.forEach { build ->
-                                    StepSectionLabel(build.versionName)
-                                    build.sections.forEach { (section, lines) ->
-                                        Text(section, color = MenuTokens.OnSurface, style = TypeRole.body)
-                                        lines.forEach { line ->
+                                else -> {
+                                    // What to do after this update, from every build in it, before what changed.
+                                    WhatsNew.onboarding(shown).takeIf { it.isNotEmpty() && !all }?.let { steps ->
+                                        StepSectionLabel("After updating")
+                                        steps.forEach { line ->
                                             Text(
                                                 "• $line",
-                                                color = MenuTokens.OnSurfaceMuted,
+                                                color = MenuTokens.OnSurface,
                                                 style = TypeRole.body,
                                                 modifier = Modifier.widthIn(max = Measure.bodyMaxWidth),
                                             )
+                                        }
+                                    }
+                                    shown.forEach { build ->
+                                        StepSectionLabel(build.versionName)
+                                        build.sections.forEach { (section, lines) ->
+                                            Text(section, color = MenuTokens.OnSurface, style = TypeRole.body)
+                                            lines.forEach { line ->
+                                                Text(
+                                                    "• $line",
+                                                    color = MenuTokens.OnSurfaceMuted,
+                                                    style = TypeRole.body,
+                                                    modifier = Modifier.widthIn(max = Measure.bodyMaxWidth),
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -134,7 +152,14 @@ class WhatsNewActivity : AppCompatActivity() {
         /** Every build's changelog, from Settings, rather than those since the last one seen. */
         const val EXTRA_ALL = "dev.droidtop.app.WhatsNew.ALL"
 
+        /** Every build newer than this versionCode and not newer than the one installed (Settings' range). */
+        const val EXTRA_FROM = "dev.droidtop.app.WhatsNew.FROM"
+
         fun intent(context: Context, all: Boolean): Intent =
             Intent(context, WhatsNewActivity::class.java).putExtra(EXTRA_ALL, all)
+
+        /** What changed since [from], the version droidtop was updated from, through the one installed. */
+        fun since(context: Context, from: Long): Intent =
+            Intent(context, WhatsNewActivity::class.java).putExtra(EXTRA_FROM, from)
     }
 }

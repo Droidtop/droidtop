@@ -12,3 +12,34 @@ permissions:
 jobs:
   hygiene:
     uses: Droidtop/droidtop-platforms/.github/workflows/commit-hygiene.yml@84f44633fc5a8441abae8d6679d2fd27b39cd2ee
+
+  # droidtop's own: the commit convention its changelog is made from (docs/SPEC.md 10b, "Every build carries its
+  # changelog"; changelog.d/README.md). A Changelog or Onboarding trailer must be well formed; a commit without one
+  # passes. The generator's own cases run first.
+  changelog-convention:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: The changelog generator's cases
+        run: python3 -m unittest discover -s build-scripts -p 'test_changelog_commits.py' -v
+      - name: Each commit's Changelog and Onboarding trailers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          base="${BASE:-$BEFORE}"
+          dir=$(mktemp -d)
+          if [ -n "$base" ] && [ "$base" != "0000000000000000000000000000000000000000" ]; then
+            gh api "repos/$REPO/compare/$base...$HEAD" --jq '.commits[].sha' > "$dir/shas" || echo "$HEAD" > "$dir/shas"
+          else
+            echo "$HEAD" > "$dir/shas"
+          fi
+          while read -r sha; do
+            gh api "repos/$REPO/commits/$sha" --jq '.commit.message' > "$dir/$sha.txt"
+          done < "$dir/shas"
+          python3 build-scripts/changelog_commits.py check "$dir"/*.txt

@@ -1,7 +1,7 @@
 """The one mechanism behind droidtop's release channels (docs/SPEC.md 10b).
 
-Six subcommands, run by CI only except fragments (run by hand when cutting
-a real version):
+Seven subcommands, run by CI only except range and fragments (run by hand
+while reviewing, and when cutting a real version):
 
   version-code COMMIT
       Prints the versionCode for COMMIT: the number of commits reachable from
@@ -13,15 +13,17 @@ a real version):
       number. Counted through the GitHub API because CI checks out one commit
       of history, and the full history is a 200 MB fetch per run.
 
-  changelog OUT VERSION_CODE
+  changelog OUT VERSION_CODE [COMMIT]
       Writes OUT, this build's changelog.json (docs/SPEC.md 10b, "Every build
       carries its changelog"): every build's entry, newest first, this one's
-      included. An entry is the changelog.d fragments that build was the
-      first to carry, grouped Added / Changed / Fixed. The history is the
-      previous per-build release's own changelog.json, so it is complete
-      without reading git history, and the app bundles OUT so it can show
-      every version a person skipped without the network. Never fails: an
-      empty entry is written as empty and publish-build refuses it.
+      included. An entry is made from the commits since the previous
+      published build (GitHub's compare API, since CI checks out one commit):
+      each commit's Changelog trailer, else its subject, grouped Added /
+      Changed / Fixed, internal commits folded into one line, and its
+      Onboarding trailers (changelog_commits.py). A changelog.d fragment new
+      in this build tells its own change instead, in better words. The
+      history is the previous per-build release's own changelog.json, so the
+      app can show every version a person skipped without the network.
 
   info OUTPUTS VERSION_CODE COMMIT
       Writes OUTPUTS/release-info.json (OUTPUTS is app/build/outputs) for the
@@ -35,9 +37,9 @@ a real version):
       (v0.2.0-dev.<code>, matching versionName). This is what every push to
       main does (the "Unstable" channel): one release per build, never
       rewritten, so the release list is droidtop's build history. The notes
-      are this build's changelog entry, rendered whole; a build without one
-      (no new fragment since the previous release) fails here, before
-      anything is published. If a release for this exact tag already exists
+      are this build's changelog entry, rendered whole, with its "After
+      updating" lines; every build has one, since its commits make it. If a
+      release for this exact tag already exists
       -- a rebuild of the same commit, or a retry after a cancelled run -- it
       is replaced (delete, recreate), never any OTHER version's release. The
       in-app updater finds the newest one through the GitHub API
@@ -58,6 +60,12 @@ a real version):
       release-info.json, which the updater rejects by digest and retries at
       the next check.
 
+  range AFTER THROUGH [CHANGELOG_JSON]
+      Prints every build's entry newer than versionCode AFTER and not newer
+      than THROUGH, merged (each line once) with their After updating lines:
+      what an update between the two brings. From CHANGELOG_JSON, else the
+      newest build release's.
+
   fragments
       Prints every fragment in changelog.d grouped Added / Changed / Fixed,
       the section to paste into CHANGELOG.md when a real version is cut
@@ -73,6 +81,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import changelog_commits  # noqa: E402  (beside this script; CI runs it by path)
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "Droidtop/droidtop")
 
@@ -324,37 +335,100 @@ def render_sections(sections):
 
 
 def previous_history(exclude_tag):
-    # The newest per-build release's changelog.json is the history up to it.
-    # A release from before builds carried one (or none at all) starts the
-    # history here.
+    # The newest per-build release's changelog.json is the history up to it, and the release is where this build's
+    # commits start. A release from before builds carried one (or none at all) starts the history here.
     release = previous_build_release(exclude_tag)
-    if release is None or not any(a["name"] == CHANGELOG_ASSET for a in release.get("assets", [])):
-        return []
+    if release is None:
+        return [], None
+    since = release.get("target_commitish")
+    if not any(a["name"] == CHANGELOG_ASSET for a in release.get("assets", [])):
+        return [], since
     stage = tempfile.mkdtemp()
     gh("release", "download", release["tag_name"], "--pattern", CHANGELOG_ASSET, "--dir", stage)
     with open(os.path.join(stage, CHANGELOG_ASSET)) as f:
-        return json.load(f).get("builds", [])
+        builds = json.load(f).get("builds", [])
+    # An entry that names its commit is exact; the release's target is the same commit for every build made here.
+    return builds, (builds[0].get("commit") if builds else None) or since
 
 
-def write_changelog(out, code):
+def commits_between(since, commit, wanted_fragments):
+    # The commits after [since] up to [commit], oldest first, each with the changelog.d fragments it added, through the
+    # API (CI checks out one commit). GitHub's compare lists up to 250; a longer range keeps what it lists. A range that
+    # cannot be read gives none, and the entry is the fragments alone, as before 2026-11-04.
+    if not since or not commit or since == commit:
+        return []
+    result = gh("api", f"repos/{REPO}/compare/{since}...{commit}", check=False)
+    if result.returncode != 0:
+        print(f"Could not list the commits since {since[:9]}: the entry is the fragments alone")
+        return []
+    listed = json.loads(result.stdout).get("commits", [])
+    out = []
+    unmatched = set(wanted_fragments)
+    for item in listed:
+        message = item.get("commit", {}).get("message", "")
+        added = []
+        # Which fragments a commit added: asked of it only while a new fragment is not yet matched to a commit.
+        if unmatched:
+            detail = gh("api", f"repos/{REPO}/commits/{item['sha']}", check=False)
+            if detail.returncode == 0:
+                for f in json.loads(detail.stdout).get("files", []):
+                    name = f.get("filename", "")
+                    if name.startswith(FRAGMENTS_DIR + "/") and name.endswith(".md") and f.get("status") == "added":
+                        added.append(os.path.basename(name)[:-3])
+            unmatched -= set(added)
+        out.append((message, added))
+    return out
+
+
+def write_changelog(out, code, commit=None):
     version_name = f"{BASE_VERSION}-dev.{code}"
+    commit = commit or os.environ.get("GITHUB_SHA")
     # A rebuild of the same version replaces its own entry.
-    history = [b for b in previous_history(f"v{version_name}") if b.get("versionCode") != code]
+    previous, since = previous_history(f"v{version_name}")
+    history = [b for b in previous if b.get("versionCode") != code]
     carried = {name for build in history for name in build.get("fragments", [])}
     fragments = read_fragments()
     new = [name for name in fragments if name not in carried]
+    # The commits since the previous build are the entry's base; a fragment their change added tells that change
+    # instead (the owner, 2026-11-04: "automatically pulled from the github change log, and ENHANCED by the fragment").
+    commits = commits_between(since, commit, new)
+    sections, onboarding = changelog_commits.entry(commits, {name: fragments[name] for name in new}, PRIVATE_NAMES)
     entry = {
         "versionCode": code,
         "versionName": version_name,
+        "commit": commit,
         "fragments": new,
-        "sections": merge_sections(fragments[name] for name in new),
+        "sections": sections,
+        "onboarding": onboarding,
     }
-    if not new:
-        print(f"No changelog fragment is new in {version_name}; publishing this build will fail")
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     with open(out, "w") as f:
         json.dump({"formatVersion": CHANGELOG_FORMAT, "builds": [entry] + history}, f, indent=1)
-    print(f"{version_name}: {len(new)} new fragment(s), {len(history)} earlier build(s)")
+    print(f"{version_name}: {len(commits)} commit(s), {len(new)} new fragment(s), {len(history)} earlier build(s)")
+
+
+def print_range(after, through, path=None):
+    # Every build newer than [after] and not newer than [through], merged: what an update between them brings, and
+    # what a person must do after it. From [path], else the newest build release's changelog.json.
+    if path is None:
+        release = previous_build_release(None)
+        if release is None:
+            sys.exit("No build release to read the changelog from")
+        stage = tempfile.mkdtemp()
+        gh("release", "download", release["tag_name"], "--pattern", CHANGELOG_ASSET, "--dir", stage)
+        path = os.path.join(stage, CHANGELOG_ASSET)
+    with open(path) as f:
+        builds = json.load(f).get("builds", [])
+    merged = changelog_commits.merged(builds, after, through)
+    if not merged["builds"]:
+        print(f"No build between {after} and {through}")
+        return
+    print("Builds: " + ", ".join(merged["builds"]))
+    print()
+    print(render_sections(merged["sections"]) or "(no lines)")
+    if merged["onboarding"]:
+        print()
+        print("### After updating\n" + "\n".join(f"- {s}" for s in merged["onboarding"]))
 
 
 def print_fragments():
@@ -381,12 +455,13 @@ def publish_build(outputs):
     with open(changelog_path) as f:
         builds = json.load(f).get("builds", [])
     entry = builds[0] if builds else None
-    if entry is None or entry.get("versionCode") != info["versionCode"] or not entry.get("sections"):
-        sys.exit(
-            f"v{info['versionName']} has no changelog entry: add a fragment under {FRAGMENTS_DIR}/ "
-            f"saying what changed for the people using droidtop ({FRAGMENTS_DIR}/{FRAGMENTS_README})"
-        )
-    notes = render_sections(entry["sections"])
+    if entry is None or entry.get("versionCode") != info["versionCode"]:
+        sys.exit(f"v{info['versionName']} has no changelog entry of its own in {CHANGELOG_ASSET}; refusing to publish")
+    # A build always publishes (2026-11-04): its commits make its entry, so one with no fragment has one too. An entry
+    # with nothing at all (a rebuild with no new commit) says so.
+    notes = render_sections(entry.get("sections") or {}) or "No changes since the previous build"
+    if entry.get("onboarding"):
+        notes += "\n\n### After updating\n" + "\n".join(f"- {s}" for s in entry["onboarding"])
 
     tag = f"v{info['versionName']}"
     # A rebuild of the same commit (or a retry after this run was cancelled
@@ -420,8 +495,10 @@ def main(argv):
         publish_build(argv[1])
     elif len(argv) == 3 and argv[0] == "publish":
         publish(argv[1], argv[2])
-    elif len(argv) == 3 and argv[0] == "changelog":
-        write_changelog(argv[1], int(argv[2]))
+    elif len(argv) in (3, 4) and argv[0] == "changelog":
+        write_changelog(argv[1], int(argv[2]), argv[3] if len(argv) == 4 else None)
+    elif len(argv) in (3, 4) and argv[0] == "range":
+        print_range(int(argv[1]), int(argv[2]), argv[3] if len(argv) == 4 else None)
     elif len(argv) == 1 and argv[0] == "fragments":
         print_fragments()
     else:

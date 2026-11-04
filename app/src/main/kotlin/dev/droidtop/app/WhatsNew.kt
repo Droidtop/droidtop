@@ -18,11 +18,15 @@ import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** One build's changelog entry: its version, and its lines under Added, Changed and Fixed, in that order. */
+/**
+ * One build's changelog entry: its version, its lines under Added, Changed and Fixed, in that order, and what a person
+ * must do after updating to it ([onboarding], from its commits' `Onboarding:` trailers; docs/SPEC.md 10b).
+ */
 internal class ChangelogBuild(
     val versionCode: Long,
     val versionName: String,
     val sections: List<Pair<String, List<String>>>,
+    val onboarding: List<String> = emptyList(),
 )
 
 /**
@@ -39,6 +43,7 @@ internal class ChangelogBuild(
 object WhatsNew {
     private const val PREFS = "whats_new"
     private const val KEY_LAST_SEEN = "last_seen_version_code"
+    private const val KEY_UPDATED_FROM = "updated_from_version_code"
     private const val ASSET = "changelog.json"
 
     private val checked = AtomicBoolean(false)
@@ -56,6 +61,7 @@ object WhatsNew {
         return (0 until builds.length()).mapNotNull { index ->
             val build = builds.optJSONObject(index) ?: return@mapNotNull null
             val sections = build.optJSONObject("sections")
+            val onboarding = build.optJSONArray("onboarding")
             ChangelogBuild(
                 versionCode = build.optLong("versionCode"),
                 versionName = build.optString("versionName"),
@@ -64,6 +70,7 @@ object WhatsNew {
                     (name to (0 until lines.length()).map { lines.optString(it) }.filter { it.isNotBlank() })
                         .takeIf { it.second.isNotEmpty() }
                 },
+                onboarding = onboarding?.let { lines -> (0 until lines.length()).map { lines.optString(it) }.filter { it.isNotBlank() } }.orEmpty(),
             )
         }
     }
@@ -76,10 +83,28 @@ object WhatsNew {
     internal fun since(builds: List<ChangelogBuild>, lastSeen: Long?, current: Long): List<ChangelogBuild> =
         builds.filter { it.versionCode <= current && it.versionCode > (lastSeen ?: (current - 1)) }
 
+    /**
+     * What a person must do after an update that brought [builds], each line once, oldest build's first: the update
+     * onboarding's lines from every build between the version they had and this one, so a skipped build's are there
+     * too (owner, 2026-11-04: "make sure we get every onboarding thing and etc required"). Pure.
+     */
+    internal fun onboarding(builds: List<ChangelogBuild>): List<String> =
+        builds.sortedBy { it.versionCode }.flatMap { it.onboarding }.distinct()
+
     /** This version counts as seen: What's new was closed, or onboarding set droidtop up on it. */
     fun markCurrentSeen(context: Context) {
-        prefs(context).edit().putLong(KEY_LAST_SEEN, AppSelfUpdate.installedVersionCode(context)).apply()
+        val current = AppSelfUpdate.installedVersionCode(context)
+        val prefs = prefs(context)
+        // The version the person updated from, kept for Settings' "Changes since your last update".
+        val before = prefs.takeIf { it.contains(KEY_LAST_SEEN) }?.getLong(KEY_LAST_SEEN, 0L)
+        prefs.edit().putLong(KEY_LAST_SEEN, current).apply {
+            if (before != null && before < current) putLong(KEY_UPDATED_FROM, before)
+        }.apply()
     }
+
+    /** The version droidtop was updated from, last time; null before an update was seen. Reads preferences. */
+    internal fun updatedFrom(context: Context): Long? =
+        prefs(context).takeIf { it.contains(KEY_UPDATED_FROM) }?.getLong(KEY_UPDATED_FROM, 0L)
 
     /** The last version whose What's new was seen, or null before there was one. Reads preferences. */
     internal fun lastSeen(context: Context): Long? =

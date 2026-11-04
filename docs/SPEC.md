@@ -10052,7 +10052,9 @@ displays it."
   and Fixed lines, Done). Done, Back or B closes it, and closing is what marks this version seen (`WhatsNew`,
   `last_seen_version_code`). A person updating from a build before What's new sees the installed build's entry. It
   never opens over onboarding or a game, nor before onboarding finished. Settings > About droidtop > What's new
-  opens it with every build's entry, any time.
+  opens it with every build's entry, any time. Above the builds, under "After updating", are the `Onboarding:`
+  lines of every build shown, each once, oldest first (10b, 2026-11-04); About's "Changes since your last update"
+  opens the same view for the last update's range any time.
   **It opens once the shell is placed, and nothing covers it** (Droidtop/tracker#824; the owner on the console after
   an update: "I don't have a "what's new" splash"). It opened over the first `MainActivity` of a fresh process, and
   0.4 s later the screen placement started the shell a second time on the second screen, over it. Two changes, no
@@ -22496,6 +22498,57 @@ showed them. Now:
   published; the build job still uploads its APKs, so a rig can test it.
   A fragment that does not parse, or names a private plugin
   (`PRIVATE_NAMES`), fails the build.
+
+**A build's entry is made from its commits, and enhanced by fragments
+(2026-11-04).** The owner: "That fragment should be automatically pulled from
+the github change log, and ENHANCED by the fragment." Until then a build with
+no new fragment was not published, which held every build from 2852 to 2888.
+Now:
+- *The base is the commits.* The Changelog step (`release_channel.py
+  changelog OUT CODE COMMIT`) lists the commits since the previous published
+  build through GitHub's compare API (the previous entry's `commit`, else the
+  release's target; CI still checks out one commit). Each gives a line
+  (`changelog_commits.py`): its `Changelog:` trailer, else its subject, under
+  Fixed when the subject says it fixes something, Added when it adds, else
+  Changed. A commit about tests, CI, docs or a fragment, or one marked
+  `Changelog: none`, folds into one line, "Internal changes (N); nothing looks
+  different". A bracketed tracker reference is left out; a line naming a
+  private plugin is dropped, not published. The first paragraph of a message
+  is not used: it says why for developers, with tracker numbers and file
+  paths, and the subject is already the change in one line.
+- *A fragment enhances.* A `changelog.d` fragment new in this build replaces
+  the line of the commit that added it, and of any commit without a trailer
+  that cites the same tracker issue (`513-plugins-search` tells a commit
+  mentioning `#513`; a change and its fragment often land as separate
+  commits). A fragment whose commit came in an earlier, unpublished build is
+  added as it is.
+- *A build always publishes.* Its entry has its commits' lines, so there is
+  always one; a rebuild with no new commit says "No changes since the
+  previous build". A range the API cannot list leaves the entry to the
+  fragments, as before.
+- *The commit convention* (owner, 2026-11-04: "update our commit policy to
+  allow us to programmatically generate the changelog, as well as required
+  onboarding updates and stuff, from it"): git trailers in the message's
+  last paragraph, `Changelog: Added|Changed|Fixed: <plain words>` (several
+  allowed), `Changelog: none`, and `Onboarding: <what a person must do or
+  know after updating>` (`changelog.d/README.md`). Commit hygiene's
+  droidtop job (`changelog-convention` in `commit-hygiene.yml`) runs the
+  generator's cases and fails a malformed trailer; a commit without one
+  passes. The rule for agents' commits belongs in AGENTS.md, which the owner
+  edits (proposed on the issue).
+- *Onboarding lines* are the entry's `onboarding`: in the release notes
+  under "After updating", and in What's new (7b) above the builds, from
+  every build between the version the person had and this one.
+- *The whole of an update* (owner, 2026-11-04: "display the TOTAL changelog,
+  computed from previous version to current, to make sure we get every
+  onboarding thing and etc required"): every build carries every earlier
+  build's entry, so What's new after an update already shows each build
+  since the last one seen (`WhatsNew.since`), and now their merged "After
+  updating" lines first (`WhatsNew.onboarding`). Settings > About droidtop
+  has "Changes since your last update" for the same range afterwards (the
+  version updated from is kept, `WhatsNew.updatedFrom`), beside What's new
+  (every build). `release_channel.py range AFTER THROUGH` prints the same
+  merged view for review.
 - *A real version.* `release_channel.py fragments` prints every fragment
   grouped, which is rewritten into `CHANGELOG.md` as that version's section;
   the fragments are then removed by name. The grouping and rendering are

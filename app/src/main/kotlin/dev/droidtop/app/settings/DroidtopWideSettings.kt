@@ -278,6 +278,19 @@ object DroidtopWideSettings {
                                 )
                             },
                         ),
+                        // The whole of the last update (owner, 2026-11-04: "display the TOTAL changelog, computed from previous
+                        // version to current"): every build between the version droidtop was updated from and this one, merged
+                        // with what to do after it. Only once droidtop has been updated with What's new in it.
+                        dev.droidtop.app.WhatsNew.updatedFrom(context)?.let { from ->
+                            ActionItem(
+                                id = "pref_global_changes_since",
+                                title = "Changes since your last update",
+                                subtitle = "Every build since the one you had, and what to do after updating",
+                                run = { ctx ->
+                                    ctx.startActivity(dev.droidtop.app.WhatsNewActivity.since(ctx, from).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                },
+                            )
+                        },
                         if (DeveloperMenu.on(context)) {
                             NestedScreenItem(
                                 id = "pref_global_developer",

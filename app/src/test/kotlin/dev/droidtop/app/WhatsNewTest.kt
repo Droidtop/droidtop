@@ -41,6 +41,22 @@ class WhatsNewTest {
     }
 
     @Test
+    fun `what to do after updating is every build's, oldest first, each line once`() {
+        val builds = WhatsNew.parse(
+            """
+            {"formatVersion": 1, "builds": [
+              {"versionCode": 3, "versionName": "c", "sections": {}, "onboarding": ["Sign in to TorBox again", "Turn on Y"]},
+              {"versionCode": 2, "versionName": "b", "sections": {"Fixed": ["x"]}},
+              {"versionCode": 1, "versionName": "a", "sections": {}, "onboarding": ["Turn on Y", ""]}
+            ]}
+            """.trimIndent(),
+        )
+        assertEquals(listOf("Turn on Y"), builds.last().onboarding)
+        assertEquals(listOf("Turn on Y", "Sign in to TorBox again"), WhatsNew.onboarding(builds))
+        assertEquals(emptyList<String>(), WhatsNew.onboarding(WhatsNew.parse(json)))
+    }
+
+    @Test
     fun `over the shell it waits for the placement to settle, over other screens it does not`() {
         assertEquals(false, WhatsNew.mayOpen(screenAlive = true, isShell = true, settled = false))
         assertEquals(true, WhatsNew.mayOpen(screenAlive = true, isShell = true, settled = true))

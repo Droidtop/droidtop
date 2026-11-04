@@ -102,11 +102,12 @@ jobs:
 
       - name: Changelog
         # This build's changelog.json (docs/SPEC.md 10b, "Every build carries its changelog"): the history from the
-        # previous release plus the changelog.d fragments new in this build. The APK bundles it (app/build.gradle.kts)
-        # for What's new; the publish job makes it the release notes and refuses a build whose entry is empty.
+        # previous release plus this build's entry, made from the commits since that release (through the API) and
+        # enhanced by the changelog.d fragments new in this build. The APK bundles it (app/build.gradle.kts) for What's
+        # new; the publish job makes it the release notes.
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 build-scripts/release_channel.py changelog app/build/generated/changelog/changelog.json "$VERSION_REVISION"
+        run: python3 build-scripts/release_channel.py changelog app/build/generated/changelog/changelog.json "$VERSION_REVISION" "$GITHUB_SHA"
 
       - name: Decode signing keystore
         # Only decodes when the secret actually exists — PR builds from
