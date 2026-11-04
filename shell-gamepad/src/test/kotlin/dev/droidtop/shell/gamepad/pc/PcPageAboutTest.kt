@@ -155,18 +155,20 @@ class PcPageAboutTest {
     @Test
     fun theSourceRowsLiveUnderVersionsAndOpenSourcePageNeedsAKnownPage() {
         val source = UpdateSources.Source("forum", "Forum thread", null)
-        val unlinked = sourceRows(listOf(source), null, {}, {})
+        val unlinked = sourceRows(listOf(source), null, {}, { _, _ -> })
         assertEquals(listOf("Forum thread"), unlinked.map { it.title })
         assertEquals(PageTab.VERSIONS, unlinked[0].tab)
         assertEquals("Link", unlinked[0].value)
         // Linked, but no page known yet: nothing to open.
         val noPage = GameLinks(sources = listOf(SourceLink("forum", "123")))
-        assertEquals(listOf("Forum thread"), sourceRows(listOf(source), noPage, {}, {}).map { it.title })
+        assertEquals(listOf("Forum thread"), sourceRows(listOf(source), noPage, {}, { _, _ -> }).map { it.title })
         val url = "https://www.example.org/threads/game.123/"
         val links = GameLinks(sources = listOf(SourceLink("forum", "123", SourceAnswer("1.0", 0L, false, url))))
         var opened: String? = null
-        val linked = sourceRows(listOf(source), links, {}, { opened = it })
-        assertEquals(listOf("Forum thread", OPEN_SOURCE_ROW), linked.map { it.title })
+        val linked = sourceRows(listOf(source), links, {}, { _, url -> opened = url })
+        assertEquals(listOf("Forum thread", VIEW_THREAD_ROW), linked.map { it.title })
+        // View thread is on the Overview, where the owner looked for it (Droidtop/tracker#859).
+        assertEquals(PageTab.OVERVIEW, linked[1].tab)
         assertEquals("#123", linked[0].value)
         // Only the host is shown; the whole link is the tip and what opens.
         assertEquals("example.org", linked[1].value)
@@ -174,7 +176,7 @@ class PcPageAboutTest {
         linked[1].onActivate?.invoke()
         assertEquals(url, opened)
         // No source installed: no rows, nothing to link to.
-        assertEquals(emptyList<PageFact>(), sourceRows(emptyList(), links, {}, {}))
+        assertEquals(emptyList<PageFact>(), sourceRows(emptyList(), links, {}, { _, _ -> }))
     }
 
     @Test

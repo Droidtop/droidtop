@@ -41,16 +41,15 @@ internal fun linkHost(url: String?): String? =
 internal const val SOURCE_LINK_HELP = "A link or id; blank unlinks"
 
 /**
- * The game's update sources as rows under Versions: one per source (A
- * links or changes it) and, for each linked one whose page is known,
- * "Open source page" with the link's host, which opens it in the browser and
- * fetches nothing ([onOpen]). Pure, for the tests.
+ * The game's update sources as rows: under Versions one per source (A links or changes it), and on the Overview, for
+ * each linked one whose page is known, "View thread" with the page's host (Droidtop/tracker#859; the owner: "there's no
+ * "view thread" button"). [onOpen] opens that page in droidtop's web view with the source's session. Pure, for the tests.
  */
 internal fun sourceRows(
     sources: List<UpdateSources.Source>,
     links: GameLinks?,
     onEdit: (UpdateSources.Source) -> Unit,
-    onOpen: (String) -> Unit,
+    onOpen: (UpdateSources.Source, String) -> Unit,
 ): List<PageFact> = sources.flatMap { source ->
     val link = links?.link(source.key)
     listOfNotNull(
@@ -65,17 +64,20 @@ internal fun sourceRows(
         link?.answer?.url?.let { url ->
             linkHost(url)?.let { host ->
                 PageFact(
-                    OPEN_SOURCE_ROW,
+                    VIEW_THREAD_ROW,
                     value = host,
                     subtitle = source.label.takeIf { sources.size > 1 },
-                    onActivate = { onOpen(url) },
+                    onActivate = { onOpen(source, url) },
                     tip = url,
-                    tab = PageTab.VERSIONS,
+                    tab = PageTab.OVERVIEW,
                 )
             }
         },
     )
 }
+
+/** The game page's row that opens a linked source's page (Droidtop/tracker#859). */
+internal const val VIEW_THREAD_ROW = "View thread"
 
 /**
  * What a source's row says in the options menu: whether the game is

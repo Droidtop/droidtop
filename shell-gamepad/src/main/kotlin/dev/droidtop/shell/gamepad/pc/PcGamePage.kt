@@ -387,8 +387,18 @@ internal fun PcGamePage(
                         val link = links?.link(source.key)
                         if (link != null) viewingRecord = Triple(source, link.externalId, RecordTab.OVERVIEW) else editingSource = source
                     },
-                    onOpen = { url ->
-                        dev.droidtop.library.Links.open(context, url)
+                    // View thread (Droidtop/tracker#859): droidtop's web view with the source's session, never another
+                    // browser; a download started there is placed as this game's update, as Open thread's is (#862).
+                    onOpen = { source, _ ->
+                        val link = links?.link(source.key)
+                        if (link != null) {
+                            scope.launch {
+                                val said = library.openUpdateThread(source.key, link.externalId, link.answer?.version, links?.gameName ?: entry.title, entry) {
+                                    updateStatus = it
+                                }
+                                updateStatus = said.takeUnless { dev.droidtop.library.DownloadPick.startedNothing(it) }
+                            }
+                        }
                     },
                 )
             } else {

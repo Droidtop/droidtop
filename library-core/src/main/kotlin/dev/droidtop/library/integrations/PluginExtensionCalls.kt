@@ -639,7 +639,6 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
     ): String {
         val (record, entry) = providers().firstOrNull { (_, e) -> e.id == source } ?: return "The source $source is not installed or not running"
         val label = entry.label ?: record.manifest.label
-        val (placement, name) = placementFor(label, gameName, version, newest).getOrElse { return it.message ?: "The update has nowhere to go" }
         onStatus("Opening the link from $label")
         // The link the record gave, opened out of sight first (Droidtop/tracker#783): a host droidtop serves takes it with
         // no page shown, and a page the person must act on opens for them (#599). A link the page says has expired is asked
@@ -658,6 +657,9 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
             Log.w(TAG, "update $source/$externalId: the web view started no download from ${dev.droidtop.pluginhost.NetScope.hostOf(url)}")
             return dev.droidtop.library.DownloadPick.NOTHING_STARTED
         }
+        // Where it lands is worked out once the page started something (Droidtop/tracker#859): a page opened only to read
+        // (View thread on a game that is up to date) never fails for a folder it was never going to make.
+        val (placement, name) = placementFor(label, gameName, version, newest).getOrElse { return it.message ?: "The update has nowhere to go" }
         val descriptors = UpdateLinks.descriptorsFor(captured)
         val title = "Download $name"
         // Files a host account or the host's own API served say so in the job's line (#638), no page having opened.

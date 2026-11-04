@@ -14218,6 +14218,14 @@ compare them so: a thread's "P3 Ep.10 v0.0.10" is "v0.0.10" beside "Installed: v
 as that platform's download, with the address's host; such a thread read as one host called "Win"
 (`ThreadDownloads.onlyPlatform`).
 
+**View thread on the game page (2026-11-04, Droidtop/tracker#859).** The owner: "there's no "view thread" button".
+A game linked to a source whose page is known has **View thread** on its page's Overview, with the page's host (it was
+"Open source page" under Versions, opening another browser). It opens that page in droidtop's web view with the source's
+session, as every source link does; a download the person starts there is placed as this game's update, as Open thread
+places it (#862). droidtop works out where an update lands only once the page has started something, so a page opened
+to read never fails for a folder it was not going to make (a game already up to date). The record page's Info keeps
+"Open source page".
+
 Most games have one build, and their rows are just its platforms. When a thread has several builds, the copy's build
 comes first, marked "Your copy". A Steam copy's build is the "Steam" one; any other copy's is the build without it.
 The other builds follow under "Other builds". A page with no copy (a new game) keeps the thread's order and marks none.
