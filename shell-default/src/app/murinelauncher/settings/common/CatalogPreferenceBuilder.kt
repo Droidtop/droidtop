@@ -816,7 +816,7 @@ class CatalogPreferenceNavigator(
                 confirmThen(context, item.confirmTitle) {
                     item.run(context)
                     // An action that ends what this screen is about goes back a screen (ActionItem.leaves).
-                    if (item.leaves) fragment.requireActivity().onBackPressedDispatcher.onBackPressed() else rebuild()
+                    if (item.leaves) pop() else rebuild()
                 }
                 true
             }
