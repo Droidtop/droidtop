@@ -75,15 +75,10 @@ class SourceRecordPageTest {
         val android = recordRows(tagged, RecordTab.DOWNLOADS, "android") { "" }.drop(1)
         assertEquals("This will not be trackable by us. Windows or Linux is recommended.", android[1].title)
         assertNull(android[1].action)
-<<<<<<< HEAD
-        assertEquals(listOf("GOFILE", "Extras", "WALKTHROUGH", "Other", "MIXDROP"), android.drop(2).map { it.title })
+        assertEquals(listOf("GOFILE", "Extras", "WALKTHROUGH", "Other", "MIXDROP", OPEN_THREAD), android.drop(2).map { it.title })
         assertEquals("windows+linux", nextSystem(downloadSystems(tagged), "android", 1))
         // A pick kept from before the groupings ("windows") still lands on the choice that holds it.
         assertEquals("mac", nextSystem(downloadSystems(tagged), "windows", 1))
-=======
-        assertEquals(listOf("GOFILE", "Extras", "WALKTHROUGH", "Other", "MIXDROP", OPEN_THREAD), android.drop(2).map { it.title })
-        assertEquals("windows", nextSystem(downloadSystems(tagged), "android", 1))
->>>>>>> f683a0912 (Updates: a mirror the source could not get gives way to the next; Open thread on the record and the failed job)
         assertEquals("android", nextSystem(downloadSystems(tagged), null, -1))
         // Links that are all for one system: no picker, but Android still says so.
         val onlyAndroid = record.copy(downloads = listOf(s("Android", "GOFILE", "android")))
