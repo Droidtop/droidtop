@@ -21065,8 +21065,10 @@ segment (`BeingADik/Chap3+/10.0-sancho` is version 10.0 of chapter 3).
 
 ### What merges, and what only suggests
 
-Two folders are the same game when their derived names are equal once case
-and punctuation are dropped (`GoodbyeEternity` = `Goodbye Eternity`).
+Two folders are the same game when their derived names, read as words,
+have the same title key (`GoodbyeEternity` = `Goodbye Eternity`; since
+Droidtop/tracker#870 the key is the one every device uses, so case and
+punctuation are dropped but word breaks count, see 7o's title key).
 Similarity does NOT merge. Pythia's `NAME_SIMILARITY_THRESHOLD` of 0.6
 (difflib's `SequenceMatcher.ratio`, ported exactly, because the threshold
 was chosen against that measure) decides what Pythia SUGGESTS to the
@@ -21886,6 +21888,29 @@ the right ones is the person's call, as in "Removing an older version"
   with Flatpak and Snap, macOS applications) and are listed apart ("Apps on
   <computer>").
 - A game installed on two computers is one entry with an install per device.
+- **One title key on every device (Droidtop/tracker#870; the owner, 2026-11-05: "letters and digits only, but with
+  space-to-hyphen conversion. Lutris's standard").** A game with no store id is keyed `title2:` followed by its
+  title's Lutris slug (`ComputerLibrary.titleKey`, `TitleKeys.slug`): Lutris's `slugify`
+  (lutris/lutris `lutris/util/strings.py`, master 4d9939e468de), re-implemented from its behaviour: NFD, everything
+  outside ASCII dropped, every character but letters, digits, `_`, whitespace and `-` removed, the ends trimmed,
+  lower case, each run of hyphens and whitespace one hyphen; a title with nothing left is the UUID-5 of the title in
+  the URL namespace, as Lutris names it. "Being a DIK" is `title2:being-a-dik`. droidtop writes `title2:` and still
+  reads the old `title:` (words joined by single spaces, `ComputerLibrary.legacyTitleKey`), so a mark from a computer
+  that has not moved finds its game; the agent rewrites its stored `title:` keys once, and the agent and Pythia
+  halves land in the same batch. ROM keys (`rom:<system>/<words>`) are unchanged. Before this droidtop had four title
+  folds and the handheld's merge key (`beingadik`) disagreed with the cross-device key (`title:being a dik`), so a
+  merge made on one device did not carry. Now:
+  - the handheld's same-game test (`GameNaming.nameKey`) is the slug of the name as a title reads
+    (`GameTitleParser.words`, the words a folder game's title is), so two names are one game here exactly when they
+    are one key everywhere. `GoodbyeEternity`, `Goodbye Eternity` and `Anomalous_Coffee_Machine_2` still merge; a
+    name joined in lower case (`ThiefofHearts`) has no word breaks to read and no longer merges with `Thief of Hearts`;
+  - store matching (`StoreIdentity.titleKey`: the wishlist, new games, search de-duplication, card identity) is the
+    slug with its own store rules on top ("&" as "and", punctuation a word break, a leading "The" and edition labels
+    dropped) and joined with nothing between the words, the form card keys are stored in, which does not change;
+  - matching a program's file name to its folder (`PcFolderClassifier`, the wrapper-folder test in
+    `GameEngineDetector`) and a renamed folder's id (`GameFolderIds.titleKey`) use the same fold without separators
+    (`TitleKeys.compact`), because there "SampleSE.exe" is "Sample SE" and spacing must not matter;
+  - search keeps its own word fold (`StoreIdentity.fold`): it compares words typed against words, not identities.
 - **In this device's own library, behind switches** (owner, 2026-10-10:
   "Apps should be toggleable"; "Games on the desktop should ALSO be
   toggleable. We don't actually know if the user will want to stream stuff
