@@ -8985,6 +8985,11 @@ proposal) is not built; these helpers are in the one settings tree that already 
   kept (`EmojiTones`, `pref_emoji_skin_tone`) for the grid and search from then on: a one-person emoji in that tone, a
   two-person one where both share it, as Gboard does. A mixed two-person pick is typed without changing the tone. An
   emoji keeps its tones only while the device's font can draw all of them.
+- **Kaomoji (Droidtop/tracker#903 H4).** The emoji panel's last tab is Kaomoji: AnySoftKeyboard's list (Apache-2.0,
+  104 faces in 19 groups such as Joy, Love, Sympathy, Music and Animals; `assets/kaomoji/`, whose SOURCE.txt names the
+  commit and the three entries corrected there). They show in wider cells in smaller type, are typed as they are, go to
+  Recent like any emoji, and emoji search finds them by group ("love", "music") or by "kaomoji". They skip the emoji
+  font check, which only answers for one glyph. A kaomoji has no skin tones, so a long press on one does nothing.
 - **More layouts.** Every locale Android reports is already selectable; the layouts are the existing `xml-*`
   folders and each locale's key text. Locales that have their own key text but were missing from the picker's
   5-row label list now carry it. A reader for HeliBoard-style text layouts is a later item on Droidtop/tracker#342.

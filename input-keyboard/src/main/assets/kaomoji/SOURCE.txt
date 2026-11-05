@@ -1,0 +1,8 @@
+kaomoji.txt is the kaomoji list Hacker Keyboard Reborn's emoji panel offers (Droidtop/tracker#903 H4).
+
+Source: AnySoftKeyboard, ime/addons/quick_text/src/main/res/xml/popup_kaomoji.xml at commit
+9f61011dc76628b8bf493c309f283fa4a8988e56 (github.com/AnySoftKeyboard/AnySoftKeyboard, Apache License 2.0).
+Each key's output text, with its trailing space dropped, under the group named by the comment above it.
+Changed from the source: three outputs that lost characters there use the key's own label instead:
+"(o˘◡˘o)" (the output lacked the opening parenthesis), "(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧" (the same) and "((╬◣﹏◢))" (the output's
+brackets did not balance).

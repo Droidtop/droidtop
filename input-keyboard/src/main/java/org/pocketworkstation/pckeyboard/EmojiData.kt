@@ -143,6 +143,30 @@ object EmojiTones {
     }
 }
 
+/**
+ * Kaomoji (Droidtop/tracker#903 H4): `assets/kaomoji/kaomoji.txt`, AnySoftKeyboard's list (Apache-2.0; see SOURCE.txt
+ * there), `[Group]` lines then one kaomoji per line, `#` for comments. Each becomes an [EmojiEntry] named "kaomoji
+ * <group>", so emoji search finds them by their group ("joy", "love"), in one [GROUP] tab. Pure.
+ */
+object Kaomoji {
+    const val GROUP = "kaomoji"
+
+    fun parse(text: String): EmojiGroup {
+        val entries = ArrayList<EmojiEntry>()
+        var group = ""
+        for (raw in text.lineSequence()) {
+            val line = raw.trim()
+            if (line.isEmpty() || line.startsWith("#")) continue
+            if (line.startsWith("[") && line.endsWith("]")) {
+                group = line.substring(1, line.length - 1).lowercase()
+                continue
+            }
+            entries += EmojiEntry(line, if (group.isEmpty()) GROUP else "$GROUP $group", listOfNotNull(group.ifEmpty { null }))
+        }
+        return EmojiGroup(GROUP, entries)
+    }
+}
+
 /** The most recently used emoji, newest first (Droidtop/tracker#342). One per line when saved. */
 object EmojiRecents {
     const val MAX = 30
@@ -183,7 +207,11 @@ object EmojiAssets {
             val catalog = try {
                 // Asked of the system's font once, here on the loader thread: the grid and search offer only what draws.
                 val paint = android.graphics.Paint()
-                assets.open("emoji/en.txt").bufferedReader().use { EmojiCatalog.parse(it.readText()) }.drawable(paint::hasGlyph)
+                val emoji = assets.open("emoji/en.txt").bufferedReader().use { EmojiCatalog.parse(it.readText()) }.drawable(paint::hasGlyph)
+                // Kaomoji after the font check: they are several characters, which hasGlyph never answers yes for.
+                val kaomoji = runCatching { assets.open("kaomoji/kaomoji.txt").bufferedReader().use { Kaomoji.parse(it.readText()) } }
+                    .getOrNull()?.takeIf { it.entries.isNotEmpty() }
+                if (kaomoji == null) emoji else EmojiCatalog(emoji.groups + kaomoji)
             } catch (e: java.io.IOException) {
                 EmojiCatalog(emptyList())
             }
