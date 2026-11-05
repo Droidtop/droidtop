@@ -215,8 +215,9 @@ data class StorePlayer(val steamId64: Long, val name: String, val dlc: Set<Strin
 
 /**
  * One of a store game's achievements and the signed-in account's progress in it (Droidtop/tracker#230). [earnedAtMs]
- * is when it was earned, null while it is not; [hidden] is a secret one, described only once earned; [progress] and
- * [progressMax] a counted one's way there ("45 of 100"), null for one that is simply earned or not.
+ * is when it was earned, null while it is not (0: earned, the store gives no date); [hidden] is a secret one, described
+ * only once earned; [progress] and [progressMax] a counted one's way there ("45 of 100"), null for one that is simply
+ * earned or not; [rarityPercent] the share of the store's players who earned it, when the store says (GOG, Epic).
  */
 data class StoreAchievement(
     val id: String,
@@ -227,6 +228,7 @@ data class StoreAchievement(
     val iconUrl: String? = null,
     val progress: Float? = null,
     val progressMax: Float? = null,
+    val rarityPercent: Float? = null,
 )
 
 /** A store game's achievements as the store reports them, read-only, for its page (Droidtop/tracker#230). */

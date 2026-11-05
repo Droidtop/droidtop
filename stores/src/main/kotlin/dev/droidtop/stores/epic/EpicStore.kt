@@ -226,6 +226,10 @@ class EpicStore : StoreLibrary {
 
     override val hasCloudSaves = true
 
+    /** [gameId]'s achievements and this account's progress, read-only (Droidtop/tracker#230, [EpicAchievements]). */
+    override suspend fun achievements(context: Context, gameId: String): Result<dev.droidtop.library.stores.StoreAchievements>? =
+        withContext(Dispatchers.IO) { dao(context).getByCatalogId(gameId) }?.let { EpicAchievements.read(context, it) }
+
     override fun settingsItems(context: Context): List<CatalogItem> = listOf(CloudSaveSetting.item(context, id, EpicCloudSaves.LABEL))
 
     /**

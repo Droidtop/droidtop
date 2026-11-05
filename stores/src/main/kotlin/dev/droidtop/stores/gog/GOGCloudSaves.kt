@@ -6,8 +6,6 @@ import dev.droidtop.library.stores.SaveSyncResult
 import dev.droidtop.library.stores.WinePrefixLocation
 import dev.droidtop.net.AtomicWrite
 import dev.droidtop.runtime.util.runCatchingCancellable
-import dev.droidtop.stores.gog.api.GOGApiClient
-import dev.droidtop.stores.gog.api.GOGManifestParser
 import dev.droidtop.stores.util.CloudSavePlan.Decision
 import dev.droidtop.stores.util.CloudSavePlan.Facts
 import dev.droidtop.stores.util.CloudSaveRun
@@ -170,17 +168,13 @@ internal object GOGCloudSaves {
      */
     suspend fun config(context: Context, gameId: String): Config? = withContext(Dispatchers.IO) {
         val fresh = runCatchingCancellable {
-            val parser = GOGManifestParser()
-            val client = GOGApiClient(context.applicationContext, parser)
-            val build = client.latestWindowsBuild(gameId).getOrThrow() ?: return@runCatchingCancellable null
-            val manifest = client.fetchManifest(build.link).getOrThrow()
-            if (manifest.clientId.isBlank() || manifest.clientSecret.isBlank()) return@runCatchingCancellable null
-            val request = Request.Builder().url("$REMOTE_CONFIG/${manifest.clientId}?component_version=2.0.45").build()
+            val client = GOGGameClient.of(context, gameId) ?: return@runCatchingCancellable null
+            val request = Request.Builder().url("$REMOTE_CONFIG/${client.id}?component_version=2.0.45").build()
             val body = StoreHttp.http.newCall(request).execute().use { response ->
                 check(response.isSuccessful) { "GOG's save locations could not be read (HTTP ${response.code})" }
                 response.body?.string().orEmpty()
             }
-            parseLocations(body, manifest.clientId)?.let { Config(manifest.clientId, manifest.clientSecret, it) }
+            parseLocations(body, client.id)?.let { Config(client.id, client.secret, it) }
         }
         fresh.onSuccess { config ->
             val file = configFile(context, gameId)

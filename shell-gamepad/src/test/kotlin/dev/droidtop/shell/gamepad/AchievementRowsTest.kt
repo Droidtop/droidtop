@@ -61,6 +61,17 @@ class AchievementRowsTest {
     }
 
     @Test
+    fun aRareOneSaysHowFewEarnedItAndAnUndatedEarnSaysEarned() {
+        val rare = StoreAchievement("D", "Speedrunner", "Finish in an hour", earnedAtMs = null, rarityPercent = 3.24f)
+        assertEquals("Finish in an hour · Rare: 3.2% of players", storeAchievementItem(rare).subtitle)
+        assertEquals("41% of players", rarityLine(41.4f))
+        assertEquals(null, rarityLine(null))
+        assertEquals("Earned", storeAchievementItem(StoreAchievement("E", "Done", "", earnedAtMs = 0L)).value)
+        // A secret one says nothing about itself, rarity included.
+        assertEquals("Described once you earn it", storeAchievementItem(rare.copy(hidden = true)).subtitle)
+    }
+
+    @Test
     fun noAchievementsNobodySignedInOrOfflineIsNoRowAndOtherFailuresSaySo() {
         assertTrue(storeAchievementRowsFor("Steam", "220", Result.success(StoreAchievements(emptyList()))).isEmpty())
         assertTrue(storeAchievementRowsFor("Steam", "220", null).isEmpty())

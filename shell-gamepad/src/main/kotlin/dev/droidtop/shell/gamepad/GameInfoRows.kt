@@ -265,7 +265,7 @@ internal fun savesScreen(
 private fun offline(message: String) = message.startsWith("No connection")
 
 internal suspend fun achievementRows(context: Context, entry: LibraryEntry): List<GameInfoRow> {
-    // A console game: RetroAchievements. A store's game: the store's own (Steam, Droidtop/tracker#230), in the same row.
+    // A console game: RetroAchievements. A store's game: the store's own (Steam, GOG, Epic: Droidtop/tracker#230), in the same row.
     val retro = achievementRowsFor(RetroAchievements.lookup(context, entry), entry.id)
     if (retro.isNotEmpty()) return retro
     val key = entry.pcInfo?.storeId
@@ -334,13 +334,21 @@ internal fun storeAchievementItem(achievement: dev.droidtop.library.stores.Store
     return ActionItem(
         id = "store_${achievement.id}",
         title = if (secret) "Hidden achievement" else achievement.title,
-        subtitle = if (secret) "Described once you earn it" else achievement.description.ifBlank { null },
+        subtitle = if (secret) "Described once you earn it" else listOfNotNull(achievement.description.ifBlank { null }, rarityLine(achievement.rarityPercent)).joinToString(" · ").ifBlank { null },
         value = when {
-            earned != null -> synchronized(EARNED_DATE) { EARNED_DATE.format(java.util.Date(earned)) }
+            earned != null && earned > 0 -> synchronized(EARNED_DATE) { EARNED_DATE.format(java.util.Date(earned)) }
+            earned != null -> "Earned"
             progress != null && max != null -> "${progress.toInt()} of ${max.toInt()}"
             else -> null
         },
     )
+}
+
+/** How rare a store says an achievement is: "Rare: 3.2% of players" under 10%, else "41% of players"; null when it does not say. Pure. */
+internal fun rarityLine(percent: Float?): String? {
+    if (percent == null || percent < 0f) return null
+    if (percent < 10f) return "Rare: ${String.format(java.util.Locale.ROOT, "%.1f", percent)}% of players"
+    return "${kotlin.math.round(percent).toInt()}% of players"
 }
 
 /** The rows for what RetroAchievements said about a game ([entryId] answers a proposal). Pure, for the tests. */

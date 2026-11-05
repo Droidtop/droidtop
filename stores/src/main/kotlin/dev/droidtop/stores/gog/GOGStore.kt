@@ -198,6 +198,10 @@ class GOGStore : StoreLibrary {
 
     override val hasCloudSaves = true
 
+    /** [gameId]'s achievements and this account's progress, read-only (Droidtop/tracker#230, [GOGAchievements]). */
+    override suspend fun achievements(context: Context, gameId: String): Result<dev.droidtop.library.stores.StoreAchievements>? =
+        GOGAchievements.read(context, gameId)
+
     override fun settingsItems(context: Context): List<CatalogItem> = listOf(CloudSaveSetting.item(context, id, GOGCloudSaves.LABEL))
 
     /** Where the game is, for its `<?INSTALL?>` save locations; null when it is not installed from GOG here. */
