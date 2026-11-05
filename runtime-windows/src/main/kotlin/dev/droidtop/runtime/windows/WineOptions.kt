@@ -222,7 +222,7 @@ object WineOptions {
      * what it costs and, once done, how much it prepared and when, or that the game changed since. Picking a choice
      * starts the job ([PrepareFirstLaunchJob]); the row itself always reads "Not now". Disk work.
      */
-    private fun prepareRow(context: Context, entryId: String, gameRoot: String): WineOptionRow {
+    private suspend fun prepareRow(context: Context, entryId: String, gameRoot: String): WineOptionRow {
         gameRoots[entryId] = gameRoot
         val title = "Prepare for first launch"
         if (!TranslationCache.enabled(context) || !translationCacheOn(context, entryId)) {
