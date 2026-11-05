@@ -317,6 +317,39 @@ object PluginCatalog {
             updateFor(listing.index, record, channelFor(listing.source, plugin.id))?.let { Offer(listing.source, plugin, it) }
         }
 
+    /**
+     * A newer release of [record] that a catalog lists under a key the person has not trusted for its origin
+     * (Droidtop/tracker#882): the catalog names one key for the origin and the person trusts another, so [offerFor]
+     * offers nothing and the update was invisible. On the console, gamegrab-sources was re-signed under a new root
+     * (2026-11-05) and F95zone 0.4.0-22 showed no update while 0.8.1-62 was listed. It is never installed from here:
+     * the person reviews the new key on the catalog's page (the owner, Droidtop/tracker#852: "a changed key goes to
+     * Review"). Null when an offer exists, or no catalog lists a newer release.
+     */
+    data class HeldOffer(
+        val source: PluginCatalogSource,
+        val release: PluginCatalogRelease,
+        val origin: String,
+        val trustedFingerprint: String,
+        val namedFingerprint: String,
+    )
+
+    fun heldOfferFor(listings: List<Listing>, record: PluginRecord, userKeys: Map<String, UserOriginKey>): HeldOffer? {
+        if (offerFor(listings, record, userKeys) != null) return null
+        return listings.firstNotNullOfOrNull { listing ->
+            val origin = listing.index.origins.firstOrNull { o -> o.plugins.any { it.id == record.manifest.id } } ?: return@firstNotNullOfOrNull null
+            val state = originState(listing.source, origin, userKeys) as? OriginState.KeyChanged ?: return@firstNotNullOfOrNull null
+            val plugin = origin.plugins.first { it.id == record.manifest.id }
+            val release = updateFor(listing.index, record, channelFor(listing.source, plugin.id)) ?: return@firstNotNullOfOrNull null
+            HeldOffer(
+                source = listing.source,
+                release = release,
+                origin = origin.origin,
+                trustedFingerprint = UserOriginKeys.fingerprint(state.stored.keyBase64) ?: "unreadable",
+                namedFingerprint = origin.keyBase64?.let { UserOriginKeys.fingerprint(it) } ?: origin.keySha256?.take(16) ?: "unreadable",
+            )
+        }
+    }
+
     /** Every plugin in [installed] with an update in [listings], in the given order. */
     fun offersFor(installed: List<PluginRecord>, listings: List<Listing>, userKeys: Map<String, UserOriginKey>): List<Pair<PluginRecord, Offer>> =
         installed.mapNotNull { record -> offerFor(listings, record, userKeys)?.let { record to it } }

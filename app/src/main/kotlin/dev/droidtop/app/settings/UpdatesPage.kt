@@ -567,6 +567,19 @@ object UpdatesPage {
                 iconFile = PluginStore.iconFile(context, held.installed),
             )
         }
+        val listings = PluginCatalog.listings(context)
+        val userKeys = dev.droidtop.pluginhost.UserOriginKeys.load(dev.droidtop.pluginhost.UserOriginKeys.storeFile(context))
+        val newKey = installed.mapNotNull { record ->
+            if ("updates_plugin_${record.manifest.id}" in shown) return@mapNotNull null
+            val held = PluginCatalog.heldOfferFor(listings, record, userKeys) ?: return@mapNotNull null
+            ActionItem(
+                id = "updates_plugin_newkey_${record.manifest.id}",
+                title = record.manifest.label,
+                subtitle = "${held.release.version} is out in ${held.source.name}, signed with a new key for \"${held.origin}\" " +
+                    "(${held.namedFingerprint}; you trust ${held.trustedFingerprint}). Review the key on that catalog's page",
+                iconFile = PluginStore.iconFile(context, record),
+            )
+        }
         val catalogs = PluginCatalog.refreshProblems(context).map { (source, problem) ->
             ActionItem(
                 id = "updates_catalog_refused_${source.id.hashCode().toUInt()}",
@@ -574,7 +587,7 @@ object UpdatesPage {
                 subtitle = "$problem. Its plugins' newest versions may be missing here until it can be read again",
             )
         }
-        return held + catalogs
+        return held + newKey + catalogs
     }
 
     /** Android apps (emulators among them) with a newer version in an app catalog, as last fetched. */

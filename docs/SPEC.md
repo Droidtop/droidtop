@@ -19964,6 +19964,16 @@ menu still list every `listed` place.
       since it was accepted. Its plugins are then offered from the copy fetched before, which may not know their
       newest releases: "<catalog> couldn't be checked: <why>". A refresh that fails for want of a network is not
       such a row.
+    - **A catalog release under a key the person has not trusted** (`PluginCatalog.heldOfferFor`). gamegrab-sources
+      was re-signed under a new root at 02:01Z on 2026-11-05: its master and gamegrab's origin key moved from
+      824a f892… to 5382 18f1…. On build 2911 F95zone then showed "v0.4.0-22" with no marker while the catalog listed
+      0.8.1-62, and RetroArch's update showed beside it. The catalog's offer rule (`PluginCatalog.originState`)
+      compares the key the person trusts for the origin with the key the index names, and on a difference
+      (KeyChanged) offered nothing, silently. The catalog page already offers "Trust new key". Updates and the
+      Plugins list now say it too: "<version> is out in <catalog>, signed with a new key for "<origin>" (<new>; you
+      trust <old>). Review the key on that catalog's page", and "· <version> out, new key to review" on the card.
+      Nothing installs until the person trusts the new key (Droidtop/tracker#852: "a changed key goes to Review").
+      The update check reads every catalog, not only the official one.
     **Open on #882:** trust is one entry per origin, and one repository per origin. gamegrab publishes seven plugin
     repositories under its one origin, and F95zone's manifest names no repository of its own. So on a device that
     trusts another gamegrab repository and has not added the catalog, F95zone's own releases are not read at all.

@@ -16,6 +16,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
+import dev.droidtop.pluginhost.UserOriginKeys
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
@@ -266,6 +267,39 @@ class PluginCatalogSourcesTest {
 
         // The official catalog never offers a third-party origin, whatever the person trusts.
         assertFalse(PluginCatalog.originOffered(PluginCatalogSources.OFFICIAL, origin, mapOf("acme" to UserOriginKey("acme", spki, null))))
+    }
+
+    private fun installedTool(version: String) = dev.droidtop.pluginhost.PluginRecord(
+        manifest = dev.droidtop.pluginhost.PluginManifest(
+            id = "acme.tool", origin = "acme", label = "Tool", description = null, version = version,
+            kind = dev.droidtop.pluginhost.PluginKind.NATIVE_BUNDLE, capabilities = setOf(dev.droidtop.pluginhost.PluginCapability.STATUS_TILE),
+            contractVersion = 1, requestsRoot = false, abis = emptySet(), entryClass = "x", payload = emptyList(),
+        ),
+        archiveDigest = "c".repeat(64),
+        trust = dev.droidtop.pluginhost.PluginTrustState.APPROVED,
+        enabled = true,
+        rootApproved = false,
+        disabledReason = null,
+    )
+
+    @Test
+    fun `a newer release under a key the person has not trusted is held, never offered`() {
+        // Droidtop/tracker#882: gamegrab-sources re-signed under a new root; F95zone 0.4.0-22 showed no update at all.
+        val listing = PluginCatalog.Listing(added.copy(acceptedDisclaimer = 2), PluginCatalogIndexParser.parse(index(catalogBlock, disclaimerBlock))!!)
+        val record = installedTool("0.9")
+        val oldKey = mapOf("acme" to UserOriginKey("acme", otherSpki, null))
+        assertNull(PluginCatalog.offerFor(listOf(listing), record, oldKey))
+        val held = PluginCatalog.heldOfferFor(listOf(listing), record, oldKey)!!
+        assertEquals("1.0", held.release.version)
+        assertEquals("acme", held.origin)
+        assertEquals(UserOriginKeys.fingerprint(otherSpki), held.trustedFingerprint)
+        assertEquals(UserOriginKeys.fingerprint(spki), held.namedFingerprint)
+        // Under the key the catalog names, it is an ordinary offer and nothing is held.
+        val sameKey = mapOf("acme" to UserOriginKey("acme", spki, null))
+        assertNotNull(PluginCatalog.offerFor(listOf(listing), record, sameKey))
+        assertNull(PluginCatalog.heldOfferFor(listOf(listing), record, sameKey))
+        // Not trusted at all is not a changed key: nothing to review here.
+        assertNull(PluginCatalog.heldOfferFor(listOf(listing), record, emptyMap()))
     }
 
     @Test

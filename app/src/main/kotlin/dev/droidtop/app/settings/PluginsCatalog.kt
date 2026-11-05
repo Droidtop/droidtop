@@ -216,12 +216,14 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                 // A newer version is counted and shown whatever the row's one state word is: "Wants new access" outranks
                 // "Update available", and on the console F95's update showed nowhere on this list (Droidtop/tracker#792).
                 val newer = installed.associate { record -> record.manifest.id to PluginCatalog.offerFor(listings, record, userKeys)?.release?.version }
+                // A newer release under a key the person has not trusted yet is said too, never as an update (#882).
+                val held = installed.associate { record -> record.manifest.id to PluginCatalog.heldOfferFor(listings, record, userKeys)?.release?.version }
                 val cards = installed.map { record ->
                     val grants = grantStore.read(record.manifest.id)
                     val update = newer[record.manifest.id]
                     val runtimeNeed = PluginRuntimeNeeds.missing(context, record.manifest)
                     val waiting = resolution.waiting[record.manifest.id]
-                    Triple(record, pluginState(record, grants, runtimeNeed, update != null, waiting), pluginCard(context, record, userKeys, catalogNames, waiting, grants, runtimeNeed, newerVersion = update))
+                    Triple(record, pluginState(record, grants, runtimeNeed, update != null, waiting), pluginCard(context, record, userKeys, catalogNames, waiting, grants, runtimeNeed, newerVersion = update, heldVersion = held[record.manifest.id]))
                 }
                 val updates = newer.values.count { it != null }
                 // Droidtop/tracker#513: what needs the person first, and the list narrowed to it.
@@ -541,6 +543,8 @@ internal fun AppSettingsCatalogs.pluginCard(
     grants: PluginGrants.Snapshot,
     runtimeNeed: RuntimeNeed?,
     newerVersion: String? = null,
+    /** A newer version listed under a key not trusted yet ([PluginCatalog.heldOfferFor]): shown, never offered. */
+    heldVersion: String? = null,
 ): NestedScreenItem {
     val m = record.manifest
     val enabledPoints = when (record.trust) {
@@ -559,7 +563,7 @@ internal fun AppSettingsCatalogs.pluginCard(
         subtitle = m.presentation.summary ?: pluginSummary(m, enabledPoints),
         inline = pluginDetailScreen(m.id, m.label, m.presentation.summary),
         // The installed version, and the newer one whenever a catalog has it (Droidtop/tracker#792).
-        valueLabel = { "$state · v${m.version}" + (newerVersion?.let { " → $it" } ?: "") },
+        valueLabel = { "$state · v${m.version}" + (newerVersion?.let { " → $it" } ?: heldVersion?.let { " · $it out, new key to review" } ?: "") },
         // An app's plugin is trusted by its app's signature, not an origin key (Droidtop/tracker#547).
         chip = if (m.kind == PluginKind.APP_INTERFACE) {
             if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) null else dev.droidtop.library.settings.RowTag.UNOFFICIAL
