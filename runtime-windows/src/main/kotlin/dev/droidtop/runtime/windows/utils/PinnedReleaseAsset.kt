@@ -24,8 +24,15 @@ class PinnedReleaseAsset(
     private val dirName: String,
     /** What a person reads when the download or the check fails ("the x86_64 Windows libraries"). */
     private val label: String,
+    /**
+     * Where the archive is, tried in order, when it is not this repository's release asset: droidtop-components'
+     * re-hosted copy first, then the maker's own release (Wine Mono). The SHA-256 decides either way.
+     */
+    urls: List<String>? = null,
+    /** How the archive is compressed. */
+    private val type: TarCompressorUtils.Type = TarCompressorUtils.Type.ZSTD,
 ) {
-    private val url = "https://github.com/Droidtop/droidtop/releases/download/$tag/$asset"
+    private val urls = urls ?: listOf("https://github.com/Droidtop/droidtop/releases/download/$tag/$asset")
 
     fun root(context: Context): File = File(context.filesDir, dirName)
 
@@ -42,7 +49,7 @@ class PinnedReleaseAsset(
         val archive = File(context.filesDir, asset)
         if (!archive.isFile || sha256(archive) != sha256) {
             archive.delete()
-            RuntimeDownloads.fetchUrl(context, url, archive, onProgress = onProgress)
+            RuntimeDownloads.fetchUrls(context, urls, archive, sha256, onProgress)
         }
         val actual = sha256(archive)
         if (actual != sha256) {
@@ -55,7 +62,7 @@ class PinnedReleaseAsset(
         val staging = File(context.filesDir, "$dirName.tmp")
         FileUtils.delete(staging)
         staging.mkdirs()
-        if (!TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, archive, staging)) {
+        if (!TarCompressorUtils.extract(type, archive, staging)) {
             FileUtils.delete(staging)
             error("couldn't unpack $label")
         }

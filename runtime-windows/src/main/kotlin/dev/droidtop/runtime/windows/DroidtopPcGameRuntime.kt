@@ -493,6 +493,14 @@ class DroidtopPcGameRuntime(
             runCatching { TranslationCache.prepare(context, entryId, WineOptions.translationCacheOn(context, entryId)) }.getOrNull().orEmpty()
         }
 
+        // A .NET Framework game gets Wine Mono where neither its prefix nor its Wine build has one
+        // (docs/SPEC.md 9, "Wine Mono for .NET Framework games"; Droidtop/tracker#895). Checked on the game's own
+        // program, before the Steamworks shim takes its place below.
+        withContext(Dispatchers.IO) {
+            runCatching { WineMono.prepare(context, container, executable) }
+                .onFailure { android.util.Log.w(TAG, "Couldn't prepare Wine Mono for ${executable.name}: ${it.message}") }
+        }
+
         // A game Steam owns starts through the shim in the prefix unless it
         // turned it off, and any other game when it turned it on
         // (docs/SPEC.md 5b, "Steamworks in the prefix"); the game's own files

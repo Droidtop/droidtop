@@ -22924,6 +22924,18 @@ in Proton. Container setup copies those folders into a new prefix (`ContainerMan
   game's own variables (Game properties, 7i) or the prefix's override it; a person can also set it for one game
   there when ICU itself misbehaves.
 
+### Wine Mono for .NET Framework games (built 2026-11-05, Droidtop/tracker#895, owner to confirm)
+
+A .NET Framework program (XNA and FNA games among them) exits at once when Wine's mscoree finds no Mono runtime.
+proton-wine-tux packages Wine Mono 10.4.1 in `share/wine/mono`, as Proton does. GameNative's builds carry none, and a
+prefix made from the prebuilt prefix pack never runs Wine's own first-boot install. mscoree also takes the runtime
+that the prefix's `HKCU\Software\Wine\Mono\RuntimePath` names, whatever the build. So `WineMono`, run from the
+launch resolver on the game's own program, acts when that program has a CLR header and neither the prefix
+(`C:\windows\mono\mono-2.0`) nor its Wine build has a runtime. It unpacks Wine Mono's release tarball once (40 MB,
+pinned SHA-256) into `imagefs/opt/wine-mono`, which Wine sees as `Z:\opt\wine-mono`, and names it in the prefix's
+registry. Nothing is installed into the prefix itself. The `wine-mono-11.0.0-x86.msi` in `extras.tzst` stays unused:
+installing it would mean a separate msiexec run in each prefix.
+
 ### Translation cache, precache and mixed-arch running (decided 2026-11-04, Droidtop/tracker#865, #866)
 
 The owner, relayed by the coordinator on 2026-11-04, approved the cache plan in #865 (mixed-architecture running
