@@ -157,7 +157,7 @@ class PluginJobsScreenTest {
     @Test
     fun `a running row is an icon, its bar and a fraction, and its words stay put while it counts`() {
         // Droidtop/tracker#886: "a fraction display (downloaded over total)"; "the text constantly changes".
-        val gb = 1024L * 1024 * 1024
+        val gb = 1_000_000_000L
         val bytes = job("b", 35).copy(nativeKind = "download", numbers = dev.droidtop.pluginhost.JobNumbers(bytesDone = 12 * gb / 10, bytesTotal = 34 * gb / 10))
         val row = PluginJobsScreen.jobRow(bytes, nowMs = 0L)
         assertEquals("1.2/3.4 GB", row.progressValue)

@@ -99,8 +99,8 @@ class ValueFormatTest {
 
     @Test
     fun `amounts are a fraction with one unit, both when they differ, and the amount alone with no total`() {
-        val mb = 1024L * 1024
-        val gb = 1024 * mb
+        val mb = 1_000_000L
+        val gb = 1_000 * mb
         assertEquals("1.2/3.4 GB", ValueFormat.fraction(12 * gb / 10, 34 * gb / 10))
         assertEquals("640 MB/3.4 GB", ValueFormat.fraction(640 * mb, 34 * gb / 10))
         assertEquals("0/3.4 GB", ValueFormat.fraction(0L, 34 * gb / 10))
