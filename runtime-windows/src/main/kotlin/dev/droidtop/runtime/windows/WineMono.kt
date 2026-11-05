@@ -15,11 +15,11 @@ import timber.log.Timber
  * Wine Mono for .NET Framework games on any Wine build (Droidtop/tracker#895).
  *
  * A .NET Framework program (XNA and FNA games among them, Reus) exits at once when Wine's mscoree finds no Mono
- * runtime: "Wine Mono is not installed". proton-wine-tux carries one beside Wine (share/wine/mono, as Proton does);
- * GameNative's builds do not, and droidtop's prefixes come from a prebuilt pack, so Wine's own first-boot install
- * never runs. mscoree also takes a runtime from anywhere the prefix's `HKCU\Software\Wine\Mono\RuntimePath` names
+ * runtime: "Wine Mono is not installed". No Wine build droidtop runs carries one: GameNative's do not, and
+ * proton-wine-tux does not either (owner, 2026-11-05: Mono is installed after the fact, not packaged with Wine).
+ * droidtop's prefixes come from a prebuilt pack, so Wine's own first-boot install never runs either. mscoree also takes a runtime from anywhere the prefix's `HKCU\Software\Wine\Mono\RuntimePath` names
  * (dlls/mscoree/metahost.c, get_mono_path_registry), whatever the Wine build. So, the first time a .NET Framework game
- * starts in a prefix that has none, Wine Mono's release (the version proton-wine-tux packages) is unpacked once into
+ * starts in a prefix that has none, Wine Mono's release (the version this tree's mscoree asks for) is unpacked once into
  * the image, which Wine sees as Z:, and the prefix is pointed at it. Nothing is installed into the prefix itself.
  */
 internal object WineMono {

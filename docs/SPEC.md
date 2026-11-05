@@ -23131,10 +23131,11 @@ from `WinePrefixPreparation` at each launch, puts any of XAudio2's 32 classes (X
 AudioVolumeMeter and AudioReverb, versions 2.0 to 2.7) that names an xapofx DLL back on its own DLL, in both views of
 `system.reg`, and touches nothing else. Existing prefixes are repaired at their next start.
 
-### Wine Mono for .NET Framework games (built 2026-11-05, Droidtop/tracker#895, owner to confirm)
+### Wine Mono for .NET Framework games (built 2026-11-05, Droidtop/tracker#895, owner decided)
 
-A .NET Framework program (XNA and FNA games among them) exits at once when Wine's mscoree finds no Mono runtime.
-proton-wine-tux packages Wine Mono 10.4.1 in `share/wine/mono`, as Proton does. GameNative's builds carry none, and a
+A .NET Framework program (XNA and FNA games among them) exits at once when Wine's mscoree finds no Mono runtime. No
+Wine build droidtop runs carries one: the owner decided (2026-11-05, tracker#913) that proton-wine-tux does not package
+Wine Mono and that it is installed after the fact, and GameNative's builds carry none either. A
 prefix made from the prebuilt prefix pack never runs Wine's own first-boot install. mscoree also takes the runtime
 that the prefix's `HKCU\Software\Wine\Mono\RuntimePath` names, whatever the build. So `WineMono`, run from the
 launch resolver on the game's own program, acts when that program has a CLR header and neither the prefix
