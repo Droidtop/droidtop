@@ -160,5 +160,51 @@ internal fun KeyboardStep(
             enabled -> StepNote("Hacker's Keyboard is on, not in use yet.")
             else -> StepNote("Opens Android's keyboard settings.")
         }
+        // The layout, asked once the keyboard is on (Droidtop/tracker#903, the owner: "the default layout is derived from
+        // screen size and dpi, and first setup asks the person"). Automatic is that default; the others are the
+        // keyboard's own presets (KeyboardProMode.Preset), changeable later in its settings.
+        if (enabled) KeyboardLayoutChoice()
+    }
+}
+
+@Composable
+private fun KeyboardLayoutChoice() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember { android.preference.PreferenceManager.getDefaultSharedPreferences(context) }
+    var chosen by remember { mutableStateOf(org.pocketworkstation.pckeyboard.KeyboardProMode.AUTOMATIC) }
+    LaunchedEffect(Unit) {
+        chosen = withContext(Dispatchers.IO) {
+            prefs.getString(org.pocketworkstation.pckeyboard.KeyboardProMode.LAYOUT_CHOICE_KEY, null)
+        } ?: org.pocketworkstation.pckeyboard.KeyboardProMode.AUTOMATIC
+    }
+    val metrics = context.resources.displayMetrics
+    val handheld = org.pocketworkstation.pckeyboard.KeyboardForm.handheld(
+        metrics.widthPixels, metrics.heightPixels, metrics.xdpi, metrics.ydpi, context.resources.configuration.smallestScreenWidthDp,
+    )
+    StepSectionLabel("Layout")
+    SelectableRow(
+        title = "Automatic (recommended)",
+        supporting = if (handheld) {
+            "Upright: four rows. Sideways: all five, with Esc, Ctrl and Alt, split for two thumbs"
+        } else {
+            "Upright: four rows. Sideways: all five, with Esc, Ctrl and Alt"
+        },
+        selected = chosen == org.pocketworkstation.pckeyboard.KeyboardProMode.AUTOMATIC,
+        onClick = {
+            chosen = org.pocketworkstation.pckeyboard.KeyboardProMode.AUTOMATIC
+            scope.launch(Dispatchers.IO) { org.pocketworkstation.pckeyboard.KeyboardProMode.automatic(prefs) }
+        },
+    )
+    org.pocketworkstation.pckeyboard.KeyboardProMode.Preset.entries.forEach { preset ->
+        SelectableRow(
+            title = preset.label,
+            supporting = preset.about,
+            selected = chosen == preset.name,
+            onClick = {
+                chosen = preset.name
+                scope.launch(Dispatchers.IO) { org.pocketworkstation.pckeyboard.KeyboardProMode.choose(context, prefs, preset) }
+            },
+        )
     }
 }

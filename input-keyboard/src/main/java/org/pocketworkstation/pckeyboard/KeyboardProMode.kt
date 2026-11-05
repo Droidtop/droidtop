@@ -140,6 +140,33 @@ object KeyboardProMode {
 
     const val PRESET_KEY = "pref_keyboard_preset"
 
+    /** The layout first setup asked for (Droidtop/tracker#903): [AUTOMATIC] or a [Preset] name; unset before it asks. */
+    const val LAYOUT_CHOICE_KEY = "pref_keyboard_layout_choice"
+    const val AUTOMATIC = "automatic"
+
+    /** Every option a [Preset] writes: what [automatic] clears so the screen-derived defaults apply again. Pure. */
+    @JvmStatic
+    fun presetKeys(): Set<String> = Preset.entries.flatMap { it.values.keys }.toSet()
+
+    /**
+     * Automatic (Droidtop/tracker#903, the owner: "the default layout is derived from screen size and dpi"): every option
+     * a preset sets goes back to its default, so the keyboard's own rules choose (four rows held upright, all five held
+     * sideways, split on a handheld, `KeyboardForm`). Nothing else changes.
+     */
+    @JvmStatic
+    fun automatic(prefs: SharedPreferences) {
+        val editor = prefs.edit()
+        presetKeys().forEach { editor.remove(it) }
+        editor.putString(LAYOUT_CHOICE_KEY, AUTOMATIC).apply()
+    }
+
+    /** [preset] for first setup's layout question: [apply], and the answer kept so the step shows it chosen. */
+    @JvmStatic
+    fun choose(context: Context, prefs: SharedPreferences, preset: Preset) {
+        apply(context, prefs, preset)
+        prefs.edit().putString(LAYOUT_CHOICE_KEY, preset.name).apply()
+    }
+
     /** Applies [preset]: Classic Hacker starts from every default, the others change only their own options. */
     @JvmStatic
     fun apply(context: Context, prefs: SharedPreferences, preset: Preset) {
