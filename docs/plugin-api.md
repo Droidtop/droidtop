@@ -3866,6 +3866,7 @@ wording the host uses, so it is identical in every mode.
 | `retroarch.commands` | normal | Send commands to RetroArch while you play: save and load states, slots, shaders, fast-forward | B8 |
 | `net.sockets` | dangerous | Make its own connections to other devices and the internet | §5.3 ("Open processes") |
 | `devices.paired` | dangerous | See and reach the devices you paired with droidtop | D21 |
+| `peers.addresses` | dangerous | Tell droidtop where your other devices can be reached | D22 |
 | `notify.post` | normal | Send you notifications | C6 |
 | `net.state` | normal | See whether you are online | D1 |
 | `net.wifi_details` | dangerous | See the name of your Wi-Fi network | D1 |
