@@ -22716,6 +22716,12 @@ client." The plan and its slices are on #645.
       Enter. A touchpad page (pointer, clicks, scroll) is next; the library already sends all of it (`input_send`).
     - Built to the recommendation, owner to confirm: paired devices may type into droidtop by default, as in the
       official apps; the switch is the library's `input` plugin.
+  - **battery, find my device, notifications (slice 6, first part):** droidtop sends its battery (Android's battery
+    broadcast) to paired devices, and shows a paired device's low battery as a notice. **Ring <device>** under Paired
+    makes it ring; a paired device's ring plays the alarm sound for 30 seconds or until the KDE Connect screen is
+    opened (the notice opens it). Another device's notifications are shown as droidtop notices on their own channel
+    ("Notifications from paired devices"), updated in place and taken away when they go there. Built to the
+    recommendation, owner to confirm: all three on for paired devices, as in the official apps.
   - Each plugin will have its own switch on the screen.
 - **Tailscale** is a VPN plugin, not a client of droidtop's own (owner, above). It feeds its tailnet's online devices
   to the same address list through the host API `peers.set_addresses` (docs/plugin-api.md D22, `peers.addresses`,
