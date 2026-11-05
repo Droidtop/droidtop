@@ -44,11 +44,20 @@ object TaskbarPolicy {
     fun without(open: List<String>, key: String): List<String> = open.filterNot { it == key }
 
     /**
-     * Whether the bar on one display is folded to its Show tab (Droidtop/tracker#700): the person's Hide on that
-     * display ([hidden], kept per display), or a game from droidtop's library in front on it ([gameHere]), which a
-     * bar must not cover (its on-screen controls, a menu bar), unless the person pressed Show during this game
-     * ([shownForThisGame]).
+     * Whether something in front folds the bar on one display by itself (Droidtop/tracker#700): a game from droidtop's
+     * library in front on it ([gameHere]), on any display, whose own controls a bar must not cover; or, on a display
+     * that is not the default one ([defaultDisplay] false: the console's external screen, a monitor), any app in front
+     * ([appInFront]), where the bar folds out of the way and Show (or Mode/Meta, which focus it) brings it back
+     * (owner, 2026-11-05: "auto-hide on the non-default display only"). The phone's own screen keeps it up for apps.
      */
-    fun collapsed(hidden: Boolean, gameHere: Boolean, shownForThisGame: Boolean): Boolean =
-        hidden || (gameHere && !shownForThisGame)
+    fun folds(gameHere: Boolean, appInFront: Boolean, defaultDisplay: Boolean): Boolean =
+        gameHere || (appInFront && !defaultDisplay)
+
+    /**
+     * Whether the bar on one display is folded to its Show tab: the person's Hide on that display ([hidden], kept
+     * per display), or something in front that [folds] it, unless the person pressed Show for that app while it is in
+     * front ([shownForThisApp]).
+     */
+    fun collapsed(hidden: Boolean, folds: Boolean, shownForThisApp: Boolean): Boolean =
+        hidden || (folds && !shownForThisApp)
 }

@@ -102,8 +102,8 @@ class StandardTaskbar(private val service: AccessibilityService) {
     /** The displays whose bar the person folded with Hide; each display keeps its own (Droidtop/tracker#700). */
     private val hiddenOn = HashSet<Int>()
 
-    /** Per display, the game the person pressed Show for while the bar had folded over it: it stays up for that game. */
-    private val shownForGame = HashMap<Int, String>()
+    /** Per display, the app the person pressed Show for while the bar had folded over it: it stays up for that app. */
+    private val shownFor = HashMap<Int, String>()
 
     /**
      * The library game in front on [displayId], or null: the app in front is the game droidtop launched
@@ -117,12 +117,27 @@ class StandardTaskbar(private val service: AccessibilityService) {
         return game.takeIf { gameDisplay == displayId }
     }
 
-    private fun collapsedOn(displayId: Int): Boolean {
+    /**
+     * The app in front that folds the bar on [displayId], or null: the library game on its display, or any app on a
+     * display that is not the default one ([TaskbarPolicy.folds]). Window changes do not say which display an app
+     * came to the front on, so on an external display the app in front is the one last reported.
+     */
+    private fun foldingApp(displayId: Int): String? {
         val game = gameOn(displayId)
+        val folds = TaskbarPolicy.folds(
+            gameHere = game != null,
+            appInFront = appInFront && frontPackage != null,
+            defaultDisplay = displayId == Display.DEFAULT_DISPLAY,
+        )
+        return if (folds) game ?: frontPackage else null
+    }
+
+    private fun collapsedOn(displayId: Int): Boolean {
+        val app = foldingApp(displayId)
         return TaskbarPolicy.collapsed(
             hidden = displayId in hiddenOn,
-            gameHere = game != null,
-            shownForThisGame = game != null && shownForGame[displayId] == game,
+            folds = app != null,
+            shownForThisApp = app != null && shownFor[displayId] == app,
         )
     }
     private var focusedDisplay: Int? = null
@@ -153,7 +168,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
         override fun onDisplayRemoved(displayId: Int) {
             bars.remove(displayId)?.remove()
             hiddenOn.remove(displayId)
-            shownForGame.remove(displayId)
+            shownFor.remove(displayId)
         }
         override fun onDisplayChanged(displayId: Int) = renderAll()
     }
@@ -372,8 +387,8 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 }
             }
         }
-        // A Show pressed for a game lasts for that game's session; the next session folds again.
-        if (dev.droidtop.runtime.RunningGame.packageName == null) shownForGame.clear()
+        // A Show pressed for an app lasts while that app is in front; the next app, or the same one later, folds again.
+        shownFor.entries.removeAll { it.value != frontPackage || !appInFront }
         bars.keys.filter { it !in wanted }.forEach { bars.remove(it)?.remove() }
         focusedDisplay?.let { if (it !in wanted) focusedDisplay = null }
         val open = openKeys.mapNotNull { openEntries[it] }.filter { entry -> pinned.none { it.key == entry.key } }
@@ -460,7 +475,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 root.setBackgroundColor(inks.plate)
                 root.addView(textButton(windowContext.getString(R.string.taskbar_show)) {
                     hiddenOn.remove(displayId)
-                    gameOn(displayId)?.let { shownForGame[displayId] = it }
+                    foldingApp(displayId)?.let { shownFor[displayId] = it }
                     renderAll()
                 })
             } else {
@@ -534,7 +549,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
             })
             bar.addView(textButton(windowContext.getString(R.string.taskbar_hide)) {
                 hiddenOn.add(displayId)
-                shownForGame.remove(displayId)
+                shownFor.remove(displayId)
                 endFocus()
                 renderAll()
             })

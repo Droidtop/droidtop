@@ -48,10 +48,18 @@ class TaskbarPolicyTest {
 
     @Test
     fun `a library game in front folds its display's bar until Show, and Hide holds on its own display`() {
-        assertFalse(TaskbarPolicy.collapsed(hidden = false, gameHere = false, shownForThisGame = false))
-        assertTrue(TaskbarPolicy.collapsed(hidden = false, gameHere = true, shownForThisGame = false))
-        assertFalse(TaskbarPolicy.collapsed(hidden = false, gameHere = true, shownForThisGame = true))
-        assertTrue(TaskbarPolicy.collapsed(hidden = true, gameHere = false, shownForThisGame = false))
-        assertTrue(TaskbarPolicy.collapsed(hidden = true, gameHere = true, shownForThisGame = true))
+        assertFalse(TaskbarPolicy.collapsed(hidden = false, folds = false, shownForThisApp = false))
+        assertTrue(TaskbarPolicy.collapsed(hidden = false, folds = true, shownForThisApp = false))
+        assertFalse(TaskbarPolicy.collapsed(hidden = false, folds = true, shownForThisApp = true))
+        assertTrue(TaskbarPolicy.collapsed(hidden = true, folds = false, shownForThisApp = false))
+        assertTrue(TaskbarPolicy.collapsed(hidden = true, folds = true, shownForThisApp = true))
+    }
+
+    @Test
+    fun `any app folds the bar on a non-default display, a game folds it anywhere, nothing folds it on the home screen`() {
+        assertTrue(TaskbarPolicy.folds(gameHere = false, appInFront = true, defaultDisplay = false))
+        assertFalse(TaskbarPolicy.folds(gameHere = false, appInFront = true, defaultDisplay = true))
+        assertTrue(TaskbarPolicy.folds(gameHere = true, appInFront = true, defaultDisplay = true))
+        assertFalse(TaskbarPolicy.folds(gameHere = false, appInFront = false, defaultDisplay = false))
     }
 }

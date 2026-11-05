@@ -1340,7 +1340,11 @@ type and the data source, which a third-party home cannot have.
   that game's display folds by itself (`TaskbarPolicy.collapsed`, Droidtop/tracker#700): the game's app
   is `RunningGame`, which `LaunchDisplay` sets, and its display the one the launch chose
   (`HomeDisplays.lastUsedDisplayId`). Show during the game keeps the bar up for that game; the next game
-  folds it again. Not yet: folding for every app with an edge to reveal it, which waits for the owner. On external displays the window is created for that display (`createWindowContext` from
+  folds it again. On a display that is not the default one (the console's external screen, a monitor) the bar
+  folds for every app in front, not only games (owner, 2026-11-05, `TaskbarPolicy.folds`); Show, or the Mode
+  button or Meta, which focus the Show tab, brings it back for that app until another comes to the front. The
+  phone's own screen keeps the bar up for apps. Window changes do not say which display an app came to the front
+  on, so the app that folds an external display's bar is the one last reported in front. On external displays the window is created for that display (`createWindowContext` from
   Android 12, `createDisplayContext` before) and apps are launched onto the display of the bar
   that was tapped (`ActivityOptions.setLaunchDisplayId`).
 - *Where it shows.* `TaskbarPolicy.shownOnDisplay` (runtime-common, unit-tested): a display of 600dp
