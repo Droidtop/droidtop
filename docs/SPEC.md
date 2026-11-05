@@ -6994,6 +6994,14 @@ shape). What made the relocation not stick: `CompanionActivity` shared
 the shell's task and brought it back there. It has a task of its own
 (`taskAffinity=""`).
 
+Attaching a screen while droidtop runs sends a burst of display events, and the
+new screen can drop out of the presentation-display list for a moment within it.
+The pass read that as the shell's screen being unplugged and relaunched the shell
+on every event, with no cooldown: twelve starts in a second on a hot-plug
+(Droidtop/tracker#785). The pass now takes the displays once they have been
+unchanged for 400 ms (the first reading goes through at once), and the shell
+counts as unplugged only when Android has removed its display.
+
 Behavior is unchanged -- this is a move, not a redesign: explicit launch-display targeting,
 the Mobile second screen (via `reassertSecondaryDisplays`, untouched), the Alternative
 forwarder, and `reassertSecondaryDisplays` itself all keep working exactly as before.

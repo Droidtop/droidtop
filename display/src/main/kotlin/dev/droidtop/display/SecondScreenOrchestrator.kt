@@ -13,6 +13,7 @@ import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
 import dev.droidtop.runtime.DualScreenOrchestration
 import dev.droidtop.runtime.ScreenRoles
+import dev.droidtop.runtime.settled
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -280,7 +281,8 @@ class SecondScreenOrchestrator(
     /** Starts the collect loop; call from lifecycleScope.launch { orchestrator.observe() }. */
     suspend fun observe() {
         combine(
-            displayOutputs.observe(),
+            // Once the displays settle: attaching a screen sends a burst of display events (Droidtop/tracker#785).
+            displayOutputs.observe().settled(DualScreenOrchestration.DISPLAY_SETTLE_MS),
             roleRefresh,
             DisplayArrangement.refresh,
             dev.droidtop.runtime.ScreenNaming.changes,
@@ -302,9 +304,13 @@ class SecondScreenOrchestrator(
 
                 val currentDisplay = host.currentDisplayId()
                 lastShellDisplayId = currentDisplay
-                val disconnectedShellDestination = DualScreenOrchestration
-                    .disconnectedShellDestination(currentDisplay, displayIds)
+                val disconnectedShellDestination = DualScreenOrchestration.disconnectedShellDestination(
+                    currentDisplay,
+                    displayIds,
+                    shellDisplayGone = displayManager.getDisplay(currentDisplay) == null,
+                )
                 if (disconnectedShellDestination != null) {
+                    Log.i(TAG, "Display $currentDisplay was removed: shell moves to display $disconnectedShellDestination")
                     dev.droidtop.runtime.ShellPlacement.settle(stays = false)
                     host.clearParkedDisplayId()
                     host.relaunchOnDisplay(disconnectedShellDestination)

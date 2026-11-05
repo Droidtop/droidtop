@@ -47,6 +47,12 @@ class DualScreenOrchestrationTest {
     }
 
     @Test
+    fun `a display that only dropped out of the list while attaching does not move the shell`() {
+        assertEquals(null, DualScreenOrchestration.disconnectedShellDestination(5, setOf(0), shellDisplayGone = false))
+        assertEquals(0, DualScreenOrchestration.disconnectedShellDestination(5, setOf(0), shellDisplayGone = true))
+    }
+
+    @Test
     fun `reconnecting second display restores selected arrangement`() {
         assertEquals(DualScreenOrchestration.ShellMove.TO_SECOND,
             DualScreenOrchestration.shellMove(0, 9, true, true, false, false))
