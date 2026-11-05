@@ -45,7 +45,7 @@ enum class GameEngine {
  * - CatSystem2: `cs2conf.dll`.
  * - CMVS: `cmvs32.exe`, `cmvs64.exe`, or `cmvs.cfg`.
  * - Flash (Adobe AIR package): `META-INF/` directory plus a `mimetype` file.
- * - Godot: a loose `.pck` file, OR an executable (`.exe`/`.x86_64`/`.x86`/
+ * - Godot: a loose `.pck` file that starts with Godot's `GDPC` magic (as Enginehost checks), OR an executable (`.exe`/`.x86_64`/`.x86`/
  *   extensionless) whose last 4 bytes are the ASCII magic `GDPC` (Godot's
  *   embedded-pack export) with a valid offset in the preceding 8
  *   little-endian bytes — Pythia's own real fix for an export shape the
@@ -136,7 +136,12 @@ object GameEngineDetector {
     private const val GODOT_MAX_TRAILER_READS = 4
 
     private fun isGodot(facts: FolderListing): Boolean {
-        if (facts.hasFile { it.substringAfterLast('.', "").lowercase() == "pck" }) return true
+        // A `.pck` counts only when it is Godot's pack: its first bytes are `GDPC`, as Enginehost checks
+        // (GodotPack.kt), so a stray file with that extension is not a Godot game (Droidtop/tracker#873).
+        val packs = facts.entryNames().asSequence()
+            .filter { it.substringAfterLast('.', "").lowercase() == "pck" && facts.isFile(it) }
+            .take(GODOT_MAX_TRAILER_READS)
+        if (packs.any { startsWithPackMagic(File(facts.folder, it)) }) return true
         return facts.entryNames().asSequence()
             .filter { it.substringAfterLast('.', "").lowercase() in GODOT_EXECUTABLE_SUFFIXES && facts.isFile(it) }
             .take(GODOT_MAX_TRAILER_READS)
@@ -159,6 +164,16 @@ object GameEngineDetector {
             .map { File(folder, it) }
             .filter { hasEmbeddedPckTrailer(it) }
             .toList()
+    }
+
+    /** Whether [file] begins with Godot's pack magic, `GDPC`. One read of four bytes. */
+    private fun startsWithPackMagic(file: File): Boolean = try {
+        file.inputStream().use { input ->
+            val head = ByteArray(4)
+            input.read(head) == 4 && head.contentEquals(GODOT_EMBEDDED_PCK_MAGIC)
+        }
+    } catch (e: java.io.IOException) {
+        false
     }
 
     private fun hasEmbeddedPckTrailer(file: File): Boolean {
