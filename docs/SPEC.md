@@ -23735,6 +23735,13 @@ app gets it too:
     Scudo's fixed 256 MB per size class and malloc fails (Slime Rancher on
     BlueStacks). This is a stopgap that delays the cap; the allocator
     question waits for the owner.
+    Not every Wine build carries that winex11
+    patch (GameNative's proton-10.0-4 asks the server and turns OpenGL off:
+    "GLX extension is missing", Droidtop/tracker#309, 2026-11-05), so the
+    session's X server also advertises the GLX name in that case
+    (`GLXExtension`, `X86_64Graphics.clientSideGlx`). The name only:
+    Mesa's xlib libGL never sends a GLX request, and one that arrives gets
+    BadImplementation. Arm64 sessions are unchanged.
     Limits that are the components', not droidtop's (rig, 2026-10-03,
     Droidtop/tracker#304): WineD3D with its Vulkan renderer
     (`renderer=vulkan`, Wine's experimental one) over lavapipe stays black,

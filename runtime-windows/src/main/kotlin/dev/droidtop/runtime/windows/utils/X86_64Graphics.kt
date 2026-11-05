@@ -126,6 +126,17 @@ object X86_64Graphics {
         }
     }
 
+    /**
+     * Whether [container]'s session draws OpenGL through Mesa's xlib `libGL.so.1` from this archive: an x86_64 device
+     * with lavapipe installed. That libGL does GLX on the client side, so the session's X server advertises the GLX
+     * name (`XServer.advertiseClientSideGlx`, Droidtop/tracker#309) for the Wine builds that ask the server before
+     * they look at `WINE_X11FORCEGLX`. Disk read.
+     */
+    @JvmStatic
+    fun clientSideGlx(context: Context, container: Container): Boolean =
+        X86_64GuestLibs.isX86_64Host() && container.graphicsDriver == LAVAPIPE && lavapipe.isInstalled(context) &&
+            File(lavapipe.root(context), "usr/lib/libGL.so.1").exists()
+
     private fun writeIcd(root: File, lib: File): File {
         val shipped = File(root, "usr/share/vulkan/icd.d/lvp_icd.x86_64.json")
         val written = File(root, "lvp_icd.json")
