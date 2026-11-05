@@ -585,23 +585,14 @@ class DroidSpacesRuntime(
 
     private fun socketsFile(name: String) = File(configsDir, "$name.sockets")
 
-    private fun readSockets(name: String): ContainerSockets {
-        val lines = socketsFile(name).takeIf { it.isFile }?.readLines().orEmpty().associate { line ->
-            val (key, value) = line.split("=", limit = 2).let { it.getOrElse(0) { "" } to it.getOrElse(1) { "" } }
-            key to value
-        }
-        return ContainerSockets(
-            waylandShared = lines["wayland"]?.toBooleanStrictOrNull() ?: true,
-            audioShared = lines["audio"]?.toBooleanStrictOrNull() ?: true,
-            clipboardShared = lines["clipboard"]?.toBooleanStrictOrNull() ?: true,
-        )
-    }
+    private fun readSockets(name: String): ContainerSockets =
+        parseSockets(socketsFile(name).takeIf { it.isFile }?.readLines().orEmpty())
 
     override suspend fun sockets(container: Container): ContainerSockets = withContext(Dispatchers.IO) { readSockets(container.id) }
 
     override suspend fun setSockets(container: Container, sockets: ContainerSockets) = withContext(Dispatchers.IO) {
         socketsFile(container.id).apply { parentFile?.mkdirs() }
-            .writeText("wayland=${sockets.waylandShared}\naudio=${sockets.audioShared}\nclipboard=${sockets.clipboardShared}\n")
+            .writeText(socketsText(sockets))
         if (sockets.clipboardShared) ClipboardFilters.stop(container.id)
         Unit
     }
@@ -712,6 +703,26 @@ class DroidSpacesRuntime(
         ContainerLayout.hostStorageToContainerPath(appStorageDir, hostPath)
 
     companion object {
+        /**
+         * A `<name>.sockets` file's lines as the container's sockets: `key=value`, each on unless it says exactly
+         * `false`, so a missing or unreadable line keeps the default. Pure (Droidtop/tracker#731).
+         */
+        internal fun parseSockets(lines: List<String>): ContainerSockets {
+            val values = lines.associate { line ->
+                val (key, value) = line.split("=", limit = 2).let { it.getOrElse(0) { "" } to it.getOrElse(1) { "" } }
+                key to value
+            }
+            return ContainerSockets(
+                waylandShared = values["wayland"]?.toBooleanStrictOrNull() ?: true,
+                audioShared = values["audio"]?.toBooleanStrictOrNull() ?: true,
+                clipboardShared = values["clipboard"]?.toBooleanStrictOrNull() ?: true,
+            )
+        }
+
+        /** What [parseSockets] reads back. Pure. */
+        internal fun socketsText(sockets: ContainerSockets): String =
+            "wayland=${sockets.waylandShared}\naudio=${sockets.audioShared}\nclipboard=${sockets.clipboardShared}\n"
+
         private const val PRIMARY_NAME = "droidtop-primary"
         private const val NO_ROOT_SHELL = "Reading this container's use needs Shizuku or Sui, which droidtop can't reach right now"
     }

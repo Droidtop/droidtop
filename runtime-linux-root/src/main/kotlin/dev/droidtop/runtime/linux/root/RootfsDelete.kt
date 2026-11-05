@@ -31,9 +31,7 @@ object RootfsDelete {
         val canonical = File(rootfsPath).canonicalPath
         // A rootfs lives deep inside app-private storage; anything this
         // shallow is not one, whatever the caller thinks.
-        if (canonical.count { it == '/' } < 3) {
-            return RootProcessResult(1, "", "refusing to delete '$canonical': too shallow to be a rootfs")
-        }
+        tooShallow(canonical)?.let { return RootProcessResult(1, "", it) }
         // Root's view of the mount table, since root is what deletes.
         val mounts = RootProcess.run("cat", "/proc/mounts")
         if (!mounts.succeeded) {
@@ -43,16 +41,24 @@ object RootfsDelete {
                 "refusing to delete '$canonical': couldn't read /proc/mounts (${mounts.stderr.trim()})",
             )
         }
-        val mountedUnder = mounts.stdout.lineSequence()
+        mountedUnder(canonical, mounts.stdout)?.let { return RootProcessResult(1, "", it) }
+        return RootProcess.run("rm", "-rf", canonical)
+    }
+
+    /** Why [canonical] is too shallow a path to be a rootfs, or null when it is deep enough. Pure. */
+    internal fun tooShallow(canonical: String): String? =
+        if (canonical.count { it == '/' } < 3) "refusing to delete '$canonical': too shallow to be a rootfs" else null
+
+    /**
+     * Why [canonical] must not be deleted given [procMounts] (the text of /proc/mounts), or null when nothing is
+     * mounted at it or under it. A mount point that only shares a prefix with it (`<rootfs>-old`) does not count.
+     * Pure, so the rule that keeps `rm -rf` out of a live bind is tested on its own (Droidtop/tracker#731).
+     */
+    internal fun mountedUnder(canonical: String, procMounts: String): String? {
+        val mounted = procMounts.lineSequence()
             .mapNotNull { it.split(' ').getOrNull(1) }
             .firstOrNull { it == canonical || it.startsWith("$canonical/") }
-        if (mountedUnder != null) {
-            return RootProcessResult(
-                1,
-                "",
-                "refusing to delete '$canonical': '$mountedUnder' is still mounted under it -- stop the container first",
-            )
-        }
-        return RootProcess.run("rm", "-rf", canonical)
+            ?: return null
+        return "refusing to delete '$canonical': '$mounted' is still mounted under it -- stop the container first"
     }
 }
