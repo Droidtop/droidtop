@@ -23250,8 +23250,7 @@ recipes built in droidtop's CI (the `mesa-xlib-gl` precedent), because Termux's 
 Termux's prefix:
 - **Built (slice 1):** `build-scripts/x86_64-venus/mesa-venus`, Mesa 26.2.4 with `-Dvulkan-drivers=virtio` and X11
   WSI only, Termux's patches except 0005, which droidtop's `0005-vtest-socket-from-env.patch` replaces: the socket is
-  `VTEST_SOCKET_NAME`, else `/tmp/.virgl_test`. `.github/workflows/x86_64-venus.yml` builds it and keeps the package as
-  an artifact; nothing ships yet.
+  `VTEST_SOCKET_NAME`, else `/tmp/.virgl_test`.
 - **Built (slice 2):** the vtest server, `build-scripts/x86_64-venus/vtest-server`: Termux's
   `virglrenderer-android` 1.3.0 recipe and patches (Venus, replayed on Android's own Vulkan by its 0011) with three
   changes: no ANGLE (libepoxy opens Android's `libEGL.so` and `libGLESv2.so`), virglrenderer and libepoxy static so the
@@ -23259,8 +23258,15 @@ Termux's prefix:
   that name could not sit beside it), and the executable named `libvirgl_vtest.so`. Its socket is given with
   `--socket-path`. The reuse check (owner, 2026-11-05: "reuse and repurpose existing code whenever possible"): the
   vendored GameNative virglrenderer predates Venus, so it cannot serve this.
-- **Next (slice 3):** pack the ICD (manifest made relative, its Termux dependencies) and the server, start the server
-  per session on a socket in the session's tmp, and add a `venus` driver to `X86_64Graphics`.
+- **Built (slice 3a, packing):** both are built by `.github/workflows/x86_64-lavapipe.yml` ("x86_64 graphics"), one
+  workflow and one archive for every guest-side driver: the Venus ICD goes into `x86_64-lavapipe.tzst` beside lavapipe
+  under the same loader (its Termux dependencies join the same closure, and the build fails if any library cannot load),
+  and the release also carries `libvirgl_vtest.so` with its SHA-256 for the APK to ship. A run started by hand on another
+  branch builds and checks everything and publishes nothing.
+- **Next (slice 3b, wiring, after a release exists):** the app pins the new archive and the server
+  (`X86_64Graphics`, a build-time fetch of `libvirgl_vtest.so` into `jniLibs/x86_64`), a `VtestServerComponent` starts
+  the server per session with `--venus --multi-clients --socket-path <session tmp>/.virgl_vtest`, and a `venus` driver
+  joins `X86_64Graphics.DRIVERS` (first, and the default only where the device's Vulkan qualifies).
 
 **Inside the guest on x86_64 (decided 2026-10-02, Droidtop/tracker#242).**
 The list above is the app's own natives; the guest process needs its own

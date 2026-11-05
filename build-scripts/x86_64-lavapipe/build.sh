@@ -27,12 +27,19 @@
 # built from Termux's recipe and patches by mesa-gl/ (MESA_GL_DEB is that
 # package); its dependencies join the same closure.
 #
-# Usage: GUEST_LIBS=<x86_64-guest-libs.tzst> MESA_GL_DEB=<mesa .deb> build.sh <out.tzst>
+# Venus (Droidtop/tracker#608): Mesa's virtio Vulkan ICD, which forwards Vulkan to
+# the app's vtest server and so to the device's own GPU, built from Termux's
+# recipe by build-scripts/x86_64-venus/mesa-venus (MESA_VENUS_DEB is that
+# package). It goes beside lavapipe under the same loader, so one archive holds
+# every guest-side driver; its dependencies join the same closure.
+#
+# Usage: GUEST_LIBS=<x86_64-guest-libs.tzst> MESA_GL_DEB=<mesa .deb> MESA_VENUS_DEB=<venus .deb> build.sh <out.tzst>
 set -euo pipefail
 
-OUT=${1:?usage: GUEST_LIBS=<x86_64-guest-libs.tzst> MESA_GL_DEB=<mesa .deb> build.sh <out.tzst>}
+OUT=${1:?usage: GUEST_LIBS=<x86_64-guest-libs.tzst> MESA_GL_DEB=<mesa .deb> MESA_VENUS_DEB=<venus .deb> build.sh <out.tzst>}
 GUEST_LIBS=${GUEST_LIBS:?set GUEST_LIBS to the x86_64-guest-libs.tzst this driver loads beside}
 MESA_GL_DEB=${MESA_GL_DEB:?set MESA_GL_DEB to the xlib OpenGL package mesa-gl/ built}
+MESA_VENUS_DEB=${MESA_VENUS_DEB:?set MESA_VENUS_DEB to the Venus package x86_64-venus/mesa-venus built}
 WORK=${WORK:-$PWD/x86_64-lavapipe-build}
 INDEX_URL=https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-x86_64/Packages
 POOL_URL=https://packages.termux.dev/apt/termux-main
@@ -56,8 +63,19 @@ find "$WORK/unpack/mesa-gl/data/data/com.termux/files/usr/lib" -maxdepth 1 \( -t
 [[ -e "$WORK/stage/usr/lib/libGL.so.1" ]] || ln -s libGL.so "$WORK/stage/usr/lib/libGL.so.1"
 printf 'mesa-xlib-gl %s https://www.mesa3d.org\n' "$gl_version" >> "$WORK/stage/usr/share/doc/x86_64-lavapipe/PACKAGES"
 
+# The Venus ICD: its library and manifest go in as they are (the app rewrites
+# the manifest's library_path, as it does lavapipe's), and what it depends on
+# joins the closure.
+mkdir -p "$WORK/unpack/mesa-venus" "$WORK/stage/usr/share/vulkan/icd.d"
+(cd "$WORK/unpack/mesa-venus" && ar x "$(realpath "$MESA_VENUS_DEB")" && tar -xf data.tar.* && tar -xf control.tar.*)
+venus_depends=$(sed -n 's/^Depends: //p' "$WORK/unpack/mesa-venus/control")
+venus_version=$(sed -n 's/^Version: //p' "$WORK/unpack/mesa-venus/control")
+cp -a "$WORK/unpack/mesa-venus/data/data/com.termux/files/usr/lib/libvulkan_virtio.so" "$WORK/stage/usr/lib/"
+cp -a "$WORK/unpack/mesa-venus/data/data/com.termux/files/usr/share/vulkan/icd.d/"virtio_icd.*.json "$WORK/stage/usr/share/vulkan/icd.d/"
+printf 'mesa-venus %s https://www.mesa3d.org\n' "$venus_version" >> "$WORK/stage/usr/share/doc/x86_64-lavapipe/PACKAGES"
+
 # The package closure, by the index's own Depends; prints "name version filename sha256".
-python3 - "$WORK/Packages" "$gl_depends" > "$WORK/closure" <<'PY'
+python3 - "$WORK/Packages" "$gl_depends, $venus_depends" > "$WORK/closure" <<'PY'
 import re, sys
 packages = {}
 for block in open(sys.argv[1], encoding="utf-8").read().split("\n\n"):
@@ -149,6 +167,8 @@ done < <(find "$WORK/stage/usr/lib" -type f -name '*.so*')
 [[ -e "$WORK/stage/usr/lib/libvulkan.so.1" ]] || { echo "no libvulkan.so.1 in vulkan-loader-generic" >&2; exit 1; }
 [[ -f "$WORK/stage/usr/share/vulkan/icd.d/lvp_icd.x86_64.json" ]] || { echo "no lvp_icd.x86_64.json in mesa-vulkan-icd-swrast" >&2; exit 1; }
 [[ -e "$WORK/stage/usr/lib/libGL.so.1" ]] || { echo "no libGL.so.1 in the xlib OpenGL package" >&2; exit 1; }
+[[ -f "$WORK/stage/usr/lib/libvulkan_virtio.so" ]] || { echo "no libvulkan_virtio.so in the Venus package" >&2; exit 1; }
+[[ -f "$WORK/stage/usr/share/vulkan/icd.d/virtio_icd.x86_64.json" ]] || { echo "no virtio_icd.x86_64.json in the Venus package" >&2; exit 1; }
 
 mkdir -p "$(dirname "$OUT")"
 tar -C "$WORK/stage" -I 'zstd -19 -T0' -cf "$OUT" usr
