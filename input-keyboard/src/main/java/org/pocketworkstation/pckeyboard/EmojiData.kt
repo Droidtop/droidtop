@@ -48,6 +48,14 @@ class EmojiCatalog(val groups: List<EmojiGroup>) {
         return scored.sortedBy { it.first }.take(limit).map { it.second }
     }
 
+    /**
+     * Only the entries [canDraw] says this device can draw, a group left out when none of its entries can be. The list
+     * is CLDR v48, newer than the emoji font of most Android versions, so without it the grid showed boxes for the
+     * newest emoji (rig 2026-11-04, AVD droidtop-rig4-dual, Droidtop/tracker#342: two in the Smileys grid).
+     */
+    fun drawable(canDraw: (String) -> Boolean): EmojiCatalog =
+        EmojiCatalog(groups.mapNotNull { group -> group.entries.filter { canDraw(it.emoji) }.takeIf { it.isNotEmpty() }?.let { EmojiGroup(group.id, it) } })
+
     companion object {
         fun parse(text: String): EmojiCatalog {
             val groups = ArrayList<EmojiGroup>()
@@ -113,7 +121,9 @@ object EmojiAssets {
         val assets = context.applicationContext.assets
         io.execute {
             val catalog = try {
-                assets.open("emoji/en.txt").bufferedReader().use { EmojiCatalog.parse(it.readText()) }
+                // Asked of the system's font once, here on the loader thread: the grid and search offer only what draws.
+                val paint = android.graphics.Paint()
+                assets.open("emoji/en.txt").bufferedReader().use { EmojiCatalog.parse(it.readText()) }.drawable(paint::hasGlyph)
             } catch (e: java.io.IOException) {
                 EmojiCatalog(emptyList())
             }

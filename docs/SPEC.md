@@ -8741,7 +8741,9 @@ proposal) is not built; these helpers are in the one settings tree that already 
   unchanged with its provenance in `assets/emoji/SOURCE.txt`; `EmojiCatalog` (JVM tested) reads it as it is:
   groups, then `emoji;name;keywords`; skin-tone variants (tab-indented lines) are left out of the grid and of
   search. `EmojiAssets` reads and parses it once per process on a background thread; the panel says "Loading"
-  until it is there. Other languages' lists (`de.txt`, `fr.txt`, ...) sit in the same upstream folder and are one
+  until it is there. Only what the device's font can draw is kept (`EmojiCatalog.drawable`, `Paint.hasGlyph` on
+  the loader thread): CLDR v48 is newer than most Android versions' emoji font, and the grid showed boxes for the
+  newest (rig 2026-11-04, AVD droidtop-rig4-dual, two in Smileys). Other languages' lists (`de.txt`, `fr.txt`, ...) sit in the same upstream folder and are one
   file each when wanted.
 - **Panel.** "Emoji panel" (preference, on) adds an Emoji button to the tool strip (`ToolsDeck`): group buttons
   with Recent first (30, `EmojiRecents`, in the keyboard's preference store), a grid of the group, Search, Back. A

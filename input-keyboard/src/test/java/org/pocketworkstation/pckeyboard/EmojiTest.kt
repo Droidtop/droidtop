@@ -55,6 +55,13 @@ class EmojiTest {
         assertEquals(1, catalog.search("face", limit = 1).size)
     }
 
+    @Test fun onlyWhatTheDeviceCanDrawIsOffered() {
+        val catalog = EmojiCatalog.parse(sample).drawable { it != "😂" && it != "🇳🇴" }
+        assertEquals(listOf("smileys_emotion", "people_body"), catalog.groups.map { it.id })
+        assertEquals(listOf("😀", "🙂"), catalog.groups[0].entries.map { it.emoji })
+        assertTrue(catalog.search("joy").isEmpty())
+    }
+
     @Test fun recentsAreNewestFirstWithoutRepeatsAndBounded() {
         var recent = emptyList<String>()
         for (e in listOf("a", "b", "c", "a")) recent = EmojiRecents.push(recent, e)
