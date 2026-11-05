@@ -213,9 +213,11 @@ class DesktopSessionService : Service() {
         // The desktop dark or light as droidtop is, and its background (docs/SPEC.md 2b "Desktop appearance", #694).
         val dark = !dev.droidtop.library.settings.AppearancePrefs.light(applicationContext)
         dev.droidtop.runtime.DesktopAppearance.dark = dark
-        val background = DesktopSetupPrefs.background(applicationContext).color(dark)
+        val backgroundChoice = DesktopSetupPrefs.background(applicationContext)
+        val background = backgroundChoice.color(dark)
         runCatching { dev.droidtop.runtime.DesktopPanel.writeConfigs(
                 filesDir, DesktopSetupPrefs.panel(applicationContext), DesktopSetupPrefs.tileWindows(applicationContext), background,
+                picture = backgroundChoice == dev.droidtop.runtime.DesktopAppearance.Background.PICTURE,
             ) }
             .onFailure { android.util.Log.w(TAG, "Writing the desktop panel's config failed", it) }
         try {

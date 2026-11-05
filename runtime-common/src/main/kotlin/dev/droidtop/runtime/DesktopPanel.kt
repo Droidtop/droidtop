@@ -35,6 +35,13 @@ enum class DesktopPanel(val id: String, val label: String) {
         const val SWAY_CONFIG = "$IN_CONTAINER_DIR/sway.config"
         const val WAYBAR_CONFIG = "$IN_CONTAINER_DIR/waybar.json"
 
+        /**
+         * The background picture's file name in [hostDir], a PNG droidtop wrote from the image the person chose
+         * (Droidtop/tracker#694); [BACKGROUND_PICTURE] is where the container sees it.
+         */
+        const val BACKGROUND_PICTURE_FILE = "background.png"
+        const val BACKGROUND_PICTURE = "$IN_CONTAINER_DIR/$BACKGROUND_PICTURE_FILE"
+
         /** The package [WAYBAR] adds to the plan, the same name in Alpine and Debian. */
         const val WAYBAR_PACKAGES = "waybar"
 
@@ -56,8 +63,14 @@ enum class DesktopPanel(val id: String, val label: String) {
          * resizes it by its border, and droidtop's bar maximizes and snaps it.
          *
          * [background] is the desktop's colour (`#RRGGBB`, [DesktopAppearance.Background]), or null for sway's own.
+         * With [picture], [BACKGROUND_PICTURE] fills the output, on that colour where it does not reach.
          */
-        fun swayConfig(panel: DesktopPanel = DEFAULT, tileWindows: Boolean = false, background: String? = null): String = buildString {
+        fun swayConfig(
+            panel: DesktopPanel = DEFAULT,
+            tileWindows: Boolean = false,
+            background: String? = null,
+            picture: Boolean = false,
+        ): String = buildString {
             appendLine("# droidtop's desktop panel (docs/SPEC.md 2a). droidtop rewrites this file at every desktop start.")
             appendLine("# To run your own sway config, choose \"Sway's own bar\" in Desktop settings and edit ~/.config/sway/config.")
             appendLine("include /etc/sway/config")
@@ -69,7 +82,11 @@ enum class DesktopPanel(val id: String, val label: String) {
                 // A border wide enough to take a fingertip's drag; the title bar stays, to move the window by.
                 appendLine("default_floating_border normal $FLOATING_BORDER_PX")
             }
-            background?.takeIf { COLOR.matches(it) }?.let { appendLine("output * bg $it solid_color") }
+            val color = background?.takeIf { COLOR.matches(it) }
+            when {
+                picture -> appendLine("output * bg $BACKGROUND_PICTURE fill${color?.let { " $it" }.orEmpty()}")
+                color != null -> appendLine("output * bg $color solid_color")
+            }
         }
 
         private val COLOR = Regex("#[0-9A-Fa-f]{6}")
@@ -97,10 +114,12 @@ enum class DesktopPanel(val id: String, val label: String) {
             """.trimIndent() + "\n"
 
         /** Writes both files under [filesDir]; small, done before each start, off the main thread. */
-        fun writeConfigs(filesDir: File, panel: DesktopPanel, tileWindows: Boolean = false, background: String? = null) {
+        fun writeConfigs(filesDir: File, panel: DesktopPanel, tileWindows: Boolean = false, background: String? = null, picture: Boolean = false) {
             val dir = hostDir(filesDir)
             dir.mkdirs()
-            File(dir, "sway.config").writeText(swayConfig(panel, tileWindows, background))
+            // A picture is named only while its file is there, so a lost file falls back to the colour.
+            val hasPicture = picture && File(dir, BACKGROUND_PICTURE_FILE).isFile
+            File(dir, "sway.config").writeText(swayConfig(panel, tileWindows, background, hasPicture))
             File(dir, "waybar.json").writeText(waybarConfig())
         }
     }
