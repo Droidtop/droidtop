@@ -12,11 +12,16 @@ import com.android.launcher3.R
  * Drawn as the row's foreground, over its own switch and ripple.
  */
 object RowFocusRing {
-    /** Gives [view], a row as it attaches, the ring, and focus in touch mode so a requestFocus there is not dropped. */
+    /**
+     * Gives [view], a row as it attaches, the ring. [inTouchMode] also lets it take focus in touch mode, so a
+     * requestFocus there is not dropped; a row like that takes focus on its first tap instead of acting, so the pages
+     * that never focus a row from code leave it off.
+     */
     @JvmStatic
-    fun wear(view: View) {
+    @JvmOverloads
+    fun wear(view: View, inTouchMode: Boolean = true) {
         view.isFocusable = true
-        view.isFocusableInTouchMode = true
+        if (inTouchMode) view.isFocusableInTouchMode = true
         view.foreground = ContextCompat.getDrawable(view.context, R.drawable.catalog_row_focus_ring)
     }
 
@@ -30,7 +35,7 @@ object RowFocusRing {
         list.setTag(R.drawable.catalog_row_focus_ring, true)
         list.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
             override fun onChildViewAttachedToWindow(view: View) {
-                if (view.isClickable) wear(view)
+                if (view.isClickable) wear(view, inTouchMode = false)
             }
             override fun onChildViewDetachedFromWindow(view: View) {}
         })
