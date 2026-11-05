@@ -1386,6 +1386,14 @@ internal fun PcGamesSection(
                 dev.droidtop.library.integrations.SourceDestinations.consoleNamesOf(ConsoleSystemsRepository.allSystems(context))
             }
         }
+        // The grid behind follows the typed text once it rests (GridFollow, Droidtop/tracker#884), not on every key.
+        val gridFollow = remember { GridFollow() }
+        var gridTyped by remember { mutableIntStateOf(0) }
+        LaunchedEffect(gridTyped) {
+            if (gridTyped == 0) return@LaunchedEffect
+            kotlinx.coroutines.delay(GRID_FOLLOW_MS)
+            gridFollow.due(android.os.SystemClock.uptimeMillis())?.let { state.showGrid(state.query.copy(text = it)) }
+        }
         if (state.home) {
             // Home's search is the global one (docs/SPEC.md 12a, "One search: where it opens"): every library and the
             // launcher's game apps, the system names ("snes" finds the system), and every source, with no system scope.
@@ -1416,8 +1424,14 @@ internal fun PcGamesSection(
             query = state.query,
             matchCount = grid.size,
             totalCount = all.size,
-            onTextChange = { state.showGrid(state.query.copy(text = it)) },
-            onDismiss = { state.searchOpen = false },
+            onTextChange = {
+                gridFollow.typed(it, android.os.SystemClock.uptimeMillis())
+                gridTyped++
+            },
+            onDismiss = {
+                gridFollow.flush()?.let { state.showGrid(state.query.copy(text = it)) }
+                state.searchOpen = false
+            },
             suggestions = suggestions,
             // The PC library's own games are rows of the one list ("One search"), as the launcher's are; the grid
             // behind still narrows to the same text. Matched in memory over the list already loaded.

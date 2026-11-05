@@ -27252,7 +27252,12 @@ match" for games Gaming listed (console, 2026-10-17).
   passes the apps and games as `local`). The PC library passes its games as
   `local` too, so the one list holds them (a row opens the game's page) and
   the grid behind still narrows to the same text, which is the Filter sheet's
-  Search row; the PC search asks the sources for PC games
+  Search row. The grid follows once the text rests (300 ms, `GridFollow`), not on
+  every key, and closing the panel applies the last text at once
+  (Droidtop/tracker#884: each key recomposed a new set of capsules behind the
+  panel, and on a device keeping little file cache, BlueStacks on the rig, that
+  paged code in on the UI thread until the field dropped keys and the app stopped
+  responding); the panel's own list still follows every key. The PC search asks the sources for PC games
   (`SourceDestinations.PC_PLATFORM`, the plugin API's `windows`) and also drops
   a source's result that names a console system (`SourceDestinations.isPcResult`,
   so a Nyaa PSP or Vita torrent is not a PC result). The result is judged by
