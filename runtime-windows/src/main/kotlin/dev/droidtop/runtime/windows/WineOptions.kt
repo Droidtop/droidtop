@@ -118,13 +118,20 @@ object WineOptions {
     private const val STEAMWORKS_APPID_KEY = "steamworks_appid"
     private const val GESTURES_KEY = "gestures"
 
+    /** The translation cache row (docs/SPEC.md 9, "Translation cache"): a game's or, with no game, every game's. */
+    const val TRANSLATION_CACHE = "wine_translation_cache"
+    private const val CACHE_KEY = "translation_cache"
+    private const val CACHE_ON = "on"
+    private const val CACHE_OFF = "off"
+    private const val CACHE_CLEAR = "clear"
+
     /** The container field the game's gestures are laid over at launch (`Container.LAUNCH_OVERRIDE_KEYS`). */
     const val GESTURE_OVERRIDE = "gestureConfig"
     private const val STEAMWORKS_ON = "on"
     private const val STEAMWORKS_OFF = "off"
 
     /** A game's choices that are not prefix settings: kept when its Wine choices change or are dropped. */
-    private val OWN_KEYS = setOf(LSFG_KEY, STEAMWORKS_KEY, STEAMWORKS_APPID_KEY)
+    private val OWN_KEYS = setOf(LSFG_KEY, STEAMWORKS_KEY, STEAMWORKS_APPID_KEY, CACHE_KEY)
 
     /**
      * Where the choices made before Set up Windows games are kept (in [WineGameOptionsPrefs], under a name no
@@ -186,9 +193,48 @@ object WineOptions {
             .filter { it.id != shared.id && it.wineVersion != shared.wineVersion }
             .groupingBy { it.wineVersion.orEmpty() }.eachCount()
 
-    /** A game's rows that are not prefix settings: frame generation and Steamworks. Disk work. */
+    /**
+     * The rows that are not prefix settings: the translation cache (a game's, or every game's), and a game's frame
+     * generation and Steamworks. Disk work.
+     */
     private suspend fun gameRows(context: Context, entryId: String?, gameRoot: String?): List<WineOptionRow> =
-        if (entryId == null) emptyList() else listOf(lsfgRow(context, entryId)) + steamworksRows(context, entryId, gameRoot?.let(::File))
+        listOf(translationCacheRow(context, entryId)) +
+            if (entryId == null) emptyList() else listOf(lsfgRow(context, entryId)) + steamworksRows(context, entryId, gameRoot?.let(::File))
+
+    /** Whether [entryId]'s own choice leaves its translation cache on (the setting for every game is [TranslationCache.enabled]). */
+    fun translationCacheOn(context: Context, entryId: String?): Boolean =
+        entryId == null || WineGameOptionsPrefs.get(context, entryId)[CACHE_KEY] != CACHE_OFF
+
+    /**
+     * The translation cache: on or off, for this game or every game, and "Clear now", which deletes the cache and keeps
+     * the setting. The summary says how much the cache takes. Disk work (the folder's size).
+     */
+    private fun translationCacheRow(context: Context, entryId: String?): WineOptionRow {
+        val title = "Translation cache"
+        val used = TranslationCache.label(runCatching { TranslationCache.size(context, entryId) }.getOrDefault(0L))
+        val allOn = TranslationCache.enabled(context)
+        if (entryId != null && !allOn) {
+            return WineOptionRow(
+                TRANSLATION_CACHE, title,
+                "Off for every game, under Settings > Library > Windows games. $used kept from before.",
+                "Off", listOf(WineOptionChoice(CACHE_CLEAR, "Clear now")),
+            )
+        }
+        val on = if (entryId == null) allOn else translationCacheOn(context, entryId)
+        val summary = if (entryId == null) {
+            "Keeps the code that x86 translation makes for each game, so the game starts and runs faster the next time. " +
+                "Needs Box64 0.3.8 or FEXCore 2609 or newer. All games: $used of up to ${TranslationCache.label(TranslationCache.TOTAL_LIMIT_MIB * 1024L * 1024L)}."
+        } else {
+            "Keeps the code that x86 translation makes for this game, so it starts and runs faster the next time. " +
+                "$used of up to ${TranslationCache.label(TranslationCache.GAME_LIMIT_MIB * 1024L * 1024L)}."
+        }
+        return WineOptionRow(
+            TRANSLATION_CACHE, title, summary,
+            if (on) CACHE_ON else CACHE_OFF,
+            listOf(WineOptionChoice(CACHE_ON, "On"), WineOptionChoice(CACHE_OFF, "Off"), WineOptionChoice(CACHE_CLEAR, "Clear now")),
+            ownChoice = entryId != null && WineGameOptionsPrefs.get(context, entryId)[CACHE_KEY] != null,
+        )
+    }
 
     /**
      * The rows before Set up Windows games has made the environment: the device's own defaults (what setup
@@ -253,6 +299,17 @@ object WineOptions {
             previous?.join()
             runCatching {
                 WindowsBackbone.awaitReady(app)
+                if (rowId == TRANSLATION_CACHE) {
+                    when {
+                        value == CACHE_CLEAR -> TranslationCache.clear(app, entryId)
+                        entryId == null -> TranslationCache.setEnabled(app, value == CACHE_ON)
+                        else -> {
+                            val stored = WineGameOptionsPrefs.get(app, entryId) - CACHE_KEY
+                            WineGameOptionsPrefs.set(app, entryId, if (value == CACHE_OFF) stored + (CACHE_KEY to CACHE_OFF) else stored)
+                        }
+                    }
+                    return@runCatching
+                }
                 if (rowId == LSFG && entryId != null) {
                     val stored = WineGameOptionsPrefs.get(app, entryId) - LSFG_KEY
                     WineGameOptionsPrefs.set(app, entryId, if (value == LSFG_OFF) stored else stored + (LSFG_KEY to value))
