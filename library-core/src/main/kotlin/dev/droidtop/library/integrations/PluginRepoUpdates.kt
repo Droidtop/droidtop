@@ -51,6 +51,13 @@ data class RepoPluginUpdate(val installed: PluginRecord, val repo: UserOriginKey
     val version: String get() = bundle.version
 }
 
+/**
+ * A newer version of an installed plugin that a trusted repository's latest release carries, which droidtop would not
+ * take (Droidtop/tracker#882): signed with another key than the one trusted for its origin, or for another origin.
+ * Updates lists it with [reason] and no Update: taking it would skip the person's own trust decision.
+ */
+data class RepoHeldUpdate(val installed: PluginRecord, val repo: String, val version: String, val reason: String)
+
 /** How installing one bundle by hand ended: whether the plugin is now installed, and the line to show for it. */
 data class RepoInstallOutcome(val installed: Boolean, val line: String)
 
@@ -153,13 +160,23 @@ object PluginRepoUpdates {
         catalogVersions: Map<String, String> = emptyMap(),
     ): List<RepoPluginUpdate> = pending(installed, trusted, { repo -> releaseRead(context, repo) }, includePrereleases(context), catalogVersions)
 
+    /**
+     * Newer versions of installed plugins that a trusted repository carries and droidtop would not take, from what the
+     * last pass read, with why ([RepoHeldUpdate], Droidtop/tracker#882). Preferences and the key store only.
+     */
+    fun heldUpdates(
+        context: Context,
+        installed: List<PluginRecord> = PluginStore.installed(context),
+        trusted: Map<String, UserOriginKey> = UserOriginKeys.load(UserOriginKeys.storeFile(context)),
+    ): List<RepoHeldUpdate> = held(installed, trusted) { repo -> prefs(context).getString(key("held", repo), null)?.let(::decodeHeld).orEmpty() }
+
     private fun key(kind: String, repo: String) = "$kind:${repo.lowercase()}"
 
     /** Forgets what is remembered about [repo], when it is removed. */
     fun forget(context: Context, repo: String) {
         prefs(context).edit()
             .remove(key("etag", repo)).remove(key("seen", repo)).remove(key("result", repo)).remove(key("release", repo))
-            .remove(key("read", repo)).remove(key("read_id", repo))
+            .remove(key("read", repo)).remove(key("read_id", repo)).remove(key("held", repo))
             .apply()
     }
 
@@ -234,6 +251,39 @@ object PluginRepoUpdates {
             update.takeIf { catalog == null || Versions.compareLoose(update.version, catalog) > 0 }
         }
     }
+
+    /** One refused bundle of the last pass: its plugin, its version and why it was refused. */
+    internal data class HeldRead(val pluginId: String, val version: String, val reason: String)
+
+    /**
+     * The held updates in [installed] from what each trusted repository's last pass refused ([reads] by repository
+     * name): a plugin installed here, still older than the refused bundle, that no pass has since updated. One per
+     * plugin, the highest version. In [installed]'s order. Pure.
+     */
+    internal fun held(installed: List<PluginRecord>, trusted: Map<String, UserOriginKey>, reads: (repo: String) -> List<HeldRead>): List<RepoHeldUpdate> {
+        val byId = installed.associateBy { it.manifest.id }
+        val best = HashMap<String, RepoHeldUpdate>()
+        for (entry in PluginRepos.trustedRepos(trusted)) {
+            val repo = entry.repo ?: continue
+            for (one in reads(repo)) {
+                val record = byId[one.pluginId] ?: continue
+                if (!PluginRepos.isNewer(one.version, record)) continue
+                val kept = best[one.pluginId]
+                if (kept == null || Versions.compareLoose(one.version, kept.version) > 0) best[one.pluginId] = RepoHeldUpdate(record, repo, one.version, one.reason)
+            }
+        }
+        return installed.mapNotNull { best[it.manifest.id] }
+    }
+
+    /** [HeldRead]s as one preference, a tab-separated line each. Pure. */
+    internal fun encodeHeld(held: List<HeldRead>): String =
+        held.filter { h -> listOf(h.pluginId, h.version, h.reason).all { t -> t.isNotBlank() && t.none { it == '\t' || it == '\n' || it == '\r' } } }
+            .joinToString("\n") { "${it.pluginId}\t${it.version}\t${it.reason}" }
+
+    internal fun decodeHeld(text: String): List<HeldRead> = text.lineSequence().mapNotNull { line ->
+        val parts = line.split('\t')
+        if (parts.size != 3 || parts.any { it.isBlank() }) null else HeldRead(parts[0], parts[1], parts[2])
+    }.toList()
 
     /** [RepoReleaseRead] as one preference: the tag, "prerelease" or "release", then a tab-separated line per bundle. Pure. */
     internal fun encodeRead(read: RepoReleaseRead): String {
@@ -387,12 +437,14 @@ object PluginRepoUpdates {
         val outcomes = mutableListOf<RepoUpdateOutcome>()
         val failures = mutableListOf<String>()
         val read = mutableListOf<RepoBundleRead>()
+        val held = mutableListOf<HeldRead>()
         var transientFailure = false
         for (asset in release.bundles.take(MAX_BUNDLES_PER_RELEASE)) {
             when (val one = processBundle(context, entry, asset, token, install)) {
                 is Processed.Outcome -> {
                     one.outcome?.let(outcomes::add)
                     one.read?.let(read::add)
+                    one.held?.let(held::add)
                 }
                 is Processed.Failure -> {
                     failures.add("${asset.name}: ${one.reason}.")
@@ -401,7 +453,10 @@ object PluginRepoUpdates {
             }
         }
         // What each bundle carries, for pendingUpdates: the Updates page's rows for this repository.
-        prefs(context).edit().putString(key("read", repo), encodeRead(RepoReleaseRead(release.tag, release.prerelease, read))).apply()
+        prefs(context).edit()
+            .putString(key("read", repo), encodeRead(RepoReleaseRead(release.tag, release.prerelease, read)))
+            .putString(key("held", repo), encodeHeld(held))
+            .apply()
         // A release is marked looked-at only when every bundle got an answer; a dropped connection is tried again next pass.
         // Only a pass that installs marks it seen: a release only read is still installed once updates are automatic.
         if (!transientFailure) {
@@ -417,7 +472,7 @@ object PluginRepoUpdates {
 
     private sealed interface Processed {
         /** [outcome] is null for a bundle that needs no mention (already current); [read] is what the bundle carries, when it is this repository's to offer. */
-        data class Outcome(val outcome: RepoUpdateOutcome?, val read: RepoBundleRead? = null) : Processed
+        data class Outcome(val outcome: RepoUpdateOutcome?, val read: RepoBundleRead? = null, val held: HeldRead? = null) : Processed
         data class Failure(val reason: String, val transient: Boolean) : Processed
     }
 
@@ -446,8 +501,12 @@ object PluginRepoUpdates {
             return when (val decision = PluginRepos.decide(peeked, entry.origin, userKeys, PluginStore.installed(context))) {
                 PluginRepos.UpdateDecision.UpToDate -> Processed.Outcome(null, read)
                 PluginRepos.UpdateDecision.NotInstalled -> Processed.Outcome(RepoUpdateOutcome.Offered(label, peeked.manifest.version), read)
-                // Another origin's, or not signed with the trusted key: not this repository's to offer, so not read.
-                is PluginRepos.UpdateDecision.Refused -> Processed.Outcome(RepoUpdateOutcome.Refused(label, decision.reason))
+                // Another origin's, or not signed with the trusted key: not this repository's to offer, so not read. When it
+                // is a newer version of a plugin installed here, Updates still says it is out and why it is not taken.
+                is PluginRepos.UpdateDecision.Refused -> Processed.Outcome(
+                    RepoUpdateOutcome.Refused(label, decision.reason),
+                    held = HeldRead(peeked.manifest.id, peeked.manifest.version, decision.reason),
+                )
                 is PluginRepos.UpdateDecision.Apply -> if (!install) {
                     Processed.Outcome(RepoUpdateOutcome.Available(label, peeked.manifest.version), read)
                 } else {

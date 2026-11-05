@@ -149,8 +149,12 @@ object PluginCatalog {
     suspend fun refresh(context: Context, source: PluginCatalogSource = PluginCatalogSources.OFFICIAL): String = withContext(Dispatchers.IO) {
         try {
             val parsed = fetchAndCache(context, source)
+            noteRefresh(context, source, null)
             "Catalog up to date: ${parsed.origins.sumOf { it.plugins.size }} plugin(s) listed."
         } catch (failure: Exception) {
+            // Kept for Updates (Droidtop/tracker#882): a catalog refused on every check left its plugins at the copy
+            // fetched before, and Updates showed no row and no reason. A plain "no network" is not worth a row.
+            if (failure !is NotPublished && failure !is java.io.IOException) noteRefresh(context, source, describe(failure))
             if (lastGoodIndex(context, source) != null) {
                 "Couldn't refresh (${describe(failure)}); the copy fetched earlier is still on file."
             } else if (failure is NotPublished) {
@@ -159,6 +163,23 @@ object PluginCatalog {
                 "Couldn't load the catalog: ${describe(failure)}."
             }
         }
+    }
+
+    private const val REFRESH_PREFS = "plugin_catalog_refresh"
+
+    private fun noteRefresh(context: Context, source: PluginCatalogSource, problem: String?) {
+        val prefs = context.applicationContext.getSharedPreferences(REFRESH_PREFS, Context.MODE_PRIVATE)
+        if (problem == null) prefs.edit().remove(source.id).apply() else prefs.edit().putString(source.id, problem).apply()
+    }
+
+    /**
+     * The catalogs whose last refresh was refused, with why (the sentence [refresh] gave): their plugins are offered
+     * from the copy fetched before, which may not know their newest releases (Droidtop/tracker#882). Updates says so
+     * instead of showing nothing. Preferences only.
+     */
+    fun refreshProblems(context: Context): List<Pair<PluginCatalogSource, String>> {
+        val prefs = context.applicationContext.getSharedPreferences(REFRESH_PREFS, Context.MODE_PRIVATE)
+        return PluginCatalogSources.all(context).mapNotNull { source -> prefs.getString(source.id, null)?.let { source to it } }
     }
 
     /**

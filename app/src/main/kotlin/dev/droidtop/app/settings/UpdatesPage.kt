@@ -353,6 +353,7 @@ object UpdatesPage {
         val checkingRows = unread.associate { section ->
             section.kind to ActionItem(id = "updates_checking_${section.name.lowercase()}", title = section.checking, progress = -1f)
         }
+        val heldBack = heldBackRows(context, updates.map { it.id }.toSet())
         val counts = updates.groupingBy { it.kind }.eachCount()
         val views = viewTitles(counts).map { (kind, title) ->
             val shown = updates.filter { kind == null || it.kind == kind }
@@ -375,6 +376,9 @@ object UpdatesPage {
                         add(TextBlockItem(id = "updates_none", text = "Everything is up to date."))
                     }
                     shown.forEach { add(rowOf(it, jobs)) }
+                    // What is out but held back, and why (Droidtop/tracker#882): never an update, so not counted and not in
+                    // Update all.
+                    if (kind == null || kind == Kind.PLUGINS) addAll(heldBack)
                     // droidtop always has its row: an update when one is known, else where it stands and the way to ask
                     // again (Droidtop/tracker#837; the owner: "there's nowhere to download/install an update to droidtop
                     // anymore"). Not an update, so it is not counted and Update all does not run it.
@@ -543,6 +547,34 @@ object UpdatesPage {
                 )
             }
         }
+    }
+
+    /**
+     * Plugin updates droidtop knows are out and will not take, each with why and where to look (Droidtop/tracker#882):
+     * F95zone sat at 0.4.0-22 with 0.7.3-54 out, and Updates showed no row and no reason. A newer bundle a trusted
+     * repository carries under another key than the one trusted for its origin, and a catalog whose refresh is refused
+     * (its master key changed since it was accepted, say), so that its plugins are offered from an older copy. Neither
+     * is updated here: that would skip the person's own trust decision. [shown] are the update rows already on the page.
+     */
+    private fun heldBackRows(context: Context, shown: Set<String>): List<CatalogItem> {
+        val installed = PluginStore.installed(context)
+        val held = PluginRepoUpdates.heldUpdates(context, installed).filter { "updates_plugin_${it.installed.manifest.id}" !in shown }.map { held ->
+            ActionItem(
+                id = "updates_plugin_held_${held.installed.manifest.id}",
+                title = held.installed.manifest.label,
+                subtitle = "${held.version} is out in ${held.repo}, but droidtop won't take it: ${held.reason}. " +
+                    "Check its key in Settings > Plugins > Keys you trust",
+                iconFile = PluginStore.iconFile(context, held.installed),
+            )
+        }
+        val catalogs = PluginCatalog.refreshProblems(context).map { (source, problem) ->
+            ActionItem(
+                id = "updates_catalog_refused_${source.id.hashCode().toUInt()}",
+                title = "${source.name} couldn't be checked",
+                subtitle = "$problem. Its plugins' newest versions may be missing here until it can be read again",
+            )
+        }
+        return held + catalogs
     }
 
     /** Android apps (emulators among them) with a newer version in an app catalog, as last fetched. */

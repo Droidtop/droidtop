@@ -19950,6 +19950,24 @@ menu still list every `listed` place.
     before, and only what it could not install is left listed. A release only read is read once; it is installed by
     the first pass that installs. The release list's ETag is kept only once its newest release is dealt with, so a
     release deferred on a metered network is fetched by the next unmetered pass instead of hiding behind GitHub's 304.
+    **What is out but held back is said, never silently dropped (Droidtop/tracker#882).** On BlueStacks (dev.2898)
+    F95zone sat at 0.4.0-22 with 0.7.3-54 released. Check now listed no plugin row and gave no reason, though the
+    gamegrab catalog itself was fine: its index (2026-10-30) lists up to 0.7.2-52 and its signature verifies under
+    the master that F95zone's repository publishes. Two refusals were silent, and Updates now shows a row for each
+    with the reason. Neither row has Update, and Update all leaves them out, because taking them would skip the
+    person's trust decision:
+    - **A repository bundle the pass would not take.** A newer version of an installed plugin, refused because it is
+      signed by another key than the one trusted for its origin, or is for another origin
+      (`PluginRepoUpdates.heldUpdates`, kept per repository with what the pass read): "<version> is out in
+      <owner/name>, but droidtop won't take it: <why>. Check its key in Settings > Plugins > Keys you trust".
+    - **A catalog whose refresh is refused** (`PluginCatalog.refreshProblems`). For example, its master key changed
+      since it was accepted. Its plugins are then offered from the copy fetched before, which may not know their
+      newest releases: "<catalog> couldn't be checked: <why>". A refresh that fails for want of a network is not
+      such a row.
+    **Open on #882:** trust is one entry per origin, and one repository per origin. gamegrab publishes seven plugin
+    repositories under its one origin, and F95zone's manifest names no repository of its own. So on a device that
+    trusts another gamegrab repository and has not added the catalog, F95zone's own releases are not read at all.
+    That is a decision for the owner, and the rig's state decides whether it is the cause.
     Enginehost's engine cores ("update … waiting" on its plugin page) are not listed: droidtop can only read that
     list (`engines.cores@1` has no install operation), so the update is Enginehost's own to install.
   - **Update settings**: how often droidtop checks, the build channel, debug builds, and

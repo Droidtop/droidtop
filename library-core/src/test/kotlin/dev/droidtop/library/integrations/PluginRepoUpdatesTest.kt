@@ -232,4 +232,51 @@ class PluginRepoUpdatesTest {
     fun anUpdateLeftForThePersonSaysWhereToInstallIt() {
         assertEquals("Tool 1.2.0 is available. Update it from Updates.", PluginRepoUpdates.describe(RepoUpdateOutcome.Available("Tool", "1.2.0")))
     }
+
+    // Droidtop/tracker#882: F95zone 0.4.0-22 with 0.7.3-54 out, and no row in Updates.
+
+    private fun held(installed: List<dev.droidtop.pluginhost.PluginRecord>, reads: Map<String, List<PluginRepoUpdates.HeldRead>>) =
+        PluginRepoUpdates.held(installed, trusted) { repo -> reads[repo].orEmpty() }
+
+    private val keyRefused = "its signature does not verify against the key you trusted for \"maker\""
+
+    @Test
+    fun aNewerBundleRefusedForItsKeyIsHeldBackWithItsReason() {
+        val found = held(listOf(installed("tool", "0.4.0-22")), mapOf("Owner/plugins" to listOf(PluginRepoUpdates.HeldRead("tool", "0.7.3-54", keyRefused))))
+        val one = found.single()
+        assertEquals("tool", one.installed.manifest.id)
+        assertEquals("0.7.3-54", one.version)
+        assertEquals("Owner/plugins", one.repo)
+        assertEquals(keyRefused, one.reason)
+    }
+
+    @Test
+    fun aHeldBundleNoNewerThanWhatIsInstalledIsNotListed() {
+        val reads = mapOf("Owner/plugins" to listOf(PluginRepoUpdates.HeldRead("tool", "0.7.3-54", keyRefused)))
+        assertTrue(held(listOf(installed("tool", "0.7.3-54")), reads).isEmpty())
+        assertTrue(held(listOf(installed("tool", "0.8.0")), reads).isEmpty())
+        assertTrue(held(listOf(installed("other-tool", "0.1")), reads).isEmpty())
+    }
+
+    @Test
+    fun theHighestHeldVersionAcrossRepositoriesIsTheOneListed() {
+        val found = held(
+            listOf(installed("tool", "0.4.0-22")),
+            mapOf(
+                "Owner/plugins" to listOf(PluginRepoUpdates.HeldRead("tool", "0.7.2-52", keyRefused)),
+                "else/where" to listOf(PluginRepoUpdates.HeldRead("tool", "0.7.3-54", "signed for origin \"other\"")),
+            ),
+        )
+        assertEquals("0.7.3-54", found.single().version)
+        assertEquals("else/where", found.single().repo)
+    }
+
+    @Test
+    fun heldReadsSurviveTheirPreferenceAndDropWhatCannotBeKept() {
+        val kept = listOf(PluginRepoUpdates.HeldRead("tool", "0.7.3-54", keyRefused), PluginRepoUpdates.HeldRead("b", "2", "why"))
+        assertEquals(kept, PluginRepoUpdates.decodeHeld(PluginRepoUpdates.encodeHeld(kept)))
+        val broken = listOf(PluginRepoUpdates.HeldRead("tool", "1", "two\nlines"), PluginRepoUpdates.HeldRead("", "1", "x"))
+        assertTrue(PluginRepoUpdates.decodeHeld(PluginRepoUpdates.encodeHeld(broken)).isEmpty())
+        assertTrue(PluginRepoUpdates.decodeHeld("garbage").isEmpty())
+    }
 }
