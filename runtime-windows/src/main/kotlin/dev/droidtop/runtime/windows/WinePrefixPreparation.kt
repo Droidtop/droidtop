@@ -161,6 +161,10 @@ internal object WinePrefixPreparation {
                 sharpnessDenoise = prefix.getExtra("sharpnessDenoise", "100").toIntOrNull() ?: 100,
             ),
         )
+        // The Visual C++ 2015-2022 runtime's "installed" record, where Wine's DLLs are there without it (Droidtop/tracker#899).
+        runCatching { WineVcRuntimes.ensure(File(prefix.rootDir, ".wine")) }
+            .onSuccess { if (it > 0) Timber.i("Wrote %d Visual C++ runtime records in prefix %s", it, prefix.id) }
+            .onFailure { Timber.w(it, "Could not check the Visual C++ runtime record in prefix %s", prefix.id) }
         // Which backend WINE itself hands audio to. The server droidtop
         // starts (PulseAudio or ALSA) is the other half of the same
         // decision, and both read the prefix's one audioDriver field.
