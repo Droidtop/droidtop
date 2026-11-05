@@ -90,6 +90,11 @@ class ProotRuntime(
     private val cachePolicy: ImageCachePolicy,
     /** Whether the person opted into the microphone; read at each desktop start (docs/SPEC.md 3d). */
     private val microphoneEnabled: () -> Boolean = { false },
+    /**
+     * The person's games folders, bound at their shared-storage paths in a container that does not have "All
+     * internal storage" (docs/SPEC.md 5a, 4; Droidtop/tracker#584); read at each start.
+     */
+    private val sharedFolders: () -> List<String> = { emptyList() },
 ) : ContainerRuntime {
     override val backend: ContainerBackend = ContainerBackend.PROOT
 
@@ -707,8 +712,16 @@ class ProotRuntime(
             }
             add("--bind=${appStorageDir.absolutePath}:${ContainerLayout.APP_STORAGE_DIR}")
             // Volumes mounted now, looked up per session: a card or USB
-            // drive mounted since the last one is there the next time.
-            ContainerLayout.sharedStorageBinds(SharedVolume.mounted(context)).forEach { (host, guest) -> add("--bind=$host:$guest") }
+            // drive mounted since the last one is there the next time. Whole
+            // only under "All internal storage"; otherwise just the person's
+            // games folders, at the same paths (SPEC 5a, 4; Droidtop/tracker#584).
+            val volumes = SharedVolume.mounted(context)
+            val storageBinds = if (readMounts(containerId).allStorage) {
+                ContainerLayout.sharedStorageBinds(volumes)
+            } else {
+                ContainerLayout.sharedFolderBinds(volumes, runCatching(sharedFolders).getOrDefault(emptyList()), context.dataDir.absolutePath)
+            }
+            storageBinds.forEach { (host, guest) -> add("--bind=$host:$guest") }
             // The container's home and the person's own extra folders
             // (docs/SPEC.md 3d "Home and folders"), from the one
             // description both backends read; a folder removed since it

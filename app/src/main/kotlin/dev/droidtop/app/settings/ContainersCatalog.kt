@@ -1118,6 +1118,22 @@ object ContainersCatalog {
         val container = info.container
         val mounts = current.folders
         return buildList {
+            // docs/SPEC.md 5a, "What a game can reach", 4 (Droidtop/tracker#584): off unless allowed; without it only
+            // the person's games folders are shared, at the same paths.
+            add(
+                ChoiceItem(
+                    id = "container_all_storage",
+                    title = "All internal storage",
+                    subtitle = "Lets this container see and change everything on the device's storage. From its next start",
+                    options = listOf(ChoiceOption("deny", "Deny"), ChoiceOption("allow", "Allow")),
+                    current = if (current.allStorage) "allow" else "deny",
+                    onSelect = { _, value ->
+                        dev.droidtop.runtime.util.AppScopes.io.launch {
+                            runCatching { runtime.setMounts(container, current.copy(allStorage = value == "allow")) }
+                        }
+                    },
+                ),
+            )
             add(
                 FolderPickItem(
                     id = "container_mount_add",

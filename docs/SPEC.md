@@ -7792,6 +7792,14 @@ on (owner, 2026-10-22: "Nope, turn it off. If it breaks, we fix it then.").
 A container that relied on the bind loses it on its next start; the person
 turns the toggle on, and the audit log of the refused paths says what
 failed.
+**Built, proot side of the shared-storage bind (2026-11-05, Droidtop/tracker#584).** `EnvironmentMounts.allStorage`
+(an `@allStorage` line in the mounts file both backends read; absent means off) is the toggle, a Deny/Allow row
+"All internal storage" in a container's Mounts group. With it on, `ProotRuntime` binds every mounted volume whole, as
+before; with it off, only the person's games folders (`GamesRoots.current`), each at the guest path the whole-volume
+bind would have given it (`ContainerLayout.sharedFolderBinds`), so a Linux game's paths read the same either way. A
+games folder that is itself wide is left to the toggle. Not built yet: removing the app-storage bind, which the
+container launcher, the logs and the Docker and libpod sockets still reach through `APP_STORAGE_DIR`, so it needs a
+per-folder replacement first.
 
 **6. Running without the protection (owner, 2026-10-22).** "No, not
 prompted. It can be a presented toggle when 'risky actions' is enabled, but

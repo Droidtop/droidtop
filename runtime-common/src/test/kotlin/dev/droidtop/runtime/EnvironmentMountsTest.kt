@@ -100,4 +100,12 @@ class EnvironmentMountsTest {
     fun `no folders means no drives`() {
         assertEquals(emptyList<Pair<Char, String>>(), EnvironmentMounts.ofFolders(emptyList()).wineDrives())
     }
+
+    @Test
+    fun `all internal storage is off unless the file says so, and survives a round trip`() {
+        assertEquals(false, EnvironmentMounts.decode("@home\tshared\n/storage/emulated/0/Games\tGames\n").allStorage)
+        val on = EnvironmentMounts(home = HomeChoice.Shared, folders = listOf(ExtraMount("/x", "x")), allStorage = true)
+        assertEquals(on, EnvironmentMounts.decode(EnvironmentMounts.encode(on)))
+        assertEquals(false, EnvironmentMounts.decode(EnvironmentMounts.encode(on.copy(allStorage = false))).allStorage)
+    }
 }

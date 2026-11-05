@@ -139,4 +139,21 @@ class ContainerLayoutTest {
         assertTrue(ContainerLayout.planId(a) != ContainerLayout.planId(b))
         assertEquals(ContainerLayout.planId(a), ContainerLayout.planId(a.copy(compositorCommand = "labwc")))
     }
+
+    @Test
+    fun `without all internal storage only the games folders are bound, at their usual paths`() {
+        val volumes = listOf(SharedVolume("primary", File("/storage/emulated/0")), SharedVolume("1234-ABCD", File("/storage/1234-ABCD")))
+        val binds = ContainerLayout.sharedFolderBinds(
+            volumes,
+            listOf("/storage/emulated/0/Games", "/storage/1234-ABCD/GOG", "/storage/emulated/0", "/data/local/tmp/elsewhere"),
+            "/data/user/0/dev.droidtop",
+        )
+        assertEquals(
+            listOf(
+                "/storage/emulated/0/Games" to "${ContainerLayout.SHARED_STORAGE_DIR}/primary/Games",
+                "/storage/1234-ABCD/GOG" to "${ContainerLayout.SHARED_STORAGE_DIR}/1234-ABCD/GOG",
+            ),
+            binds,
+        )
+    }
 }
