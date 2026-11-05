@@ -338,7 +338,7 @@ fn three_handhelds_and_three_computers_in_a_partial_mesh() {
     // A copy of the agent opened before anything happens, like the headless
     // `run` while a window or a command line is used (Droidtop/tracker#528, #531).
     let stale = Agent::open_in(dirs.clone()).unwrap();
-    let game = "title:dt sync test";
+    let game = "title2:dt-sync-test";
     // H1 has the same game from a folder "DtSyncTest v1.0", titled the way droidtop
     // titles it, and has favourited it.
     let on_h1 = json!([{ "key": game, "title": "Dt Sync Test", "platform": "pc",
@@ -504,7 +504,7 @@ fn a_newer_version_on_the_computer_is_seen_and_copied_through_the_tunnel() {
     let older = shelf.join("DtSyncTest v1.0");
     fs::create_dir_all(&older).unwrap();
     fs::write(older.join("DtSyncTest.exe"), b"MZ v1.0").unwrap();
-    let key = "title:dt sync test";
+    let key = "title2:dt-sync-test";
     let synced: Value = serde_json::from_str(&call(
         "sync_library",
         &through_tunnel(json!({
