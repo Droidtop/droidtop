@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import dev.droidtop.ui.shared.NoticeCard
 import dev.droidtop.library.settings.NoticePlacement
 import dev.droidtop.library.settings.NoticeTone
@@ -74,7 +75,7 @@ internal fun ManualMatchPicker(
 
     if (editingQuery) {
         TextEditDialog(
-            title = "Search",
+            title = words(R.string.gamepad_search),
             subtitle = dev.droidtop.shell.gamepad.pc.SEARCH_HELP,
             initial = query,
             search = true,
@@ -177,7 +178,7 @@ internal fun ManualMatchPicker(
             // The search first (Droidtop/tracker#861): A types other words, with the touch keyboard or the pad's.
             MenuRow(
                 title = dev.droidtop.shell.gamepad.pc.searchRowTitle(query),
-                subtitle = "Change what is searched for",
+                subtitle = words(R.string.gamepad_change_what_is_searched_for),
                 selected = focusIndex == 0,
                 onClick = {
                     focusIndex = 0
@@ -185,7 +186,7 @@ internal fun ManualMatchPicker(
                 },
             )
             when {
-                candidates == null -> MenuRow(title = "Searching...")
+                candidates == null -> MenuRow(title = words(R.string.gamepad_searching))
                 candidates!!.isEmpty() -> MenuRow(title = status ?: "Nothing found")
                 else -> candidates!!.forEachIndexed { index, candidate ->
                     MenuRow(

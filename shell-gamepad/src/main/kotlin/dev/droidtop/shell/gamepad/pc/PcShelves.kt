@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import dev.droidtop.library.originLabel
 import dev.droidtop.library.runsInEnginehost
 import dev.droidtop.library.CapsuleBadgeStyle
@@ -85,7 +87,7 @@ internal fun homeShelves(
 ): List<PcShelf> {
     val shelves = pcShelves(games, now, others, options, isRecentlyAdded)
     val recent = shelves.firstOrNull { it.id == SHELF_CONTINUE } ?: shelves.firstOrNull { it.id == SHELF_RECENTLY_ADDED }
-    return listOfNotNull(recent?.copy(id = SHELF_RECENT_GAMES, title = "Recent games"), mostPlayedShelf(games + others, options))
+    return listOfNotNull(recent?.copy(id = SHELF_RECENT_GAMES, title = words(R.string.gamepad_recent_games)), mostPlayedShelf(games + others, options))
 }
 
 /**

@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import dev.droidtop.shell.gamepad.pressableRow
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.onPad
@@ -63,7 +65,7 @@ internal fun RunnerPicker(
         if (overridden) {
             item {
                 RunnerRow(
-                    title = "Use droidtop's default again",
+                    title = words(R.string.gamepad_use_droidtop_s_default_again),
                     detail = "Clears your choice for this game",
                     enabled = true,
                     selected = false,
@@ -122,11 +124,11 @@ internal fun EnginePicker(
     onPick: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    PickerPage(title = "Engine", onDismiss = onDismiss) {
+    PickerPage(title = words(R.string.gamepad_engine), onDismiss = onDismiss) {
         if (pinned) {
             item {
                 RunnerRow(
-                    title = "Detect it again",
+                    title = words(R.string.gamepad_detect_it_again),
                     detail = "Clears your choice; the engines database decides",
                     enabled = true,
                     selected = false,
@@ -157,7 +159,7 @@ internal fun ScrapeSourcePicker(
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    PickerPage(title = "Rescrape with", onDismiss = onDismiss) {
+    PickerPage(title = words(R.string.gamepad_rescrape_with), onDismiss = onDismiss) {
         items(choices, key = { it.key }) { choice ->
             RunnerRow(
                 title = choice.label,

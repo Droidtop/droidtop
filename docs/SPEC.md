@@ -19521,7 +19521,7 @@ hand, so `Words` holds the Application's, set in `DroidtopApplication.attachBase
 providers that register the catalogs, and a word read before that fails loudly. Renderers and the settings search
 still read plain strings, so the catalog model is unchanged; a language change applies from the next start of the
 process. The rule `catalog-literals` (on) fails a capitalised `title = "..."` or `subtitle = "..."` outside its
-allowlist, which shrinks module by module and file by file; `:runtime-common` is cleared except
+allowlist, which shrinks module by module and file by file; `:shell-gamepad` is cleared (95 strings named `gamepad_`), `:runtime-common` is cleared except
 `GamingSettingsCatalog.kt` (Droidtop/tracker#177).
 
 **Accessibility is part of the system.** droidtop's chrome is driven by a pad, a finger or a

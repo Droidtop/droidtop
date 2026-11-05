@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
 import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.R
 import androidx.compose.ui.res.stringResource
@@ -1645,8 +1646,8 @@ internal fun PcGamesSection(
     // Edit: the name first, then the Filter sheet over the tab's own filters and sort.
     renaming?.let { view ->
         dev.droidtop.shell.gamepad.TextEditDialog(
-            title = "Rename tab",
-            subtitle = "Then change its filters and sort, and save",
+            title = words(R.string.gamepad_rename_tab),
+            subtitle = words(R.string.gamepad_then_change_its_filters_and_sort),
             initial = view.name,
             onCommit = { name ->
                 renaming = null
@@ -1907,7 +1908,7 @@ private fun HomeStripItem(home: HomeParts, state: PcGamesState) {
 internal fun needsAttentionScreen(items: List<AttentionItem>): dev.droidtop.library.settings.CatalogScreen =
     dev.droidtop.library.settings.CatalogScreen(
         id = "home_needs_attention",
-        title = "Needs attention",
+        title = words(R.string.gamepad_needs_attention),
         groups = { _ ->
             listOf(
                 dev.droidtop.library.settings.CatalogGroup(

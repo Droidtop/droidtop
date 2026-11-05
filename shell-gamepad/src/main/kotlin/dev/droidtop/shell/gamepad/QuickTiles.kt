@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -219,8 +220,8 @@ object QuickTiles {
     fun withSearch(groups: List<CatalogGroup>, open: () -> Unit): List<CatalogGroup> {
         val tile = ActionItem(
             id = ID_SEARCH,
-            title = "Search",
-            subtitle = "Your games, apps, download sources and settings",
+            title = words(R.string.gamepad_search_2),
+            subtitle = words(R.string.gamepad_your_games_apps_download_sources_and),
             run = { open() },
         )
         return groups.mapIndexed { index, group -> if (index == 0) group.copy(items = listOf(tile) + group.items) else group }

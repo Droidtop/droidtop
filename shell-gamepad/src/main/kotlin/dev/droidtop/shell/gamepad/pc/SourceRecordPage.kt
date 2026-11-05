@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.horizontalScroll
@@ -536,7 +538,7 @@ internal fun SourceRecordPage(
                 ShoulderGlyph("R1", badge = true, modifier = Modifier.padding(start = Space.Sm))
             }
             when {
-                answer == null -> MenuRow(title = "Asking ${source.label}...")
+                answer == null -> MenuRow(title = words(R.string.gamepad_asking_x, source.label))
                 record == null -> {
                     MenuRow(
                         title = if (answer?.unsupported == true) "${source.label} has no update page" else "${source.label} has no page for this game",
@@ -560,7 +562,7 @@ internal fun SourceRecordPage(
                 else -> {
                     // A saved copy says so: its links are the ones droidtop kept, and the source may have newer ones.
                     answer?.savedAtMs?.let { saved ->
-                        MenuRow(title = "Saved ${dateFormat.format(Date(saved))}", subtitle = answer?.failure ?: "Asking ${source.label} for the page as it is now...")
+                        MenuRow(title = words(R.string.gamepad_saved_x, dateFormat.format(Date(saved))), subtitle = answer?.failure ?: "Asking ${source.label} for the page as it is now...")
                     }
                     rows.forEachIndexed { index, row ->
                         if (row.heading) {
@@ -588,7 +590,7 @@ internal fun SourceRecordPage(
 
 /** Change link: it opens the link sheet. The record's thread number is the site's, not something the person reads. */
 private fun changeLinkRow(): RecordRow =
-    RecordRow("Change link", subtitle = "Link this game to a different page", action = RecordAction.Relink)
+    RecordRow("Change link", subtitle = words(R.string.gamepad_link_this_game_to_a_different), action = RecordAction.Relink)
 
 private val RECORD_HINTS = listOf(
     HintBinding(GamepadAction.A, "Select"),

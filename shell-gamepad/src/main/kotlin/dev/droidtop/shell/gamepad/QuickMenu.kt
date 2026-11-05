@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -468,7 +469,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             MenuRow(
-                title = "Overlay",
+                title = words(R.string.gamepad_overlay),
                 value = if (canDraw) overlayLevel.label else "Needs display over apps",
                 subtitle = if (overlayLevel != OverlayLevel.OFF && !hasShell) "FPS, CPU and GPU need More controls" else null,
                 adjustable = canDraw,
@@ -480,7 +481,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
             )
             if (PerfRow.CORNER in rows) {
                 MenuRow(
-                    title = "Overlay corner",
+                    title = words(R.string.gamepad_overlay_corner),
                     value = overlayCorner.label,
                     adjustable = true,
                     selected = rows.getOrNull(focusIndex) == PerfRow.CORNER,
@@ -490,7 +491,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
                     },
                 )
                 MenuRow(
-                    title = "Overlay size",
+                    title = words(R.string.gamepad_overlay_size),
                     value = overlaySize.label,
                     adjustable = true,
                     selected = rows.getOrNull(focusIndex) == PerfRow.SIZE,
@@ -782,7 +783,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
             when {
                 !granted -> item(key = "access") {
                     MenuRow(
-                        title = "Notification access",
+                        title = words(R.string.gamepad_notification_access),
                         value = if (restricted) dev.droidtop.runtime.systemstatus.RestrictedSettings.TITLE else "Needs permission",
                         selected = systemIndex == 0,
                         onClick = {

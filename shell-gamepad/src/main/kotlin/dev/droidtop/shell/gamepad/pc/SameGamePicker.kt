@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import dev.droidtop.ui.shared.NoticeCard
 import dev.droidtop.library.settings.NoticePlacement
 import dev.droidtop.library.settings.NoticeTone
@@ -118,7 +120,7 @@ internal fun SameGamePicker(
                 fontWeight = FontWeight.SemiBold,
             )
             if (choices.isEmpty()) {
-                MenuRow(title = "No game here has a name like this one")
+                MenuRow(title = words(R.string.gamepad_no_game_here_has_a_name))
             } else {
                 choices.forEachIndexed { index, choice ->
                     MenuRow(
