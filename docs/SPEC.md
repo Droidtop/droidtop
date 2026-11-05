@@ -23409,6 +23409,23 @@ explain as a finding. The smoke review of v0.2.0-dev.2898 raised these; each is 
 - *The address `1.2.2.1`.* Not an address: in `classes6.dex` it is an ASN.1 object identifier in a crypto library's
   table (between `1.2.2` and `1.2.2.2`), in `libcrane.so` part of a Go closure name
   (`marshalCertificate.1.2.2.1`), and in `libwindowcast_client.so` inside an OID table.
+- *The review of v0.2.0-dev.2974 (Droidtop/tracker#901).*
+  - *Go standard library CVEs (GO-2026-6603 and ten more, `artefact:stdlib`).* The one Go binary is `libcrane.so`
+    (vendor/go-containerregistry, built by `build-vendor-deps.sh`). CI's setup took whichever Go 1.25 patch the runner
+    cached; it now takes the newest 1.25 patch (`check-latest`, `.github/actions/android-setup`) and prints the
+    version it built with. Go backports security fixes to each supported release line.
+  - *`su`.* Not Android's. Every `su` in the dex is `ContainerUser.EXEC_TAIL`, the end of droidtop's own scripts
+    *inside a container*: the image's own `/bin/su`, run by the container's root to drop a program to the user it
+    asked for (`-u`, the image's `User`; #715, non-root first). It runs in the guest and only lowers privileges. Root
+    on Android comes only through the enhanced privileges provider (#394); nothing in droidtop runs Android's `su`.
+  - *Trust-all TLS in `org.bouncycastle.est`.* BouncyCastle's `bcpkix` bundles its EST client. droidtop uses
+    `bcpkix` only to build its own adb key's certificate (`X500Name`, `JcaX509v3CertificateBuilder`,
+    `JcaX509CertificateConverter`, `JcaContentSignerBuilder` in `WirelessDebuggingOps`) and imports nothing from
+    `est`. In the 2974 release APK R8's reachability analysis removed every `org.bouncycastle.est` class (0
+    references); only the unshrunk debug APK carries them, unreachable.
+  - *APKiD "manipulator" on `assets/provider-host.apk`.* The same cause as droidtop's own: the inner APK is
+    `:provider-host`'s release build, and AGP shortens a release build's resource paths (31 of its 43 `res/` entries
+    in 2974 are `res/2K.9.png`, `res/4B.xml` and the like), which is what "Resources Confusion" reads.
 - *A real version.* `release_channel.py fragments` prints every fragment
   grouped, which is rewritten into `CHANGELOG.md` as that version's section;
   the fragments are then removed by name. The grouping and rendering are

@@ -79,7 +79,15 @@ runs:
       uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
       with:
         go-version: "1.25"
+        # The newest 1.25 patch, not whichever one the runner's tool cache holds: crane links Go's standard library,
+        # and an older patch shipped its fixed CVEs (Droidtop/tracker#901, build review on 2974: GO-2026-6603 and ten more
+        # at artefact:stdlib). Go backports security fixes to each supported release line's patches.
+        check-latest: true
         cache: false
+
+    - name: Go version used for crane
+      shell: bash
+      run: go version
 
     - name: Install build dependencies
       shell: bash
