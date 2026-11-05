@@ -54,8 +54,12 @@ enum class ModePiece(vararg owners: Mode) {
      */
     LAUNCHER_SYSTEM_COMPONENTS(Mode.LAUNCHER),
 
-    /** droidtop's own notification listener, read only by the Quick Menu. */
-    GAMING_NOTIFICATION_LISTENER(Mode.GAMING),
+    /**
+     * droidtop's own notification listener. Every mode reads it: the Quick Menu's Notifications section (Gaming and
+     * Desktop), and the companion's Notifications tab and Now playing card, which Mobile has too. Owned by Gaming
+     * alone, it left those empty with Gaming off (Droidtop/tracker#828).
+     */
+    NOTIFICATION_LISTENER(Mode.GAMING, Mode.DESKTOP, Mode.LAUNCHER),
 
     /** The Gaming companion/input surface on a secondary screen. */
     GAMING_SECOND_SCREEN(Mode.GAMING),

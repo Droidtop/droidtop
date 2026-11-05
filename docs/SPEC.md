@@ -1990,7 +1990,12 @@ they are enabled and disabled as components
 (`PackageManager.setComponentEnabledSetting`). The honest price: a
 system-bound service loses its grant when its component is disabled, so
 re-enabling the mode means granting notification or accessibility access
-again.
+again. droidtop's notification listener is a piece of every mode
+(`ModePiece.NOTIFICATION_LISTENER`): the Quick Menu's Notifications section and
+the companion's Notifications tab and Now playing read it, and Mobile has the
+companion too, so only every mode off disables it (Droidtop/tracker#828).
+Launcher3's notification-dots listener stays its own component, with the rest
+of Mobile's system-started pieces.
 
 A piece a mode STARTED is stopped by the same switch: `ModeStartup.apply`
 stops every running piece whose owning modes are all off, so "runs no

@@ -56,15 +56,14 @@ object ModeStartup {
         // nothing can show it in anyway.
         SecondaryDisplayRegistrations.registerStandard()
 
-        // The Quick Menu's Notifications tab is the only reader of the
-        // listener, and a NotificationListenerService is bound by the
-        // SYSTEM whenever access is granted -- no Activity of ours is
-        // involved, so the only way to not run it is to not offer the
-        // component at all.
+        // Every mode reads the listener (ModePiece.NOTIFICATION_LISTENER), and a
+        // NotificationListenerService is bound by the SYSTEM whenever access is
+        // granted -- no Activity of ours is involved, so the only way to not run
+        // it, with every mode off, is to not offer the component at all.
         setComponentEnabled(
             app,
             DroidtopNotificationListener::class.java.name,
-            on(ModePiece.GAMING_NOTIFICATION_LISTENER),
+            on(ModePiece.NOTIFICATION_LISTENER),
         )
         // A mode switched off mid-session takes its surfaces with it, not
         // only its next process.

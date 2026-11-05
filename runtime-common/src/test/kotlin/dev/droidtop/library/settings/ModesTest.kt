@@ -103,7 +103,7 @@ class ModesTest {
     fun `a disabled mode contributes no piece`() {
         val launcherOnly = ModeGate.piecesToStart(setOf(Mode.LAUNCHER))
         assertEquals(
-            setOf(ModePiece.LAUNCHER_SYSTEM_COMPONENTS),
+            setOf(ModePiece.LAUNCHER_SYSTEM_COMPONENTS, ModePiece.NOTIFICATION_LISTENER),
             launcherOnly,
         )
         assertTrue(ModeGate.piecesToStart(emptySet()).isEmpty())
@@ -116,9 +116,15 @@ class ModesTest {
             ModePiece.entries.filter { Mode.GAMING in it.owners }.toSet(),
             gaming,
         )
-        assertTrue(ModePiece.GAMING_NOTIFICATION_LISTENER in gaming)
+        assertTrue(ModePiece.NOTIFICATION_LISTENER in gaming)
         assertTrue(ModePiece.GAMING_PLATFORMS_DATABASE in gaming)
         assertFalse(ModePiece.DESKTOP_SECOND_SCREEN in gaming)
+    }
+
+    @Test
+    fun `the notification listener runs in every mode and stops only with all of them off`() {
+        Mode.entries.forEach { assertTrue(ModePiece.NOTIFICATION_LISTENER in ModeGate.piecesToStart(setOf(it))) }
+        assertFalse(ModePiece.NOTIFICATION_LISTENER in ModeGate.piecesToStart(emptySet()))
     }
 
     @Test
