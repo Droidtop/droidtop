@@ -73,6 +73,8 @@ object PluginPermissions {
         // D21 (Droidtop/tracker#556, #553): the computers and handhelds the person paired, and what the same plugin
         // announced on each; never an address, a key or another plugin's value.
         PluginPermission("devices.paired", PermissionTier.DANGEROUS, "See and reach the devices you paired with droidtop"),
+        // D22 (Droidtop/tracker#645): a VPN plugin's devices, which droidtop announces itself to (KDE Connect).
+        PluginPermission("peers.addresses", PermissionTier.DANGEROUS, "Tell droidtop where your other devices can be reached"),
         PluginPermission("storage.volumes", PermissionTier.NORMAL, "See your storage devices and free space"),
         PluginPermission("files.picker", PermissionTier.NORMAL, "Ask you to choose files or folders"),
         PluginPermission("files.shared.read", PermissionTier.DANGEROUS, "Read all files on shared storage"),
