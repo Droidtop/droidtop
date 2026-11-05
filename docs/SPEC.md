@@ -15506,6 +15506,20 @@ follows:
   once it reads the collection. A product Indiegala serves only through its own
   client (`galaclient_only`) is listed and its install says so. The update
   check compares the installed version with the newest the collection lists.
+- **Battle.net** (`BattleNetStore`; Droidtop/tracker#335, built to the recommendation of
+  its design comment, owner to confirm): the account's games, read as Playnite's
+  BattleNetLibrary (MIT) reads them, from `account.battle.net/api/games-and-subs`
+  (`gameAccounts`: Blizzard's title id and the game's name, each title once) and
+  `/api/classic-games`, with the account site's session cookies (the whole header,
+  `ALL_COOKIES`, from the account overview Blizzard's sign-in lands on; an answer
+  without the games is a sign-in gone). Blizzard serves games only through its
+  own Battle.net app, so this store lists them and does not install them: Install
+  says "Battle.net games install through Blizzard's own Battle.net app, which
+  droidtop does not run". Running that app in a Wine prefix and launching through
+  it (`Battle.net.exe --exec="launch <product code>"`, Playnite's way) is the
+  next Battle.net step on Droidtop/tracker#335. A game the app installed keeps
+  Battle.net's folder marker (`battle.net:<product code>`), a folder entry that
+  one-game grouping joins with this row by title.
 - **Amazon Games** (`AmazonStore`): sign-in is Amazon's own page with a
   fresh PKCE session per sign-in (nile's device registration, through
   GameNative's `AmazonAuthManager`); the code comes back on the address
