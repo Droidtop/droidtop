@@ -11,7 +11,9 @@ package dev.droidtop.shell.gamepad.input
  *    opens (List options, Filter, Copy all), and a touch never assumes a pad (Droidtop/tracker#839).
  *
  * A, B and Select never drop. Start and R2 always sit first, on the left. What still does not fit after the last
- * step wraps (a sheet) or scrolls (a full-width bar), as before. Pure, so the order is a JVM test.
+ * step wraps onto a second line, in a sheet's bar and a full-width bar alike: a scrolled bar cut "A Open" mid-word
+ * at Largest text in portrait, with nothing saying there was more (Droidtop/tracker#770). Pure, so the order is a
+ * JVM test.
  */
 object HintFit {
 
@@ -42,7 +44,7 @@ object HintFit {
 
     /**
      * The first stage whose hints fit [available] by [width] (the drawn width of a list of hints), or the
-     * last stage when none does (the bar then wraps or scrolls what is left).
+     * last stage when none does (the bar then wraps what is left).
      */
     fun fit(hints: List<Pair<GamepadAction, String>>, available: Float, width: (List<Shown>) -> Float): List<Shown> {
         for (stage in Stage.entries) {
@@ -50,6 +52,15 @@ object HintFit {
             if (width(shown) <= available) return shown
         }
         return at(hints, Stage.entries.last())
+    }
+
+    /** What the bar draws: [shown], and whether it [wraps] because even the last stage overflows one line. */
+    data class Layout(val shown: List<Shown>, val wraps: Boolean)
+
+    /** [fit], and whether its answer still overflows [available] (the bar then wraps it rather than scroll it). */
+    fun layout(hints: List<Pair<GamepadAction, String>>, available: Float, width: (List<Shown>) -> Float): Layout {
+        val shown = fit(hints, available, width)
+        return Layout(shown, width(shown) > available)
     }
 
     /** The whole set, as a screen reader hears it ("Controls: A Open, B Back"), however much the bar had to shrink. */

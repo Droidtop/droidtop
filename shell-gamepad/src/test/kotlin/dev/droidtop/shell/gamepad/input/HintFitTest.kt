@@ -53,6 +53,18 @@ class HintFitTest {
     }
 
     @Test
+    fun `a bar wraps only when even the last stage overflows, and never drops a face button to avoid it`() {
+        assertEquals(false, HintFit.layout(hints, 1000f, width).wraps)
+        val last = width(HintFit.at(hints, HintFit.Stage.SELECT_AS_GLYPH))
+        assertEquals(false, HintFit.layout(hints, last, width).wraps)
+        // Gaming Home at Largest text in portrait (Droidtop/tracker#770): Y, L2 and X still show, on a second line.
+        val home = listOf(GamepadAction.Y to "Search", GamepadAction.L2 to "Options", GamepadAction.X to "Play now") + hints
+        val wrapped = HintFit.layout(home, 1f, width)
+        assertTrue(wrapped.wraps)
+        assertTrue(listOf(GamepadAction.Y, GamepadAction.L2, GamepadAction.X, GamepadAction.A).all { a -> wrapped.shown.any { it.action == a } })
+    }
+
+    @Test
     fun `a screen reader hears the whole set`() {
         assertEquals(
             "Controls: Start Menu, R2 Quick Menu · 3 new, A Open",

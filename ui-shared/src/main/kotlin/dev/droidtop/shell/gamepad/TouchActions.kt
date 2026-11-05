@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -97,8 +95,9 @@ fun rememberGamepadTouch(): (GamepadAction) -> Unit {
  * gives up room in the fit rule's order ([HintFit]: Start and R2 become
  * glyphs, then L1/R1 drop, then Select; A and B never drop). Whatever
  * still does not fit wraps onto a second line in a sheet's bar (narrower
- * than [TIGHT_HINT_BAR_WIDTH], or any bar on a compact window) and
- * scrolls sideways in a full-width bar. A screen reader hears the whole
+ * than [TIGHT_HINT_BAR_WIDTH], or any bar on a compact window), and a
+ * full-width bar wraps too once even the last stage overflows: it never
+ * scrolls a hint out of sight (Droidtop/tracker#770). A screen reader hears the whole
  * set however much was folded, and the bar offers "Read controls".
  */
 @Composable
@@ -138,10 +137,15 @@ fun TouchHintBar(
         // Over a theme's own canvas there is no bar plate, so each pill carries its own (Droidtop/tracker#668).
         val plated = background.alpha == 0f
         val pill = if (window.touchFirst || plated) TOUCH_PILL_PADDING * 2 else 0.dp
-        val shown = remember(hints, maxWidth, tight, pill, density.fontScale, labelStyle, glyphStyle) {
+        // One answer to "what is shown, and does it fit on one line": the fit rule's stage, and whether even its
+        // last stage overflows. A full-width bar that still overflows wraps like a sheet's bar instead of
+        // scrolling: a scrolled row cut "A Open" mid-word at Largest text in portrait and hid the hints after it,
+        // with nothing saying there was more (Droidtop/tracker#770). No hint drops to make room: a pill can be
+        // the only touch route to its action (#839).
+        val (shown, overflows) = remember(hints, maxWidth, tight, pill, density.fontScale, labelStyle, glyphStyle) {
             with(density) {
                 val available = (maxWidth - sidePadding * 2).toPx()
-                HintFit.fit(hints, available) { list ->
+                val width: (List<HintFit.Shown>) -> Float = { list ->
                     list.sumOf { hint ->
                         val glyph = GamepadKeyMap.labelFor(hint.action).ifBlank { hint.label.orEmpty() }
                         val cap = maxOf(
@@ -152,6 +156,7 @@ fun TouchHintBar(
                         (cap + label + pill.toPx()).toDouble()
                     }.toFloat() + gap.toPx() * (list.size - 1).coerceAtLeast(0)
                 }
+                HintFit.layout(hints, available, width).let { it.shown to it.wraps }
             }
         }
         val plate = Modifier
@@ -160,7 +165,7 @@ fun TouchHintBar(
             // A plate gets the frame's hairline on its top edge; over a
             // theme's own canvas (transparent) there is no plate and none.
             .then(if (background.alpha > 0f) Modifier.frameEdge(atTop = true) else Modifier)
-        if (tight) {
+        if (tight || overflows) {
             // A sheet's bar wraps its pills onto a second line instead of scrolling them: a scrolled
             // row showed "B Close" cut at the sheet's edge whenever X and Y joined A and B (Desktop's
             // Start sheet, rig emulator-5560, 2026-10-09), and nothing said there was more to scroll to.
@@ -178,7 +183,6 @@ fun TouchHintBar(
         } else {
             Row(
                 modifier = plate
-                    .horizontalScroll(rememberScrollState())
                     .heightIn(min = window.frameBarHeight)
                     .padding(horizontal = sidePadding),
                 horizontalArrangement = Arrangement.spacedBy(gap),
