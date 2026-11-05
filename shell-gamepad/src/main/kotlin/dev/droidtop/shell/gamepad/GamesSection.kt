@@ -1081,6 +1081,10 @@ internal fun GamesSection(
                             HintBinding(GamepadAction.A, "Launch") { gameUnderCursor },
                             HintBinding(GamepadAction.Y, "Info") { gameUnderCursor },
                             HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
+                            // Sort by and Filter live in the list options on Select, as on PC Games: named here so a
+                            // themed view shows its way to them, and a tap on the hint opens them (Droidtop/tracker#260,
+                            // rig 2778: "no X Filter and no Y Sort ... and no other on-screen route").
+                            HintBinding(GamepadAction.SELECT, "List options"),
                             HintBinding(GamepadAction.B, "Back"),
                         ) + ShellMenuHints
                     ),

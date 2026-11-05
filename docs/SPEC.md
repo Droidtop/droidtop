@@ -20635,7 +20635,9 @@ mechanism per job).
 **Gaming's button map changes this (Droidtop/tracker#644 slice 4, proposal 6.A and 6.B, which the owner approved;
 X became Play on a game in #641):** in Gaming, **Y is Search** on every list as on Home, and Filter and Sort by are
 reached from **Select**: PC Games' List options lead with Filter and Sort by, and on Apps Select opens the Filter
-sheet, whose footer has Sort by. X on Apps does nothing. Mobile's games screen (`LauncherGamesScreen`) keeps X
+sheet, whose footer has Sort by. X on Apps does nothing. A themed Retro gamelist names it too: its footer reads
+**Select List options** beside the theme's A Launch, Y Info and X Favorite, and a tap on that hint opens them, since
+the rig found no on-screen route to Filter or Sort there (Droidtop/tracker#260, build 2778). Mobile's games screen (`LauncherGamesScreen`) keeps X
 Filter and Y Sort By below until its own lane takes up the map.
 
 One vocabulary on every library and app list: **X Filter, Y Sort By,
