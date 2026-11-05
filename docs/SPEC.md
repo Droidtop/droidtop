@@ -20645,7 +20645,10 @@ covers every text-on-surface pair. The chrome honours the system font scale to 1
 clipping: rows keep the one-row-height rule at each scale, and text that still does not fit is
 abbreviated with an ellipsis. Colour is never the only signal for a state; the focused, selected
 and disabled states each have a shape or weight of their own. Themed views are the theme
-author's and are excluded, as in ES-DE. The touch-target minimum (§7j) already holds in every
+author's and are excluded from the look, as in ES-DE, but not from what is read: each themed list
+widget (carousel, textlist, grid) is one screen-reader node that says the entry under the cursor,
+its name, "favourite" when it is one, its system in a collection and "N of M", again on each move,
+and a double tap opens it (`esDeSpokenList`, Droidtop/tracker#728). The touch-target minimum (§7j) already holds in every
 orientation and on every input.
 
 **What is checked and what is not (Droidtop/tracker#87).** Checked by unit test:
