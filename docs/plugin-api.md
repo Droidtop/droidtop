@@ -4746,6 +4746,24 @@ Android 11 and later (`PluginTiers.runsIsolated`; the sandbox's
 `SBX_LOCK_NET_BROKERED`; droidtop's broker grants out, in and name lookups,
 and connects netd's `dnsproxyd` and `fwmarkd` for it). Below Android 11 it
 stays in an open process of droidtop's UID until the broker's byte relay.
+
+Built (2026-11-05), to the recommendation, owner to confirm (coordinator,
+2026-11-05: "Build the recommended option where a decision is his, and
+record it as built to the recommendation, owner to confirm";
+Droidtop/tracker#850): the isolated `net.sockets` process is locked down
+with the sandbox's network filter (`SBX_LOCK_NET_FILTER`, Fibrewall 0.2.0).
+Every connect, accept and send that names an address is decided by
+droidtop's broker, and nothing goes around it: not a connect made from
+the sandbox handler's own code, not a datagram sent to an address, not DNS
+except through the broker. The rules grant what the grants did: any
+destination out (`allow out any`), any peer in (`allow in any`) and any
+name (`allow dns any`). So no plugin loses access, and every network call
+is decided and its refusals are logged with the rule that refused them.
+netd's `dnsproxyd` is answered by the broker itself (the sandbox's DNS
+relay). liblog's `/dev/socket/logdw` is registered as a system socket,
+because the filter sends every Unix connect to the broker. **Owner to
+confirm:** narrowing each plugin to its own destinations (#553 lists
+Syncthing's). Until then the rules stay as broad as the grants were.
 Built (2026-10-16), behind a switch: full access isolated and the Shizuku
 relay.
 

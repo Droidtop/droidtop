@@ -100,6 +100,12 @@ static void audit(void *context, const struct sbx_access *access, int result) {
     const struct plugin *p = context;
     /* Refusals only: an allowed call that fails on its own (ENOENT for a file not made yet) is no refusal. */
     if (result != -EACCES && result != -EPERM && result != -ENOSPC) return;
+    if (access->net_rule) {
+        /* A network call under the rules: the rule that decided it ("no rule" when none matched). */
+        __android_log_print(ANDROID_LOG_WARN, TAG, "%s: refused %s %s (%s): %s", p->tag, access->op, access->asked,
+                            access->net_rule, strerror(-result));
+        return;
+    }
     __android_log_print(ANDROID_LOG_WARN, TAG, "%s: refused %s %s (%s): %s", p->tag, access->op,
                         access->asked, access->resolved[0] ? access->resolved : "unresolved", strerror(-result));
 }
@@ -166,6 +172,19 @@ Java_dev_droidtop_pluginhost_SandboxBroker_nativeServe(JNIEnv *env, jclass clazz
         sbx_policy_set_net(policy, (unsigned) net_grants);
         sbx_policy_add_system_socket(policy, "/dev/socket/dnsproxyd", SBX_NET_RESOLVE);
         sbx_policy_add_system_socket(policy, "/dev/socket/fwmarkd", SBX_NET_CONNECT | SBX_NET_LISTEN);
+        /*
+         * The process is locked down with SBX_LOCK_NET_FILTER (plugin_filter.c), so every destination is decided by rules.
+         * Built to the recommendation, owner to confirm (Droidtop/tracker#850, 2026-11-05): the rules grant what the
+         * grants did, any destination out, any peer in and any name, so no plugin loses access; what the filter adds is
+         * that nothing goes around the broker (a send that names an address, a connect from the handler's own code,
+         * DNS other than the broker's) and that every call is decided and logged. Narrowing a plugin to its own
+         * destinations (#553 lists Syncthing's) waits on the owner. liblog's socket is the system's: the filter sends
+         * every Unix connect to the broker, and a contained plugin's rules name only its own folders.
+         */
+        if (net_grants & SBX_NET_CONNECT) sbx_policy_net_rule(policy, "allow out any");
+        if (net_grants & SBX_NET_LISTEN) sbx_policy_net_rule(policy, "allow in any");
+        if (net_grants & SBX_NET_RESOLVE) sbx_policy_net_rule(policy, "allow dns any");
+        sbx_policy_add_system_socket(policy, "/dev/socket/logdw", 0);
     }
 
     int pair[2];
