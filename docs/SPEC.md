@@ -5335,7 +5335,10 @@ droidtop 0.2.0-dev.1931).
   `ControlPanel.DROIDTOP`, owner decision of 2026-10-30) are the companion's own panels: the Quick Menu never lists
   them (`ControlAccess.COMPANION_ONLY`), and only Full allows them, default-deny for every other mode. Any of
   their pages can be a tab of its own, stored as `page:<parent>/<page>` (`CompanionPrefs.pageId`), whose panel is
-  its parent's, so a mode that denies the panel denies the page. Their tabs and pages are drawn from S3. Where the mode hides the Companion
+  its parent's, so a mode that denies the panel denies the page. Their tabs and pages are drawn from S3. **The companion's own settings on the
+  companion** (Droidtop/tracker#786 S2b): More's last row, "Companion settings", opens the screen Settings shows
+  under "Companion screen" (`GamingSettingsCatalog.companionScreen`), in place, as a nested screen; where the mode
+  hides the Companion group (Kid, Kiosk, Guest) there is no such row. S3 moves it under the droidtop tab. Where the mode hides the Companion
   group (Kid, Kiosk) nobody can choose, so the bar is the mode's whole tab set. Defaults: Home, System, Apps,
   Social in Gaming and Mobile; Input, Home, System, Apps in Desktop. A tab under More passes its badge to
   More (the Social unread count, spoken with it). Every entry has the tab role, its selected state and a spoken
