@@ -150,6 +150,10 @@ class WineXSession(
             XServerComponent(xServer, UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.XSERVER_PATH)),
         )
         environment.addComponent(NetworkInfoUpdateComponent())
+        // Venus on x86_64 (Droidtop/tracker#608): its vtest server, up before the guest starts.
+        if (X86_64Graphics.usesVenus(context, prefix)) {
+            environment.addComponent(VtestServerComponent(X86_64Graphics.vtestSocket(context)))
+        }
 
         envVars.apply {
             // The prefix's own locale. A Japanese-locale game reads
