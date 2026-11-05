@@ -1,5 +1,6 @@
 package dev.droidtop.library.settings
 
+import dev.droidtop.runtime.R
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.content.ComponentName
 import android.content.Context
@@ -136,8 +137,8 @@ object GamingSettingsCatalog {
         }
         return ChoiceItem(
             id = ID_ORIENTATION_HERE,
-            title = "Screen orientation",
-            subtitle = "In ${mode.label} mode",
+            title = words(R.string.gaming_screen_orientation),
+            subtitle = words(R.string.gaming_in_x_mode, mode.label),
             options = options,
             current = CatalogPrefs.prefs(context).getString(key, "follow"),
             onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(key, value).apply() },
@@ -196,8 +197,8 @@ object GamingSettingsCatalog {
             items = listOf(
                 NestedScreenItem(
                     id = ID_GLOBAL_SETTINGS,
-                    title = "Settings",
-                    subtitle = "Home screen and modes",
+                    title = words(R.string.gaming_settings),
+                    subtitle = words(R.string.gaming_home_screen_and_modes),
                     registryId = "global_settings",
                     icon = CatalogIcon.GLOBAL,
                 ),
@@ -205,7 +206,7 @@ object GamingSettingsCatalog {
         ),
         CatalogGroup(
             id = GROUP_GAMING,
-            title = "Shell",
+            title = words(R.string.gaming_shell),
             icon = CatalogIcon.GAMING,
             category = "Shell behaviour",
             items = buildList {
@@ -213,8 +214,8 @@ object GamingSettingsCatalog {
                 add(
                     NestedScreenItem(
                         id = "pref_gaming_quick_menu_order",
-                        title = "Quick Menu order",
-                        subtitle = "Which section comes where on the Quick Menu's rail",
+                        title = words(R.string.gaming_quick_menu_order),
+                        subtitle = words(R.string.gaming_which_section_comes_where_on_the),
                         inline = QuickMenuOrder.screen(),
                     ),
                 )
@@ -222,8 +223,8 @@ object GamingSettingsCatalog {
                 add(
                     NestedScreenItem(
                         id = "pref_gaming_home_rows",
-                        title = "Home rows",
-                        subtitle = "Pin rows to the top of Home or hide them",
+                        title = words(R.string.gaming_home_rows),
+                        subtitle = words(R.string.gaming_pin_rows_to_the_top_of),
                         inline = HomeRows.screen(),
                     ),
                 )
@@ -237,14 +238,14 @@ object GamingSettingsCatalog {
         // Kid, Kiosk and Guest: who the device is handed to, and the limits that go with it.
         CatalogGroup(
             id = GROUP_KIDS,
-            title = "Kids and guests",
+            title = words(R.string.gaming_kids_and_guests),
             icon = CatalogIcon.GAMING,
             category = "Modes",
             items = buildList {
                 add(
                     ChoiceItem(
                         id = ID_UI_MODE,
-                        title = "UI mode",
+                        title = words(R.string.gaming_ui_mode),
                         subtitle = null,
                         options = UiMode.entries.map { ChoiceOption(it.name, it.label) },
                         current = UiModePrefs.get(context).name,
@@ -259,7 +260,7 @@ object GamingSettingsCatalog {
                 add(
                     TextInputItem(
                         id = ControlAccess.ID_UI_MODE_PASSKEY,
-                        title = "Passkey to leave Kid, Kiosk and Guest",
+                        title = words(R.string.gaming_passkey_to_leave_kid_kiosk_and),
                         subtitle = (
                             if (passkeySet) {
                                 "Set: leaving asks for it. Clear the field to remove it. "
@@ -277,8 +278,8 @@ object GamingSettingsCatalog {
                 add(
                     ChoiceItem(
                         id = ControlAccess.ID_KID_VOLUME_CAP,
-                        title = "Kid mode's highest volume",
-                        subtitle = "In Kid mode no slider or volume key goes past this",
+                        title = words(R.string.gaming_kid_mode_s_highest_volume),
+                        subtitle = words(R.string.gaming_in_kid_mode_no_slider_or),
                         options = listOf(ChoiceOption("0", "No limit (default)")) + listOf(30, 50, 70).map { ChoiceOption(it.toString(), "$it%") },
                         current = dev.droidtop.runtime.systemstatus.VolumeControl.kidCapPercent.toString(),
                         onSelect = { ctx, value -> dev.droidtop.runtime.systemstatus.VolumeControl.setKidCap(ctx, value.toIntOrNull() ?: 0) },
@@ -289,7 +290,7 @@ object GamingSettingsCatalog {
         ),
         CatalogGroup(
             id = GROUP_LIBRARY,
-            title = "Library",
+            title = words(R.string.gaming_library),
             category = "Library",
             items = buildList {
                 // The person's own play, by game and system (docs/SPEC.md 7f "Your play").
@@ -297,8 +298,8 @@ object GamingSettingsCatalog {
                 add(
                     NestedScreenItem(
                         id = ID_SCRAPER,
-                        title = "Scraper",
-                        subtitle = "Artwork and metadata",
+                        title = words(R.string.gaming_scraper),
+                        subtitle = words(R.string.gaming_artwork_and_metadata),
                         registryId = "rom_scraper",
                         icon = CatalogIcon.SCRAPER,
                     ),
@@ -306,8 +307,8 @@ object GamingSettingsCatalog {
                 add(
                     NestedScreenItem(
                         id = ID_CONSOLE_SYSTEMS,
-                        title = "Console systems",
-                        subtitle = "Systems and folders",
+                        title = words(R.string.gaming_console_systems),
+                        subtitle = words(R.string.gaming_systems_and_folders),
                         registryId = "console_systems",
                         icon = CatalogIcon.CONSOLE_SYSTEMS,
                     ),
@@ -315,8 +316,8 @@ object GamingSettingsCatalog {
                 add(
                     NestedScreenItem(
                         id = ID_EMULATORS,
-                        title = "Emulators",
-                        subtitle = "System emulators",
+                        title = words(R.string.gaming_emulators),
+                        subtitle = words(R.string.gaming_system_emulators),
                         registryId = "emulators",
                         icon = CatalogIcon.CONSOLE_SYSTEMS,
                     ),
@@ -324,8 +325,8 @@ object GamingSettingsCatalog {
                 add(
                     NestedScreenItem(
                         id = ID_DOWNLOADS,
-                        title = "Downloads and Updates",
-                        subtitle = "Active and recent, and what has a newer version",
+                        title = words(R.string.gaming_downloads_and_updates),
+                        subtitle = words(R.string.gaming_active_and_recent_and_what_has),
                         registryId = "plugin_jobs",
                         icon = CatalogIcon.INTEGRATIONS,
                     ),
@@ -333,8 +334,8 @@ object GamingSettingsCatalog {
                 add(
                     NestedScreenItem(
                         id = ID_GAME_FOLDERS,
-                        title = "Game folders",
-                        subtitle = "Add or remove the folders droidtop scans for games",
+                        title = words(R.string.gaming_game_folders),
+                        subtitle = words(R.string.gaming_add_or_remove_the_folders_droidtop),
                         registryId = "rom_folders",
                         icon = CatalogIcon.GAME_FOLDERS,
                     ),
@@ -342,11 +343,11 @@ object GamingSettingsCatalog {
                 add(
                     NestedScreenItem(
                         id = ID_WINDOWS_GAMES,
-                        title = "Windows games",
+                        title = words(R.string.gaming_windows_games),
                         // This is the destination launchWindows's own
                         // "isn't set up yet" error names, so the title
                         // there and here must stay in step.
-                        subtitle = "Set up the Wine environment Windows games run inside",
+                        subtitle = words(R.string.gaming_set_up_the_wine_environment_windows),
                         registryId = "windows_games",
                         icon = CatalogIcon.WINDOWS_GAMES,
                     ),
@@ -364,8 +365,8 @@ object GamingSettingsCatalog {
             items = listOf(
                 NestedScreenItem(
                     id = ID_ACCOUNTS_AND_SOURCES,
-                    title = "Accounts and sources",
-                    subtitle = "Accounts and plugins",
+                    title = words(R.string.gaming_accounts_and_sources),
+                    subtitle = words(R.string.gaming_accounts_and_plugins),
                     registryId = "accounts_and_sources",
                     icon = CatalogIcon.INTEGRATIONS,
                 ),
@@ -376,13 +377,13 @@ object GamingSettingsCatalog {
         // device. The live controls are the quick-only group below.
         CatalogGroup(
             id = GROUP_SCREENS,
-            title = "Displays",
+            title = words(R.string.gaming_displays),
             icon = CatalogIcon.DISPLAY,
             category = "Displays",
             items = buildList {
                 add(ChoiceItem(
                     id = ID_ORIENTATION,
-                    title = "Screen orientation",
+                    title = words(R.string.gaming_screen_orientation),
                     options = listOf(
                         ChoiceOption("follow", "Follow device"),
                         ChoiceOption("landscape", "Landscape"),
@@ -402,7 +403,7 @@ object GamingSettingsCatalog {
         // Companion screen (Droidtop/tracker#610).
         CatalogGroup(
             id = GROUP_KEYBOARD,
-            title = "Keyboard on the screens",
+            title = words(R.string.gaming_keyboard_on_the_screens),
             icon = CatalogIcon.INPUT,
             category = "Controls and keyboard",
             items = secondScreenKeyboardItems(context).filter { it.id != ID_DISPLAY_COMPANION },
@@ -416,13 +417,13 @@ object GamingSettingsCatalog {
         ),
         CatalogGroup(
             id = GROUP_ANDROID,
-            title = "Android",
+            title = words(R.string.gaming_android),
             category = "System",
             items = listOf(
                 NestedScreenItem(
                     id = ID_SYSTEM_ANDROID_LINKS,
-                    title = "Android settings",
-                    subtitle = "System settings",
+                    title = words(R.string.gaming_android_settings),
+                    subtitle = words(R.string.gaming_system_settings),
                     registryId = "android_settings",
                     icon = CatalogIcon.ANDROID_SETTINGS,
                 ),
@@ -430,7 +431,7 @@ object GamingSettingsCatalog {
         ),
         CatalogGroup(
             id = GROUP_INPUT,
-            title = "Controls",
+            title = words(R.string.gaming_controls),
             category = "Controls and keyboard",
             icon = CatalogIcon.INPUT,
             items = buildList {
@@ -440,8 +441,8 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_CONTROLLER,
-                        title = "Controller",
-                        subtitle = "Controller setup",
+                        title = words(R.string.gaming_controller),
+                        subtitle = words(R.string.gaming_controller_setup),
                         run = launchComponent(
                             "dev.droidtop.app.OnboardingActivity",
                             "dev.droidtop.app.EXTRA_START_STEP" to "CONTROLLER",
@@ -454,7 +455,7 @@ object GamingSettingsCatalog {
                 add(
                     AsyncActionItem(
                         id = ID_HOME_CHORDS,
-                        title = "HOME button combos over games",
+                        title = words(R.string.gaming_home_button_combos_over_games),
                         subtitle = chordsLine,
                         value = if (chordsOn) "On" else "Off",
                         statusMark = if (chordsOn) null else StatusMark.ATTENTION,
@@ -477,7 +478,7 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_KEYBOARD_PICK,
-                        title = "Keyboard",
+                        title = words(R.string.gaming_keyboard),
                         subtitle = keyboardSubtitle(context),
                         value = Keyboards.enabled(context).firstOrNull { it.isCurrent }?.label,
                         run = { ctx -> Keyboards.showPicker(ctx) },
@@ -487,7 +488,7 @@ object GamingSettingsCatalog {
                     add(
                         ActionItem(
                             id = ID_KEYBOARD_ENABLE,
-                            title = "Turn on Hacker's Keyboard",
+                            title = words(R.string.gaming_turn_on_hacker_s_keyboard),
                             subtitle = Keyboards.WHY,
                             run = { ctx -> Keyboards.openSystemSettings(ctx) },
                         ),
@@ -497,7 +498,7 @@ object GamingSettingsCatalog {
         ),
         CatalogGroup(
             id = GROUP_APPEARANCE,
-            title = "Appearance",
+            title = words(R.string.gaming_appearance),
             category = "Appearance",
             icon = CatalogIcon.APPEARANCE,
             items = buildList {
@@ -508,7 +509,7 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_BROWSE_THEMES,
-                        title = "Browse themes",
+                        title = words(R.string.gaming_browse_themes),
                         // Default fulfillment: deep-link into the shell's
                         // ThemeBrowserScreen. The in-shell renderer opens
                         // the browser inline instead (by id).
@@ -528,7 +529,7 @@ object GamingSettingsCatalog {
         // used to be listed in both, row for row (UI pass 2026-09-24, M2).
         CatalogGroup(
             id = GROUP_SYSTEM,
-            title = "System",
+            title = words(R.string.gaming_system),
             quickOnly = true,
             items = buildList {
                 val status = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context)
@@ -549,8 +550,8 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_SYSTEM_SWITCH_MODE,
-                        title = "Switch mode",
-                        subtitle = "Home screen",
+                        title = words(R.string.gaming_switch_mode),
+                        subtitle = words(R.string.gaming_home_screen),
                         run = launchComponent("dev.droidtop.app.ModeSwitcherActivity"),
                     ),
                 )
@@ -568,7 +569,7 @@ object GamingSettingsCatalog {
                         // again, which was a second mechanism for the
                         // same job; the title is written right here now
                         // and that splitter is gone.
-                        title = "Network",
+                        title = words(R.string.gaming_network),
                         // The captive-portal state, said out loud: the
                         // row's action opens the system sheet where
                         // signing in actually happens.
@@ -591,8 +592,8 @@ object GamingSettingsCatalog {
                 add(
                     AsyncActionItem(
                         id = ID_DISPLAY_SWAP,
-                        title = "Swap screens",
-                        subtitle = "Puts the menus on the companion's screen and the companion on this one",
+                        title = words(R.string.gaming_swap_screens),
+                        subtitle = words(R.string.gaming_puts_the_menus_on_the_companion),
                         run = { ctx, _ -> dev.droidtop.runtime.ScreenRoles.swap(ctx) },
                     ),
                 )
@@ -606,7 +607,7 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_DISPLAY_REINIT,
-                        title = "Reinitialize displays",
+                        title = words(R.string.gaming_reinitialize_displays),
                         subtitle = if (degraded != null) {
                             "The second screen is in a low-resolution mode: turn it off and on again, then reinitialize"
                         } else {
@@ -628,8 +629,8 @@ object GamingSettingsCatalog {
                 add(
                     AsyncActionItem(
                         id = ID_SCREENSHOT,
-                        title = "Screenshot",
-                        subtitle = "Saves a picture of the main screen to Pictures/Screenshots",
+                        title = words(R.string.gaming_screenshot),
+                        subtitle = words(R.string.gaming_saves_a_picture_of_the_main),
                         run = { ctx, _ -> dev.droidtop.runtime.Capture.take(ctx.applicationContext, android.view.Display.DEFAULT_DISPLAY).message },
                     ),
                 )
@@ -638,8 +639,8 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_TYPE_FROM_DEVICE,
-                        title = "Type from another device",
-                        subtitle = "Scan a QR code with a phone on this network to type into the field in focus",
+                        title = words(R.string.gaming_type_from_another_device),
+                        subtitle = words(R.string.gaming_scan_a_qr_code_with_a),
                         run = launchComponent("dev.droidtop.app.RemoteInputActivity"),
                     ),
                 )
@@ -649,8 +650,8 @@ object GamingSettingsCatalog {
                     add(
                         AsyncActionItem(
                             id = ID_STOP_FOREGROUND,
-                            title = "Stop the app in front",
-                            subtitle = "Ends the app on the main screen, as Stop in Apps does",
+                            title = words(R.string.gaming_stop_the_app_in_front),
+                            subtitle = words(R.string.gaming_ends_the_app_on_the_main),
                             confirmTitle = if (CompanionPrefs.settings.value.askBeforeStopping) "Stop the app in front? Anything not saved in it is lost." else null,
                             run = { ctx, _ ->
                                 val pkg = dev.droidtop.runtime.tasks.AppsInsights.foreground(ctx) ?: return@AsyncActionItem "Nothing in front"
@@ -667,8 +668,8 @@ object GamingSettingsCatalog {
                     add(
                         ActionItem(
                             id = ID_COMPANION_WAKE,
-                            title = "Companion screen",
-                            subtitle = "Turns the companion screen back on",
+                            title = words(R.string.gaming_companion_screen),
+                            subtitle = words(R.string.gaming_turns_the_companion_screen_back_on),
                             run = { _ -> CompanionPrefs.requestWake() },
                         ),
                     )
@@ -676,7 +677,7 @@ object GamingSettingsCatalog {
                 add(
                     SliderItem(
                         id = ID_SYSTEM_VOLUME,
-                        title = "Volume",
+                        title = words(R.string.gaming_volume),
                         min = 0,
                         max = controls.volumeRange(context).last,
                         current = controls.volume(context),
@@ -687,7 +688,7 @@ object GamingSettingsCatalog {
                     add(
                         SliderItem(
                             id = ID_SYSTEM_BRIGHTNESS,
-                            title = "Brightness",
+                            title = words(R.string.gaming_brightness),
                             min = 0,
                             max = 255,
                             current = dev.droidtop.runtime.DisplayControls.brightness(context) ?: 128,
@@ -702,8 +703,8 @@ object GamingSettingsCatalog {
                             // itself rather than as the permission behind
                             // it; what is missing goes in the value column
                             // like any other state (ui-polish item 15).
-                            title = "Brightness",
-                            subtitle = "Opens the system screen where droidtop can be granted Modify system settings",
+                            title = words(R.string.gaming_brightness),
+                            subtitle = words(R.string.gaming_opens_the_system_screen_where_droidtop),
                             value = "Needs permission",
                             run = { ctx -> SettingsLaunch.start(ctx, controls.brightnessGrantIntent(ctx)) },
                         ),
@@ -716,7 +717,7 @@ object GamingSettingsCatalog {
                     add(
                         ToggleItem(
                             id = ID_SYSTEM_DND,
-                            title = "Do Not Disturb",
+                            title = words(R.string.gaming_do_not_disturb),
                             current = controls.dndEnabled(context),
                             onToggle = { ctx, on -> controls.setDnd(ctx, on) },
                         ),
@@ -725,7 +726,7 @@ object GamingSettingsCatalog {
                     add(
                         ActionItem(
                             id = ID_SYSTEM_DND_GRANT,
-                            title = "Do Not Disturb",
+                            title = words(R.string.gaming_do_not_disturb),
                             value = "Needs permission",
                             run = { ctx -> SettingsLaunch.start(ctx, controls.dndGrantIntent()) },
                         ),
@@ -735,7 +736,7 @@ object GamingSettingsCatalog {
                     add(
                         ToggleItem(
                             id = ID_SYSTEM_ADAPTIVE,
-                            title = "Adaptive brightness",
+                            title = words(R.string.gaming_adaptive_brightness),
                             current = controls.adaptiveBrightness(context),
                             onToggle = { ctx, on -> controls.setAdaptiveBrightness(ctx, on) },
                         ),
@@ -743,7 +744,7 @@ object GamingSettingsCatalog {
                     add(
                         ToggleItem(
                             id = ID_SYSTEM_ROTATE,
-                            title = "Auto-rotate",
+                            title = words(R.string.gaming_auto_rotate),
                             current = controls.autoRotate(context),
                             onToggle = { ctx, on -> controls.setAutoRotate(ctx, on) },
                         ),
@@ -752,7 +753,7 @@ object GamingSettingsCatalog {
                     add(
                         ChoiceItem(
                             id = ID_SYSTEM_TIMEOUT,
-                            title = "Screen timeout",
+                            title = words(R.string.gaming_screen_timeout),
                             // The device's own value is offered too when it is not one of ours, named in words
                             // ("Never" for Android's largest value), never as raw milliseconds.
                             options = (TIMEOUT_OPTIONS.map { it.first } + listOfNotNull(controls.screenTimeoutMs(context)))
@@ -774,8 +775,8 @@ object GamingSettingsCatalog {
                     add(
                         ActionItem(
                             id = ID_SYSTEM_LEAVE_UI_MODE,
-                            title = "Leave ${UiModePrefs.get(context).label}",
-                            subtitle = "Restores Settings and the full library",
+                            title = words(R.string.gaming_leave_x, UiModePrefs.get(context).label),
+                            subtitle = words(R.string.gaming_restores_settings_and_the_full_library),
                             confirmTitle = if (passkey) null else "Leave restricted mode?",
                             run = if (passkey) {
                                 launchComponent(UiModePasskey.ENTRY_ACTIVITY)
@@ -788,8 +789,8 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_SYSTEM_VPN,
-                        title = "VPN",
-                        subtitle = "Opens the system VPN screen to connect, disconnect, or configure",
+                        title = words(R.string.gaming_vpn),
+                        subtitle = words(R.string.gaming_opens_the_system_vpn_screen_to),
                         state = status.vpnActive,
                         run = { ctx ->
                             ctx.startActivity(
@@ -808,8 +809,8 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_SYSTEM_BATTERY,
-                        title = "Battery",
-                        subtitle = "Opens the system Battery Saver screen",
+                        title = words(R.string.gaming_battery),
+                        subtitle = words(R.string.gaming_opens_the_system_battery_saver_screen),
                         value = controls.batteryValue(status.batteryPercent, status.charging, controls.powerSaveOn(context)),
                         run = { ctx -> SettingsLaunch.start(ctx, controls.batterySaverSettingsIntent()) },
                     ),
@@ -827,8 +828,8 @@ object GamingSettingsCatalog {
                     add(
                         ActionItem(
                             id = ID_SYSTEM_BLUETOOTH,
-                            title = "Bluetooth",
-                            subtitle = "Pair controllers and audio in the system Bluetooth screen",
+                            title = words(R.string.gaming_bluetooth),
+                            subtitle = words(R.string.gaming_pair_controllers_and_audio_in_the),
                             state = controls.bluetoothOn(context),
                             run = { ctx -> SettingsLaunch.start(ctx, controls.bluetoothSettingsIntent()) },
                         ),
@@ -838,8 +839,8 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_SYSTEM_LOCATION,
-                        title = "Location",
-                        subtitle = "Opens Android's location screen",
+                        title = words(R.string.gaming_location),
+                        subtitle = words(R.string.gaming_opens_android_s_location_screen),
                         state = controls.locationOn(context),
                         run = { ctx -> SettingsLaunch.start(ctx, controls.locationSettingsIntent()) },
                     ),
@@ -848,8 +849,8 @@ object GamingSettingsCatalog {
                 add(
                     ToggleItem(
                         id = ID_SYSTEM_MIC_MUTE,
-                        title = "Mute microphone",
-                        subtitle = "Every app hears silence from the microphone while this is on",
+                        title = words(R.string.gaming_mute_microphone),
+                        subtitle = words(R.string.gaming_every_app_hears_silence_from_the),
                         current = controls.micMuted(context),
                         onToggle = { ctx, on -> controls.setMicMuted(ctx, on) },
                     ),
@@ -859,8 +860,8 @@ object GamingSettingsCatalog {
                     add(
                         ToggleItem(
                             id = ID_SYSTEM_FLASHLIGHT,
-                            title = "Flashlight",
-                            subtitle = "The light beside the camera",
+                            title = words(R.string.gaming_flashlight),
+                            subtitle = words(R.string.gaming_the_light_beside_the_camera),
                             current = controls.flashlightOn(),
                             onToggle = { ctx, on -> controls.setFlashlight(ctx, on) },
                         ),
@@ -874,8 +875,8 @@ object GamingSettingsCatalog {
                     add(
                         ActionItem(
                             id = ID_SYSTEM_AIRPLANE,
-                            title = "Airplane mode",
-                            subtitle = "Opens the system screen: Android does not let an app switch it",
+                            title = words(R.string.gaming_airplane_mode),
+                            subtitle = words(R.string.gaming_opens_the_system_screen_android_does),
                             state = controls.airplaneModeOn(context),
                             run = { ctx -> SettingsLaunch.start(ctx, controls.airplaneModeSettingsIntent()) },
                         ),
@@ -888,7 +889,7 @@ object GamingSettingsCatalog {
                     add(
                         AsyncActionItem(
                             id = ID_SYSTEM_SLEEP,
-                            title = "Sleep",
+                            title = words(R.string.gaming_sleep),
                             run = { _, _ -> PowerAction.SLEEP.run(dev.droidtop.runtime.tasks.TaskManager.shell) },
                         ),
                     )
@@ -897,7 +898,7 @@ object GamingSettingsCatalog {
                     add(
                         AsyncActionItem(
                             id = ID_SYSTEM_SLEEP,
-                            title = "Sleep",
+                            title = words(R.string.gaming_sleep),
                             value = "Power button",
                             run = { _, _ -> "Press the power button to sleep. With More controls set up, droidtop can do it from here" },
                         ),
@@ -911,7 +912,7 @@ object GamingSettingsCatalog {
                     add(
                         AsyncActionItem(
                             id = ID_SYSTEM_POWER_MENU,
-                            title = "Power menu",
+                            title = words(R.string.gaming_power_menu),
                             run = { _, _ ->
                                 val out = dev.droidtop.runtime.tasks.TaskManager.shell
                                     .exec(listOf("input", "keyevent", "--longpress", "KEYCODE_POWER"))
@@ -925,7 +926,7 @@ object GamingSettingsCatalog {
                     add(
                         AsyncActionItem(
                             id = ID_SYSTEM_POWER_OFF,
-                            title = "Power off",
+                            title = words(R.string.gaming_power_off),
                             confirmTitle = "Power off?",
                             run = { _, _ -> PowerAction.POWER_OFF.run(dev.droidtop.runtime.tasks.TaskManager.shell) },
                         ),
@@ -933,7 +934,7 @@ object GamingSettingsCatalog {
                     add(
                         AsyncActionItem(
                             id = ID_SYSTEM_RESTART,
-                            title = "Restart",
+                            title = words(R.string.gaming_restart),
                             confirmTitle = "Restart?",
                             run = { _, _ -> PowerAction.RESTART.run(dev.droidtop.runtime.tasks.TaskManager.shell) },
                         ),
@@ -944,8 +945,8 @@ object GamingSettingsCatalog {
                 add(
                     ActionItem(
                         id = ID_AUDIO_OUTPUT,
-                        title = "Audio output",
-                        subtitle = "Opens Android's output switcher",
+                        title = words(R.string.gaming_audio_output),
+                        subtitle = words(R.string.gaming_opens_android_s_output_switcher),
                         run = { ctx -> SettingsLaunch.start(ctx, controls.audioOutputIntent()) },
                     ),
                 )
@@ -955,15 +956,15 @@ object GamingSettingsCatalog {
         ),
         CatalogGroup(
             id = GROUP_OTHER_SHELLS,
-            title = "Other shells",
+            title = words(R.string.gaming_other_shells),
             icon = CatalogIcon.MODES,
             // With the modes: each mode's own settings page sits beside the modes themselves.
             category = "Modes",
             items = listOf(
                 NestedScreenItem(
                     id = ID_DESKTOP_SETTINGS,
-                    title = "Desktop mode",
-                    subtitle = "Settings for the Desktop shell",
+                    title = words(R.string.gaming_desktop_mode),
+                    subtitle = words(R.string.gaming_settings_for_the_desktop_shell),
                     registryId = "desktop_settings",
                     icon = CatalogIcon.DESKTOP,
                 ),
@@ -971,8 +972,8 @@ object GamingSettingsCatalog {
                     id = ID_STANDARD_SETTINGS,
                     // Named for its mode, as Desktop's row beside it is; the page it opens is titled Settings
                     // (Droidtop/tracker#827 F0: "Home settings" is renamed Settings).
-                    title = "Mobile mode",
-                    subtitle = "Mobile mode's home screen, icons and app drawer",
+                    title = words(R.string.gaming_mobile_mode),
+                    subtitle = words(R.string.gaming_mobile_mode_s_home_screen_icons),
                     fragmentClassName = "app.murinelauncher.settings.SettingsRootFragment",
                     icon = CatalogIcon.STANDARD,
                 ),
@@ -982,7 +983,7 @@ object GamingSettingsCatalog {
 
     private fun defaultSectionItem(context: Context) = ChoiceItem(
         id = ID_DEFAULT_SECTION,
-        title = "Default section",
+        title = words(R.string.gaming_default_section),
         // Home, Gaming's two game tabs (docs/SPEC.md 7i, 2026-10-01) and Apps.
         options = listOf(
             ChoiceOption("home", "Home"), ChoiceOption("pc", "PC Games"),
@@ -996,8 +997,8 @@ object GamingSettingsCatalog {
 
     private fun showHintsItem(context: Context) = ToggleItem(
         id = ID_SHOW_HINTS,
-        title = "Show button hints",
-        subtitle = "Show the A/B/Y button legend at the bottom of the Gaming shell",
+        title = words(R.string.gaming_show_button_hints),
+        subtitle = words(R.string.gaming_show_the_a_b_y_button),
         current = CatalogPrefs.prefs(context).getBoolean(ID_SHOW_HINTS, true),
         onToggle = { ctx, value ->
             CatalogPrefs.prefs(ctx).edit().putBoolean(ID_SHOW_HINTS, value).apply()
@@ -1011,8 +1012,8 @@ object GamingSettingsCatalog {
      */
     private fun animationsItem(context: Context) = ToggleItem(
         id = ID_ANIMATIONS,
-        title = "Animations",
-        subtitle = "Focus, panels and pages move; off, every change is instant",
+        title = words(R.string.gaming_animations),
+        subtitle = words(R.string.gaming_focus_panels_and_pages_move_off),
         current = animationsOn(context),
         onToggle = { ctx, value ->
             CatalogPrefs.prefs(ctx).edit().putBoolean(ID_ANIMATIONS, value).apply()
@@ -1030,8 +1031,8 @@ object GamingSettingsCatalog {
      */
     fun navigationSoundsItem(context: Context) = SliderItem(
         id = ID_NAVIGATION_SOUNDS,
-        title = "Navigation sounds",
-        subtitle = "Sounds for moving, choosing, going back, menus and launching, the theme's where it has any",
+        title = words(R.string.gaming_navigation_sounds),
+        subtitle = words(R.string.gaming_sounds_for_moving_choosing_going_back),
         min = 0,
         max = NAVIGATION_SOUNDS_MAX,
         current = navigationSoundsVolume(context),
@@ -1092,7 +1093,7 @@ object GamingSettingsCatalog {
         return ToggleItem(
             id = id,
             title = title,
-            subtitle = "Switches $title",
+            subtitle = words(R.string.gaming_switches_x, title),
             current = controls.radioOn(context, radio) == true,
             onToggle = { ctx, on ->
                 // Never a switch that silently does nothing (tracker#581): when Android did not end up in the state
@@ -1132,8 +1133,8 @@ object GamingSettingsCatalog {
         val decision = dev.droidtop.runtime.power.PowerController.decide(context, game)
         return AsyncActionItem(
             id = ID_PERFORMANCE_MODE,
-            title = "Power",
-            subtitle = "How hard the game in front runs: Auto, Saver, Standard or Performance",
+            title = words(R.string.gaming_power),
+            subtitle = words(R.string.gaming_how_hard_the_game_in_front),
             value = powerValue(pick, auto, decision),
             run = { ctx, onStatus ->
                 onStatus("Setting...")
@@ -1183,8 +1184,8 @@ object GamingSettingsCatalog {
      */
     fun privacyDashboardItem(): ActionItem = ActionItem(
         id = ID_PRIVACY_DASHBOARD,
-        title = "Privacy dashboard",
-        subtitle = "Which apps used the camera, microphone or location lately, in Android's own screen",
+        title = words(R.string.gaming_privacy_dashboard),
+        subtitle = words(R.string.gaming_which_apps_used_the_camera_microphone),
         run = { ctx ->
             val dashboard = Intent("android.intent.action.REVIEW_PERMISSION_USAGE").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val fallback = Intent(android.provider.Settings.ACTION_PRIVACY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1227,12 +1228,12 @@ object GamingSettingsCatalog {
             val name = COMPANION_MODE_NAMES.getValue(mode)
             NestedScreenItem(
                 id = "companion_tabs_$mode",
-                title = "In $name",
-                subtitle = "The tabs on the companion's bar in $name, and the one it opens on",
+                title = words(R.string.gaming_in_x, name),
+                subtitle = words(R.string.gaming_the_tabs_on_the_companion_s, name),
                 valueLabel = { _ -> names(CompanionPrefs.settings.value.chosen(mode)) },
                 inline = CatalogScreen(
                     id = "companion_tabs_$mode",
-                    title = "Companion in $name",
+                    title = words(R.string.gaming_companion_in_x, name),
                     groups = { ctx ->
                         CompanionPrefs.load(ctx)
                         val now = CompanionPrefs.settings.value
@@ -1244,12 +1245,12 @@ object GamingSettingsCatalog {
                         listOf(
                             CatalogGroup(
                                 id = "companion_tabs_${mode}_bar",
-                                title = "Tabs on the bar",
+                                title = words(R.string.gaming_tabs_on_the_bar),
                                 items = (0 until CompanionPrefs.MAX_CHOSEN).map { slot ->
                                     ChoiceItem(
                                         id = "companion_tab_${mode}_$slot",
-                                        title = "Tab ${slot + 1}",
-                                        subtitle = "Tabs not on the bar are under More; Game joins the bar while a game runs",
+                                        title = words(R.string.gaming_tab_x, slot + 1),
+                                        subtitle = words(R.string.gaming_tabs_not_on_the_bar_are),
                                         options = listOf(ChoiceOption("", "None")) + modeTabOptions,
                                         current = chosen.getOrNull(slot).orEmpty(),
                                         onSelect = { c, value ->
@@ -1268,8 +1269,8 @@ object GamingSettingsCatalog {
                                 items = listOf(
                                     ChoiceItem(
                                         id = "companion_opening_$mode",
-                                        title = "Opening tab",
-                                        subtitle = "The tab the companion shows when it appears",
+                                        title = words(R.string.gaming_opening_tab),
+                                        subtitle = words(R.string.gaming_the_tab_the_companion_shows_when),
                                         options = listOf(
                                             ChoiceOption(
                                                 CompanionPrefs.OPEN_DEFAULT,
@@ -1289,12 +1290,12 @@ object GamingSettingsCatalog {
         }
         return CatalogGroup(
             id = ControlAccess.GROUP_COMPANION,
-            title = "Tabs",
+            title = words(R.string.gaming_tabs),
             items = perMode + listOf(
                 ChoiceItem(
                     id = "companion_game_start",
-                    title = "When a game starts",
-                    subtitle = "Which tab the companion turns to when you start a game from its Home",
+                    title = words(R.string.gaming_when_a_game_starts),
+                    subtitle = words(R.string.gaming_which_tab_the_companion_turns_to),
                     options = listOf(
                         ChoiceOption(CompanionPrefs.GAME_START_RUNNER, "Game, or Input for streams (default)"),
                         ChoiceOption(CompanionPrefs.GAME_START_NONE, "Stay where it is"),
@@ -1304,35 +1305,35 @@ object GamingSettingsCatalog {
                 ),
                 ToggleItem(
                     id = "companion_pip",
-                    title = "Picture-in-picture on the companion",
-                    subtitle = "A video shrunk on the main screen plays on the companion instead. Needs More controls",
+                    title = words(R.string.gaming_picture_in_picture_on_the_companion),
+                    subtitle = words(R.string.gaming_a_video_shrunk_on_the_main),
                     current = settings.pipToCompanion,
                     onToggle = { c, on -> CompanionPrefs.setPipToCompanion(c, on) },
                 ),
                 ToggleItem(
                     id = "companion_ask_stopping",
-                    title = "Ask before stopping",
-                    subtitle = "Quit, Restart, Kill, Stop and Clear all ask first, on the companion and in the Quick Menu",
+                    title = words(R.string.gaming_ask_before_stopping),
+                    subtitle = words(R.string.gaming_quit_restart_kill_stop_and_clear),
                     current = settings.askBeforeStopping,
                     onToggle = { c, on -> CompanionPrefs.setAskBeforeStopping(c, on) },
                 ),
                 ToggleItem(
                     id = "companion_ask_load",
-                    title = "Ask before load and overwrite",
-                    subtitle = "Loading a save state or saving over a filled slot asks first",
+                    title = words(R.string.gaming_ask_before_load_and_overwrite),
+                    subtitle = words(R.string.gaming_loading_a_save_state_or_saving),
                     current = settings.askBeforeLoad,
                     onToggle = { c, on -> CompanionPrefs.setAskBeforeLoad(c, on) },
                 ),
                 NestedScreenItem(
                     id = "companion_trackpad",
-                    title = "Trackpad",
-                    subtitle = "How the companion's Input trackpad moves, clicks and scrolls",
+                    title = words(R.string.gaming_trackpad),
+                    subtitle = words(R.string.gaming_how_the_companion_s_input_trackpad),
                     inline = trackpadScreen(),
                 ),
                 ChoiceItem(
                     id = "companion_idle",
-                    title = "Dim the companion screen",
-                    subtitle = "With no input it dims after this, and its backlight 3 minutes later. Chats keep it on",
+                    title = words(R.string.gaming_dim_the_companion_screen),
+                    subtitle = words(R.string.gaming_with_no_input_it_dims_after),
                     options = dev.droidtop.runtime.CompanionIdle.DIM_CHOICES_MS.map {
                         ChoiceOption(it.toString(), dev.droidtop.runtime.CompanionIdle.dimLabel(it))
                     },
@@ -1341,16 +1342,16 @@ object GamingSettingsCatalog {
                 ),
                 ChoiceItem(
                     id = "companion_wake",
-                    title = "Wake the companion screen",
-                    subtitle = "What turns the companion screen back on once it is off",
+                    title = words(R.string.gaming_wake_the_companion_screen),
+                    subtitle = words(R.string.gaming_what_turns_the_companion_screen_back),
                     options = dev.droidtop.runtime.CompanionIdle.Wake.entries.map { ChoiceOption(it.key, it.label) },
                     current = settings.wake,
                     onSelect = { c, value -> CompanionPrefs.setWake(c, value) },
                 ),
                 ChoiceItem(
                     id = "companion_handle_edge",
-                    title = "Show tabs handle",
-                    subtitle = "Input fills the companion screen; the handle that brings the tabs back sits on this edge",
+                    title = words(R.string.gaming_show_tabs_handle),
+                    subtitle = words(R.string.gaming_input_fills_the_companion_screen_the),
                     options = listOf(
                         ChoiceOption(CompanionPrefs.HANDLE_BOTTOM, "Bottom (default)"),
                         ChoiceOption(CompanionPrefs.HANDLE_TOP, "Top"),
@@ -1360,8 +1361,8 @@ object GamingSettingsCatalog {
                 ),
                 ChoiceItem(
                     id = "companion_low_battery",
-                    title = "Low battery line",
-                    subtitle = "A line on the companion's Home at this level, with battery saver one tap away",
+                    title = words(R.string.gaming_low_battery_line),
+                    subtitle = words(R.string.gaming_a_line_on_the_companion_s),
                     options = listOf(ChoiceOption("0", "Off (default)")) +
                         listOf(10, 15, 20, 30).map { ChoiceOption(it.toString(), "At $it%") },
                     current = settings.lowBattery.toString(),
@@ -1369,16 +1370,16 @@ object GamingSettingsCatalog {
                 ),
                 ChoiceItem(
                     id = "companion_message_text",
-                    title = "Show message text",
-                    subtitle = "Whether notifications on the companion show what a message says, or only who sent it",
+                    title = words(R.string.gaming_show_message_text),
+                    subtitle = words(R.string.gaming_whether_notifications_on_the_companion_show),
                     options = dev.droidtop.runtime.systemstatus.NotificationRows.MessageText.entries.map { ChoiceOption(it.key, it.label) },
                     current = settings.messageText,
                     onSelect = { c, value -> CompanionPrefs.setMessageText(c, value) },
                 ),
                 ActionItem(
                     id = "companion_reset",
-                    title = "Reset the companion to defaults",
-                    subtitle = "Puts the bar, the opening tab, the pins and the tips back as they came",
+                    title = words(R.string.gaming_reset_the_companion_to_defaults),
+                    subtitle = words(R.string.gaming_puts_the_bar_the_opening_tab),
                     confirmTitle = "Reset the companion?",
                     run = { c -> CompanionPrefs.reset(c); PinnedControls.reset(c) },
                 ),
@@ -1392,7 +1393,7 @@ object GamingSettingsCatalog {
      */
     private fun trackpadScreen(): CatalogScreen = CatalogScreen(
         id = "companion_trackpad",
-        title = "Trackpad",
+        title = words(R.string.gaming_trackpad),
         groups = { ctx ->
             CompanionPrefs.load(ctx)
             val t = CompanionPrefs.settings.value.trackpad
@@ -1411,8 +1412,8 @@ object GamingSettingsCatalog {
                     items = listOf(
                         SliderItem(
                             id = "companion_trackpad_speed",
-                            title = "Pointer speed",
-                            subtitle = "How far the pointer moves for the same finger movement",
+                            title = words(R.string.gaming_pointer_speed),
+                            subtitle = words(R.string.gaming_how_far_the_pointer_moves_for),
                             min = -10,
                             max = 10,
                             current = t.speed,
@@ -1421,16 +1422,16 @@ object GamingSettingsCatalog {
                         toggle("tap", "Tap to click", "A tap clicks, and tap then hold drags", t.tapToClick) { s, on -> s.copy(tapToClick = on) },
                         ChoiceItem(
                             id = "companion_trackpad_tap_ms",
-                            title = "Tap time",
-                            subtitle = "How long a touch can last and still count as a tap",
+                            title = words(R.string.gaming_tap_time),
+                            subtitle = words(R.string.gaming_how_long_a_touch_can_last),
                             options = listOf(120, 180, 250, 350).map { ChoiceOption(it.toString(), if (it == 180) "$it ms (default)" else "$it ms") },
                             current = t.tapMs.toString(),
                             onSelect = { c, value -> CompanionPrefs.setTrackpad(c) { it.copy(tapMs = value.toIntOrNull() ?: 180) } },
                         ),
                         ChoiceItem(
                             id = "companion_trackpad_drag_ms",
-                            title = "Hold to drag",
-                            subtitle = "How soon after a tap your finger must come back down to drag instead of clicking",
+                            title = words(R.string.gaming_hold_to_drag),
+                            subtitle = words(R.string.gaming_how_soon_after_a_tap_your),
                             options = listOf(200, 300, 500).map { ChoiceOption(it.toString(), if (it == 300) "$it ms (default)" else "$it ms") },
                             current = t.dragWindowMs.toString(),
                             onSelect = { c, value -> CompanionPrefs.setTrackpad(c) { it.copy(dragWindowMs = value.toIntOrNull() ?: 300) } },
@@ -1472,7 +1473,7 @@ object GamingSettingsCatalog {
             val kind = if (facts.screenClass == dev.droidtop.runtime.ScreenClass.BUILT_IN) "Built-in" else "External"
             TextInputItem(
                 id = "screen_name_${output.uniqueId}",
-                title = "Name: ${names[output.androidDisplayId] ?: output.name}",
+                title = words(R.string.gaming_name_x, names[output.androidDisplayId] ?: output.name),
                 subtitle = "$kind, Android calls it \"${output.name.ifBlank { "display ${output.androidDisplayId}" }}\". " +
                     "Leave empty for droidtop's own name",
                 value = custom[output.uniqueId].orEmpty(),
@@ -1483,11 +1484,11 @@ object GamingSettingsCatalog {
 
     private fun screensaverItem(context: Context) = ChoiceItem(
         id = ID_SCREENSAVER,
-        title = "Screensaver",
+        title = words(R.string.gaming_screensaver),
         // Android's own screen timeout still turns the
         // panel off, and it wins when it is the shorter
         // (docs/SPEC.md 7f, "Screensaver").
-        subtitle = "Library artwork",
+        subtitle = words(R.string.gaming_library_artwork),
         options = ScreensaverMode.entries.map { ChoiceOption(it.name, it.label) },
         current = ScreensaverPrefs.mode(context).name,
         onSelect = { ctx, value ->
@@ -1502,7 +1503,7 @@ object GamingSettingsCatalog {
     // on its own while a game runs, unless the person asks for Android's timer.
     private fun gameAwakeItem(context: Context) = ChoiceItem(
         id = ID_GAME_AWAKE,
-        title = "While a game runs",
+        title = words(R.string.gaming_while_a_game_runs),
         subtitle = null,
         options = GameAwakeMode.entries.map { ChoiceOption(it.name, it.label) },
         current = GameAwakePrefs.mode(context).name,
@@ -1520,7 +1521,7 @@ object GamingSettingsCatalog {
             add(
                 ToggleItem(
                     id = dev.droidtop.runtime.keyboard.AddonKeyboard.KEY_ANDROID_KEYBOARD,
-                    title = "Android keyboard on second screen",
+                    title = words(R.string.gaming_android_keyboard_on_second_screen),
                     current = dev.droidtop.runtime.keyboard.AddonKeyboard.androidKeyboardOnSecondScreen(context),
                     onToggle = { ctx, value -> dev.droidtop.runtime.keyboard.AddonKeyboard.setAndroidKeyboardOnSecondScreen(ctx, value) },
                 ),
@@ -1531,7 +1532,7 @@ object GamingSettingsCatalog {
         add(
             ChoiceItem(
                 id = ID_DISPLAY_KEYBOARD_PLACEMENT,
-                title = "Keyboard displays on",
+                title = words(R.string.gaming_keyboard_displays_on),
                 options = dev.droidtop.runtime.keyboard.KeyboardPlacement.entries.map { ChoiceOption(it.key, it.label) },
                 current = keyboard.placement.value.key,
                 onSelect = { ctx, value -> keyboard.setPlacement(ctx, dev.droidtop.runtime.keyboard.KeyboardPlacement.fromKey(value)) },
@@ -1543,11 +1544,11 @@ object GamingSettingsCatalog {
                 id = ID_DISPLAY_COMPANION,
                 // Its category's name in the Settings column ("Companion screen", CATEGORY_ORDER); every category
                 // has an icon (Droidtop/tracker#676).
-                title = "Companion screen",
+                title = words(R.string.gaming_companion_screen),
                 icon = CatalogIcon.DISPLAY,
                 inline = CatalogScreen(
                     id = ID_DISPLAY_COMPANION,
-                    title = "Companion",
+                    title = words(R.string.gaming_companion),
                     groups = { ctx ->
                         keyboard.load(ctx)
                         CompanionHomePrefs.load(ctx)
@@ -1559,11 +1560,11 @@ object GamingSettingsCatalog {
                             // The companion screen's own orientation lock, apart from each mode's (tracker#213).
                             CatalogGroup(
                                 id = "${ID_DISPLAY_COMPANION}_screen",
-                                title = "Screen",
+                                title = words(R.string.gaming_screen),
                                 items = listOf(
                                     ToggleItem(
                                         id = CompanionOrientation.KEY_LOCK_LANDSCAPE,
-                                        title = "Lock to landscape",
+                                        title = words(R.string.gaming_lock_to_landscape),
                                         current = CompanionOrientation.lockLandscape(ctx),
                                         onToggle = { c, on -> CompanionOrientation.setLockLandscape(c, on) },
                                     ),
@@ -1572,7 +1573,7 @@ object GamingSettingsCatalog {
                             // Which sections the companion's Home shows; folding one is done on Home itself.
                             CatalogGroup(
                                 id = "${ID_DISPLAY_COMPANION}_home",
-                                title = "Home",
+                                title = words(R.string.gaming_home),
                                 items = CompanionHomeSection.entries.map { section ->
                                     ToggleItem(
                                         id = CompanionHomePrefs.itemId(section),
@@ -1587,11 +1588,11 @@ object GamingSettingsCatalog {
                             ),
                             CatalogGroup(
                                 id = "${ID_DISPLAY_COMPANION}_keyboard",
-                                title = "Keyboard",
+                                title = words(R.string.gaming_keyboard),
                                 items = listOf(
                                     ToggleItem(
                                         id = keyboard.KEY_COMPANION_HOSTS,
-                                        title = "Keyboard for the other screen",
+                                        title = words(R.string.gaming_keyboard_for_the_other_screen),
                                         current = keyboard.companionHostsKeyboard.value,
                                         onToggle = { c, on -> keyboard.setCompanionHostsKeyboard(c, on) },
                                     ),
@@ -1610,7 +1611,7 @@ object GamingSettingsCatalog {
         add(
             ActionItem(
                 id = ID_DISPLAY_KEYBOARD,
-                title = "Keyboard for apps on second screen",
+                title = words(R.string.gaming_keyboard_for_apps_on_second_screen),
                 value = state.label,
                 run = { ctx ->
                     if (state == dev.droidtop.runtime.keyboard.AppsKeyboard.NEEDS_OVERLAY) {
@@ -1629,7 +1630,7 @@ object GamingSettingsCatalog {
         add(
             ActionItem(
                 id = ID_DISPLAY_KEYBOARD_ACCESSIBILITY,
-                title = "Accessibility keyboard and pointer",
+                title = words(R.string.gaming_accessibility_keyboard_and_pointer),
                 value = if (accessibility) "On" else "Off",
                 run = { ctx -> dev.droidtop.runtime.keyboard.AccessibilityKeyboard.openSettings(ctx) },
             ),
@@ -1649,7 +1650,7 @@ object GamingSettingsCatalog {
 
     private fun displayGameLaunchTargetItem(context: Context) = ChoiceItem(
         id = ID_DISPLAY_GAME_LAUNCH_TARGET,
-        title = "Games launch on",
+        title = words(R.string.gaming_games_launch_on),
         options = listOf(
             ChoiceOption("ASK", "Ask every time (default)"),
             ChoiceOption("FOLLOW_SHELL", "Same display as the shell"),
@@ -1678,7 +1679,7 @@ object GamingSettingsCatalog {
         val themes = ThemeAssets.discoverThemes(context)
         return ChoiceItem(
             id = ID_THEME,
-            title = "Theme",
+            title = words(R.string.gaming_theme),
             options = themes.map { ChoiceOption(it.name, ThemeAssets.displayName(context, it)) },
             current = ThemeAssets.activeThemeName(context),
             onSelect = { ctx, value -> ThemePrefs.set(ctx, value) },
@@ -1698,7 +1699,7 @@ object GamingSettingsCatalog {
         // a named scheme is the person's own choice and is drawn as the theme wrote it, whatever the appearance.
         return ChoiceItem(
             id = ID_THEME_COLOR_SCHEME,
-            title = "Theme color scheme",
+            title = words(R.string.gaming_theme_color_scheme),
             options = listOf(ChoiceOption(SCHEME_AUTOMATIC, "Automatic (matches Light or dark)")) +
                 schemes.map { ChoiceOption(it, caps.colorSchemeLabels[it] ?: it) },
             current = ThemePrefs.colorScheme(context, themeName) ?: SCHEME_AUTOMATIC,
@@ -1713,7 +1714,7 @@ object GamingSettingsCatalog {
         if (variants.size <= 1) return null
         return ChoiceItem(
             id = ID_THEME_VARIANT,
-            title = "Theme variant",
+            title = words(R.string.gaming_theme_variant),
             options = variants.map { ChoiceOption(it, caps.variantLabels[it] ?: it) },
             current = ThemePrefs.variant(context, themeName) ?: variants.first(),
             onSelect = { ctx, value -> ThemePrefs.setVariant(ctx, themeName, value) },
@@ -1740,8 +1741,8 @@ object GamingSettingsCatalog {
         if (ratios.isEmpty()) return null
         return ChoiceItem(
             id = ID_THEME_ASPECT_RATIO,
-            title = "Theme aspect ratio",
-            subtitle = "Automatic follows the screen the app is on",
+            title = words(R.string.gaming_theme_aspect_ratio),
+            subtitle = words(R.string.gaming_automatic_follows_the_screen_the_app),
             options = ratios.map { ChoiceOption(it, EsDeAspectRatio.labelFor(it)) },
             current = ThemePrefs.aspectRatio(context, themeName) ?: ratios.first(),
             onSelect = { ctx, value -> ThemePrefs.setAspectRatio(ctx, themeName, value) },
@@ -1758,8 +1759,8 @@ object GamingSettingsCatalog {
         if (packs.size <= 1) return null
         return ChoiceItem(
             id = ID_ICON_PACK,
-            title = "Icon pack",
-            subtitle = "App icons in Apps and on Mobile's home screen",
+            title = words(R.string.gaming_icon_pack),
+            subtitle = words(R.string.gaming_app_icons_in_apps_and_on),
             options = packs.map { (pack, label) -> ChoiceOption(pack, label) },
             current = source.selected(context),
             onSelect = { ctx, pack -> source.select(ctx, pack) },
@@ -1768,8 +1769,8 @@ object GamingSettingsCatalog {
 
     private fun appsGridColumnsItem(context: Context) = SliderItem(
         id = ID_APPS_GRID_COLUMNS,
-        title = "Apps grid columns",
-        subtitle = "Icon density for the Apps tab, independent of the launcher app drawer's own grid width",
+        title = words(R.string.gaming_apps_grid_columns),
+        subtitle = words(R.string.gaming_icon_density_for_the_apps_tab),
         min = MIN_APPS_GRID_COLUMNS,
         max = MAX_APPS_GRID_COLUMNS,
         current = CatalogPrefs.prefs(context).getInt(ID_APPS_GRID_COLUMNS, DEFAULT_APPS_GRID_COLUMNS),
@@ -1789,8 +1790,8 @@ object GamingSettingsCatalog {
      */
     fun rescanLibraryItem(): AsyncActionItem = AsyncActionItem(
         id = ID_RESCAN_LIBRARY,
-        title = "Rescan library",
-        subtitle = "Look for new or changed games and apps again",
+        title = words(R.string.gaming_rescan_library),
+        subtitle = words(R.string.gaming_look_for_new_or_changed_games),
         // One action wherever the row is: it says it started, how far it
         // is, and what it found when it finished (LibraryRescan). Selected
         // again while it runs, it stops the rescan instead of starting a
@@ -1808,7 +1809,7 @@ object GamingSettingsCatalog {
     fun rescanPcFoldersItem(): AsyncActionItem = AsyncActionItem(
         id = ID_RESCAN_PC_FOLDERS,
         title = RESCAN_PC_FOLDERS,
-        subtitle = "Looks in your game folders for new or changed PC and engine games, not console folders",
+        subtitle = words(R.string.gaming_looks_in_your_game_folders_for),
         run = { ctx, onStatus ->
             if (LibraryRescan.cancel()) "Cancelling the rescan\u2026" else LibraryRescan.runPcFolders(ctx, onStatus)
         },
@@ -1869,7 +1870,7 @@ private fun interfaceSizeItem(context: Context, role: dev.droidtop.runtime.Displ
     return ChoiceItem(
         id = size.key(role),
         title = if (main) "Interface size, main screen" else "Interface size, companion screen",
-        subtitle = "Text and layout together. Auto fits what the screen reports",
+        subtitle = words(R.string.gaming_text_and_layout_together_auto_fits),
         options = listOf(ChoiceOption(size.AUTO, "Auto")) + size.PERCENTS.map { ChoiceOption(it.toString(), "$it%") },
         current = size.value(context, role),
         onSelect = { ctx, value -> size.set(ctx, role, value) },
