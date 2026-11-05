@@ -11679,7 +11679,9 @@ pictures and record video?"); it never shows a manifest string. droidtop does th
 - a risk is said in the Danger tone, plainly, in the sheet and in any hint; it is never the default or focused
   choice.
 
-**8. Built on one model** (R1): a requirement has a stable id, a kind (Android access, Home role, More controls,
+**8. Built on one model** (R1, built: `dev.droidtop.runtime.requirements`, `Requirement`, `Requirements`,
+`AndroidAccess` for the table below and the Home role and the Wi-Fi name; the companion's Privacy grant list reads its
+checks; the features' own rows move onto it in R2 and after, deleting their wording): a requirement has a stable id, a kind (Android access, Home role, More controls,
 plugin, download, files, account), the feature that needs it, the one-line effect, a cheap check run off the main
 thread into one snapshot that every list reads (no list touches the disk), a fix route and a way back. Every
 check, fix and removal writes one log line, tag `droidtop.requirements`. Hints come from the shared hint component

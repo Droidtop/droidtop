@@ -78,12 +78,9 @@ object PrivacyAccess {
 
     fun droidtopGrants(context: Context): List<Grant> {
         val pkg = context.packageName
-        val appOps = context.getSystemService(AppOpsManager::class.java)
-        @Suppress("DEPRECATION")
-        val usage = runCatching {
-            appOps?.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), pkg) == AppOpsManager.MODE_ALLOWED
-        }.getOrDefault(false)
-        val listener = NotificationsStore.isGranted(context)
+        // The one check per grant is the requirement's (Droidtop/tracker#830 R1); this list reads it.
+        val usage = dev.droidtop.runtime.requirements.Requirements.isMet(context, dev.droidtop.runtime.requirements.AndroidAccess.USAGE)
+        val listener = dev.droidtop.runtime.requirements.Requirements.isMet(context, dev.droidtop.runtime.requirements.AndroidAccess.NOTIFICATIONS)
         val accessibility = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
             ?.split(':')?.any { it.startsWith("$pkg/") } == true
         val bluetooth = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
