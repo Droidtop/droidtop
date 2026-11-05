@@ -158,6 +158,8 @@
     <string name="gamepad_scrape_all_systems">Scrape all systems</string>
     <string name="gamepad_scrape_x">Scrape %1$s</string>
     <string name="gamepad_games">Games</string>
+    <string name="gamepad_spoken_favourite">favourite</string>
+    <string name="gamepad_spoken_position">%1$d of %2$d</string>
     <string name="gamepad_sources_unreachable">Could not reach your sources</string>
     <string name="gamepad_sources_unreachable_line">Check the connection, then try again</string>
     <string name="gamepad_bring_back_saves_from_x">Bring back saves from %1$s</string>

@@ -664,6 +664,7 @@ private fun EsDeCarousel(
     BoxWithConstraints(
         modifier = (if (firstItemFocus != null) modifier.focusRequester(firstItemFocus) else modifier)
             .focusable()
+            .esDeSpokenList(items, focusedIndex)
             // Swipe moves the cursor the way the D-pad steps it. These
             // widgets own their cursor and move in whole entries rather
             // than scrolling, so Compose's own scroll gestures do not
@@ -1298,6 +1299,7 @@ private fun EsDeTextList(
     BoxWithConstraints(
         modifier = (if (firstItemFocus != null) modifier.focusRequester(firstItemFocus) else modifier)
             .focusable()
+            .esDeSpokenList(items, cursor)
             .clipToBounds()
             .esDeSwipeSteps(vertical = 1) { step(it) }
             .onPad(cadence = PadCadence.THEMED_LIST) { press ->
@@ -1599,6 +1601,7 @@ private fun EsDeGrid(
                 .fillMaxSize()
                 .then(if (firstItemFocus != null) Modifier.focusRequester(firstItemFocus) else Modifier)
                 .focusable()
+                .esDeSpokenList(items, cursor)
                 // A grid takes horizontal drags as columns and vertical
                 // ones as whole rows, the same two meanings its own
                 // Left/Right and Up/Down have.
