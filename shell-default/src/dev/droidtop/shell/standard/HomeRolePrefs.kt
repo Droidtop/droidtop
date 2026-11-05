@@ -17,9 +17,8 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * `com.android.launcher3.Launcher` once it decides Standard is the
  * target, docs/SPEC.md 2c) or [AlternativeLauncherActivity] (Alternative,
  * which forwards to a different installed launcher). Exactly one is ever
- * enabled at a time, mirroring `farmerbb/Taskbar`'s own real, shipping
- * `HomeActivity`/`HSLActivity` toggle (verified against its actual source
- * this session) — `PackageManager.setComponentEnabledSetting` overrides
+ * enabled at a time, as `farmerbb/Taskbar` toggles its own
+ * `HomeActivity`/`HSLActivity` — `PackageManager.setComponentEnabledSetting` overrides
  * the manifest's default `android:enabled` value at runtime, so both real
  * activities stay declared normally in the manifest and this is the only
  * thing that decides which one Android actually offers as a HOME
