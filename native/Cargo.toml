@@ -20,6 +20,9 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # Identity, pairing, the channel, the protocol and the sync rules: Droidtop/lib-sync.
 droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.1" }
+# The person's own shares (Droidtop/tracker#573): Droidtop/lib-net's share client, WebDAV and the backends to come.
+# Pinned by the lib-net commit that adds it (ci/remote) until it is released as v0.2.1, when this pin becomes that tag.
+net-remote = { git = "https://github.com/Droidtop/lib-net", rev = "5f447d92901734d20af12af5c64f66f83002fecf" }
 jni = { version = "0.21", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

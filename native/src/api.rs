@@ -30,6 +30,7 @@ use droidtop_agent_core::proto::{check_announcements, Announcements, GameRef, Re
 use droidtop_agent_core::saves::{prefix_roots, Roots};
 use droidtop_agent_core::savesync::{self, SaveSyncRequest, Side};
 use droidtop_agent_core::{hex, Error, PAIR_PORT, PORT};
+use net_remote::{Error as RemoteError, Remote, RemotePath, WebDav, WebDavConfig};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -71,6 +72,7 @@ pub fn call(op: &str, args: &str) -> String {
         "serve_stop" => serve_stop(),
         "share_library" => share_library(&args),
         "share_post_saves" => share_post_saves(&args),
+        "remote_test" => remote_test(&args),
         other => Err(Failure::Error(format!("unknown operation {other}"))),
     };
     match result {
@@ -78,6 +80,7 @@ pub fn call(op: &str, args: &str) -> String {
         Err(Failure::Error(m)) => error(&m),
         Err(Failure::Unreachable(m)) => json!({ "unreachable": m }).to_string(),
         Err(Failure::NotPaired(m)) => json!({ "error": m, "code": droidtop_agent_core::proto::NOT_PAIRED }).to_string(),
+        Err(Failure::Coded(code, m)) => json!({ "error": m, "code": code }).to_string(),
     }
 }
 
@@ -86,6 +89,8 @@ enum Failure {
     Unreachable(String),
     /// The computer answered as itself and said it no longer knows this device.
     NotPaired(String),
+    /// A failure droidtop tells apart by its code (a share's sign-in refused, an unencrypted address).
+    Coded(&'static str, String),
 }
 
 impl From<Error> for Failure {
@@ -638,6 +643,53 @@ fn share_post_saves(args: &Value) -> Outcome {
     let a: SavesArgs = serde_json::from_value(args.clone())?;
     let posted = savesync::post_to_share(&outbox, &key, &peer, &a.game, &a.roots(), &a.baseline)?;
     Ok(serde_json::to_value(posted)?)
+}
+
+// Shares --------------------------------------------------------------------
+//
+// The person's own shares that droidtop reaches itself, through lib-net's share
+// client (Droidtop/tracker#573), named in `share`:
+// `{"kind": "webdav", "url", "user", "password", "allow_plain_http"}`.
+
+/// The share named in [`args`]' `share`, or None when there is none.
+fn share_of(args: &Value) -> Result<Option<Box<dyn Remote>>, Failure> {
+    let share = &args["share"];
+    if share.is_null() {
+        return Ok(None);
+    }
+    let text = |k: &str| share[k].as_str().filter(|v| !v.is_empty()).map(str::to_string);
+    match share["kind"].as_str().unwrap_or_default() {
+        "webdav" => {
+            let url = text("url").ok_or_else(|| Failure::Coded("bad_address", "the share has no address".into()))?;
+            let mut config = WebDavConfig::new(url).allow_plain_http(share["allow_plain_http"].as_bool().unwrap_or(false));
+            if let Some(user) = text("user") {
+                config = config.sign_in(user, text("password").unwrap_or_default());
+            }
+            Ok(Some(Box::new(WebDav::new(config).map_err(remote_failure)?)))
+        }
+        other => Err(Failure::Error(format!("droidtop does not know shares of kind {other:?}"))),
+    }
+}
+
+/// A share's failure, with the code the settings row tells apart.
+fn remote_failure(e: RemoteError) -> Failure {
+    let message = e.to_string();
+    match e {
+        RemoteError::Unreachable(_) => Failure::Unreachable(message),
+        RemoteError::SignInRefused => Failure::Coded("sign_in_refused", message),
+        RemoteError::NotEncrypted => Failure::Coded("not_encrypted", message),
+        RemoteError::BadPath(_) => Failure::Coded("bad_address", message),
+        RemoteError::NotFound(_) => Failure::Coded("not_found", message),
+        RemoteError::Refused(_) => Failure::Coded("refused", message),
+        _ => Failure::Error(message),
+    }
+}
+
+/// Whether a share answers with the sign-in given: its top folder is listed. `{"entries": n}`.
+fn remote_test(args: &Value) -> Outcome {
+    let share = share_of(args)?.ok_or_else(|| Failure::Error("no share was given".into()))?;
+    let entries = share.list(&RemotePath::root()).map_err(remote_failure)?;
+    Ok(json!({ "entries": entries.len() }))
 }
 
 // Game folders ----------------------------------------------------------------
