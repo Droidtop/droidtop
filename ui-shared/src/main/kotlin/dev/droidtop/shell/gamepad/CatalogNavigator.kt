@@ -237,7 +237,6 @@ fun CatalogNavigator(
     // Y's Info sheet: the selected row's whole text. Rows show their
     // name and value; this is where the rest of it is.
     var infoRow by remember { mutableStateOf<CatalogItem?>(null) }
-    var pendingFolderPick by remember { mutableStateOf<FolderPickItem?>(null) }
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     // null until the one-time index build below lands: the search overlay
@@ -433,33 +432,11 @@ fun CatalogNavigator(
         selectionByDepth[depth] = index
     }
 
-    var pendingDocumentPick by remember { mutableStateOf<DocumentPickItem?>(null) }
-    val documentPickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val item = pendingDocumentPick
-        pendingDocumentPick = null
-        val uri = result.data?.data
-        if (uri == null || item == null) return@rememberLauncherForActivityResult
-        // onPicked reads or writes the document: never on the main thread.
-        statusById[item.id] = "Working..."
-        scope.launch {
-            statusById[item.id] = withContext(Dispatchers.IO) { item.onPicked(context, uri) }
-            refresh()
-        }
-    }
-
-    val folderPickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        val item = pendingFolderPick
-        pendingFolderPick = null
-        if (uri == null || item == null) return@rememberLauncherForActivityResult
-        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        statusById[item.id] = "Working..."
-        scope.launch {
-            val error = runCatching { item.onPicked(context, uri) }
-                .getOrElse { "Couldn't share that folder: ${it.message ?: "an unknown error"}" }
-            if (error != null) statusById[item.id] = error else statusById.remove(item.id)
-            refresh()
-        }
-    }
+    // The system's pickers, shared with the companion's catalog host (CatalogPickers).
+    val pickers = rememberCatalogPickers(
+        onStatus = { id, line -> if (line != null) statusById[id] = line else statusById.remove(id) },
+        onDone = { refresh() },
+    )
 
     fun pop() {
         stack.lastOrNull()?.onLeave?.invoke()
@@ -597,18 +574,14 @@ fun CatalogNavigator(
             }
             is SliderItem -> {}
             is TextInputItem -> editingText = item
-            is FolderPickItem -> {
-                pendingFolderPick = item
-                folderPickLauncher.launch(null)
-            }
+            is FolderPickItem -> pickers.pickFolder(item)
             is DocumentPickItem -> {
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
                     confirming = item
                     return
                 }
                 confirmArmedId = null
-                pendingDocumentPick = item
-                documentPickLauncher.launch(item.pickerIntent())
+                pickers.pickDocument(item)
             }
             is TextBlockItem, is PageHeaderItem -> {}
             is ButtonBarItem -> pressBar(item, barSlot)
@@ -1975,62 +1948,83 @@ fun TextEditDialog(
     // A search box: the keyboard's Search key runs it, the button says Search, and there is nothing to paste.
     search: Boolean = false,
 ) {
-    var value by remember(title, initial) { mutableStateOf(initial) }
     ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
-        Column(
-            Modifier
-                .clip(MenuTokens.OverlayShape)
-                .background(MenuTokens.OverlaySurface)
-                .padding(20.dp),
-        ) {
-            Text(title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
-            subtitle?.let {
-                Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+        TextEditPanel(title, subtitle, initial, onCommit, onDismiss, multiline = multiline, secret = secret, search = search)
+    }
+}
+
+/**
+ * [TextEditDialog]'s panel without the dialog window: the title, the field, droidtop's own keyboard where Android draws
+ * none, and Paste, Cancel and Save. A surface that cannot open a dialog window (the companion on a Presentation
+ * display, Droidtop/tracker#786 S2a2) draws it in place.
+ */
+@Composable
+fun TextEditPanel(
+    title: String,
+    subtitle: String?,
+    initial: String,
+    onCommit: (String) -> Unit,
+    onDismiss: () -> Unit,
+    multiline: Boolean = false,
+    secret: Boolean = false,
+    // A search box: the keyboard's Search key runs it, the button says Search, and there is nothing to paste.
+    search: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    var value by remember(title, initial) { mutableStateOf(initial) }
+    Column(
+        modifier
+            .clip(MenuTokens.OverlayShape)
+            .background(MenuTokens.OverlaySurface)
+            .padding(20.dp),
+    ) {
+        Text(title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
+        subtitle?.let {
+            Text(it, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = { value = it },
+            singleLine = !multiline,
+            // The keyboard's own Done key saves a one-line value: the
+            // on-screen keyboard can cover the dialog's Save button
+            // (rig, dq-desk2-02, a container rename in landscape).
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                imeAction = when {
+                    multiline -> androidx.compose.ui.text.input.ImeAction.Default
+                    search -> androidx.compose.ui.text.input.ImeAction.Search
+                    else -> androidx.compose.ui.text.input.ImeAction.Done
+                },
+                showKeyboardOnFocus = raisesKeyboardWithFocus,
+            ),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onCommit(value) }, onSearch = { onCommit(value) }),
+            visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+                .clip(Corners.Crisp)
+                .background(MenuTokens.SurfaceSelected)
+                .opensFocused("Text field")
+                .padding(12.dp),
+        )
+        // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).
+        OwnFieldKeyboard()
+        val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
+            if (!search) {
+                TextButton(
+                    onClick = { clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let { value = it } },
+                    modifier = Modifier.keepsFieldFocusOnTouch(),
+                ) { Text(stringResource(R.string.ui_shared_paste), color = MenuTokens.Accent) }
             }
-            BasicTextField(
-                value = value,
-                onValueChange = { value = it },
-                singleLine = !multiline,
-                // The keyboard's own Done key saves a one-line value: the
-                // on-screen keyboard can cover the dialog's Save button
-                // (rig, dq-desk2-02, a container rename in landscape).
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    imeAction = when {
-                        multiline -> androidx.compose.ui.text.input.ImeAction.Default
-                        search -> androidx.compose.ui.text.input.ImeAction.Search
-                        else -> androidx.compose.ui.text.input.ImeAction.Done
-                    },
-                    showKeyboardOnFocus = raisesKeyboardWithFocus,
-                ),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onCommit(value) }, onSearch = { onCommit(value) }),
-                visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp)
-                    .clip(Corners.Crisp)
-                    .background(MenuTokens.SurfaceSelected)
-                    .opensFocused("Text field")
-                    .padding(12.dp),
-            )
-            // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).
-            OwnFieldKeyboard()
-            val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
-                if (!search) {
-                    TextButton(
-                        onClick = { clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let { value = it } },
-                        modifier = Modifier.keepsFieldFocusOnTouch(),
-                    ) { Text(stringResource(R.string.ui_shared_paste), color = MenuTokens.Accent) }
-                }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDismiss, modifier = Modifier.keepsFieldFocusOnTouch()) {
-                    Text(stringResource(R.string.ui_shared_cancel), color = MenuTokens.OnSurfaceMuted)
-                }
-                TextButton(onClick = { onCommit(value) }, modifier = Modifier.keepsFieldFocusOnTouch()) {
-                    Text(if (search) "Search" else "Save", color = MenuTokens.Accent)
-                }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onDismiss, modifier = Modifier.keepsFieldFocusOnTouch()) {
+                Text(stringResource(R.string.ui_shared_cancel), color = MenuTokens.OnSurfaceMuted)
+            }
+            TextButton(onClick = { onCommit(value) }, modifier = Modifier.keepsFieldFocusOnTouch()) {
+                Text(if (search) "Search" else "Save", color = MenuTokens.Accent)
             }
         }
     }
