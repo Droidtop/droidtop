@@ -48,6 +48,10 @@ dependencies {
     // window, and a catalog row's picture (CatalogGlyph) is drawn by the image loader, as it was in :shell-gamepad.
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.coil.compose)
+    // StatusViews hosts the status readout in a window with no activity (Standard's taskbar, Droidtop/tracker#701): it
+    // gives the ComposeView its own lifecycle and saved state, as InGameOverlays does in :app.
+    implementation(libs.savedstate)
+    implementation(libs.savedstate.ktx)
     // The settings renderer (Droidtop/tracker#827 F1b part 4): CatalogNavigator takes Back through the activity's back
     // dispatcher and opens Android's folder and document pickers, as it did in :shell-gamepad.
     implementation(libs.androidx.activity.compose)
