@@ -52,7 +52,9 @@ class CompanionSheetActivity : AppCompatActivity() {
         val tray = intent?.getBooleanExtra(CompanionSheet.EXTRA_TRAY, false) == true
         val mode = if (tray) SecondaryDisplayContent.Mode.DESKTOP else SecondaryDisplayContent.Mode.STANDARD
         setContent {
-            dev.droidtop.app.ui.DroidtopTheme(gamingThemed = false) {
+            // Desktop's tray panel wears the Gaming theme as Desktop's chrome does; Standard's pull-down sheet keeps
+            // the colours outside Gaming (Droidtop/tracker#524, docs/SPEC.md 2b "One bar, in droidtop's look").
+            dev.droidtop.app.ui.DroidtopTheme(gamingThemed = tray) {
                 val context = LocalContext.current
                 LaunchedEffect(Unit) { withContext(Dispatchers.IO) { CompanionPrefs.load(context.applicationContext) } }
                 val settings by CompanionPrefs.settings.collectAsState()

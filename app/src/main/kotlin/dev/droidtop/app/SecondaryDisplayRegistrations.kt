@@ -68,7 +68,9 @@ object SecondaryDisplayRegistrations {
         // One tab host for every mode: Home is the companion, the input surface is the default tab
         // where the mode's role says so (Desktop by default), and Tasks, Performance and System are
         // beside them (docs/SPEC.md "The companion's tabs").
-        dev.droidtop.app.ui.DroidtopTheme {
+        // The companion beside Gaming or Desktop wears the theme the shell beside it does (its colours and typefaces),
+        // as CompanionActivity does; Standard's keeps the colours outside Gaming (Droidtop/tracker#524).
+        dev.droidtop.app.ui.DroidtopTheme(gamingThemed = mode != SecondaryDisplayContent.Mode.STANDARD) {
             CompanionTabs(mode) { CompanionSurfaceHost(settledFocusedEntry()) }
         }
     }
