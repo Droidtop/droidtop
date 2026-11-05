@@ -81,6 +81,10 @@ internal class EmojiBrowser(
 
     private fun select(id: String) {
         selected = id
+        // Kaomoji are wide: fewer, wider cells in smaller type (Droidtop/tracker#903 H4).
+        val wide = id == Kaomoji.GROUP
+        grid.columnWidth = dp(if (wide) 128 else 46)
+        adapter.wide = wide
         val items = if (id == RECENT) recent() else catalog?.groups?.firstOrNull { it.id == id }?.entries?.map { it.emoji } ?: emptyList()
         adapter.show(if (items.isEmpty() && id == RECENT) listOf(context.getString(R.string.emoji_recent_empty)) else items, loading = items.isEmpty())
     }
@@ -89,6 +93,9 @@ internal class EmojiBrowser(
         var items: List<String> = emptyList()
             private set
         private var note = false
+
+        /** Kaomoji cells: smaller type, so a whole face fits a cell. */
+        var wide = false
 
         fun show(list: List<String>, loading: Boolean) {
             items = list
@@ -113,7 +120,8 @@ internal class EmojiBrowser(
                 setTextColor(textColor)
                 layoutParams = AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (44 * density).toInt())
             }
-            view.textSize = if (note) 13f else 26f
+            view.textSize = if (note) 13f else if (wide) 15f else 26f
+            view.maxLines = 1
             view.text = items[position]
             return view
         }
@@ -134,6 +142,7 @@ internal class EmojiBrowser(
                 "objects" -> R.string.emoji_group_objects
                 "symbols" -> R.string.emoji_group_symbols
                 "flags" -> R.string.emoji_group_flags
+                Kaomoji.GROUP -> R.string.emoji_group_kaomoji
                 else -> return id.replace('_', ' ')
             }
             return context.getString(name)

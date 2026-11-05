@@ -804,6 +804,7 @@
     <string name="emoji_group_objects">Objects</string>
     <string name="emoji_group_symbols">Symbols</string>
     <string name="emoji_group_flags">Flags</string>
+    <string name="emoji_group_kaomoji">Kaomoji</string>
     <!-- Why a wordlist was not added (Droidtop/tracker#339, #772). -->
     <string name="dictionary_refused_no_language">The wordlist does not say its language (no locale= in its first line)</string>
     <string name="dictionary_refused_no_words">The wordlist has no words</string>

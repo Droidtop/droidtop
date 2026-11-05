@@ -8975,6 +8975,11 @@ proposal) is not built; these helpers are in the one settings tree that already 
   width; the grid sits at its edge in the tool strip's key area, so with the strip off a right-hand grid is drawn
   at the left. A change rebuilds the input method's view (the setting's flags) or, for a panel droidtop draws,
   rebuilds its grid (`KeyboardPanel.rebuildKeys`).
+- **Kaomoji (Droidtop/tracker#903 H4).** The emoji panel's last tab is Kaomoji: AnySoftKeyboard's list (Apache-2.0,
+  104 faces in 19 groups such as Joy, Love, Sympathy, Music and Animals; `assets/kaomoji/`, whose SOURCE.txt names the
+  commit and the three entries corrected there). They show in wider cells in smaller type, are typed as they are, go to
+  Recent like any emoji, and emoji search finds them by group ("love", "music") or by "kaomoji". They skip the emoji
+  font check, which only answers for one glyph.
 - **More layouts.** Every locale Android reports is already selectable; the layouts are the existing `xml-*`
   folders and each locale's key text. Locales that have their own key text but were missing from the picker's
   5-row label list now carry it. A reader for HeliBoard-style text layouts is a later item on Droidtop/tracker#342.
