@@ -22852,6 +22852,22 @@ SteamBootstrap, libpatchelf and libdrawable.
   between the fork and upstream GameNative). The rig checks are in the
   change's commit message.
 
+### ICU for .NET games (built 2026-11-05, owner to confirm)
+
+Wine's `icu.dll` forwards 564 exports to `icuuc68.dll` and 461 to `icuin68.dll` (Proton's
+"icu: Forward function to Unicode library v68"). .NET 5 and later find `icu.dll`, take the ICU globalization path,
+and fail at start when those DLLs are missing, which they were in every droidtop Wine build (the BlueStacks Wine
+triage, 2026-11-05). The fix reuses Proton's: proton-wine-tux packages the Unicode Consortium's ICU 68.2 builds
+(the same files and hashes as Proton's `icu/` folder) in `lib/wine/<arch>-windows`. arm64ec gets the x86_64 DLLs, as
+in Proton. Container setup copies those folders into a new prefix (`ContainerManager.extractCommonDlls`).
+
+- **At launch** (`WineIcu`, from `WinePrefixPreparation`): a prefix that lacks any of the three DLLs gets them from
+  its Wine build, never replacing a file. This covers prefixes made before the build carried ICU.
+- **Fallback**: when the prefix still lacks ICU (a Wine build without it), the launch sets
+  `DOTNET_SYSTEM_GLOBALIZATION_USENLS=1`, so .NET uses Windows' own NLS. It is set in the base environment, so a
+  game's own variables (Game properties, 7i) or the prefix's override it; a person can also set it for one game
+  there when ICU itself misbehaves.
+
 ### Translation cache, precache and mixed-arch running (decided 2026-11-04, Droidtop/tracker#865, #866)
 
 The owner, relayed by the coordinator on 2026-11-04, approved the cache plan in #865 (mixed-architecture running

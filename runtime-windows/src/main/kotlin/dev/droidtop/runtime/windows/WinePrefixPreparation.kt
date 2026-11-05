@@ -166,6 +166,14 @@ internal object WinePrefixPreparation {
         // decision, and both read the prefix's one audioDriver field.
         changeWineAudioDriver(prefix.audioDriver, prefix, imageFs)
         setImagefsContainerVariant(context, prefix)
+        // ICU 68 for .NET 5+ games (docs/SPEC.md 9, "ICU for .NET games"): copied from the Wine build when the prefix
+        // lacks it; without it, .NET is told to use Windows' NLS. In this base env, so a prefix's or game's own value
+        // of the variable wins.
+        val icu = runCatching {
+            WineIcu.ensure(File(imageFs.winePath, "lib/wine"), File(prefix.rootDir, ".wine/drive_c/windows"), wineInfo.isArm64EC, wineInfo.isWin64)
+        }.getOrDefault(false)
+        if (!icu) envVars.put(WineIcu.NLS_VAR, "1")
+        Timber.i("ICU 68 in prefix %s: %s", prefix.id, if (icu) "present" else "missing, .NET uses NLS")
         return envVars
     }
 }
