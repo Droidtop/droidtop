@@ -395,8 +395,10 @@ object PluginJobsScreen {
      */
     fun oneLine(entry: PluginJobsCenter.Entry, nowMs: Long = System.currentTimeMillis()): String = when {
         entry.done -> outcome(entry).lineSequence().first()
-        // Moving: the icon's sign and the value, the compact status (Droidtop/tracker#886), where text is all there is.
-        standingLine(entry) == null -> compactValue(entry)?.let { "${iconSign(iconOf(entry))} $it" }
+        // Moving: the icon's sign and the amount, the compact status (Droidtop/tracker#886), where text is all there is.
+        // Only an amount: a job that sends just a percent keeps its words, as the bar says how far and a bare
+        // percent in a line that has no fixed width is the flicker #643 removed.
+        standingLine(entry) == null && entry.numbers != null -> compactValue(entry)?.let { "${iconSign(iconOf(entry))} $it" }
             ?: progressLine(entry, JobPace.line(entry, nowMs)).replace("\n", " · ")
         else -> progressLine(entry, JobPace.line(entry, nowMs)).replace("\n", " · ")
     }
