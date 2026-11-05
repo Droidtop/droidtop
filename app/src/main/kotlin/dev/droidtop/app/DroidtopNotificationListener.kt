@@ -83,8 +83,17 @@ class DroidtopNotificationListener : NotificationListenerService() {
                     message = sbn.notification.category == android.app.Notification.CATEGORY_MESSAGE ||
                         extras.getString(android.app.Notification.EXTRA_TEMPLATE) ==
                         android.app.Notification.MessagingStyle::class.java.name,
+                    forwardable = forwardable(sbn),
                 )
             }
         NotificationsStore.publish(list)
+    }
+
+    /** kdeconnect-android's rule for what it mirrors (NotificationsPlugin.onNotificationPosted), plus secret ones and droidtop's own. */
+    private fun forwardable(sbn: StatusBarNotification): Boolean {
+        val n = sbn.notification
+        val skip = android.app.Notification.FLAG_FOREGROUND_SERVICE or android.app.Notification.FLAG_ONGOING_EVENT or
+            android.app.Notification.FLAG_LOCAL_ONLY or android.app.Notification.FLAG_GROUP_SUMMARY
+        return n.flags and skip == 0 && n.visibility != android.app.Notification.VISIBILITY_SECRET && sbn.packageName != packageName
     }
 }

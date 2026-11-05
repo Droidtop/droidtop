@@ -22948,7 +22948,18 @@ client." The plan and its slices are on #645.
     opened (the notice opens it). Another device's notifications are shown as droidtop notices on their own channel
     ("Notifications from paired devices"), updated in place and taken away when they go there. Built to the
     recommendation, owner to confirm: all three on for paired devices, as in the official apps.
-  - Each plugin will have its own switch on the screen.
+  - **This device's notifications, and each plugin's switch (slice 6, second part; Droidtop/tracker#913 section 9).**
+    droidtop's own notifications go to paired devices, read by the notification listener droidtop already has
+    (`DroidtopNotificationListener` into `NotificationsStore`, one mechanism): new ones are posted, changed ones posted
+    again without sound, gone ones taken away, and a dismissal on the other device dismisses it here. Only what
+    kdeconnect-android itself mirrors goes: never an ongoing one, a foreground service's, a local-only one or a group
+    summary, and never one marked secret or one of droidtop's own (its KDE Connect notices among them). The library
+    keeps what is shown and sends it to a device that asks on connecting. Built to the recommendation, owner to confirm
+    (#913, question A): on by default when droidtop already has notification access ("Send this device's
+    notifications"; without access the row asks for it), as in the official apps.
+    - The screen's **What paired devices can do** group has a switch for each plugin (ping, share, clipboard, typing
+      from other devices, battery, find my device, notifications). A plugin that is off is not offered to other
+      devices and not answered; switching one starts the device again, since its plugins are in its identity.
 - **Tailscale** is a VPN plugin, not a client of droidtop's own (owner, above). It feeds its tailnet's online devices
   to the same address list through the host API `peers.set_addresses` (docs/plugin-api.md D22, `peers.addresses`,
   dangerous): KDE Connect announces this device to the person's addresses and every VPN plugin's, once each

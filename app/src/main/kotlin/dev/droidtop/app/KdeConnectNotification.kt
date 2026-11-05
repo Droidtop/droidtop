@@ -17,9 +17,13 @@ import dev.droidtop.library.credentials.handoff.FileNames
 import dev.droidtop.library.settings.CatalogScreenLink
 import dev.droidtop.net.kdeconnect.KdcEvent
 import dev.droidtop.net.kdeconnect.KdeConnect
+import dev.droidtop.runtime.systemstatus.NotificationsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
@@ -54,7 +58,49 @@ object KdeConnectNotification {
         }
         followClipboard(app)
         followBattery(app)
+        followNotifications(app)
         holdMulticast(app)
+    }
+
+    /**
+     * This device's notifications to paired devices (docs/SPEC.md 7q, slice 6): the ones droidtop's notification
+     * listener already reads ([NotificationsStore], so there is one listener), when it may and the person left
+     * "Send this device's notifications" on. New ones are posted, changed ones posted again silently, gone ones taken
+     * away. A device that starts again has none, so the list is sent whole each time it starts.
+     */
+    private fun followNotifications(context: Context) {
+        scope.launch {
+            kotlinx.coroutines.flow.combine(
+                KdeConnect.running,
+                KdeConnect.changes.onStart { emit(0L) }.map { KdeConnect.sendsNotifications(context) && KdeConnect.pluginOn(context, "notifications") }
+                    .distinctUntilChanged(),
+                NotificationsStore.items,
+            ) { running, sends, items -> if (running && sends) items.filter { it.forwardable } else null }
+                .collect { items -> runCatching { mirror(items) } }
+        }
+    }
+
+    /** What was last sent, by key: its title and text. Reset while KdeConnect is off or not sending. */
+    private val sent = HashMap<String, Pair<String, String>>()
+
+    private suspend fun mirror(items: List<NotificationsStore.Item>?) {
+        if (items == null) {
+            sent.keys.toList().forEach { KdeConnect.cancelNotification(it) }
+            sent.clear()
+            return
+        }
+        val now = items.associateBy { it.key }
+        (sent.keys - now.keys).forEach { key ->
+            KdeConnect.cancelNotification(key)
+            sent.remove(key)
+        }
+        now.values.forEach { n ->
+            val shown = n.title to n.text
+            val before = sent[n.key]
+            if (before == shown) return@forEach
+            KdeConnect.postNotification(n.key, n.appLabel, n.title, n.text, n.clearable, silent = before != null, time = n.postTime)
+            sent[n.key] = shown
+        }
     }
 
     /**
@@ -221,6 +267,8 @@ object KdeConnectNotification {
                 silent = e.silent,
             )
             is KdcEvent.NotificationGone -> manager.cancel(MIRROR_BASE + (e.id + e.key).hashCode().mod(0x3FF))
+            // The person dismissed one of this device's notifications on the other device.
+            is KdcEvent.NotificationDismissed -> NotificationsStore.controller?.dismiss(e.key)
             is KdcEvent.Other -> Unit
         }
     }

@@ -45,6 +45,11 @@ object NotificationsStore {
         val canReply: Boolean = false,
         /** A message: the app posts it as `MessagingStyle` or in the message category. */
         val message: Boolean = false,
+        /**
+         * It may be mirrored to the person's other devices (KDE Connect, docs/SPEC.md 7q): not ongoing, a foreground
+         * service's, local-only or a group summary (kdeconnect-android's own rule), not marked secret, and not droidtop's.
+         */
+        val forwardable: Boolean = false,
     )
 
     private val mutableItems = MutableStateFlow<List<Item>>(emptyList())

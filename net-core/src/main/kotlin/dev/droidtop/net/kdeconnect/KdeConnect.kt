@@ -33,6 +33,11 @@ object KdeConnect {
     private const val KEY_ON = "on"
     private const val KEY_NAME = "name"
     private const val KEY_ADDRESSES = "addresses"
+    private const val KEY_PLUGIN = "plugin_"
+    private const val KEY_SEND_NOTIFICATIONS = "send_notifications"
+
+    /** lib-kdeconnect's plugins, each with a switch on the screen; all on by default, as in the official apps. */
+    val PLUGINS = listOf("ping", "share", "clipboard", "input", "battery", "findmyphone", "notifications")
 
     /** How long one `event` call waits in the library before the loop asks again. */
     private const val EVENT_WAIT_MS = 30_000
@@ -75,6 +80,29 @@ object KdeConnect {
     fun addresses(context: Context): List<String> = parseAddresses(prefs(context).getString(KEY_ADDRESSES, "") ?: "")
 
     /** Splits what the person typed into addresses: commas, spaces or new lines between them. */
+    fun pluginOn(context: Context, name: String): Boolean = prefs(context).getBoolean(KEY_PLUGIN + name, true)
+
+    /** Switches one plugin; a running device starts again, since the plugins it has are in its identity. */
+    suspend fun setPluginOn(context: Context, name: String, on: Boolean) = withContext(Dispatchers.IO) {
+        if (name !in PLUGINS || pluginOn(context, name) == on) return@withContext
+        prefs(context).edit().putBoolean(KEY_PLUGIN + name, on).commit()
+        if (_running.value) {
+            stop()
+            start(context)
+        }
+    }
+
+    /**
+     * Whether this device's own notifications go to paired devices (with the notifications plugin on, and only when
+     * droidtop has notification access). On by default, as in the official apps; owner to confirm (#913).
+     */
+    fun sendsNotifications(context: Context): Boolean = prefs(context).getBoolean(KEY_SEND_NOTIFICATIONS, true)
+
+    suspend fun setSendsNotifications(context: Context, on: Boolean) = withContext(Dispatchers.IO) {
+        prefs(context).edit().putBoolean(KEY_SEND_NOTIFICATIONS, on).commit()
+        _changes.tryEmit(System.nanoTime())
+    }
+
     fun parseAddresses(text: String): List<String> = text.split(',', ' ', '\n', ';').map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 
     /** Starts the device when the person left it on. Called once at droidtop's start. */
@@ -144,7 +172,8 @@ object KdeConnect {
         val reply = call(
             "start",
             JSONObject().put("state_dir", dir.absolutePath).put("receive_dir", incoming.absolutePath)
-                .put("name", name(context)).put("type", "tablet"),
+                .put("name", name(context)).put("type", "tablet")
+                .put("plugins", JSONObject().apply { PLUGINS.forEach { put(it, pluginOn(context, it)) } }),
         )
         lastError = AgentNative.failure(reply)
         if (lastError != null) {
@@ -225,6 +254,24 @@ object KdeConnect {
     suspend fun clipboardSet(text: String): Int = withContext(Dispatchers.IO) {
         if (!_running.value) return@withContext 0
         call("clipboard_set", JSONObject().put("text", text)).optInt("sent_to", 0)
+    }
+
+    /**
+     * This device's notification [key] posted or updated: sent to paired devices, which ask the library for all of
+     * them on connecting. [silent] for an update.
+     */
+    suspend fun postNotification(key: String, app: String, title: String, text: String, dismissable: Boolean, silent: Boolean, time: Long) =
+        withContext(Dispatchers.IO) {
+            if (!_running.value) return@withContext
+            call(
+                "notification_post",
+                JSONObject().put("key", key).put("app", app).put("title", title).put("text", text)
+                    .put("dismissable", dismissable).put("silent", silent).put("time", time),
+            )
+        }
+
+    suspend fun cancelNotification(key: String) = withContext(Dispatchers.IO) {
+        if (_running.value) call("notification_cancel", JSONObject().put("key", key))
     }
 
     suspend fun shareText(id: String, text: String): String? = withContext(Dispatchers.IO) {
@@ -313,6 +360,8 @@ sealed class KdcEvent {
     data class Ring(val id: String) : KdcEvent()
     data class Notification(val id: String, val key: String, val app: String, val title: String, val text: String, val silent: Boolean) : KdcEvent()
     data class NotificationGone(val id: String, val key: String) : KdcEvent()
+    /** The person dismissed this device's notification [key] on [id]: dismiss it here. */
+    data class NotificationDismissed(val id: String, val key: String) : KdcEvent()
     /** The other device's clipboard: put on this one's. */
     data class Clipboard(val id: String, val text: String) : KdcEvent()
     data class FileSent(val id: String, val name: String, val size: Long) : KdcEvent()
@@ -343,6 +392,7 @@ sealed class KdcEvent {
                         p.optBoolean("silent"),
                     )
                     "notification_gone" -> NotificationGone(o.optString("id"), p.optString("key"))
+                    "notification_dismissed" -> NotificationDismissed(o.optString("id"), p.optString("key"))
                     "input" -> {
                         val i = p.optJSONObject("input") ?: JSONObject()
                         Input(
