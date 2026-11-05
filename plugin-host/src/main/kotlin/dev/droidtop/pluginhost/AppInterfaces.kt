@@ -75,7 +75,7 @@ object AppInterfaces {
             it.manifest.kind == PluginKind.APP_INTERFACE && it.manifest.app?.packageName == found.packageName
         } ?: return false
         val cert = AppInterfaceTrust.certOf(found.verdict) ?: return false
-        return cert.equals(record.approvedKeySha256, ignoreCase = true) && found.manifestBytes?.let(::sha256) == record.archiveDigest
+        return cert.equals(record.approvedKeySha256, ignoreCase = true) && found.manifestBytes?.let { Sha256.hex(it) } == record.archiveDigest
     }
 
     /** Whether [record] is an app plugin signed by its app's pinned official certificate. */
