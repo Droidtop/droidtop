@@ -28,14 +28,18 @@ class CompositorProvisioningTest {
         assertEquals("sway -c /run/droidtop-app-storage/desktop-launcher/panel/sway.config", plan.compositorCommand)
         val debian = CompositorProvisioning.plan("debian", "sway", panel = DesktopPanel.WAYBAR)!!
         assertTrue(debian.installCommand.endsWith("&& apt-get install -y --no-install-recommends waybar"))
-        // Sway's own bar is the plain plan; labwc takes no panel.
+        // No panel starts the same config without installing anything (#683); Sway's own bar is the plain plan; labwc
+        // takes no panel.
+        val none = CompositorProvisioning.plan("alpine", "sway", panel = DesktopPanel.NONE)!!
+        assertEquals("sway -c /run/droidtop-app-storage/desktop-launcher/panel/sway.config", none.compositorCommand)
+        assertFalse(none.installCommand.contains("waybar"))
         assertEquals("sway", CompositorProvisioning.plan("alpine", "sway", panel = DesktopPanel.SWAYBAR)!!.compositorCommand)
         assertEquals("labwc", CompositorProvisioning.plan("alpine", "labwc", panel = DesktopPanel.WAYBAR)!!.compositorCommand)
     }
 
     @Test
     fun `droidtop's sway config keeps the distro's and swaps only the bar and the launcher`() {
-        val lines = DesktopPanel.swayConfig().lines()
+        val lines = DesktopPanel.swayConfig(DesktopPanel.WAYBAR).lines()
         assertTrue("include /etc/sway/config" in lines)
         assertTrue("bar bar-0 swaybar_command true" in lines)
         assertTrue("exec waybar -c /run/droidtop-app-storage/desktop-launcher/panel/waybar.json" in lines)
@@ -51,7 +55,11 @@ class CompositorProvisioningTest {
         assertTrue("for_window [all] floating enable" in lines)
         assertTrue("default_floating_border normal 8" in lines)
         assertFalse(DesktopPanel.swayConfig(tileWindows = true).contains("floating"))
-        assertEquals(DesktopPanel.WAYBAR, DesktopPanel.fromId(null))
+        // One bar by default: droidtop's, with no Waybar started (#683).
+        assertEquals(DesktopPanel.NONE, DesktopPanel.fromId(null))
+        assertFalse(DesktopPanel.swayConfig().contains("waybar"))
+        assertTrue("bar bar-0 swaybar_command true" in DesktopPanel.swayConfig().lines())
+        assertEquals(DesktopPanel.WAYBAR, DesktopPanel.fromId("waybar"))
         assertEquals(DesktopPanel.SWAYBAR, DesktopPanel.fromId("swaybar"))
     }
 

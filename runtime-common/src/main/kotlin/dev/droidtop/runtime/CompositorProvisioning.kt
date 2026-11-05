@@ -143,19 +143,19 @@ object CompositorProvisioning {
     }
 
     /**
-     * [DesktopPanel.WAYBAR] adds Waybar and wofi to a sway plan and starts
-     * sway with droidtop's config ([DesktopPanel.swayConfig]); like
-     * Printing it changes the plan, so a desktop made before installs them
-     * on its next start. Sway's own bar, and labwc, are the plan as it is.
+     * [DesktopPanel.NONE] and [DesktopPanel.WAYBAR] start sway with droidtop's config ([DesktopPanel.swayConfig]);
+     * Waybar also adds its package to the plan. Like Printing a change of panel changes the plan, so a desktop made
+     * before installs what it needs on its next start. Sway's own bar, and labwc, are the plan as it is.
      */
     private fun withPanel(base: PrimaryProvisioning, os: String, desktopEnvironment: String, panel: DesktopPanel): PrimaryProvisioning {
-        if (panel != DesktopPanel.WAYBAR || desktopEnvironment != "sway") return base
+        if (panel == DesktopPanel.SWAYBAR || desktopEnvironment != "sway") return base
+        if (panel == DesktopPanel.NONE) return base.copy(compositorCommand = DesktopPanel.DROIDTOP_SWAY)
         val install = when (os) {
             "debian" -> "${base.installCommand} && apt-get install -y --no-install-recommends ${DesktopPanel.WAYBAR_PACKAGES}"
             "alpine" -> "${base.installCommand} && apk add --no-cache ${DesktopPanel.WAYBAR_PACKAGES}"
             else -> return base
         }
-        return base.copy(installCommand = install, compositorCommand = DesktopPanel.WAYBAR_COMPOSITOR)
+        return base.copy(installCommand = install, compositorCommand = DesktopPanel.DROIDTOP_SWAY)
     }
 
     private fun withPrinting(base: PrimaryProvisioning, os: String, printing: Boolean): PrimaryProvisioning {
