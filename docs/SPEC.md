@@ -15448,8 +15448,8 @@ follows:
   and for a game that needs one an ownership token, written under the app's
   files and passed as a `Z:` path, the drive a Wine prefix maps to the
   filesystem root); signed out or offline, it starts without them. Not
-  carried: GameNative's Epic overlay install into a prefix and its Epic and
-  GOG cloud saves, which belong to the Wine path.
+  carried: GameNative's Epic overlay install into a prefix. Epic's and GOG's
+  cloud saves are droidtop's own ("GOG and Epic cloud saves" below).
 - **Steam** (`SteamStore`, `dev.droidtop.stores.steam`; decided 2026-10-07,
   the owner: droidtop's own Steam client is the default, the JavaSteam client
   taken out of GameNative and moved in like the other stores; "let the user
@@ -15736,7 +15736,7 @@ follows:
   user's folder, and `SteamUserData` the `remote` folder of Steam's userdata
   (where the files the Steam API writes go, as GameNative laid it out). Roots of
   other systems in the cloud list are left alone. **The decision is Steam's
-  client rule, kept whole-game** (`SteamCloudPlan.decide`): from the files as
+  client rule, kept whole-game** (`CloudSavePlan.decide`): from the files as
   they were at the last sync (`steam/cloud/<app id>.json`, name to SHA-1, size
   and time, which also saves re-hashing a file whose size and time did not
   change), if only this device changed the files go up (and a file deleted here is
@@ -15757,6 +15757,40 @@ follows:
   launch intent, ignoring other devices' pending operations) and ends (the exit
   sync's result) with the calls its client makes. Not carried: GameNative's
   achievement sync and Goldberg save migration.
+- **GOG and Epic cloud saves (decided 2026-11-04, Droidtop/tracker#224)** run on the same seam as Steam's, so a
+  launch through Wine or through Enginehost syncs them with nothing added to the launch path: `GOGStore.syncSaves`
+  (`GOGCloudSaves`) and `EpicStore.syncSaves` (`EpicCloudSaves`), both `hasCloudSaves`, called by `StoreSaves`
+  before the game starts (the same 45 s bound), after it ends (the "Saves: <game>" job) and from "Sync cloud saves".
+  **One decision for every store** (`CloudSavePlan` in `:stores`, which `SteamCloudPlan` became): Steam's rule
+  above, kept per game in `<store>/cloud/<id>.json`. Each side keeps its own fingerprint of a file at the last
+  sync, since GOG lists the MD5 of the gzip it stores and not of the file: a side is unchanged while its
+  fingerprint is the one kept, and a file whose two sides have the same fingerprint agrees. A conflict goes to the
+  same dialog ("GOG cloud" or "Epic cloud" named as the other side), never to a newer timestamp, which is where
+  GameNative's GOG and Epic syncs decided by themselves. Each store has a **Cloud saves switch** on its page in
+  the Stores place (`CloudSaveSetting`, `<store>_prefs`/`cloud_saves`, the file Steam's switch always used): off,
+  launches and exits leave the saves alone, and "Sync cloud saves" still syncs because the person asked.
+  - **GOG** (GameNative's GOGCloudSavesManager and save locations, after gogdl): the game's newest Windows build
+    manifest names its GOG client (`clientId`, `clientSecret`, served by GOG for the game, never bundled), GOG's
+    remote config for that client names its save locations (`<?INSTALL?>`, `<?APPLICATION_DATA_LOCAL?>`,
+    `_LOCAL_LOW`, `_ROAMING`, `<?SAVED_GAMES?>`, `<?DOCUMENTS?>`, mapped like `SaveLayout.windowsDirs`), and a game
+    whose cloud is on with no locations keeps the Galaxy SDK's folder
+    (`%LOCALAPPDATA%/GOG.com/Galaxy/Applications/<client>/Storage/Shared/Files`, its files unprefixed). The config
+    is kept per game (`gog/cloud/<id>.config.json`), so `saveFolder` (the first location, for Enginehost's
+    `saveRoot`) needs no network. Galaxy's refresh token is traded for the game's own client token
+    (`GOGAuthManager.getGameCredentials`, kept in the auth file beside Galaxy's). Files are listed, sent and fetched
+    one by one at `cloudstorage.gog.com/v1/<user>/<client>/<location>/<path>`, sent gzipped (a fixed gzip, so the
+    same file always has the same MD5) and deleted with DELETE; a file GOG lists with its deletion MD5 is gone.
+  - **Epic** (GameNative's EpicCloudSavesManager, after Legendary): the game's `CloudSaveFolder` from its catalogue
+    attributes (`{AppData}` is `%LOCALAPPDATA%` as in Legendary, `{RoamingAppData}`, `{UserDir}` Documents,
+    `{UserSavedGames}`, `{UserProfile}`, `{InstallDir}`, `{EpicId}`, `{AppName}`). Epic keeps snapshots: the cloud's
+    side is the newest manifest's file list (SHA-1 each), a download rebuilds the files that differ from its chunks
+    and checks each file's SHA-1 before it replaces anything, an upload sends a new snapshot of every save file here
+    (1 MiB chunks, padded, rolling hash and SHA-1, the manifest last), so a file deleted here is simply not in it.
+    An empty file is not a save Epic keeps and is left out of both sides.
+  - Both write a download beside its target and put it in place only when whole; a file name that would leave its
+    folder (`..`, a drive) is never written, and an existing folder or file is matched whatever its case, as Wine
+    sees it. Amazon and itch.io keep no cloud saves droidtop reaches: their page row says
+    "<Store> cloud saves are not supported".
 - **Steam carried over** (`SteamCarryOver`): the rows come with `steam.db`;
   the sign-in GameNative kept in its preferences (the refresh token encrypted
   with its Android Keystore key, readable only through its `PrefManager`) and
@@ -15958,9 +15992,9 @@ for users" above promises more than the store services hold:
   on droidtop measuring a session itself, one mechanism per launch path.
   The PC surface therefore offers no playtime sort (7i): a sort on a number
   that is 0 for every game is a control that does nothing.
-- **Cloud saves** are reached for Steam (the "Steam Cloud saves" bullet of
-  "Stores" above); GameNative's GOG and Epic save sync resolve save folders
-  inside its own Wine containers and are not reached from droidtop.
+- **Cloud saves** are reached for Steam, GOG and Epic (the "Steam Cloud
+  saves" and "GOG and Epic cloud saves" bullets of "Stores" above); Amazon and
+  itch.io have none droidtop reaches.
   **`gamefixes/`** is left
   out of droidtop's prefix preparation on purpose (`WinePrefixPreparation`
   lists it with the other store-specific steps it does not run).
@@ -16019,8 +16053,10 @@ identity line.
   and the game's detail links to where the runner keeps them rather than
   modelling them a second time. What the person has earned on
   RetroAchievements is a read of the service with their own account, for
-  display only (7h, "RetroAchievements"). Store cloud saves (§7g yardstick) are the
-  store client's feature and are reached through its own screens.
+  display only (7h, "RetroAchievements"). Store cloud saves are the exception
+  the store's own client makes too: droidtop syncs Steam's, GOG's and Epic's
+  around a launch the way their clients do (7g, "Steam Cloud saves", "GOG and
+  Epic cloud saves").
 - **A folder that cannot be listed is not an empty folder.** The PC folder
   walk (`PcFolderScan`) reads a folder Android will not list (`listFiles()`
   null: access lost, a card or a share still coming up inside a mounted
@@ -17443,10 +17479,10 @@ against a linked source compare it; a folder name's version still wins over
 it. The page and what a paired computer is sent read the same field through
 `SetVersions.shown`. A game walked before this keeps no such version until its
 folder is walked again (Rescan library). **Cloud saves**:
-a store copy whose store keeps cloud saves droidtop reaches (Steam) says when
+a store copy whose store keeps cloud saves droidtop reaches (Steam, GOG, Epic) says when
 they last synced (`StoreSaves.lastSync`, kept by every sync), "Last sync
 failed" with A to retry, or offline "Not synced since <when>"; a store with
-none reads "<Store> cloud saves are not supported" (GOG); a folder game has no
+none reads "<Store> cloud saves are not supported" (Amazon, itch.io); a folder game has no
 row. The Update row stays the first row of Versions. **Set
 version**: on a folder game A on Version opens a field prefilled with what the
 folder's name says; what is set wins over the folder's name until "Clear set

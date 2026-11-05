@@ -13,8 +13,8 @@ import timber.log.Timber
 /**
  * GOG's library: the database rows, the library read from GOG's API, and
  * what an installed game's own GOG info file says (GameNative's GOGManager,
- * GPL-3.0, without its dependency injection). Not carried: GameNative's
- * cloud saves, its Wine launch command and the installer scripts it ran
+ * GPL-3.0, without its dependency injection); its cloud saves are
+ * [GOGCloudSaves]. Not carried: its Wine launch command and the installer scripts it ran
  * before a game (scriptinterpreter, support commands), which belong to the
  * Wine path, and its scan of GameNative's own install folders.
  */

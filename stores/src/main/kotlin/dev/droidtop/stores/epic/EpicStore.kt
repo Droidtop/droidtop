@@ -3,6 +3,11 @@ package dev.droidtop.stores.epic
 import android.content.Context
 import android.net.Uri
 import dev.droidtop.library.StoreUpdate
+import dev.droidtop.library.settings.CatalogItem
+import dev.droidtop.library.stores.SaveConflictResolver
+import dev.droidtop.library.stores.SaveSyncPhase
+import dev.droidtop.library.stores.SaveSyncResult
+import dev.droidtop.library.stores.WinePrefixLocation
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLaunch
 import dev.droidtop.library.stores.StoreLibrary
@@ -13,10 +18,12 @@ import dev.droidtop.library.stores.StoreSyncs
 import dev.droidtop.library.stores.StoreUpdateCheck
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.runtime.SafeDelete
+import dev.droidtop.runtime.util.runCatchingCancellable
 import dev.droidtop.stores.data.EpicGame
 import dev.droidtop.stores.db.StoresDatabase
 import dev.droidtop.stores.epic.manifest.EpicManifest
 import dev.droidtop.stores.epic.manifest.ManifestUtils
+import dev.droidtop.stores.util.CloudSaveSetting
 import dev.droidtop.stores.util.StoreFiles
 import dev.droidtop.stores.util.StoreLanguage
 import dev.droidtop.stores.util.newDownloadInfo
@@ -215,6 +222,43 @@ class EpicStore : StoreLibrary {
             workingDir = exe.parentFile ?: installDir,
             arguments = EpicGameLauncher.tokenizeArgs(game.launchCommand) + epicArguments,
         )
+    }
+
+    override val hasCloudSaves = true
+
+    override fun settingsItems(context: Context): List<CatalogItem> = listOf(CloudSaveSetting.item(context, id, EpicCloudSaves.LABEL))
+
+    /**
+     * Epic cloud saves of [gameId] in [prefix] ([EpicCloudSaves], docs/SPEC.md 7g, "Stores"): null when nobody is
+     * signed in, the switch is off (unless the person asked), the prefix has no `drive_c` yet, or the game keeps no
+     * cloud saves (Epic names no `CloudSaveFolder` for it).
+     */
+    override suspend fun syncSaves(
+        context: Context,
+        gameId: String,
+        phase: SaveSyncPhase,
+        prefix: WinePrefixLocation,
+        title: String,
+        onConflict: SaveConflictResolver?,
+    ): SaveSyncResult? {
+        if (!signedIn(context)) return null
+        if (phase != SaveSyncPhase.MANUAL && !withContext(Dispatchers.IO) { CloudSaveSetting.on(context, id) }) return null
+        val game = withContext(Dispatchers.IO) {
+            if (!File(prefix.prefixDir, "drive_c").isDirectory) null else dao(context).getByCatalogId(gameId)
+        } ?: return null
+        return runCatchingCancellable { EpicCloudSaves.run(context, game, title, prefix, onConflict) }
+            .getOrElse {
+                Timber.tag(TAG).w(it, "Epic cloud sync failed for $gameId")
+                SaveSyncResult("Cloud saves: ${it.message ?: it.javaClass.simpleName}", failed = true)
+            }
+    }
+
+    /** The game's `CloudSaveFolder` in [prefix], with the signed-in account's id (which may refresh the sign-in). */
+    override suspend fun saveFolder(context: Context, gameId: String, prefix: WinePrefixLocation): File? = withContext(Dispatchers.IO) {
+        val game = dao(context).getByCatalogId(gameId)?.takeIf { it.cloudSaveEnabled } ?: return@withContext null
+        val accountId = EpicAuthManager.getStoredCredentials(context).getOrNull()?.accountId ?: return@withContext null
+        val installDir = game.installPath.takeIf { game.isInstalled && it.isNotBlank() }?.let(::File)
+        EpicCloudSaves.resolve(game.saveFolder, prefix, installDir, accountId, game.appName)
     }
 
     override fun changeStamp(context: Context): Long =

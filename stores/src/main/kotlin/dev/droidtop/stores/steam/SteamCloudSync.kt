@@ -1,13 +1,13 @@
 package dev.droidtop.stores.steam
 
-import dev.droidtop.library.stores.SaveChoice
 import dev.droidtop.library.stores.SaveConflict
 import dev.droidtop.library.stores.SaveConflictResolver
-import dev.droidtop.library.stores.SaveSide
 import dev.droidtop.library.stores.SaveSyncResult
 import dev.droidtop.runtime.util.runCatchingCancellable
-import dev.droidtop.stores.steam.SteamCloudPlan.Decision
-import dev.droidtop.stores.steam.SteamCloudPlan.Facts
+import dev.droidtop.stores.util.CloudSavePlan
+import dev.droidtop.stores.util.CloudSavePlan.Decision
+import dev.droidtop.stores.util.CloudSavePlan.Facts
+import dev.droidtop.stores.util.CloudSaveState
 import `in`.dragonbra.javasteam.enums.EResult
 import `in`.dragonbra.javasteam.steam.handlers.steamcloud.FileDownloadInfo
 import `in`.dragonbra.javasteam.steam.handlers.steamcloud.SteamCloud
@@ -31,7 +31,7 @@ import timber.log.Timber
  * One Steam Cloud save sync of one game (docs/SPEC.md 7g, "Stores",
  * Droidtop/tracker#313): the file transfers of GameNative's SteamAutoCloud
  * (GPL-3.0: the list call, the per-file download URL, the upload batch with its
- * block requests), with the decision made by [SteamCloudPlan] from the state
+ * block requests), with the decision made by [CloudSavePlan] from the state
  * kept at the last sync, so "this device changed" and "the cloud changed" are
  * known and not guessed from timestamps. Files are written beside their
  * target and checked against the SHA-1 Steam lists before they replace
@@ -68,7 +68,7 @@ internal object SteamCloudSync {
             remote[name.key] = Remote(name, apiName, Facts(hex(file.shaFile), file.rawFileSize.toLong(), file.timestamp.time))
         }
 
-        val state = SteamCloudState.load(filesDir, app.id)
+        val state = CloudSaveState.load(stateFile(filesDir, app.id))
         val scanned = layout.scan(remote.values.map { it.name.name } + state.files.keys)
         val local = LinkedHashMap<String, SaveLayout.Local>()
         val localFacts = LinkedHashMap<String, Facts>()
@@ -84,24 +84,20 @@ internal object SteamCloudSync {
         }
         val remoteFacts = remote.mapValues { it.value.facts }
 
-        var decision = SteamCloudPlan.decide(state.shas, localFacts, remoteFacts)
+        var decision = CloudSavePlan.decide(state.base, localFacts, remoteFacts)
         if (decision is Decision.Conflict) {
             val choice = onConflict?.resolve(title, SaveConflict(side(decision.local), side(decision.cloud), "Steam Cloud"))
                 ?: return@withContext Outcome(
                     SaveSyncResult("Saves differ between this device and Steam Cloud. Choose which to keep", unresolved = true),
                     uploadsRequired = false, uploadsCompleted = false, settled = false,
                 )
-            // Treating one side as unchanged makes the other side win.
-            decision = when (choice) {
-                SaveChoice.LOCAL -> SteamCloudPlan.decide(remoteFacts.mapValues { it.value.sha }, localFacts, remoteFacts)
-                SaveChoice.CLOUD -> SteamCloudPlan.decide(localFacts.mapValues { it.value.sha }, localFacts, remoteFacts)
-            }
+            decision = CloudSavePlan.settle(choice, localFacts, remoteFacts)
         }
 
         when (decision) {
             Decision.UpToDate -> {
                 // Remember what both sides hold, so a change from here on is known to be a change.
-                if (state.shas != localFacts.mapValues { it.value.sha }) SteamCloudState.save(filesDir, app.id, SteamCloudState(localFacts))
+                if (state.shas != localFacts.mapValues { it.value.sha }) CloudSaveState.save(stateFile(filesDir, app.id), CloudSaveState(localFacts))
                 Outcome(SaveSyncResult("Saves are up to date"), uploadsRequired = false, uploadsCompleted = true, settled = true)
             }
             is Decision.Download -> download(filesDir, http, cloud, app, layout, state, decision, remote, local, localFacts, progress)
@@ -110,7 +106,7 @@ internal object SteamCloudSync {
         }
     }
 
-    private fun side(side: SteamCloudPlan.Side) = SaveSide(side.timeMs, side.files, side.bytes)
+    private fun side(side: CloudSavePlan.Side) = side.asSaveSide()
 
     private suspend fun download(
         filesDir: File,
@@ -118,7 +114,7 @@ internal object SteamCloudSync {
         cloud: SteamCloud,
         app: SteamApp,
         layout: SaveLayout,
-        state: SteamCloudState,
+        state: CloudSaveState,
         decision: Decision.Download,
         remote: Map<String, Remote>,
         local: Map<String, SaveLayout.Local>,
@@ -163,7 +159,7 @@ internal object SteamCloudSync {
         http: OkHttpClient,
         cloud: SteamCloud,
         app: SteamApp,
-        state: SteamCloudState,
+        state: CloudSaveState,
         decision: Decision.Upload,
         remote: Map<String, Remote>,
         local: Map<String, SaveLayout.Local>,
@@ -218,9 +214,12 @@ internal object SteamCloudSync {
         return Outcome(SaveSyncResult(line, uploaded = uploaded, removed = removed, failed = failed > 0), uploadsRequired = true, uploadsCompleted = failed == 0, settled = failed == 0)
     }
 
+    /** Where a game's last-synced state is kept: `steam/cloud/<app id>.json`. */
+    fun stateFile(filesDir: File, appId: Int): File = CloudSaveState.file(filesDir, "steam", appId.toString())
+
     /** Remembers the files both sides now agree on; an entry the pass did not finish keeps its old SHA. */
     private fun finish(filesDir: File, appId: Int, facts: Map<String, Facts>) {
-        SteamCloudState.save(filesDir, appId, SteamCloudState(facts))
+        CloudSaveState.save(stateFile(filesDir, appId), CloudSaveState(facts))
     }
 
     /** Downloads [file] over [target]; false when Steam gave no URL, the transfer failed or the SHA-1 did not match. */

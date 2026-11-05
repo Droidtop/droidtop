@@ -169,6 +169,13 @@ data class GOGManifestMeta(
     val productTimestamp: String? = null,
     val scriptInterpreter: Boolean = false,
     val supportCommands: List<SupportCommand> = emptyList(),
+    /**
+     * The game's own GOG client id and secret (Gen 2 build manifests carry both, as gogdl and Heroic read them):
+     * what its cloud saves are signed in with ([GOGAuthManager.getGameCredentials]). Empty in a Gen 1 manifest.
+     * Identification GOG serves for the game, never bundled.
+     */
+    val clientId: String = "",
+    val clientSecret: String = "",
 ) {
     companion object {
         fun fromJson(json: JSONObject): GOGManifestMeta {
@@ -207,6 +214,8 @@ data class GOGManifestMeta(
                 products = products,
                 productTimestamp = null,
                 scriptInterpreter = json.optBoolean("scriptInterpreter", false),
+                clientId = json.optString("clientId", ""),
+                clientSecret = json.optString("clientSecret", ""),
             )
         }
     }

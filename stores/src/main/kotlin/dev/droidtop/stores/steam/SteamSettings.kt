@@ -6,6 +6,7 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.social.SocialPresence
+import dev.droidtop.stores.util.CloudSaveSetting
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,7 +21,6 @@ import kotlinx.coroutines.withContext
  */
 internal object SteamSettings {
     const val ID_STATUS = "steam_status"
-    const val ID_CLOUD_SAVES = "steam_cloud_saves"
     const val ID_NOTIFY = "steam_notify_messages"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -34,13 +34,7 @@ internal object SteamSettings {
             current = SteamPrefs.presence(context).key,
             onSelect = { ctx, value -> scope.launch { SteamFriendsHub.setPresence(ctx, SocialPresence.from(value)) } },
         ),
-        ToggleItem(
-            id = ID_CLOUD_SAVES,
-            title = "Cloud saves",
-            subtitle = "Syncs a game's saves with Steam Cloud before it starts and after it ends",
-            current = SteamPrefs.cloudSaves(context),
-            onToggle = { ctx, on -> withContext(Dispatchers.IO) { SteamPrefs.setCloudSaves(ctx, on) } },
-        ),
+        CloudSaveSetting.item(context, "steam", "Steam Cloud"),
         ToggleItem(
             id = ID_NOTIFY,
             title = "Message notifications",

@@ -2,6 +2,7 @@ package dev.droidtop.stores.gog
 
 import android.content.Context
 import dev.droidtop.stores.data.GOGCredentials
+import dev.droidtop.runtime.util.runCatchingCancellable
 import dev.droidtop.stores.util.StoreHttp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -199,6 +200,48 @@ object GOGAuthManager {
             Result.failure(e)
         }
     }
+
+    /**
+     * The signed-in account's token for one game's own GOG client ([clientId], [clientSecret] from the game's build
+     * manifest), which GOG's cloud storage asks for (GameNative's getGameCredentials, GPL-3.0; gogdl does the same):
+     * Galaxy's refresh token traded for the game's client, kept beside Galaxy's in the auth file until it expires.
+     */
+    suspend fun getGameCredentials(context: Context, clientId: String, clientSecret: String): Result<GOGCredentials> = runCatchingCancellable {
+        // Galaxy's own token first, refreshed when it expired, so its refresh token is a live one.
+        getStoredCredentials(context).getOrThrow()
+        val authFile = File(getAuthConfigPath(context))
+        val authJson = withContext(Dispatchers.IO) { JSONObject(authFile.readText()) }
+        authJson.optJSONObject(clientId)?.let { known ->
+            val expired = System.currentTimeMillis() / 1000.0 >= known.optDouble("loginTime", 0.0) + known.optInt("expires_in", 0)
+            if (!expired && known.has("access_token") && known.has("user_id")) return@runCatchingCancellable gameCredentials(known, "")
+        }
+        val refreshToken = authJson.optJSONObject(GOGConstants.GOG_CLIENT_ID)?.optString("refresh_token", "").orEmpty()
+        check(refreshToken.isNotEmpty()) { "GOG sign-in has no refresh token; sign in again" }
+        val url = tokenUrl.toHttpUrl().newBuilder()
+            .addQueryParameter("client_id", clientId)
+            .addQueryParameter("client_secret", clientSecret)
+            .addQueryParameter("grant_type", "refresh_token")
+            .addQueryParameter("refresh_token", refreshToken)
+            .addQueryParameter("without_new_session", "1")
+            .build()
+        val tokenJson = withContext(Dispatchers.IO) {
+            httpClient.newCall(okhttp3.Request.Builder().url(url).get().build()).execute().use { response ->
+                check(response.isSuccessful) { "GOG would not sign this game in to its cloud (HTTP ${response.code})" }
+                JSONObject(response.body?.string().orEmpty())
+            }
+        }
+        tokenJson.put("loginTime", System.currentTimeMillis() / 1000.0)
+        authJson.put(clientId, tokenJson)
+        withContext(Dispatchers.IO) { authFile.writeText(authJson.toString(2)) }
+        gameCredentials(tokenJson, refreshToken)
+    }
+
+    private fun gameCredentials(json: JSONObject, refreshToken: String) = GOGCredentials(
+        accessToken = json.getString("access_token"),
+        refreshToken = json.optString("refresh_token", refreshToken),
+        userId = json.getString("user_id"),
+        username = json.optString("username", ""),
+    )
 
     /**
      * Clear stored credentials (logout)

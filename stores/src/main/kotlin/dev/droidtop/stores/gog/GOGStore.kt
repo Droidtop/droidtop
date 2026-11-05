@@ -3,6 +3,11 @@ package dev.droidtop.stores.gog
 import android.content.Context
 import android.net.Uri
 import dev.droidtop.library.StoreUpdate
+import dev.droidtop.library.settings.CatalogItem
+import dev.droidtop.library.stores.SaveConflictResolver
+import dev.droidtop.library.stores.SaveSyncPhase
+import dev.droidtop.library.stores.SaveSyncResult
+import dev.droidtop.library.stores.WinePrefixLocation
 import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreLaunch
 import dev.droidtop.library.stores.StoreLibrary
@@ -14,9 +19,11 @@ import dev.droidtop.library.stores.StoreUpdateCheck
 import dev.droidtop.library.stores.Wishlist
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.runtime.SafeDelete
+import dev.droidtop.runtime.util.runCatchingCancellable
 import dev.droidtop.stores.db.StoresDatabase
 import dev.droidtop.stores.gog.api.GOGApiClient
 import dev.droidtop.stores.gog.api.GOGManifestParser
+import dev.droidtop.stores.util.CloudSaveSetting
 import dev.droidtop.stores.util.StoreFiles
 import dev.droidtop.stores.util.StoreLanguage
 import dev.droidtop.stores.util.newDownloadInfo
@@ -188,6 +195,44 @@ class GOGStore : StoreLibrary {
 
     override suspend fun launch(context: Context, gameId: String): StoreLaunch? =
         manager(context).primaryPlayTask(gameId)?.let { StoreLaunch(it.executable, it.workingDir, it.arguments) }
+
+    override val hasCloudSaves = true
+
+    override fun settingsItems(context: Context): List<CatalogItem> = listOf(CloudSaveSetting.item(context, id, GOGCloudSaves.LABEL))
+
+    /** Where the game is, for its `<?INSTALL?>` save locations; null when it is not installed from GOG here. */
+    private suspend fun installDir(context: Context, gameId: String): File? = withContext(Dispatchers.IO) {
+        dao(context).getById(gameId)?.takeIf { it.isInstalled && it.installPath.isNotBlank() }?.let { File(it.installPath) }
+    }
+
+    /**
+     * GOG cloud saves of [gameId] in [prefix] ([GOGCloudSaves], docs/SPEC.md 7g, "Stores"): null when nobody is
+     * signed in, the switch is off (unless the person asked), the prefix has no `drive_c` yet, or the game keeps no
+     * cloud saves.
+     */
+    override suspend fun syncSaves(
+        context: Context,
+        gameId: String,
+        phase: SaveSyncPhase,
+        prefix: WinePrefixLocation,
+        title: String,
+        onConflict: SaveConflictResolver?,
+    ): SaveSyncResult? {
+        if (!signedIn(context)) return null
+        if (phase != SaveSyncPhase.MANUAL && !withContext(Dispatchers.IO) { CloudSaveSetting.on(context, id) }) return null
+        if (!withContext(Dispatchers.IO) { File(prefix.prefixDir, "drive_c").isDirectory }) return null
+        return runCatchingCancellable { GOGCloudSaves.run(context, gameId, title, prefix, installDir(context, gameId), onConflict) }
+            .getOrElse {
+                Timber.tag(TAG).w(it, "GOG cloud sync failed for $gameId")
+                SaveSyncResult("Cloud saves: ${it.message ?: it.javaClass.simpleName}", failed = true)
+            }
+    }
+
+    /** The folder of [gameId]'s first save location in [prefix], as the last sync kept GOG's config; no network. */
+    override suspend fun saveFolder(context: Context, gameId: String, prefix: WinePrefixLocation): File? = withContext(Dispatchers.IO) {
+        val config = GOGCloudSaves.keptConfig(context, gameId) ?: return@withContext null
+        GOGCloudSaves.folders(config, prefix, installDir(context, gameId)).firstOrNull()?.dir
+    }
 
     override fun changeStamp(context: Context): Long =
         StoreFiles.stamp(StoresDatabase.files(context) + File(GOGAuthManager.getAuthConfigPath(context)) + Wishlist.file(context, id))

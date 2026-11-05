@@ -1321,7 +1321,7 @@ internal fun ownershipSentence(entry: LibraryEntry): Pair<String, String>? {
  * The Cloud saves row of a store copy (docs/SPEC.md 7i): when the saves last
  * matched the store's cloud, that the last sync failed (A retries), that the
  * device is offline and since when nothing synced, or that the store keeps no
- * cloud saves droidtop reaches ("GOG cloud saves are not supported"). Value
+ * cloud saves droidtop reaches ("Amazon cloud saves are not supported"). Value
  * then line. Pure.
  */
 internal fun cloudSavesLine(

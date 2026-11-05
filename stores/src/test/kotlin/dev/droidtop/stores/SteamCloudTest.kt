@@ -4,10 +4,6 @@ import dev.droidtop.stores.steam.CloudKey
 import dev.droidtop.stores.steam.SaveLayout
 import dev.droidtop.stores.steam.SavePattern
 import dev.droidtop.stores.steam.SaveRoot
-import dev.droidtop.stores.steam.SteamCloudPlan
-import dev.droidtop.stores.steam.SteamCloudPlan.Decision
-import dev.droidtop.stores.steam.SteamCloudPlan.Facts
-import dev.droidtop.stores.steam.SteamCloudState
 import dev.droidtop.stores.steam.SteamCloudSync
 import dev.droidtop.stores.steam.SteamUfs
 import dev.droidtop.stores.steam.SteamUfsParser
@@ -25,87 +21,6 @@ import org.junit.rules.TemporaryFolder
 class SteamCloudTest {
     @get:Rule
     val temp = TemporaryFolder()
-
-    private fun facts(sha: String, time: Long = 1_000L) = Facts(sha, 10L, time)
-
-    @Test
-    fun `equal files on both sides need nothing`() {
-        val both = mapOf("a" to facts("1"))
-        assertEquals(Decision.UpToDate, SteamCloudPlan.decide(emptyMap(), both, both))
-        assertEquals(Decision.UpToDate, SteamCloudPlan.decide(mapOf("a" to "0"), both, both))
-        assertEquals(Decision.UpToDate, SteamCloudPlan.decide(emptyMap(), emptyMap(), emptyMap()))
-    }
-
-    @Test
-    fun `only this device changed, so the files go up and a deleted one is deleted there`() {
-        val base = mapOf("a" to "1", "b" to "2", "c" to "3")
-        val local = mapOf("a" to facts("1"), "b" to facts("22"), "d" to facts("4"))
-        val remote = mapOf("a" to facts("1"), "b" to facts("2"), "c" to facts("3"))
-        val decision = SteamCloudPlan.decide(base, local, remote) as Decision.Upload
-        assertEquals(setOf("b", "d"), decision.send.toSet())
-        assertEquals(listOf("c"), decision.removeRemote)
-    }
-
-    @Test
-    fun `only the cloud changed, so the files come down and a file it dropped goes here`() {
-        val base = mapOf("a" to "1", "b" to "2")
-        val local = mapOf("a" to facts("1"), "b" to facts("2"))
-        val remote = mapOf("a" to facts("11"), "c" to facts("3"))
-        val decision = SteamCloudPlan.decide(base, local, remote) as Decision.Download
-        assertEquals(setOf("a", "c"), decision.fetch.toSet())
-        assertEquals(listOf("b"), decision.removeLocal)
-    }
-
-    @Test
-    fun `a first sync with files on one side only takes them across`() {
-        val files = mapOf("a" to facts("1"))
-        assertTrue(SteamCloudPlan.decide(emptyMap(), files, emptyMap()) is Decision.Upload)
-        assertTrue(SteamCloudPlan.decide(emptyMap(), emptyMap(), files) is Decision.Download)
-    }
-
-    @Test
-    fun `a first sync with different files on both sides is a conflict`() {
-        val local = mapOf("a" to facts("1", time = 5_000L))
-        val remote = mapOf("a" to facts("2", time = 9_000L), "b" to facts("3", time = 2_000L))
-        val conflict = SteamCloudPlan.decide(emptyMap(), local, remote) as Decision.Conflict
-        assertEquals(5_000L, conflict.local.timeMs)
-        assertEquals(9_000L, conflict.cloud.timeMs)
-        assertEquals(1, conflict.local.files)
-        assertEquals(2, conflict.cloud.files)
-    }
-
-    @Test
-    fun `both sides changed since the last sync is a conflict, and choosing a side makes it win`() {
-        val base = mapOf("a" to "1")
-        val local = mapOf("a" to facts("2"))
-        val remote = mapOf("a" to facts("3"))
-        assertTrue(SteamCloudPlan.decide(base, local, remote) is Decision.Conflict)
-        // Treating the cloud as unchanged is how "keep this device" is applied.
-        val keepLocal = SteamCloudPlan.decide(mapOf("a" to "3"), local, remote) as Decision.Upload
-        assertEquals(listOf("a"), keepLocal.send)
-        val keepCloud = SteamCloudPlan.decide(mapOf("a" to "2"), local, remote) as Decision.Download
-        assertEquals(listOf("a"), keepCloud.fetch)
-    }
-
-    @Test
-    fun `a file both sides lost says nothing and does not make a false conflict later`() {
-        val base = mapOf("gone" to "1", "a" to "5")
-        val local = mapOf("a" to facts("5"))
-        val remote = mapOf("a" to facts("6"))
-        assertTrue(SteamCloudPlan.decide(base, local, remote) is Decision.Download)
-    }
-
-    @Test
-    fun `the last-synced state round trips and a damaged one is empty`() {
-        val state = SteamCloudState(mapOf("%gameinstall%save.dat" to Facts("abc", 12L, 99L)))
-        assertEquals(state, SteamCloudState.decode(SteamCloudState.encode(state)))
-        assertEquals(SteamCloudState(), SteamCloudState.decode("nonsense"))
-        assertEquals(mapOf("%gameinstall%save.dat" to "abc"), state.shas)
-        val dir = temp.newFolder()
-        SteamCloudState.save(dir, 7, state)
-        assertEquals(state, SteamCloudState.load(dir, 7))
-        assertEquals(SteamCloudState(), SteamCloudState.load(dir, 8))
-    }
 
     @Test
     fun `Steam's prefix and file name meet however it spells them`() {

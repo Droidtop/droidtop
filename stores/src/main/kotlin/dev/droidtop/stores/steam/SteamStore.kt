@@ -269,7 +269,7 @@ class SteamStore : StoreLibrary {
         val appId = gameId.toIntOrNull() ?: return null
         if (!signedIn(context)) return null
         // A person who turned cloud saves off is only asked again by "Sync cloud saves" on the game's menu.
-        if (phase != SaveSyncPhase.MANUAL && !withContext(Dispatchers.IO) { SteamPrefs.cloudSaves(context) }) return null
+        if (phase != SaveSyncPhase.MANUAL && !withContext(Dispatchers.IO) { dev.droidtop.stores.util.CloudSaveSetting.on(context, id) }) return null
         val found = withContext(Dispatchers.IO) {
             if (!File(prefix.prefixDir, "drive_c").isDirectory) null else runCatchingCancellable { installOf(context, gameId) }.getOrNull()
         } ?: return null

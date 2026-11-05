@@ -294,7 +294,7 @@ class PcPageAboutTest {
         val failed = synced.copy(failedAt = now - 1000)
         assertEquals("Last sync failed" to "Select to retry", cloudSavesLine("Steam", true, failed, online = true, now = now))
         assertEquals("Not synced yet" to "Select to sync now", cloudSavesLine("Steam", true, null, online = true, now = now))
-        assertEquals("Not supported" to "GOG cloud saves are not supported", cloudSavesLine("GOG", false, null, online = true, now = now))
+        assertEquals("Not supported" to "Amazon cloud saves are not supported", cloudSavesLine("Amazon", false, null, online = true, now = now))
     }
 
     @Test
