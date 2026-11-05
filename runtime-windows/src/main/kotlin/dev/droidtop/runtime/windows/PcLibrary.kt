@@ -401,11 +401,18 @@ object PcLibrary {
     fun isManualFolder(path: String): Boolean =
         runCatching { dev.droidtop.runtime.windows.PrefManager.customGameManualFolders.contains(path) }.getOrDefault(false)
 
+    /**
+     * [folders] without [path] and every folder under it; a folder that only shares its name's start (`<path>-2`) is
+     * kept. Pure (Droidtop/tracker#731).
+     */
+    internal fun foldersKept(folders: Set<String>, path: String): Set<String> =
+        folders.filterNot { it == path || it.startsWith("$path/") }.toSet()
+
     /** The vendored scanner is no longer told about game folders that were under [path], which is gone. */
     fun forgetFolders(path: String) {
         runCatching {
             val current = dev.droidtop.runtime.windows.PrefManager.customGameManualFolders
-            val kept = current.filterNot { it == path || it.startsWith("$path/") }.toSet()
+            val kept = foldersKept(current, path)
             if (kept.size != current.size) dev.droidtop.runtime.windows.PrefManager.customGameManualFolders = kept
         }.onFailure { android.util.Log.w(TAG, "Could not tell the folder scanner a folder is gone", it) }
     }
