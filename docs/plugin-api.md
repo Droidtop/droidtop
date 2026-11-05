@@ -3846,6 +3846,7 @@ wording the host uses, so it is identical in every mode.
 | `apps.bind` | dangerous | Stay connected to other apps | F6, F1 |
 | `vault.own` | normal | Keep its own saved passwords | G1 |
 | `context.sync` | dangerous | Keep its data in step with apps on your paired computers | F8 |
+| `data.kinds` | normal | Hand its data to plugins that can take it, when you ask | H3 |
 | `auth.oauth` | normal | Ask you to sign in to a service | G2 |
 | `web.session` | dangerous | Use your sign-in on its sites | G3 |
 | `github.api` | normal | Use your GitHub account for GitHub requests | G4 |
