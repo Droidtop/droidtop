@@ -68,5 +68,4 @@ internal object WineMediaConverter {
 
     /** Deletes the dump databases in [dir], so a damaged one from an earlier run is never read. Returns how many went. */
     fun resetDumps(dir: File): Int = DUMPS.count { File(dir, it).let { f -> f.isFile && f.delete() } }
-    }
 }
