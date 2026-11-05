@@ -107,6 +107,8 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
         /** Android's own pages, folded under one row until each has its own page (plan 4.1 rule 1). */
         val ANDROID_PAGES = CompanionTab(CompanionPrefs.DEVICE_ANDROID, "Android's pages", QuickGlyph.ANDROID)
         val COMPANION_SETTINGS = CompanionTab(CompanionPrefs.DROIDTOP_COMPANION, "Companion", QuickGlyph.SECOND_SCREEN)
+        /** droidtop > Downloads (Droidtop/tracker#786 S6): Downloads and Updates, the place every mode has. */
+        val DOWNLOADS = CompanionTab(CompanionPrefs.DROIDTOP_DOWNLOADS, "Downloads", QuickGlyph.DOWNLOAD)
         val PERFORMANCE = of(ControlPanel.PERFORMANCE, "Performance", QuickGlyph.GAUGE)
         val INPUT = of(ControlPanel.INPUT, "Input", QuickGlyph.KEYBOARD)
         val SOCIAL = of(ControlPanel.SOCIAL, "Social", QuickGlyph.PEOPLE)
@@ -120,7 +122,7 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
 
         /** Device's pages and droidtop's, in the order their tab lists them. */
         val DEVICE_PAGES = listOf(SYSTEM, NETWORK, APPS, ANDROID_PAGES)
-        val DROIDTOP_PAGES = listOf(COMPANION_SETTINGS)
+        val DROIDTOP_PAGES = listOf(COMPANION_SETTINGS, DOWNLOADS)
 
         /** Pages a person can choose as a tab of its own; they are never listed under More, their tab lists them. */
         val PAGE_TABS = DEVICE_PAGES + DROIDTOP_PAGES
@@ -698,6 +700,12 @@ private fun CompanionPage(id: String) {
         CompanionTab.ANDROID_PAGES.id -> CompanionCatalogPage { context -> androidPagesScreen(context) }
         CompanionTab.COMPANION_SETTINGS.id -> CompanionCatalogPage { context ->
             dev.droidtop.library.settings.GamingSettingsCatalog.companionScreen(context)
+        }
+        // The same Downloads and Updates screen the places open (SPEC 7j), so its jobs' Pause, Cancel and Retry and
+        // Updates' Check now are the ones every surface has; a row's outcome stays by its id (Droidtop/tracker#554).
+        CompanionTab.DOWNLOADS.id -> CompanionCatalogPage { _ ->
+            dev.droidtop.app.settings.AppSettingsCatalogs.ensureRegistered()
+            dev.droidtop.library.settings.SettingsScreenRegistry.get(dev.droidtop.library.settings.Place.ID_DOWNLOADS, null)
         }
     }
 }

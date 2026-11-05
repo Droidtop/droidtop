@@ -154,6 +154,8 @@ object CompanionPrefs {
     val DEVICE_APPS: String = pageId(ControlPanel.DEVICE, "apps")
     val DEVICE_ANDROID: String = pageId(ControlPanel.DEVICE, "android")
     val DROIDTOP_COMPANION: String = pageId(ControlPanel.DROIDTOP, "companion")
+    /** droidtop > Downloads (S6): the jobs with their controls, and Updates with Check now. */
+    val DROIDTOP_DOWNLOADS: String = pageId(ControlPanel.DROIDTOP, "downloads")
 
     /** The panel a page tab belongs to (Device or droidtop); null for a tab that is not a page. */
     fun parentOf(id: String): ControlPanel? = if (id.startsWith(PAGE_PREFIX)) panelOf(id) else null

@@ -5344,7 +5344,9 @@ droidtop 0.2.0-dev.1931).
   so an exit is on one page. Later slices move each area onto a page of its own and its link leaves the fold.
   droidtop's first page is **Companion**, the companion's own settings: the screen Settings shows under "Companion
   screen" (`GamingSettingsCatalog.companionScreen`, S2b), drawn by the companion's catalog host; it was More's last
-  row until S3. A page chosen as a tab is on the bar and never under More, which lists tabs only; anything that
+  row until S3. Its second is **Downloads** (S6): the Downloads and Updates screen the places open, so the jobs'
+  controls and Updates' Check now are the ones every surface has, each row's outcome kept by its id
+  (Droidtop/tracker#554). A page chosen as a tab is on the bar and never under More, which lists tabs only; anything that
   opens a page that is not on the bar (Home's "All controls", the status line, the System page's Network) opens it
   on its parent's tab. A saved bar keeps its reach (`CompanionPrefs.currentId`): System is read as Device, Network
   and Apps as Device's pages. Where the mode hides the Companion

@@ -157,6 +157,7 @@ class CompanionTabsTest {
         assertEquals(listOf("home", CompanionPrefs.DEVICE_NETWORK), ids(bar.tabs))
         assertFalse(bar.more.any { it.id.startsWith(CompanionPrefs.PAGE_PREFIX) })
         assertEquals(CompanionTab.DEVICE_PAGES, CompanionTab.pagesOf(CompanionTab.DEVICE.id))
+        assertEquals(listOf(CompanionPrefs.DROIDTOP_COMPANION, CompanionPrefs.DROIDTOP_DOWNLOADS), ids(CompanionTab.pagesOf(CompanionTab.DROIDTOP.id)))
         // Kid gets neither Device nor its pages.
         assertFalse(slots(listOf(CompanionPrefs.DEVICE_NETWORK), UiMode.KID, emptyList(), 0f, emptyMap()).all.any { it.id == CompanionPrefs.DEVICE_NETWORK })
     }

@@ -1217,6 +1217,7 @@ object GamingSettingsCatalog {
         CompanionPrefs.DEVICE_NETWORK to "Device: Network",
         CompanionPrefs.DEVICE_APPS to "Device: Apps",
         CompanionPrefs.DROIDTOP_COMPANION to "droidtop: Companion",
+        CompanionPrefs.DROIDTOP_DOWNLOADS to "droidtop: Downloads",
     )
 
     /** The names of plugin panels last offered as tab choices, so a bar's summary can name them without reading manifests. */
