@@ -235,6 +235,22 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 build-scripts/check_class_load_api.py app/build/outputs/apk/release/app-universal-release.apk
 
+      - name: Native imports resolve
+        # Every library in the APK finds each symbol it imports among the
+        # libraries its NEEDED names reach, by file name or SONAME, or in the
+        # NDK's platform libraries (scripts/check-native-links.py). Release
+        # 2967 shipped a libwinlator_11.so without the functions
+        # libvortekrenderer.so imports, and every vortek game crashed at its
+        # first frame (Droidtop/tracker#857).
+        if: ${{ !cancelled() }}
+        run: |
+          apk_dir="$RUNNER_TEMP/apk-libs"
+          mkdir -p "$apk_dir"
+          unzip -q -o app/build/outputs/apk/release/app-universal-release.apk 'lib/*' -d "$apk_dir"
+          ndk_bin="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
+          READELF="$ndk_bin/bin/llvm-readelf" python3 scripts/check-native-links.py \
+            "$apk_dir" "$ndk_bin/sysroot"
+
       - name: ABI sets (arm64-v8a libraries without an x86_64 build)
         # The fat APK installs as x86_64 on an Android-x86 device with ARM
         # translation only when its x86_64 set holds every arm64 name
