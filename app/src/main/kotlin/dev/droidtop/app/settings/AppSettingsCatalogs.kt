@@ -225,6 +225,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(integrationsScreen())
         SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(pluginKeysScreen())
+        SettingsScreenRegistry.register(keysAndAccountsScreen())
         // Opened on their own by droidtop:// action links (LinkActivity, LinkRouter); More catalogs is also inside Plugins > Add.
         SettingsScreenRegistry.register(PluginCatalogScreen.screen())
         SettingsScreenRegistry.register(dev.droidtop.library.integrations.ActionLinks.screen())
@@ -1132,6 +1133,7 @@ object AppSettingsCatalogs {
 
     private suspend fun accountsAndSourcesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val signedInStores = PcStore.entries.count { it.signedIn(context) }
+        val keysHeld = runCatching { heldKeys(context).size }.getOrDefault(0)
         val pairedComputers = dev.droidtop.net.peer.Computers.list(context).size
 
         val activeIntegrations = IntegrationStore.available(context).size
@@ -1159,6 +1161,8 @@ object AppSettingsCatalogs {
                 title = "Accounts",
                 items = listOf(
                     GitHubAccountCatalog.accountRow(context),
+                    // Every key droidtop holds, in one place (Droidtop/tracker#12, the owner's choice (b), 2026-10-28).
+                    keysAndAccountsRow(keysHeld),
                     // Each store's sign-in, library and sync live on its own page in Stores (docs/SPEC.md 7j "Places").
                     NestedScreenItem(
                         id = "accounts_stores_link",

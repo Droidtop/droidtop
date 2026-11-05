@@ -13670,6 +13670,20 @@ one page per store in **Stores** (`stores`, reached from the Gaming left
 menu, "Places" under 7j), and Accounts and sources links to it with one row
 instead of five sign-in rows.
 
+**Keys and accounts (2026-11-05, Droidtop/tracker#12).** The owner chose one page
+(2026-10-28: "Add one 'Keys and accounts' page under Settings > Accounts and
+sources. It lists every key and token droidtop holds, where each is used, and a
+Remove. Each service's own page keeps its row."). `keysAndAccountsScreen`
+(`keys_and_accounts`, the Accounts group's second row, "n held") lists, one row
+each with where it is used: every store sign-in or API key (removed by that
+store's Sign out), the GitHub token (`GitHubTokenStore.clear`), each service key
+a scraper, achievement, debrid or file-host setup holds (`ScraperKeyService`,
+cleared through its own `write`), and each plugin signer and app key the person
+trusted (`stopTrustingOrigin`, `stopTrustingApp`, the same calls "Keys you
+trust" makes). Pressing a row asks, then removes it. The page stores nothing: it
+reads each key from where it lives, so the service's own page and this one never
+disagree.
+
 **A plugin's store (2026-10-28, Droidtop/tracker#220, docs/plugin-api.md 3
 A13).** A plugin that provides `library.stores` adds a store beside
 droidtop's own: a `StoreLibrary` (`PluginStoreLibrary`) registered at

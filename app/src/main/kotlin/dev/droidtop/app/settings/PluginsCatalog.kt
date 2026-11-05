@@ -1958,17 +1958,32 @@ internal suspend fun AppSettingsCatalogs.appKeysGroup(context: Context): Catalog
                         title = "Stop trusting $packageName",
                         subtitle = "Its plugin stops running until you trust its key again",
                         confirmTitle = "Stop trusting the key $packageName is signed with?",
-                        run = { ctx, _ ->
-                            UserOriginKeys.forgetApp(UserOriginKeys.storeFile(ctx), packageName)
-                            dev.droidtop.pluginhost.AppInterfaces.recheck(packageName)
-                            pluginsChanged(ctx)
-                            "No longer trusting $packageName's key"
-                        },
+                        run = { ctx, _ -> stopTrustingApp(ctx, packageName) },
                     ),
                 )
             }
         },
     )
+}
+
+/**
+ * Stops trusting the signer [origin] the person added: what "Keys you trust" and "Keys and accounts" both do
+ * (Droidtop/tracker#12), so the plugins it signed are flagged the same way from either. The line to show.
+ */
+internal fun AppSettingsCatalogs.stopTrustingOrigin(context: Context, origin: String): String =
+    if (UserOriginKeys.remove(UserOriginKeys.storeFile(context), origin)) {
+        pluginsChanged(context)
+        "No longer trusting \"$origin\": its plugins are flagged on the Plugins screen"
+    } else {
+        "Nothing to remove"
+    }
+
+/** Stops trusting the key the app [packageName]'s plugin is signed with: both pages' one way. The line to show. */
+internal fun AppSettingsCatalogs.stopTrustingApp(context: Context, packageName: String): String {
+    UserOriginKeys.forgetApp(UserOriginKeys.storeFile(context), packageName)
+    dev.droidtop.pluginhost.AppInterfaces.recheck(packageName)
+    pluginsChanged(context)
+    return "No longer trusting $packageName's key"
 }
 
 internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
@@ -2022,14 +2037,7 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                                 title = "Stop trusting \"${entry.origin}\"",
                                 subtitle = "Plugins it signed stop running and can no longer be updated, until you trust it again",
                                 confirmTitle = "Stop trusting \"${entry.origin}\"?",
-                                run = { ctx, _ ->
-                                    if (UserOriginKeys.remove(UserOriginKeys.storeFile(ctx), entry.origin)) {
-                                        pluginsChanged(ctx)
-                                        "No longer trusting \"${entry.origin}\": its plugins are flagged on the Plugins screen"
-                                    } else {
-                                        "Nothing to remove"
-                                    }
-                                },
+                                run = { ctx, _ -> stopTrustingOrigin(ctx, entry.origin) },
                             ),
                         )
                     }
