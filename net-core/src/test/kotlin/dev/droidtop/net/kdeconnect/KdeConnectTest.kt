@@ -89,6 +89,20 @@ class KdeConnectTest {
     }
 
     @Test
+    fun batteryRingNotifications() {
+        assertEquals(
+            KdcEvent.Battery("a", 12, false, true),
+            KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"battery","charge":12,"charging":false,"low":true}}""")),
+        )
+        assertEquals(KdcEvent.Ring("a"), KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"ring"}}""")))
+        assertEquals(
+            KdcEvent.Notification("a", "k", "Messages", "Ana", "hi", false),
+            KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"notification","key":"k","app":"Messages","title":"Ana","text":"hi","dismissable":true,"silent":false}}""")),
+        )
+        assertEquals(KdcEvent.NotificationGone("a", "k"), KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"notification_gone","key":"k"}}""")))
+    }
+
+    @Test
     fun addresses() {
         assertEquals(listOf("100.64.0.2", "192.168.1.9"), KdeConnect.parseAddresses(" 100.64.0.2, 192.168.1.9\n100.64.0.2 "))
         assertEquals(emptyList<String>(), KdeConnect.parseAddresses(""))

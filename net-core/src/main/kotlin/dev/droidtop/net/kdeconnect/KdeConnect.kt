@@ -190,6 +190,19 @@ object KdeConnect {
         AgentNative.failure(call("ping", JSONObject().put("id", id).put("message", "Ping from droidtop")))
     }
 
+    /** This device's battery, for paired devices: [charge] 0..100, or null with no battery. */
+    suspend fun setBattery(charge: Int?, charging: Boolean) = withContext(Dispatchers.IO) {
+        if (!_running.value) return@withContext
+        val args = JSONObject().put("charging", charging)
+        if (charge != null) args.put("charge", charge)
+        call("battery_set", args)
+    }
+
+    /** Rings the paired device [id] (find my device). */
+    suspend fun ring(id: String): String? = withContext(Dispatchers.IO) {
+        AgentNative.failure(call("ring", JSONObject().put("id", id)))
+    }
+
     /** Types [text] on the paired device [id] (droidtop as the controller). */
     suspend fun type(id: String, text: String, enter: Boolean = false): String? = withContext(Dispatchers.IO) {
         var failure = if (text.isEmpty()) null else AgentNative.failure(call("input_send", JSONObject().put("id", id).put("input", JSONObject().put("key", text))))
@@ -291,6 +304,11 @@ sealed class KdcEvent {
     data class FileFailed(val id: String, val name: String, val why: String) : KdcEvent()
     /** A paired device types ([key] text, or [specialKey] such as "backspace" or "enter") or moves the pointer. */
     data class Input(val id: String, val key: String?, val specialKey: String?, val pointer: Boolean) : KdcEvent()
+    data class Battery(val id: String, val charge: Int, val charging: Boolean, val low: Boolean) : KdcEvent()
+    /** A paired device is looking for this one: ring. */
+    data class Ring(val id: String) : KdcEvent()
+    data class Notification(val id: String, val key: String, val app: String, val title: String, val text: String, val silent: Boolean) : KdcEvent()
+    data class NotificationGone(val id: String, val key: String) : KdcEvent()
     /** The other device's clipboard: put on this one's. */
     data class Clipboard(val id: String, val text: String) : KdcEvent()
     data class FileSent(val id: String, val name: String, val size: Long) : KdcEvent()
@@ -310,6 +328,17 @@ sealed class KdcEvent {
                 when (p?.optString("plugin")) {
                     "ping" -> Ping(o.optString("id"), p.optString("message").takeIf { it.isNotEmpty() && !p.isNull("message") })
                     "clipboard" -> Clipboard(o.optString("id"), p.optString("text"))
+                    "battery" -> Battery(o.optString("id"), p.optInt("charge", -1), p.optBoolean("charging"), p.optBoolean("low"))
+                    "ring" -> Ring(o.optString("id"))
+                    "notification" -> Notification(
+                        o.optString("id"),
+                        p.optString("key"),
+                        p.optString("app"),
+                        p.optString("title"),
+                        p.optString("text"),
+                        p.optBoolean("silent"),
+                    )
+                    "notification_gone" -> NotificationGone(o.optString("id"), p.optString("key"))
                     "input" -> {
                         val i = p.optJSONObject("input") ?: JSONObject()
                         Input(
