@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- droidtop, the only app that drives the host (ProviderHostService checks the caller's user id against it). -->
+    <queries>
+        <package android:name="dev.droidtop.app" />
+    </queries>
+    <!--
+      tools:node="replace": the host carries droidtop's plugin runtime as a library, and none of that library's own
+      components (droidtop's plugin processes, its door, its activities) belong in the host. The host declares only
+      what it is: one service droidtop binds.
+    -->
+    <application
+        android:label="droidtop provider host"
+        android:allowBackup="false"
+        android:hasCode="true"
+        tools:node="replace">
+        <!--
+          The host as an app interface plugin (docs/plugin-api.md 1.3, Droidtop/tracker#852): droidtop finds it by this
+          action, checks its signature against the key droidtop made for it, and binds it. Exported because droidtop is
+          another app; the service answers droidtop's user id alone.
+        -->
+        <service
+            android:name="dev.droidtop.providerhost.ProviderHostService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="dev.droidtop.plugin.APP_INTERFACE" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

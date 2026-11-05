@@ -104,9 +104,29 @@ abstract class PluginProcessService : Service() {
      * plugin; every call below is refused unless it comes from :app.
      */
     private val appCaller by lazy {
-        AppCaller(DroidtopCallers.isIsolatedUid(Process.myUid()), applicationInfo.uid) { pid ->
+        // A remote driver (the provider host's, droidtop in another app) cannot be named by process, so its first
+        // caller's pid is kept, as an isolated process keeps it, until every binding is gone ([onUnbind]).
+        AppCaller(driverIsRemote || DroidtopCallers.isIsolatedUid(Process.myUid()), driverUid()) { pid ->
             DroidtopCallers.processName(this, pid)?.let { DroidtopCallers.isAppProcess(packageName, it) } == true
         }
+    }
+
+    /**
+     * True in a process of another app that droidtop drives (the enhancement provider host, Droidtop/tracker#852):
+     * droidtop's user id is not this app's, and its processes cannot be named from here.
+     */
+    protected open val driverIsRemote: Boolean get() = false
+
+    /** The user id of droidtop's main process, the one driver: this app's own, unless [driverIsRemote]. */
+    protected open fun driverUid(): Int = applicationInfo.uid
+
+    /** A plugin context that reaches only [broker], for a process that loads a plugin itself (the provider host's). */
+    protected fun brokerContext(broker: IPluginHostBroker, folder: String = ""): PluginContext = BrokerPluginContext(broker, folder)
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        // Every client is gone, droidtop included (its process may have died): the next droidtop process is asked again.
+        if (driverIsRemote) appCaller.reset()
+        return super.onUnbind(intent)
     }
 
     /** The secret droidtop's one-way screen calls carry ([requireAppToken]); made once per process. */
@@ -124,7 +144,7 @@ abstract class PluginProcessService : Service() {
      */
     private fun requireAppToken(token: Long) {
         val uid = android.os.Binder.getCallingUid()
-        if (!AppCaller.tokenAllows(uid, applicationInfo.uid, token, inputSecret)) {
+        if (!AppCaller.tokenAllows(uid, driverUid(), token, inputSecret)) {
             Log.w("droidtop.plugin", "refused a one-way call from uid $uid: only droidtop drives a plugin process")
             throw SecurityException("only droidtop drives a plugin process")
         }

@@ -1,0 +1,13 @@
+{
+  "id": "dev.droidtop.providerhost",
+  "origin": "droidtop-provider-host",
+  "label": "Provider host",
+  "description": "The app droidtop makes for itself to hold system-level access, so droidtop's own code holds none. Root, Shizuku and wireless debugging are allowed to this app, and every use goes through droidtop's checks.",
+  "summary": "Holds system-level access for droidtop, behind droidtop's checks",
+  "publisher": "droidtop",
+  "version": "1.0.0",
+  "kind": "app_interface",
+  "contractVersion": 3,
+  "category": "system",
+  "app": { "package": "dev.droidtop.providerhost", "service": "dev.droidtop.providerhost.ProviderHostService" }
+}

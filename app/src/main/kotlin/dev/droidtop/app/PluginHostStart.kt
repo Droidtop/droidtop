@@ -73,6 +73,9 @@ object PluginHostStart {
             // With Shizuku, the grants the system controls need are taken now, so they switch in place rather than
             // opening Android's screens (docs/SPEC.md "Privileged actions", tracker#581). Here, not in droidtop's start:
             // the backend may be the Shizuku plugin.
+            // The enhancement provider host (Droidtop/tracker#852): a newer one goes in over droidtop's own, without asking,
+            // where Android allows that. Nothing is installed for the first time here.
+            step("provider host") { ProviderHostSetup.updateQuietly(app) }
             step("elevated grants") { dev.droidtop.runtime.tasks.ElevatedGrants.takeAll(app, dev.droidtop.runtime.tasks.TaskManager.shell) }
         }
     }

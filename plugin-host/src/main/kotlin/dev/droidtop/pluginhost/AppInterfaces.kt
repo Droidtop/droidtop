@@ -81,7 +81,8 @@ object AppInterfaces {
     /** Whether [record] is an app plugin signed by its app's pinned official certificate. */
     fun isOfficial(record: PluginRecord): Boolean {
         val pkg = record.manifest.app?.packageName ?: return false
-        return AppInterfaceTrust.OFFICIAL[pkg]?.any { it.equals(record.approvedKeySha256, ignoreCase = true) } == true
+        val host = if (pkg == ProviderHost.PACKAGE) ProviderHost.certSha256() else null
+        return AppInterfaceTrust.officialCerts(pkg, host).any { it.equals(record.approvedKeySha256, ignoreCase = true) }
     }
 
     /**
@@ -115,6 +116,7 @@ object AppInterfaces {
             checks,
             signersReported(info),
             UserOriginKeys.appCerts(UserOriginKeys.storeFile(context), packageName),
+            hostCert = if (packageName == ProviderHost.PACKAGE) ProviderHost.certSha256() else null,
         )
         val manifest = manifestBytes?.let { bytes -> runCatching { PluginManifest.fromJson(JSONObject(String(bytes, Charsets.UTF_8))) }.getOrNull() }
         val problem = if (manifestBytes == null) "its APK carries no ${AppInterfaceTrust.ASSET_PATH}" else AppInterfaceTrust.manifestProblem(manifest, packageName, serviceName)

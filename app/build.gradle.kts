@@ -337,6 +337,34 @@ tasks.matching { it.name == "packageDebug" }.configureEach {
 // before Gradle runs: What's new reads it from the APK's assets. A local build has none and shows an empty history.
 android.sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/changelog"))
 
+// The enhancement provider host (Droidtop/tracker#852): :provider-host's unsigned release APK, carried as an asset of
+// droidtop itself. droidtop signs it on the device with its own Keystore key and installs it (ProviderHostSetup); the
+// template is the same for every device, the key is each device's own.
+abstract class CopyProviderHost : DefaultTask() {
+    @get:InputFile
+    abstract val apk: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val dir = outputDir.get().asFile
+        dir.mkdirs()
+        apk.get().asFile.copyTo(File(dir, "provider-host.apk"), overwrite = true)
+    }
+}
+val copyProviderHost = tasks.register<CopyProviderHost>("copyProviderHost") {
+    dependsOn(":provider-host:assembleRelease")
+    apk.set(project(":provider-host").layout.buildDirectory.file("outputs/apk/release/provider-host-release-unsigned.apk"))
+}
+// A generated asset folder of every variant: AGP wires the task into everything that reads the assets, lint included.
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(copyProviderHost, CopyProviderHost::outputDir)
+    }
+}
+
 // The throwaway app the priv.packages rig check installs (Droidtop/tracker#130): built by :rigtest-throwaway and
 // carried as an asset of the androidTest APK only, never of droidtop itself.
 val rigThrowawayAssets = layout.buildDirectory.dir("generated/rigThrowaway")

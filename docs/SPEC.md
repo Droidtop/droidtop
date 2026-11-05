@@ -4557,6 +4557,49 @@ the `ContainerRuntime` interface that already exists (§3):
   this gets built out (workspace switching, per-app window rules, etc.),
   not a component to fork code from.
 
+### Enhancement providers: one host app holds every elevated privilege (Droidtop/tracker#852, owner 2026-10-30)
+
+The owner: "We run enhancement provider plugins through an apk that droidtop generates and installs for itself, that
+hooks into droidtop through the application interface plugin api. This means no separate downloads, no separate
+builds, etc", with "One host apk for all providers" and "The point of this is to remove enhanced privileges from
+droidtop's raw code. Everything runs as an isolated plugin now, so the API handles scoping that stuff". So:
+
+- **Enhancement providers** are the only plugins that may hold elevated privilege: `su` through the root manager,
+  Shizuku, and the adb port and pairing key of wireless debugging.
+- **They run in one provider host app** (`dev.droidtop.providerhost`, module `:provider-host`). It has its own
+  Android user id. That user id, not droidtop's, is what the person allows in the root manager and in Shizuku, and
+  droidtop's own entry in the root manager can stay Deny.
+- **The host is a template droidtop carries.** CI builds `:provider-host`'s release APK unsigned and packs it into
+  droidtop's assets (`provider-host.apk`, app/build.gradle.kts `copyProviderHost`); nothing signed is built for it.
+- **Signing, on the device** (`ProviderHost`, plugin-host). On first use droidtop makes an EC P-256 key in Android's
+  Keystore (alias `droidtop-provider-host`, sign only) and signs the template with it, APK Signature Scheme v2 and v3
+  through apksig. The same key signs every later version, so each installs over the last. The key never leaves the
+  Keystore and the signed APK never leaves droidtop's cache, which is emptied after the install. Uninstalling droidtop
+  deletes the key: a host left from before is then "not made by this droidtop" and the person removes it on Android's
+  own screen before droidtop sets up its own (`ProviderHost.Plan.FOREIGN`).
+- **Install** (`ProviderHostSetup`, :app, through the one installer `ApkInstaller`). The first install is the person's
+  choice: Settings > Accounts and sources > Plugins and integrations > "Set up the provider host", and Android asks
+  once. A newer template (each droidtop build carries one with its own version code) goes in over droidtop's own
+  host at the plugin host's start, after droidtop's first screen, only where Android allows it without asking
+  (Android 12+, droidtop its installer of record, "Update apps without asking" on). Otherwise the row says "Update
+  the provider host". Nothing is installed for the first time without the person's press.
+- **Trust is droidtop's own key.** The host is an app interface plugin (docs/plugin-api.md 1.3) and its signature is
+  checked like any app's. It is Official only when signed by the key droidtop made on this device
+  (`AppInterfaceTrust.officialCerts`), and its package signed by any other key is refused outright, never offered to
+  trust by hand ("This provider host was not made by this droidtop").
+- **The connection is the app interface plugin API.** Once installed, droidtop adds the host as a plugin waiting for
+  the person's approval, like any app's plugin; installing it grants nothing. Every call to it, and every call it makes,
+  goes through droidtop's broker, with the grants, scopes and the activity log. The host's service answers only
+  droidtop: the caller's user id must be droidtop's, droidtop must be the host's installer of record, and the first
+  droidtop process to bind it is the only one it serves until every binding is gone (`ProviderHostService`,
+  `PluginProcessService.driverIsRemote`). Its own manifest drops every component of droidtop's plugin runtime it
+  carries as a library.
+- **Not concerns** (owner): restricted settings, since scoping is the API's job, and Play Protect, which already
+  warns about droidtop.
+- **Built in steps.** The host, its signing, install and connection come first and hold nothing. Then the root,
+  Shizuku and wireless debugging providers move into it, then droidtop's own Shizuku and wireless debugging code and
+  the full-trust tier go. The Fibrewall lane confines the host's processes, each provider isolated from the others.
+
 ### Wireless debugging (Droidtop/tracker#816, owner 2026-10-30)
 
 The owner: "Add it to the things droidtop can do for setup, when shizuku is running, or through wireless debugging's

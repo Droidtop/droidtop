@@ -120,6 +120,8 @@ include(":stores")
 // contract (IPluginRuntime). No dependency on :library-core or :app --
 // a plugin call site hands it plain values, never a database handle.
 include(":plugin-host")
+// The enhancement provider host template (Droidtop/tracker#852): built unsigned, carried in droidtop's assets.
+include(":provider-host")
 
 // The sandbox library's program-tree binding (docs/SPEC.md 5b, Droidtop/tracker#584): the broker listener Wine's
 // processes attach to, with libsbx_child.so and sbx-exec. No dependency on droidtop's other modules.

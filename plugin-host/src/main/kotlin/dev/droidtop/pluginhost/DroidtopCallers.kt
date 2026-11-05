@@ -121,6 +121,12 @@ internal class AppCaller(val isolated: Boolean, private val appUid: Int, private
             callingUid == appUid && secret != 0L && token == secret
     }
 
+    /** Every binding is gone (a remote driver's process may have died): the next caller of droidtop's UID is kept. */
+    @Synchronized
+    fun reset() {
+        pid = 0
+    }
+
     /** Droidtop's process [deadPid] died: the next caller is asked about again. */
     @Synchronized
     fun forget(deadPid: Int) {

@@ -17,7 +17,29 @@ import dev.droidtop.runtime.tasks.ElevatedChoicePrefs
  * a second row asks it to. Reads binder state: build it off the main thread.
  */
 object ElevatedAccessCatalog {
-    fun rows(context: Context): List<CatalogItem> = listOfNotNull(choiceRow(context), allowRow(), wirelessRow(context))
+    fun rows(context: Context): List<CatalogItem> = listOfNotNull(hostRow(context), choiceRow(context), allowRow(), wirelessRow(context))
+
+    /**
+     * The enhancement provider host (docs/SPEC.md "Enhancement providers", Droidtop/tracker#852): set it up, update it, or
+     * replace one droidtop did not make. Once it is current the row says so; its plugin page is where it is approved.
+     */
+    private fun hostRow(context: Context): CatalogItem? {
+        val (title, subtitle) = when (dev.droidtop.app.ProviderHostSetup.plan(context)) {
+            dev.droidtop.pluginhost.ProviderHost.Plan.NONE -> return null
+            dev.droidtop.pluginhost.ProviderHost.Plan.INSTALL -> "Set up the provider host" to
+                "An app droidtop makes for itself to hold root, Shizuku and wireless debugging, so droidtop holds none. Android asks you once"
+            dev.droidtop.pluginhost.ProviderHost.Plan.UPDATE -> "Update the provider host" to "A newer provider host comes with this droidtop"
+            dev.droidtop.pluginhost.ProviderHost.Plan.FOREIGN -> "Replace the provider host" to
+                "The one installed wasn't made by this droidtop. Remove it, then set it up again"
+            dev.droidtop.pluginhost.ProviderHost.Plan.CURRENT -> "Provider host" to "Installed and up to date. Approve it and choose what it may do in Plugins"
+        }
+        return dev.droidtop.library.settings.AsyncActionItem(
+            id = "accounts_provider_host",
+            title = title,
+            subtitle = subtitle,
+            run = { ctx, _ -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { dev.droidtop.app.ProviderHostSetup.setUp(ctx) } },
+        )
+    }
 
     /**
      * Wireless debugging, the backend that needs nothing installed (docs/SPEC.md "Wireless debugging"): Pair until

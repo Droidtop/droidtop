@@ -512,6 +512,16 @@ store". Its adapter is the app itself:
     official certificate, and its page says whose key signs it.
   - **Uninstalling it** removes the plugin, not the app, and lets droidtop's
     binding to the app go.
+- **The enhancement provider host is an app interface plugin droidtop
+  makes itself** (Droidtop/tracker#852; docs/SPEC.md "Enhancement
+  providers"). `dev.droidtop.providerhost` is signed on the device by a key
+  droidtop keeps in Android's Keystore, and that key is the host's only
+  official certificate: the host is Official by it alone, and its package
+  signed by any other key is refused, never offered under "Keys you trust".
+  It goes through the same approval as any app's plugin. Its service answers
+  only droidtop: the caller's user id is droidtop's, droidtop is the host's
+  installer of record, and the first droidtop process to bind it is the one
+  served until every binding is gone.
 
 ### 1.4 The broker
 

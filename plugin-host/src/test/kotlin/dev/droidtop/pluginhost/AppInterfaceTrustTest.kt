@@ -29,6 +29,27 @@ class AppInterfaceTrustTest {
     }
 
     @Test
+    fun `the provider host is Official only by the key droidtop made for it, and refused by any other`() {
+        val host = ProviderHost.PACKAGE
+        assertEquals(AppInterfaceTrust.Verdict.Official(a), AppInterfaceTrust.decide(host, listOf(apk(a)), setOf(a), emptySet(), hostCert = a))
+        // Another key, even one the person trusts for that package, never makes a host droidtop will use.
+        assertEquals(AppInterfaceTrust.Verdict.Refused(AppInterfaceTrust.NOT_OUR_HOST), AppInterfaceTrust.decide(host, listOf(apk(b)), setOf(b), setOf(b), hostCert = a))
+        assertEquals(AppInterfaceTrust.Verdict.Refused(AppInterfaceTrust.NOT_OUR_HOST), AppInterfaceTrust.decide(host, listOf(apk(a)), setOf(a), emptySet(), hostCert = null))
+        // droidtop's host key makes no other app Official.
+        assertEquals(AppInterfaceTrust.Verdict.NotTrusted(a), AppInterfaceTrust.decide("com.example.app", listOf(apk(a)), setOf(a), emptySet(), hostCert = a))
+    }
+
+    @Test
+    fun `droidtop installs the host once, updates its own, and leaves one it did not sign to the person`() {
+        assertEquals(ProviderHost.Plan.NONE, ProviderHost.Plan.decide(template = null, installed = 5, ours = true))
+        assertEquals(ProviderHost.Plan.INSTALL, ProviderHost.Plan.decide(template = 9, installed = null, ours = false))
+        assertEquals(ProviderHost.Plan.UPDATE, ProviderHost.Plan.decide(template = 9, installed = 5, ours = true))
+        assertEquals(ProviderHost.Plan.CURRENT, ProviderHost.Plan.decide(template = 9, installed = 9, ours = true))
+        assertEquals(ProviderHost.Plan.CURRENT, ProviderHost.Plan.decide(template = 9, installed = 12, ours = true))
+        assertEquals(ProviderHost.Plan.FOREIGN, ProviderHost.Plan.decide(template = 9, installed = 5, ours = false))
+    }
+
+    @Test
     fun `Enginehost signed by its release certificate is Official, and by any other key is not`() {
         val release = "56ad873eefebacfbbd5662b3b8bd0b094b6ac2d86f27933b257080d04951bf35"
         assertEquals(setOf(release), AppInterfaceTrust.OFFICIAL["dev.enginehost"])

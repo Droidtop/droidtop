@@ -47,6 +47,7 @@ object AppInterfaceTrust {
     const val UNCHECKABLE = "Its app's signature could not be checked, so droidtop won't use it"
     const val SIGNED_OLD_WAY = "Its app is signed the old way droidtop cannot check, so droidtop won't use it"
     const val MANY_SIGNERS = "Its app is signed by more than one key, which droidtop doesn't accept for a plugin"
+    const val NOT_OUR_HOST = "This provider host was not made by this droidtop, so droidtop won't use it. Remove it, and droidtop sets up its own"
     const val NOT_ITS_SIGNER = "Its app's files are not signed by the key Android reports for it, so droidtop won't use it"
 
     /**
@@ -57,6 +58,16 @@ object AppInterfaceTrust {
     val OFFICIAL: Map<String, Set<String>> = mapOf(
         "dev.enginehost" to setOf("56ad873eefebacfbbd5662b3b8bd0b094b6ac2d86f27933b257080d04951bf35"),
     )
+
+    /**
+     * The certificates that make [packageName] Official: its pinned ones, and for the enhancement provider host
+     * ([ProviderHost.PACKAGE], Droidtop/tracker#852) [hostCert], the certificate of the key droidtop made on this device
+     * and signed the host with. No other package is ever Official by that key, and the host by no other key.
+     */
+    fun officialCerts(packageName: String, hostCert: String?): Set<String> = when (packageName) {
+        ProviderHost.PACKAGE -> setOfNotNull(hostCert?.lowercase())
+        else -> OFFICIAL[packageName].orEmpty()
+    }
 
     /** droidtop's own verification of one APK of the app: verified at all, with v2 or v3, and by which certificates. */
     data class ApkCheck(val verified: Boolean, val v2OrV3: Boolean, val signers: Set<String>)
@@ -80,14 +91,22 @@ object AppInterfaceTrust {
      * [packageManagerSigners] (what Android reports as the app's current signers) and [trustedByYou] (the certificates
      * the person trusts for this package).
      */
-    fun decide(packageName: String, apks: List<ApkCheck>, packageManagerSigners: Set<String>, trustedByYou: Set<String>): Verdict {
+    fun decide(
+        packageName: String,
+        apks: List<ApkCheck>,
+        packageManagerSigners: Set<String>,
+        trustedByYou: Set<String>,
+        hostCert: String? = null,
+    ): Verdict {
         if (apks.isEmpty() || apks.any { !it.verified }) return Verdict.Refused(UNCHECKABLE)
         if (apks.any { !it.v2OrV3 }) return Verdict.Refused(SIGNED_OLD_WAY)
         val signer = apks.first().signers.singleOrNull()?.lowercase() ?: return Verdict.Refused(MANY_SIGNERS)
         if (apks.any { check -> check.signers.map { it.lowercase() }.toSet() != setOf(signer) }) return Verdict.Refused(MANY_SIGNERS)
         if (packageManagerSigners.map { it.lowercase() }.toSet() != setOf(signer)) return Verdict.Refused(NOT_ITS_SIGNER)
         return when {
-            OFFICIAL[packageName]?.any { it.equals(signer, ignoreCase = true) } == true -> Verdict.Official(signer)
+            officialCerts(packageName, hostCert).any { it.equals(signer, ignoreCase = true) } -> Verdict.Official(signer)
+            // The host's package signed by anything but droidtop's own key is never offered, not even to trust by hand.
+            packageName == ProviderHost.PACKAGE -> Verdict.Refused(NOT_OUR_HOST)
             trustedByYou.any { it.equals(signer, ignoreCase = true) } -> Verdict.TrustedByYou(signer)
             else -> Verdict.NotTrusted(signer)
         }
