@@ -99,7 +99,32 @@ class StandardTaskbar(private val service: AccessibilityService) {
     /** The mode in use when the last window came to the front (`Modes.lastMode`): the bar is Standard's alone. */
     private var modeInUse = ""
 
-    private var collapsed = false
+    /** The displays whose bar the person folded with Hide; each display keeps its own (Droidtop/tracker#700). */
+    private val hiddenOn = HashSet<Int>()
+
+    /** Per display, the game the person pressed Show for while the bar had folded over it: it stays up for that game. */
+    private val shownForGame = HashMap<Int, String>()
+
+    /**
+     * The library game in front on [displayId], or null: the app in front is the game droidtop launched
+     * ([dev.droidtop.runtime.RunningGame]), on the display it was launched to. Window changes do not say which display
+     * an app came to the front on, so the game's display is the one the launch chose.
+     */
+    private fun gameOn(displayId: Int): String? {
+        val game = dev.droidtop.runtime.RunningGame.packageName ?: return null
+        if (!appInFront || frontPackage != game) return null
+        val gameDisplay = dev.droidtop.runtime.HomeDisplays.lastUsedDisplayId ?: Display.DEFAULT_DISPLAY
+        return game.takeIf { gameDisplay == displayId }
+    }
+
+    private fun collapsedOn(displayId: Int): Boolean {
+        val game = gameOn(displayId)
+        return TaskbarPolicy.collapsed(
+            hidden = displayId in hiddenOn,
+            gameHere = game != null,
+            shownForThisGame = game != null && shownForGame[displayId] == game,
+        )
+    }
     private var focusedDisplay: Int? = null
 
     /**
@@ -127,6 +152,8 @@ class StandardTaskbar(private val service: AccessibilityService) {
         override fun onDisplayAdded(displayId: Int) = renderAll()
         override fun onDisplayRemoved(displayId: Int) {
             bars.remove(displayId)?.remove()
+            hiddenOn.remove(displayId)
+            shownForGame.remove(displayId)
         }
         override fun onDisplayChanged(displayId: Int) = renderAll()
     }
@@ -345,12 +372,14 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 }
             }
         }
+        // A Show pressed for a game lasts for that game's session; the next session folds again.
+        if (dev.droidtop.runtime.RunningGame.packageName == null) shownForGame.clear()
         bars.keys.filter { it !in wanted }.forEach { bars.remove(it)?.remove() }
         focusedDisplay?.let { if (it !in wanted) focusedDisplay = null }
         val open = openKeys.mapNotNull { openEntries[it] }.filter { entry -> pinned.none { it.key == entry.key } }
         for ((id, display) in wanted) {
             val bar = bars.getOrPut(id) { TaskbarWindow(display) }
-            bar.show(pinned, open, running, collapsed)
+            bar.show(pinned, open, running, collapsedOn(id))
         }
     }
 
@@ -430,7 +459,8 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 params.gravity = Gravity.BOTTOM or Gravity.END
                 root.setBackgroundColor(inks.plate)
                 root.addView(textButton(windowContext.getString(R.string.taskbar_show)) {
-                    this@StandardTaskbar.collapsed = false
+                    hiddenOn.remove(displayId)
+                    gameOn(displayId)?.let { shownForGame[displayId] = it }
                     renderAll()
                 })
             } else {
@@ -503,7 +533,8 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
             })
             bar.addView(textButton(windowContext.getString(R.string.taskbar_hide)) {
-                this@StandardTaskbar.collapsed = true
+                hiddenOn.add(displayId)
+                shownForGame.remove(displayId)
                 endFocus()
                 renderAll()
             })

@@ -152,6 +152,11 @@ object LaunchDisplay {
     /** Package resolved for the parked launch; used to notice Android's force-stop state. */
     @Volatile
     var runningPackageName: String? = null
+        set(value) {
+            field = value
+            // Mirrored for the parts that cannot see the library: Standard's taskbar folds over the game (Droidtop/tracker#700).
+            dev.droidtop.runtime.RunningGame.packageName = value
+        }
 
     /**
      * Installed by the shell owning launch UI: presents [askOptions] and

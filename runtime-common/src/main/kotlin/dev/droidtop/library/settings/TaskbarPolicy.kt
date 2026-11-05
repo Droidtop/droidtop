@@ -42,4 +42,13 @@ object TaskbarPolicy {
     }
 
     fun without(open: List<String>, key: String): List<String> = open.filterNot { it == key }
+
+    /**
+     * Whether the bar on one display is folded to its Show tab (Droidtop/tracker#700): the person's Hide on that
+     * display ([hidden], kept per display), or a game from droidtop's library in front on it ([gameHere]), which a
+     * bar must not cover (its on-screen controls, a menu bar), unless the person pressed Show during this game
+     * ([shownForThisGame]).
+     */
+    fun collapsed(hidden: Boolean, gameHere: Boolean, shownForThisGame: Boolean): Boolean =
+        hidden || (gameHere && !shownForThisGame)
 }

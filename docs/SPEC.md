@@ -1324,7 +1324,11 @@ type and the data source, which a third-party home cannot have.
   the union of its owners). There was a second service, Murine's, for the taskbar and gestures; it was
   deleted (Droidtop/tracker#740, one mechanism per job), so Android's list shows droidtop once. The overlay covers the bottom strip of the app in front (an overlay
   cannot reserve space the app lays out around); Hide folds it to a tab for an app whose own controls sit
-  there. On external displays the window is created for that display (`createWindowContext` from
+  there. Hide and Show are per display, and while a game from droidtop's library is in front the bar on
+  that game's display folds by itself (`TaskbarPolicy.collapsed`, Droidtop/tracker#700): the game's app
+  is `RunningGame`, which `LaunchDisplay` sets, and its display the one the launch chose
+  (`HomeDisplays.lastUsedDisplayId`). Show during the game keeps the bar up for that game; the next game
+  folds it again. Not yet: folding for every app with an edge to reveal it, which waits for the owner. On external displays the window is created for that display (`createWindowContext` from
   Android 12, `createDisplayContext` before) and apps are launched onto the display of the bar
   that was tapped (`ActivityOptions.setLaunchDisplayId`).
 - *Where it shows.* `TaskbarPolicy.shownOnDisplay` (runtime-common, unit-tested): a display of 600dp

@@ -45,4 +45,13 @@ class TaskbarPolicyTest {
         assertFalse(TaskbarPolicy.shown(enabled = false, modeInUse = Mode.LAUNCHER.id, appInFront = true, droidtopIsHome = true))
         assertFalse(TaskbarPolicy.shown(enabled = true, modeInUse = Mode.LAUNCHER.id, appInFront = false, droidtopIsHome = true))
     }
+
+    @Test
+    fun `a library game in front folds its display's bar until Show, and Hide holds on its own display`() {
+        assertFalse(TaskbarPolicy.collapsed(hidden = false, gameHere = false, shownForThisGame = false))
+        assertTrue(TaskbarPolicy.collapsed(hidden = false, gameHere = true, shownForThisGame = false))
+        assertFalse(TaskbarPolicy.collapsed(hidden = false, gameHere = true, shownForThisGame = true))
+        assertTrue(TaskbarPolicy.collapsed(hidden = true, gameHere = false, shownForThisGame = false))
+        assertTrue(TaskbarPolicy.collapsed(hidden = true, gameHere = true, shownForThisGame = true))
+    }
 }
