@@ -7,7 +7,6 @@ import android.net.Uri
 import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.LibraryCore
 import dev.droidtop.app.PluginStatusWidgetProvider
-import dev.droidtop.app.ScraperKeySetupActivity
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.LibraryScrapeJob
 import dev.droidtop.library.consoles.ConsoleSystemDef
@@ -1400,8 +1399,8 @@ object AppSettingsCatalogs {
 
     /**
      * An optional source that needs the person's own credential: one row,
-     * its state ("Not set", "Not tested", "Connected") as the value, and the
-     * numbered guide, QR code and fields behind it (ScraperKeySetupActivity).
+     * its state ("Not set", "Not tested", "Connected") as the value, and its
+     * setup page behind it (ScraperKeyScreen).
      */
     /**
      * Each debrid account in the person's order (Droidtop/tracker#638): its key row, whether it is used for downloads,
@@ -1431,12 +1430,13 @@ object AppSettingsCatalogs {
         }
     }
 
-    private fun guidedKeyRow(context: Context, service: ScraperKeyService, title: String) = ActionItem(
+    // The service's own page, opened in place, in the frame every Settings page has (Droidtop/tracker#869).
+    private fun guidedKeyRow(context: Context, service: ScraperKeyService, title: String) = NestedScreenItem(
         id = "accounts_" + service.name.lowercase(),
         title = title,
-        value = ScraperKeyCheck.state(context, service),
+        valueLabel = ScraperKeyCheck.state(context, service).let { state -> { _: Context -> state } },
         icon = CatalogIcon.GLOBAL,
-        run = { ctx -> ctx.startActivity(ScraperKeySetupActivity.intent(ctx, service).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+        inline = ScraperKeyScreen.screen(service),
     )
 
     private fun integrationsScreen() = CatalogScreen(

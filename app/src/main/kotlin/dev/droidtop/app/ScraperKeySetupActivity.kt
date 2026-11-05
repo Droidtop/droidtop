@@ -1,66 +1,45 @@
 package dev.droidtop.app
 
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
+import dev.droidtop.app.settings.ScraperKeyScreen
 import dev.droidtop.app.ui.DroidtopTheme
-import dev.droidtop.app.ui.QrCode
 import dev.droidtop.library.credentials.web.KeyPageSpec
 import dev.droidtop.library.credentials.web.KeyPages
-import dev.droidtop.library.debrid.DebridAccounts
-import dev.droidtop.library.scraper.ScraperKeyCheck
 import dev.droidtop.library.scraper.ScraperKeyService
-import dev.droidtop.library.scraper.ScraperKeyState
-import dev.droidtop.library.scraper.ScraperKeyVerified
-import dev.droidtop.pluginhost.debrid.RealDebridSignIn
+import dev.droidtop.shell.gamepad.CatalogNavigator
+import dev.droidtop.shell.gamepad.LocalShellWindow
+import dev.droidtop.shell.gamepad.currentShellWindow
+import dev.droidtop.shell.gamepad.groundBackground
+import dev.droidtop.shell.gamepad.input.GamepadAction
+import dev.droidtop.shell.gamepad.input.HintBinding
+import dev.droidtop.shell.gamepad.input.HintRow
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The guided setup for a scraper source that needs the person's own
- * credential (docs/SPEC.md 7h, "Supplying your own keys"). Three ways in, one
- * screen: the service's own page in a browser pane that reads the key off the
- * page when the person confirms ([KeyWebPane]); a QR code and button that open
- * the official page elsewhere; and "Type from another device" ([RemoteInputActivity]),
- * the one session that types a phone's or PC's text into the field in focus, so
- * the key is typed there instead of on a gamepad. Fields also
- * take the clipboard. Every path ends in the same encrypted store, and nothing
- * is tested until Test is pressed. Opened from the source's row under
- * Settings > Accounts and sources.
+ * The guided setup for a source that needs the person's own credential (docs/SPEC.md 7h, "Supplying your own keys"),
+ * opened from a game page's sign-in row and from the key page's "Open the key page here". Where droidtop's browser
+ * pane can show the service's key page, it opens on that pane ([KeyWebPane]), which reads the key off the page when
+ * the person confirms. Otherwise, and from the pane's "Other ways", it is the service's Settings page
+ * ([ScraperKeyScreen]), drawn by the same [CatalogNavigator] as every other page, with the shell's hint row: the
+ * page Settings > Accounts and sources opens in place (Droidtop/tracker#869).
  */
 class ScraperKeySetupActivity : AppCompatActivity() {
     private val panelFocus = mutableStateOf(false)
@@ -74,20 +53,14 @@ class ScraperKeySetupActivity : AppCompatActivity() {
         }
         setContent {
             DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
-                Scaffold { padding ->
+                CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
                     var page by remember { mutableStateOf<KeyPageSpec?>(null) }
                     var loaded by remember { mutableStateOf(false) }
                     LaunchedEffect(Unit) {
-                        page = withContext(Dispatchers.IO) {
-                            runCatching {
-                                KeyPages.parse(assets.open("key-pages.json").bufferedReader().use { it.readText() })[service.name]
-                            }.getOrNull()
-                        }
+                        page = withContext(Dispatchers.IO) { keyPage(this@ScraperKeySetupActivity, service) }
                         loaded = true
                     }
-                    if (loaded) {
-                        SetupHost(service, page, panelFocus.value, onClose = { finish() }, modifier = Modifier.fillMaxSize().padding(padding))
-                    }
+                    if (loaded) SetupHost(service, page, panelFocus.value, onClose = { finish() })
                 }
             }
         }
@@ -109,215 +82,50 @@ class ScraperKeySetupActivity : AppCompatActivity() {
 
         fun intent(context: Context, service: ScraperKeyService): Intent =
             Intent(context, ScraperKeySetupActivity::class.java).putExtra(EXTRA_SERVICE, service.name)
+
+        /** [service]'s key page for the browser pane (`key-pages.json`), or null for none. Reads an asset: off the main thread. */
+        fun keyPage(context: Context, service: ScraperKeyService): KeyPageSpec? = runCatching {
+            KeyPages.parse(context.assets.open("key-pages.json").bufferedReader().use { it.readText() })[service.name]
+        }.getOrNull()
     }
 }
 
-private enum class SetupMode { WEB, MANUAL }
+private enum class SetupMode { WEB, PAGE }
 
 @Composable
-private fun SetupHost(
-    service: ScraperKeyService,
-    page: KeyPageSpec?,
-    panelFocus: Boolean,
-    onClose: () -> Unit,
-    modifier: Modifier,
-) {
+private fun SetupHost(service: ScraperKeyService, page: KeyPageSpec?, panelFocus: Boolean, onClose: () -> Unit) {
     val context = LocalContext.current
     val paneAvailable = page != null && KeyWebProfiles.supported()
-    var mode by remember { mutableStateOf(if (paneAvailable) SetupMode.WEB else SetupMode.MANUAL) }
+    var mode by remember { mutableStateOf(if (paneAvailable) SetupMode.WEB else SetupMode.PAGE) }
     if (mode == SetupMode.WEB && page != null) {
         KeyWebPane(
             service = service,
             page = page,
             panelFocus = panelFocus,
-            onOtherWays = { mode = SetupMode.MANUAL },
+            onOtherWays = { mode = SetupMode.PAGE },
             onFallback = {
                 // The provider refused the pane: the browser opens on its page and the session to type from a phone over it.
-                mode = SetupMode.MANUAL
+                mode = SetupMode.PAGE
                 dev.droidtop.library.Links.open(context, service.url)
                 RemoteInputActivity.open(context)
             },
             onClose = onClose,
         )
-    } else {
-        Column(
-            modifier = modifier.padding(20.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ManualSetup(
-                service = service,
-                browserPaneAvailable = paneAvailable,
-                onBrowserPane = { mode = SetupMode.WEB },
-            )
+        return
+    }
+    val screen = remember(service) { ScraperKeyScreen.screen(service) }
+    Column(Modifier.fillMaxSize().groundBackground()) {
+        Box(Modifier.weight(1f)) {
+            CatalogNavigator(root = screen, onExit = onClose)
         }
+        // The shell's hint row, as on every page this host draws (CatalogScreenActivity): A, B and Y dispatch inside the
+        // navigator; on a touch screen these are the controls.
+        HintRow(
+            bindings = listOf(
+                HintBinding(GamepadAction.A, "Select"),
+                HintBinding(GamepadAction.B, "Back"),
+                HintBinding(GamepadAction.Y, "Info"),
+            ),
+        )
     }
-}
-
-@Composable
-private fun ManualSetup(service: ScraperKeyService, browserPaneAvailable: Boolean, onBrowserPane: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var state by remember { mutableStateOf("") }
-    var testing by remember { mutableStateOf(false) }
-    var result by remember { mutableStateOf<String?>(null) }
-    var loaded by remember { mutableStateOf(false) }
-    // The fields buffer here and are stored on Test; the vault is read off the main thread.
-    val buffer = remember { mutableStateMapOf<String, String>() }
-
-    suspend fun refresh() {
-        state = withContext(Dispatchers.IO) { ScraperKeyCheck.state(context, service) }
-    }
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) { buffer.putAll(service.read(context)) }
-        refresh()
-        loaded = true
-    }
-
-    Text(service.title, style = MaterialTheme.typography.headlineMedium)
-    Text(result ?: state, style = MaterialTheme.typography.titleMedium)
-    Text(service.credit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Text(service.gets, style = MaterialTheme.typography.labelLarge)
-    if (service == ScraperKeyService.REALDEBRID) {
-        RealDebridSignInPanel(onSignedIn = { token ->
-            buffer["api_token"] = token
-            result = ScraperKeyState.CONNECTED
-            scope.launch { refresh() }
-        })
-        Text(stringResource(R.string.scraper_key_setup_or_paste_a_token), style = MaterialTheme.typography.titleMedium)
-    }
-    if (browserPaneAvailable) {
-        Button(onClick = onBrowserPane) { Text(stringResource(R.string.scraper_key_setup_open_the_key_page_here)) }
-    }
-    service.steps.forEachIndexed { index, step ->
-        Text("${index + 1}  $step", style = MaterialTheme.typography.bodyLarge)
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        QrCode(content = service.url, size = 180.dp)
-        Button(onClick = {
-            dev.droidtop.library.Links.open(context, service.url)
-        }) { Text(stringResource(R.string.scraper_key_setup_open_on_this_device)) }
-    }
-
-    if (loaded) {
-        service.fields.forEach { field ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = buffer[field.id].orEmpty(),
-                    onValueChange = { buffer[field.id] = it.trim() },
-                    label = { Text(field.label) },
-                    singleLine = true,
-                    visualTransformation = if (field.secret) PasswordVisualTransformation() else VisualTransformation.None,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = { clipboardText(context)?.let { buffer[field.id] = it } }) { Text(stringResource(R.string.scraper_key_setup_paste)) }
-            }
-        }
-    }
-
-    // The same session as everywhere: scan, confirm the code, then type from the phone into the field in focus.
-    Button(onClick = { RemoteInputActivity.open(context) }) { Text(stringResource(R.string.scraper_key_setup_type_from_another_device)) }
-
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Button(enabled = !testing && loaded, onClick = {
-            testing = true
-            result = "Testing"
-            scope.launch {
-                val line = withContext(Dispatchers.IO) {
-                    service.write(context, buffer.toMap())
-                    ScraperKeyCheck.test(context, service)
-                }
-                refresh()
-                result = line
-                testing = false
-            }
-        }) { Text(stringResource(R.string.scraper_key_setup_test)) }
-        if (state != ScraperKeyState.NOT_SET && state != ScraperKeyState.NO_ACCOUNT && state != ScraperKeyState.BUILT_IN) {
-            Button(onClick = {
-                scope.launch {
-                    withContext(Dispatchers.IO) { service.write(context, service.fields.associate { it.id to "" }) }
-                    buffer.clear()
-                    result = null
-                    refresh()
-                }
-            }) { Text(stringResource(R.string.scraper_key_setup_clear)) }
-        }
-    }
-}
-
-/**
- * Real-Debrid's device sign-in (Droidtop/tracker#638): a short code to enter at real-debrid.com/device on any device,
- * with the page as a QR code. Approval stores the sign-in, whose token droidtop refreshes itself; leaving the screen
- * or Cancel stops the wait.
- */
-@Composable
-private fun RealDebridSignInPanel(onSignedIn: (String) -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var code by remember { mutableStateOf<RealDebridSignIn.Code?>(null) }
-    var secondsLeft by remember { mutableStateOf(0) }
-    var line by remember { mutableStateOf<String?>(null) }
-    var waiting by remember { mutableStateOf(false) }
-    val cancelled = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
-    DisposableEffect(Unit) { onDispose { cancelled.set(true) } }
-
-    fun start() {
-        cancelled.set(false)
-        waiting = true
-        line = null
-        scope.launch {
-            val ended = withContext(Dispatchers.IO) {
-                val flow = RealDebridSignIn()
-                val (issued, refused) = try {
-                    flow.code()
-                } catch (e: java.io.IOException) {
-                    null to "Can't reach Real-Debrid. Try again when you are online"
-                }
-                if (issued == null) return@withContext refused
-                code = issued
-                val outcome = try {
-                    flow.await(issued, isCancelled = { cancelled.get() }, onWaiting = { secondsLeft = it })
-                } catch (e: java.io.IOException) {
-                    RealDebridSignIn.Outcome.Failed("Lost the connection to Real-Debrid")
-                }
-                when (outcome) {
-                    is RealDebridSignIn.Outcome.SignedIn -> {
-                        DebridAccounts.saveRealDebrid(context, outcome.credential)
-                        ScraperKeyVerified.set(context, ScraperKeyService.REALDEBRID, true)
-                        withContext(Dispatchers.Main) { onSignedIn(outcome.credential.accessToken) }
-                        "Signed in"
-                    }
-                    RealDebridSignIn.Outcome.Expired -> "The code ran out before it was approved. Start again for a new one"
-                    RealDebridSignIn.Outcome.Cancelled -> "Sign-in cancelled. Nothing was saved"
-                    is RealDebridSignIn.Outcome.Failed -> outcome.reason
-                }
-            }
-            code = null
-            waiting = false
-            line = ended
-        }
-    }
-
-    val shown = code
-    if (shown == null) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(enabled = !waiting, onClick = { start() }) { Text(stringResource(R.string.scraper_key_setup_sign_in_with_a_code)) }
-            line?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-        }
-    } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            QrCode(content = shown.verificationUrl, size = 180.dp)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.scraper_key_setup_enter_this_code_at, shown.verificationUrl.removePrefix("https://")), style = MaterialTheme.typography.bodyLarge)
-                Text(shown.userCode, style = MaterialTheme.typography.headlineMedium)
-                Text("%d:%02d left".format(secondsLeft / 60, secondsLeft % 60), style = MaterialTheme.typography.bodyMedium)
-                TextButton(onClick = { cancelled.set(true) }) { Text(stringResource(R.string.scraper_key_setup_cancel)) }
-            }
-        }
-    }
-}
-
-/** The clipboard's text, trimmed; null when it holds none. */
-private fun clipboardText(context: Context): String? {
-    val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return null
-    return manager.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()?.trim()?.takeIf { it.isNotEmpty() }
 }

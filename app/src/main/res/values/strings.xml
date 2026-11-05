@@ -105,16 +105,10 @@
     <string name="companion_plugins_plugins">Plugins</string>
     <string name="open_with_close">Close</string>
     <string name="open_with_start_the_desktop">Start the desktop</string>
-    <string name="scraper_key_setup_or_paste_a_token">Or paste a token</string>
     <string name="scraper_key_setup_open_the_key_page_here">Open the key page here</string>
-    <string name="scraper_key_setup_open_on_this_device">Open on this device</string>
-    <string name="scraper_key_setup_paste">Paste</string>
     <string name="scraper_key_setup_type_from_another_device">Type from another device</string>
     <string name="scraper_key_setup_test">Test</string>
     <string name="scraper_key_setup_clear">Clear</string>
-    <string name="scraper_key_setup_sign_in_with_a_code">Sign in with a code</string>
-    <string name="scraper_key_setup_enter_this_code_at">Enter this code at %1$s</string>
-    <string name="scraper_key_setup_cancel">Cancel</string>
     <string name="plugin_widget_configure_reading_your_plugins">Reading your plugins</string>
     <string name="companion_social_messages">Messages</string>
     <string name="companion_notifications_tap_to_show">Tap to show</string>
