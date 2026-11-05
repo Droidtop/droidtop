@@ -33,6 +33,15 @@ serde_json = "1"
 droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "fd46b3304805bd04ff1fc91700d827905b8a82bc" }
 droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.2" }
 
+# windowcast's patched IronRDP, sspi and winscard (its Cargo.toml [patch.crates-io]), as droidtop-agent repeats them:
+# the mesh test's agent brings windowcast's IronRDP, and a dependency's patches do not reach this workspace. Unpatched,
+# sspi 0.21.3 pins ed25519-dalek =3.0.0-rc.1 (macOS and iOS), which no other ed25519-dalek 3 can share a graph with
+# (Droidtop/tracker#573: russh 0.65, net-remote's SFTP, needs ^3). Keep the rev the agent dev-dependency uses.
+[patch.crates-io]
+ironrdp-connector = { git = "https://github.com/Droidtop/windowcast", rev = "7359936a6083cc7f2ca6cae67aedf45ad9797026" }
+sspi = { git = "https://github.com/Droidtop/windowcast", rev = "7359936a6083cc7f2ca6cae67aedf45ad9797026" }
+winscard = { git = "https://github.com/Droidtop/windowcast", rev = "7359936a6083cc7f2ca6cae67aedf45ad9797026" }
+
 [profile.release]
 # As droidtop-agent built it.
 opt-level = "s"
