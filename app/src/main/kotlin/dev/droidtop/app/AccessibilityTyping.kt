@@ -71,9 +71,13 @@ class TypingAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** The key filter's two users: the HOME chords (Droidtop/tracker#740) first, then the taskbar's Meta and Mode. */
+    /**
+     * The key filter's users: the HOME chords (Droidtop/tracker#740) first, then the keys Android keeps, for a Desktop
+     * session in front (Droidtop/tracker#697), then the taskbar's Meta and Mode.
+     */
     override fun onKeyEvent(event: KeyEvent): Boolean =
-        HomeOverlayKeys.onKey(this, event) || taskbar?.onKey(event) == true
+        HomeOverlayKeys.onKey(this, event) || dev.droidtop.runtime.keyboard.DesktopSystemKeys.offer(event) ||
+            taskbar?.onKey(event) == true
 
     override fun onInterrupt() = Unit
 

@@ -365,6 +365,7 @@ object DroidtopWideSettings {
                             onToggle = { ctx, on -> dev.droidtop.app.DesktopSetupPrefs.setKeepRunning(ctx, on) },
                         ),
                         keyboardLayoutChoice(context),
+                        desktopSystemKeysItem(context),
                         ChoiceItem(
                             id = "pref_desktop_panel",
                             title = "Desktop panel",
@@ -502,6 +503,31 @@ object DroidtopWideSettings {
      * container's own layouts (its list is copied the first time a desktop
      * runs; before that, the layouts droidtop can name from a language).
      */
+    /**
+     * Whether the keys Android keeps (Super, Alt+Tab, Ctrl+Space) reach the desktop (Droidtop/tracker#697): a grant
+     * the person gives once, through droidtop's accessibility service, and takes back in Android's list.
+     */
+    private suspend fun desktopSystemKeysItem(context: Context): AsyncActionItem {
+        val (on, line) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            dev.droidtop.runtime.keyboard.AccessibilityKeyboard.desktopKeys(context)
+        }
+        return AsyncActionItem(
+            id = "pref_desktop_system_keys",
+            title = "Super and Alt+Tab",
+            subtitle = line,
+            value = if (on) "On" else "Off",
+            statusMark = if (on) null else dev.droidtop.library.settings.StatusMark.ATTENTION,
+            run = { ctx, _ ->
+                if (on) {
+                    dev.droidtop.runtime.keyboard.AccessibilityKeyboard.openSettings(ctx)
+                    "Turn it off in Android's list"
+                } else {
+                    dev.droidtop.runtime.keyboard.AccessibilityKeyboard.turnOn(ctx)
+                }
+            },
+        )
+    }
+
     private suspend fun keyboardLayoutChoice(context: Context): ChoiceItem {
         val names = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             dev.droidtop.app.DesktopKeyboardLayout.layoutNames(context)

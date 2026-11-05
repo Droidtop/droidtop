@@ -8981,8 +8981,24 @@ modifier combos" (Android 13, 14 and current AOSP alike); Alt+Tab is Recents. On
 sway's Super bindings (its stock ones and droidtop's `$mod+d`) work from the on-screen keyboard and the companion,
 which type into the session's seat directly ("Companion input", above), and not from a hardware keyboard. The
 v0.2.0-dev.2011 note above that Super+B reached sway does not hold on current Android. An accessibility service's
-key filter sees keys before that policy; whether Desktop should ask for droidtop's (Mobile's taskbar uses it) is
+key filter sees keys before that policy; whether Desktop should ask for droidtop's (Mobile's taskbar uses it) was
 an owner question on #697.
+**Decided 2026-11-05 (owner, #697: Desktop uses droidtop's accessibility key filter "while a Desktop session is in
+front, so Super, Alt+Tab and similar keys reach the session. It is off everywhere else", turned on once as a
+revocable grant).** While a Desktop session's input is live and its activity resumed, the Desktop shell gives its
+input router to `DesktopSystemKeys` (`runtime-common`), which asks droidtop's one accessibility service for the key
+filter (`AccessibilityHost.wantKeyFilter`) and takes from a keyboard exactly the keys Android would keep: Meta alone,
+any Meta chord, Alt+Tab (with or without Shift), Ctrl+Space and the All apps key, each press with its release
+(`DesktopSystemKeys.Filter`, JVM tested). They go into the session's seat like any other key, so sway's Super
+bindings (`$mod+d` opens Start, `$mod+Return` a terminal) work from a hardware keyboard and the rest reach the
+focused window. Every other key still reaches droidtop's windows first, as before, and droidtop's own three
+shortcuts below are unchanged. On pause, or when the session's input ends, the filter is let go (unless the HOME
+chords or Mobile's taskbar want it), and nothing is taken. Ctrl+Space then switches the session's layout, not
+Android's; the desktop's layout is Desktop settings' Keyboard layout (6b "Keyboard layout"). The grant: Desktop
+settings has "Super and Alt+Tab", which says in plain words whether they reach the desktop and turns the service on
+the way the HOME combos' row does (`AccessibilityKeyboard.turnOn`: through Device setup's shell where it can, else
+Android's list or App info for restricted settings); pressed while on, it opens Android's list, where it is turned
+off again. With the service off, Android keeps those keys, as before.
 
 **droidtop's three keyboard shortcuts (decided 2026-10-29, Droidtop/tracker#697).**
 A person on a keyboard (a lapdock, a monitor with a keyboard, 4c's canonical

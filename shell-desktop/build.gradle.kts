@@ -43,6 +43,8 @@ dependencies {
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
+    // LocalLifecycleOwner: the session hands Android-kept keys over only while resumed (Droidtop/tracker#697).
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.foundation)
 

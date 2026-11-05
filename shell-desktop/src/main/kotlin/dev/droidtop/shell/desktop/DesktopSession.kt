@@ -185,6 +185,24 @@ internal fun BoxScope.DesktopViewport(
             onDispose { input.close() }
         }
         val router = input.router
+        // The keys Android keeps (Super, Alt+Tab, Ctrl+Space) come to this session through droidtop's accessibility
+        // service while it is in front, and to nothing at any other time (Droidtop/tracker#697, docs/SPEC.md 6b).
+        val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+        DisposableEffect(router, lifecycle) {
+            val give: (android.view.KeyEvent) -> Boolean = { event -> router.onKeyEvent(event) }
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                when (event) {
+                    androidx.lifecycle.Lifecycle.Event.ON_RESUME -> dev.droidtop.runtime.keyboard.DesktopSystemKeys.sink = give
+                    androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> dev.droidtop.runtime.keyboard.DesktopSystemKeys.sink = null
+                    else -> Unit
+                }
+            }
+            lifecycle.addObserver(observer)
+            onDispose {
+                lifecycle.removeObserver(observer)
+                if (dev.droidtop.runtime.keyboard.DesktopSystemKeys.sink === give) dev.droidtop.runtime.keyboard.DesktopSystemKeys.sink = null
+            }
+        }
 
         // The output is sized from the surface and the scale and resolution settings; the latest settings are read
         // here, so a change made while the desktop shows applies at once, not at the next surface change.

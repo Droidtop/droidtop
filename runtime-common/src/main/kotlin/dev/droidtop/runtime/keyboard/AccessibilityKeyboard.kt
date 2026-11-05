@@ -65,6 +65,19 @@ object AccessibilityKeyboard {
     }
 
     /**
+     * Whether Super, Alt+Tab and the other keys Android keeps reach the desktop (Droidtop/tracker#697,
+     * [DesktopSystemKeys]), and the line that says so in plain words. They need this service on, as the HOME combos
+     * do. Reads system state: off the main thread.
+     */
+    fun desktopKeys(context: Context): Pair<Boolean, String> = when {
+        isActive(context) -> true to "On: Super, Alt+Tab and Ctrl+Space reach the desktop while it is in front"
+        RestrictedSettings.stepNeeded(context, RestrictedGrant.ACCESSIBILITY, granted = false) ->
+            false to "Blocked: Android stops apps installed from a file from seeing keys until you allow it. " +
+                "Press for the way to allow it"
+        else -> false to "Off: Android keeps Super and Alt+Tab for itself. Press to let droidtop pass them to the desktop"
+    }
+
+    /**
      * Turns the service on for the person who pressed to (Droidtop/tracker#740). With the privileged shell (Shizuku,
      * Sui or wireless debugging; docs/SPEC.md "Device setup") droidtop allows its restricted settings and adds itself
      * to Android's enabled list, keeping every service already on it (a vendor's, such as Retroid's Game Assistant,
