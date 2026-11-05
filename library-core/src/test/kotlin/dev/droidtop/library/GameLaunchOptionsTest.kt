@@ -43,6 +43,16 @@ class GameLaunchOptionsTest {
     }
 
     @Test
+    fun `the .NET globalization switches are kept, other DOTNET_ variables are not`() {
+        val parsed = GameLaunchOptions.parseEnvironment("DOTNET_SYSTEM_GLOBALIZATION_USENLS=1 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0 DOTNET_ROOT=x")
+        assertEquals(
+            mapOf("DOTNET_SYSTEM_GLOBALIZATION_USENLS" to "1", "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT" to "0"),
+            parsed.variables,
+        )
+        assertTrue(parsed.refused.single().startsWith("DOTNET_ROOT"))
+    }
+
+    @Test
     fun `the environment text round-trips and new lines separate like spaces`() {
         val parsed = GameLaunchOptions.parseEnvironment("DXVK_HUD=fps\nVKD3D_CONFIG=dxr")
         assertEquals("DXVK_HUD=fps VKD3D_CONFIG=dxr", GameLaunchOptions.formatEnvironment(parsed.variables))

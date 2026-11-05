@@ -18655,7 +18655,9 @@ they are added); they are handed to the program one by one, never through a
 shell. **Environment variables** are `NAME=value` pairs accepted by the same
 allowlist the Lutris import uses (`GameLaunchOptions.isAllowedEnvName` and
 `isAllowedEnvValue`, which `LutrisImport` now calls too: `DXVK_`, `VKD3D_`,
-`MESA_`, `__GL_` and four named tuning variables, plain values only, threat
+`MESA_`, `__GL_`, four named tuning variables and .NET's three globalization
+switches (`DOTNET_SYSTEM_GLOBALIZATION_USENLS`, `_INVARIANT`,
+`_PREDEFINED_CULTURES_ONLY`, §9 "ICU for .NET games"), plain values only, threat
 model decision 5 of §7e3); a pair outside it is not kept and the field says
 why. They ride the one launch's `Container.LAUNCH_ENV` beside the Steamworks
 shim's, are asked against the allowlist again at launch, and never change the

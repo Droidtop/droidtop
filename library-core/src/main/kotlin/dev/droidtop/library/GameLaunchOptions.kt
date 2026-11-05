@@ -76,6 +76,10 @@ object GameLaunchOptions {
         { it == "WINE_LARGE_ADDRESS_AWARE" },
         { it == "STAGING_SHARED_MEMORY" },
         { it == "PULSE_LATENCY_MSEC" },
+        // .NET's globalization switches (docs/SPEC.md 9, "ICU for .NET games"): ICU, Windows NLS or none.
+        { it == "DOTNET_SYSTEM_GLOBALIZATION_USENLS" },
+        { it == "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT" },
+        { it == "DOTNET_SYSTEM_GLOBALIZATION_PREDEFINED_CULTURES_ONLY" },
     )
 
     private val ENV_VALUE = Regex("[A-Za-z0-9_.,:=+-]{0,256}")
