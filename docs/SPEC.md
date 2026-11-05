@@ -531,7 +531,10 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   battery's percent, then VPN when one is up and the waiting notifications as a count on a badge. Before, it was
   a line of glyph text ("◤ 3/4", "ETH", "✕", "⚡", "3 new"), and the only clock was Waybar's `date +%H:%M`, 24
   hour always and absent with no session or under labwc. The tray's clock is the desktop's one clock, shown with
-  or without a session, and Waybar has none. Someone on Sway's own bar keeps their own config's status line. The container's windows are in the bar's list, the desktop's only one
+  or without a session, and Waybar has none. The tray keeps its own width: on a bar too narrow for every
+  button (under `BAR_ONE_ROW_MIN`), the buttons between Start and the tray share what is left and scroll
+  sideways, and the readout's text never wraps (rig 2026-11-04, build 2852, a 411 dp AVD with the Clipboard chip
+  showing: "100%" wrapped one character per line and the tray grew to the bar's full height). Someone on Sway's own bar keeps their own config's status line. The container's windows are in the bar's list, the desktop's only one
   since Waybar dropped its window title (#683): a finger needs a way to raise, minimise and close one.
 - **Window controls** (Droidtop/tracker#686, the coordinator's Desktop review, decided 2026-10-29). Under
   sway, windows float by default: droidtop's sway config adds `for_window [all] floating enable` and an
