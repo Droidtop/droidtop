@@ -33,7 +33,7 @@ object WineMediaDecode {
 
     /** DROIDTOP_MEDIA_TRACE=1 (from droidtop's own environment) turns on the element's and the server's step lines. */
     const val TRACE_VAR = "DROIDTOP_MEDIA_TRACE"
-    @Volatile var trace: Boolean = false
+    @Volatile var trace: Boolean = true // DIAGNOSTIC BUILD (#897), not to land
     fun traceEnv(): Array<String> = if (trace) arrayOf("$TRACE_VAR=1") else emptyArray()
 
     fun server(context: Context) = File(context.applicationInfo.nativeLibraryDir, SERVER)

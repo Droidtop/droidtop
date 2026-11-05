@@ -178,6 +178,8 @@ class WineXSession(
             // 2026-10-17), bounded where the full trace would flood the output tail; a prefix's own WINEDEBUG,
             // set below, still wins.
             put("WINEDEBUG", WineLaunchPlan.DEFAULT_WINEDEBUG)
+            // DIAGNOSTIC BUILD (#897): GStreamer's warnings, decodebin and Wine's GStreamer glue in detail.
+            put("GST_DEBUG", "2,decodebin:4,GST_PLUGIN_LOADING:4,WINE:4")
             // EnvVars parses a string or copies another EnvVars; there is
             // no map overload, so the plan's pairs go in one at a time.
             if (!silent) WineLaunchPlan.audioEnvVars(prefix.audioDriver, rootPath).forEach { (name, value) -> put(name, value) }
@@ -376,7 +378,8 @@ internal object WineWorkingDirectory {
  */
 object WineLaunchPlan {
     /** Wine's log channels by default: errors only ("-all,err+all"), never the full trace. */
-    const val DEFAULT_WINEDEBUG = "-all,err+all"
+    // DIAGNOSTIC BUILD, not to land (Droidtop/tracker#897): where Clover Days waits after its intro on 3090.
+    const val DEFAULT_WINEDEBUG = "-all,err+all,+loaddll,+seh,+mfplat,+mf,+mfreadwrite,+mfmediaengine,+mfsrcsnk,+quartz,+strmbase,+gstreamer"
 
 
     enum class AudioDriver { PULSEAUDIO, ALSA, NONE }
