@@ -26,6 +26,9 @@ android {
             java.srcDir("../vendor/droidtop-shared/trust/src/main/kotlin")
             // The names droidtop and Enginehost agree on to start each other (docs/SPEC.md 7d, Droidtop/tracker#204).
             java.srcDir("../vendor/droidtop-shared/launch-contract/src/main/kotlin")
+            // The pad model droidtop and Enginehost share: Droidtop/lib-input's PadFamily, PadFamilies.classify (SDL's ids)
+            // and FaceLayout (Droidtop/tracker#867 D4), compiled in the same way.
+            java.srcDir("../vendor/lib-input/pads/src/main/kotlin")
         }
         getByName("test") {
             resources.srcDirs("src/main/assets")

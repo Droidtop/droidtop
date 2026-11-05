@@ -432,10 +432,11 @@ store". Its adapter is the app itself:
   approval).
 - **The service** is exported with the action
   `dev.droidtop.plugin.APP_INTERFACE` and returns an `IPluginRuntime`
-  binder built from droidtop's own AIDL, copied unchanged:
-  `plugin-host/src/main/aidl/dev/droidtop/pluginhost/IPluginRuntime.aidl`,
-  `IPluginHostBroker.aidl` and `IPluginRuntimeCallback.aidl` (package
-  `dev.droidtop.pluginhost`; methods are only ever appended). droidtop
+  binder built from the one AIDL droidtop builds from too, Droidtop/lib-plugins'
+  `android/aidl/dev/droidtop/pluginhost/IPluginRuntime.aidl`, `IPluginHostBroker.aidl`
+  and `IPluginRuntimeCallback.aidl` (package `dev.droidtop.pluginhost`; methods are only
+  ever appended). An app takes it as a submodule and compiles it with its own build
+  (`aidl.srcDir`), so no copy can drift (Droidtop/tracker#867). droidtop
   binds it and calls `loadContained(pluginId, manifestJson, [], [],
   broker)` with the manifest droidtop verified itself, then `handle`,
   `startJob`, `cancelJob`, `registerCallback` and `unloadPlugin` as for any

@@ -56,3 +56,9 @@
 [submodule "vendor/libadrenotools"]
 	path = vendor/libadrenotools
 	url = https://github.com/Pipetto-crypto/libadrenotools.git
+[submodule "vendor/lib-input"]
+	path = vendor/lib-input
+	url = https://github.com/Droidtop/lib-input
+[submodule "vendor/lib-plugins"]
+	path = vendor/lib-plugins
+	url = https://github.com/Droidtop/lib-plugins

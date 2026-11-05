@@ -39,6 +39,10 @@ android {
     sourceSets {
         getByName("main") {
             resources.srcDir("../docs/view-limits")
+            // The plugin host's Binder interface (IPluginRuntime and its callbacks), one file for droidtop and Enginehost:
+            // Droidtop/lib-plugins' android/aidl (Droidtop/tracker#867). Binder numbers a method by its place in the file,
+            // so two hand-kept copies drifted (Enginehost's IPluginRuntime still described contract 1).
+            aidl.srcDir("../vendor/lib-plugins/android/aidl")
         }
     }
 
