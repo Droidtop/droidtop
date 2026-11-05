@@ -218,6 +218,7 @@ set_target_properties(droidtopmediad PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 target_compile_options(droidtopmediad PRIVATE -O2 -Wall -Wextra -fstack-protector-strong -D_FORTIFY_SOURCE=2)
 target_link_options(droidtopmediad PRIVATE -pie -Wl,-z,relro,-z,now)
+target_link_libraries(droidtopmediad log)
 page_16k(droidtopmediad)
 
 # libgstdroidtopff.so, against vendor/gstreamer and vendor/glib's headers (with the headers their builds generate,

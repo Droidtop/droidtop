@@ -21,6 +21,7 @@
 #include "protocol.h"
 
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -28,6 +29,13 @@
 #include <sys/syscall.h>
 #include <sys/un.h>
 #include <unistd.h>
+
+/* DROIDTOP_MEDIA_TRACE=1: one line per step on stderr, which lands in droidtop.wine (Droidtop/tracker#897). */
+static int trace_on = -1;
+#define TRACE(...) do { \
+        if (trace_on < 0) trace_on = getenv("DROIDTOP_MEDIA_TRACE") != NULL; \
+        if (trace_on) { fprintf(stderr, "droidtopff: " __VA_ARGS__); fputc('\n', stderr); fflush(stderr); } \
+    } while (0)
 
 typedef struct {
     GstElement parent;
@@ -165,6 +173,7 @@ static void loop(gpointer data) {
         self->apts = reply.a.pts_ns;
         pad = self->apad;
     } else if (reply.s.type == MD_END) {
+        TRACE("server ended the %s stream", video ? "video" : "audio");
         if (video) {
             gst_pad_push_event(self->vpad, gst_event_new_eos());
             self->video_done = TRUE;
@@ -177,6 +186,8 @@ static void loop(gpointer data) {
         goto ended;
     }
     GstFlowReturn flow = gst_pad_push(pad, buffer);
+    TRACE("pushed %s pts %llu ns: flow %d", video ? "video" : "audio",
+        (unsigned long long)(video ? self->vpts : self->apts), (int)flow);
     if (flow == GST_FLOW_NOT_LINKED) {
         /* Nobody wants this stream (a video-only reader): stop decoding it, keep the other. */
         if (video) self->video_done = TRUE; else self->audio_done = TRUE;
@@ -187,6 +198,7 @@ static void loop(gpointer data) {
     return;
 
 ended:
+    TRACE("server gone or bad reply (n=%zd, type=%u): EOS on every pad", n, n >= 4 ? reply.s.type : 0u);
     /* The server ended the stream, died or was killed by its watchdog: the stream ends, nothing else does. */
     finish(self);
     gst_pad_pause_task(task_pad);
@@ -194,6 +206,7 @@ ended:
 
 static gboolean start(DroidtopFf *self) {
     const char *path = getenv("DROIDTOP_MEDIA_SOCKET");
+    TRACE("start: socket %s", path ? path : "(unset)");
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
@@ -215,6 +228,9 @@ static gboolean start(DroidtopFf *self) {
         if (shared >= 0) close(shared);
         return FALSE;
     }
+    TRACE("info: video %u %ux%u %u/%u, audio %u %u Hz x%u, duration %llu ns",
+        self->info.has_video, self->info.width, self->info.height, self->info.fps_n, self->info.fps_d,
+        self->info.has_audio, self->info.rate, self->info.channels, (unsigned long long)self->info.duration_ns);
     self->region_size = (gsize)self->info.frame_bytes + self->info.audio_bytes;
     self->region = mmap(NULL, self->region_size, PROT_READ, MAP_SHARED, shared, 0);
     close(shared);
@@ -243,6 +259,7 @@ static gboolean start(DroidtopFf *self) {
             NULL));
     }
     gst_element_no_more_pads(GST_ELEMENT(self));
+    TRACE("pads added: video %s, audio %s", self->vpad ? "yes" : "no", self->apad ? "yes" : "no");
     GstPad *task_pad = self->vpad ? self->vpad : self->apad;
     if (!task_pad) return FALSE;
     return gst_pad_start_task(task_pad, loop, self, NULL);
@@ -270,6 +287,7 @@ static GstFlowReturn chain(GstPad *pad, GstObject *parent, GstBuffer *buffer) {
     (void)pad;
     gst_buffer_unref(buffer);
     if (!self->started) {
+        TRACE("first input buffer: opening the stream");
         self->started = TRUE;
         if (!start(self)) {
             post_error(self, "droidtop's media decode server is not available");
@@ -282,6 +300,7 @@ static GstFlowReturn chain(GstPad *pad, GstObject *parent, GstBuffer *buffer) {
 static gboolean sink_event(GstPad *pad, GstObject *parent, GstEvent *event) {
     (void)pad;
     (void)parent;
+    TRACE("sink event %d dropped", (int)GST_EVENT_TYPE(event));
     /* The container's own segment, caps and EOS stay here: the server's output carries its own. */
     gst_event_unref(event);
     return TRUE;
@@ -289,6 +308,7 @@ static gboolean sink_event(GstPad *pad, GstObject *parent, GstEvent *event) {
 
 static GstStateChangeReturn change_state(GstElement *element, GstStateChange transition) {
     GstStateChangeReturn ret = GST_ELEMENT_CLASS(droidtop_ff_parent_class)->change_state(element, transition);
+    TRACE("state change 0x%x: %d", (unsigned)transition, (int)ret);
     if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) stop(DROIDTOP_FF(element));
     return ret;
 }

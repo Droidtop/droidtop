@@ -13,6 +13,9 @@
 #include "protocol.h"
 
 #include <errno.h>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +26,14 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+/* DROIDTOP_MEDIA_TRACE=1: one logcat line per request, tag droidtop.mediad (Droidtop/tracker#897). */
+static int trace_on;
+#ifdef __ANDROID__
+#define TRACE(...) do { if (trace_on) __android_log_print(ANDROID_LOG_INFO, "droidtop.mediad", __VA_ARGS__); } while (0)
+#else
+#define TRACE(...) do { if (trace_on) { fprintf(stderr, "mediad: " __VA_ARGS__); fputc('\n', stderr); } } while (0)
+#endif
 
 #define W 64
 #define H 48
@@ -97,6 +108,7 @@ static void serve_stream(int sock) {
         send(sock, &err, sizeof(err), MSG_NOSIGNAL);
         return;
     }
+    TRACE("stream %d: open, input fd %d", (int)getpid(), input);
     /* Slice 1 reads nothing from the input; slice 2 hands it to the decoder's AVIOContext. */
     if (input >= 0) close(input);
 
@@ -123,7 +135,11 @@ static void serve_stream(int sock) {
     for (;;) {
         union { struct md_simple s; struct md_decode_audio a; } req;
         ssize_t n = recv_with_fd(sock, &req, sizeof(req), NULL);
-        if (n <= 0 || req.s.type == MD_CLOSE) return;
+        if (n <= 0 || req.s.type == MD_CLOSE) {
+            TRACE("stream %d: %s after %u frames, %u samples", (int)getpid(), n <= 0 ? "hung up" : "closed", next_frame, next_sample);
+            return;
+        }
+        TRACE("stream %d: request %u", (int)getpid(), req.s.type);
         if (req.s.type == MD_DECODE_VIDEO) {
             if (next_frame >= stub_frames) {
                 struct md_simple end = { MD_END };
@@ -167,6 +183,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "usage: %s --socket <path>\n", argv[0]);
         return 2;
     }
+    trace_on = getenv("DROIDTOP_MEDIA_TRACE") != NULL;
     signal(SIGCHLD, SIG_IGN); /* no zombies: a stream's process is reaped as it ends */
     signal(SIGPIPE, SIG_IGN);
 

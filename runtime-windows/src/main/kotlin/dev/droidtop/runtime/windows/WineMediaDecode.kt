@@ -31,6 +31,11 @@ object WineMediaDecode {
     const val PLUGIN = "libgstdroidtopff.so"
     const val SOCKET_VAR = "DROIDTOP_MEDIA_SOCKET"
 
+    /** DROIDTOP_MEDIA_TRACE=1 (from droidtop's own environment) turns on the element's and the server's step lines. */
+    const val TRACE_VAR = "DROIDTOP_MEDIA_TRACE"
+    @Volatile var trace: Boolean = false
+    fun traceEnv(): Array<String> = if (trace) arrayOf("$TRACE_VAR=1") else emptyArray()
+
     fun server(context: Context) = File(context.applicationInfo.nativeLibraryDir, SERVER)
     fun socket(context: Context) = File(XEnvironment.getTmpDir(context), ".droidtop-media")
     fun pluginDir(context: Context) = File(context.filesDir, "gst-droidtop")
@@ -60,6 +65,7 @@ object WineMediaDecode {
         if (!socket.exists() || !plugin.isFile) return false
         envVars.put("GST_PLUGIN_PATH", withPluginDir(envVars.get("GST_PLUGIN_PATH"), pluginDir(context).path))
         envVars.put(SOCKET_VAR, socket.path)
+        if (trace) envVars.put(TRACE_VAR, "1")
         return true
     }
 }
@@ -78,7 +84,7 @@ class MediaDecodeServerComponent(private val socket: File) : EnvironmentComponen
         socket.delete()
         pid = ProcessHelper.exec(
             "${server.path} --socket ${socket.path}",
-            arrayOf("LD_LIBRARY_PATH=/system/lib64"),
+            arrayOf("LD_LIBRARY_PATH=/system/lib64") + WineMediaDecode.traceEnv(),
             context.filesDir,
         ) { status -> Timber.i("media decode server exited with %d", status) }
         var waited = 0
