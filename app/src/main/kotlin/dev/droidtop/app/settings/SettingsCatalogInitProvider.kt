@@ -47,6 +47,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // The stores droidtop runs itself, then their installs and updates,
         // a job each (docs/SPEC.md 7g, "Stores").
         dev.droidtop.stores.BuiltInStores.register()
+        // The Steam account plugins may use through droidtop's own session (docs/plugin-api.md 3 G8).
+        dev.droidtop.stores.BuiltInStores.offerSteamToPlugins(appContext)
         // A plugin's stores beside them (docs/plugin-api.md 3 A13), once the plugins are read: off this thread.
         dev.droidtop.library.integrations.PluginStores.refreshAsync(appContext)
         dev.droidtop.library.stores.StoreInstallJob.register(appContext)

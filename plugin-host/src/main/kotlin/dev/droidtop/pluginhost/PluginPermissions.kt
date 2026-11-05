@@ -115,6 +115,8 @@ object PluginPermissions {
         PluginPermission("web.session", PermissionTier.DANGEROUS, "Use your sign-in on its sites"),
         PluginPermission("github.api", PermissionTier.NORMAL, "Use your GitHub account for GitHub requests"),
         PluginPermission("github.token.read", PermissionTier.DANGEROUS, "See your GitHub sign-in"),
+        // docs/plugin-api.md 3 G8 (Droidtop/tracker#379): through droidtop's own Steam session, never its secrets.
+        PluginPermission("steam.account", PermissionTier.DANGEROUS, "Use your Steam account: claim free games, redeem keys and show games as played"),
         PluginPermission("diagnostics.read", PermissionTier.DANGEROUS, "Read droidtop's logs", officialOnly = true),
         PluginPermission("telemetry.send", PermissionTier.DANGEROUS, "Send usage data"),
         PluginPermission("plugins.export", PermissionTier.NORMAL, "Offer features to other plugins"),

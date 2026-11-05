@@ -32,4 +32,13 @@ object BuiltInStores {
         StoreLibraries.register(UbisoftStore())
         StoreLibraries.register(XboxStore())
     }
+
+    /**
+     * Offers the Steam account to plugins that hold `steam.account` (docs/plugin-api.md 3 G8, Droidtop/tracker#379):
+     * the broker's `steam.*` ops run on the registered Steam store's session ([SteamPluginAccount]).
+     */
+    fun offerSteamToPlugins(context: android.content.Context) {
+        val steam = StoreLibraries.byId("steam") as? SteamStore ?: return
+        dev.droidtop.pluginhost.SteamAccounts.provider = dev.droidtop.stores.steam.SteamPluginAccount(context.applicationContext, steam)
+    }
 }

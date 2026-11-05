@@ -15978,6 +15978,17 @@ follows:
   launch intent, ignoring other devices' pending operations) and ends (the exit
   sync's result) with the calls its client makes. Not carried: GameNative's
   achievement sync and Goldberg save migration.
+- **The Steam account for plugins (2026-11-05, Droidtop/tracker#379, built to the recommendation, owner to
+  confirm).** The owner (2026-10-08): ASF's breadth as "a public, unofficial plugin" on droidtop's Steam, not ASF's
+  .NET plugins. droidtop offers its own Steam session to plugins that hold the dangerous `steam.account`
+  (docs/plugin-api.md 3 G8, `HostSteamApis` in `:plugin-host`, filled at start by `SteamPluginAccount` in `:stores`
+  through the `SteamAccounts.provider` seam): product changes and product info, free licences (apps over the client
+  connection, packages on the store with droidtop's web session), product keys on the store, and games shown as
+  played (at most 12 hours a call, holding the connection while it lasts). droidtop keeps Steam's limits for every
+  plugin together (30 free licences a rolling hour, an hour's pause after Steam says too many, one key every 10 s),
+  so no plugin can get the account flagged; no op hands out a password, token or cookie, and trades, the market and
+  Steam Guard confirmations are not offered. The plugin itself ("Steam tools") is unofficial and lives in the
+  public `gamegrab-sources` repository with its own origin key.
 - **GOG and Epic cloud saves (decided 2026-11-04, Droidtop/tracker#224)** run on the same seam as Steam's, so a
   launch through Wine or through Enginehost syncs them with nothing added to the launch path: `GOGStore.syncSaves`
   (`GOGCloudSaves`) and `EpicStore.syncSaves` (`EpicCloudSaves`), both `hasCloudSaves`, called by `StoreSaves`
