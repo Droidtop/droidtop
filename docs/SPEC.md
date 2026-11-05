@@ -23248,6 +23248,30 @@ waited for one for good), so droidtop's `blank.mkv` is the same 4 s but uncompre
 5 fps) and 16-bit PCM silence (8 kHz mono), which need nothing beyond matroskademux. A first copy that kept Proton's
 Opus audio made decodebin report a missing plug-in on the console: the base system has no Opus decoder.
 
+### Video in Wine games (slice 1 built 2026-11-05, Droidtop/tracker#601, #906)
+
+The base image's GStreamer has no decoders for the formats games ship (WMV/WMA, AV1, H.264, Opus: #897), and the owner
+chose (#906, 2026-11-05) that Wine games decode through droidtop's own build of the sandboxed decode service Enginehost
+ships, built from the enginehost-ffmpeg library, with no guest GStreamer or FFmpeg build, on arm64 and x86_64 alike.
+Two pieces, both in `runtime-windows/native/mediadecode`:
+- `libdroidtopmediad.so`, the decode server: an executable in nativeLibraryDir, started per session by
+  `MediaDecodeServerComponent` and listening on a Unix socket in the image's tmp folder. It forks one process per
+  stream, so a crash, limit or kill ends only that stream. `protocol.h` is the wire (open with the input descriptor,
+  info with a shared output region, decode video, decode audio, close), mirroring Enginehost's `IMediaStream`.
+- `libgstdroidtopff.so`, a GStreamer plugin the image's GStreamer loads in Wine's process. Its element,
+  `droidtopffdemux`, claims a game's media container at primary + 10, above every demuxer and Proton's converter, has
+  the server decode it, and exposes one `video/x-raw` (I420) and one `audio/x-raw` (S16) pad, which winegstreamer maps
+  with no decoder after it. When the server ends a stream or dies, every pad gets EOS. It is built against
+  `vendor/gstreamer` (1.24.13) and `vendor/glib` (2.80.5) headers only, with the headers their builds generate kept in
+  `mediadecode/generated`, and linked against link-only stubs carrying the image's sonames, so it names the image's own
+  `libgstreamer-1.0`, `libgobject-2.0` and `libglib-2.0` and nothing of GStreamer ships in the APK.
+`WineMediaDecode` copies the plugin into `files/gst-droidtop` and puts that directory first on GST_PLUGIN_PATH only
+while the session's server listens; without it nothing changes and the media converter's blank placeholder still lets
+a game go on. Slice 1 claims ASF only and its decoder is a stub returning that same blank (4 s, I420 64x48 at 5 fps,
+8 kHz mono silence). Slice 2 brings the enginehost-ffmpeg decoder and the other containers, and the per-stream process
+locks down with Fibrewall's `SBX_LOCK_COMPUTE` before reading any media; slice 3 seeks; slice 4 is #906's
+hardware-codec mode.
+
 ### The allocator a game's Wine uses (built 2026-11-05, Droidtop/tracker#894, owner approved)
 
 Bionic's allocator, Scudo, gives each small size class a fixed 256 MB region in a process. LLVM compiling DXVK's

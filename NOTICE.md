@@ -126,6 +126,14 @@ This project is distributed under the GNU General Public License v3.0 (see
 - **mimalloc** — `vendor/mimalloc` (v2.2.7), https://github.com/microsoft/mimalloc — MIT,
   Copyright (c) 2018-2025 Microsoft Corporation, Daan Leijen. Built into `libmimalloc.so` for both ABIs, the allocator
   a game can choose for its Wine processes (docs/SPEC.md 9, "The allocator a game's Wine uses").
+- **GStreamer** — `vendor/gstreamer` (1.24.13), https://gitlab.freedesktop.org/gstreamer/gstreamer — LGPL-2.1-or-later.
+  Headers only, for building `libgstdroidtopff.so`, the media handoff element Wine's GStreamer loads (docs/SPEC.md 9,
+  "Video in Wine games"). `runtime-windows/native/mediadecode/generated/gst` holds the three headers its build
+  generates (`gstconfig.h`, `gstversion.h`, `gstenumtypes.h`), produced by its own meson configure at that version.
+  Nothing of GStreamer is built into the APK; the element links against the Windows base image's own libraries.
+- **GLib** — `vendor/glib` (2.80.5), https://gitlab.gnome.org/GNOME/glib — LGPL-2.1-or-later. Headers only, for the
+  same element; `runtime-windows/native/mediadecode/generated/{glib,gobject,gmodule}` holds the headers its build
+  generates (`glibconfig.h` and the visibility, version and enum-type headers), produced by its own meson configure.
 - **libffi** — `vendor/libffi`, https://github.com/libffi/libffi — MIT.
   Runtime dependency of `libwayland-client`, cross-compiled by
   `build-scripts/build-vendor-deps.sh`.

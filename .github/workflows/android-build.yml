@@ -251,7 +251,9 @@ jobs:
           ndk_bin="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
           READELF="$ndk_bin/bin/llvm-readelf" python3 scripts/check-native-links.py \
             "$apk_dir" "$ndk_bin/sysroot" \
-            --exports libmimalloc.so:malloc,free,calloc,realloc,posix_memalign,memalign,malloc_usable_size
+            --exports libmimalloc.so:malloc,free,calloc,realloc,posix_memalign,memalign,malloc_usable_size \
+            --exports libgstdroidtopff.so:gst_plugin_droidtopff_get_desc \
+            --other-process libgstdroidtopff.so
 
       - name: ABI sets (arm64-v8a libraries without an x86_64 build)
         # The fat APK installs as x86_64 on an Android-x86 device with ARM

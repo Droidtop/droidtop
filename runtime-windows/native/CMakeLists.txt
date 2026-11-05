@@ -203,3 +203,59 @@ target_compile_options(mimalloc PRIVATE -O3 -fvisibility=hidden -ftls-model=init
         -fno-builtin-malloc -Wno-unknown-pragmas -Wno-static-in-inline)
 target_link_libraries(mimalloc dl)
 page_16k(mimalloc)
+
+# The Wine media handoff (docs/SPEC.md 9, "Video in Wine games"; Droidtop/tracker#601): a GStreamer element Wine's
+# GStreamer loads, and the decode server it talks to, one process per stream. Slice 1: the server's decoder is a stub
+# that returns the media converter's blank; slice 2 brings the enginehost-ffmpeg library.
+set(MEDIADECODE ${CMAKE_CURRENT_SOURCE_DIR}/mediadecode)
+
+# libdroidtopmediad.so: an executable, named like a library so Android installs it in nativeLibraryDir, the one place
+# an app may run a file from (as libvirgl_vtest.so and libsbx_exec.so are).
+add_executable(droidtopmediad ${MEDIADECODE}/mediad.c)
+set_target_properties(droidtopmediad PROPERTIES
+        C_STANDARD 11
+        OUTPUT_NAME "libdroidtopmediad.so"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+target_compile_options(droidtopmediad PRIVATE -O2 -Wall -Wextra -fstack-protector-strong -D_FORTIFY_SOURCE=2)
+target_link_options(droidtopmediad PRIVATE -pie -Wl,-z,relro,-z,now)
+page_16k(droidtopmediad)
+
+# libgstdroidtopff.so, against vendor/gstreamer and vendor/glib's headers (with the headers their builds generate,
+# in mediadecode/generated) and the image's libraries' sonames, through link-only stubs.
+# The stubs are built with the compiler directly, not as library targets: every shared library this project defines
+# ships in the APK, and these must not.
+set(GST_STUB_DIR ${CMAKE_CURRENT_BINARY_DIR}/gst-link-stubs)
+set(GST_STUBS)
+foreach(stub IN ITEMS "GST;gstreamer-1.0" "GOBJECT;gobject-2.0" "GLIB;glib-2.0")
+    list(GET stub 0 key)
+    list(GET stub 1 lib)
+    set(out ${GST_STUB_DIR}/lib${lib}.so)
+    add_custom_command(OUTPUT ${out}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${GST_STUB_DIR}
+            COMMAND ${CMAKE_C_COMPILER} --target=${CMAKE_C_COMPILER_TARGET} -nostdlib -shared -fPIC -DSTUB_${key}
+                    -Wl,-soname,lib${lib}.so.0 -o ${out} ${MEDIADECODE}/link-stubs.c
+            DEPENDS ${MEDIADECODE}/link-stubs.c
+            VERBATIM)
+    list(APPEND GST_STUBS ${out})
+endforeach()
+add_custom_target(gst_link_stubs DEPENDS ${GST_STUBS})
+
+add_library(gstdroidtopff SHARED ${MEDIADECODE}/gstdroidtopff.c)
+set_target_properties(gstdroidtopff PROPERTIES C_STANDARD 11)
+target_include_directories(gstdroidtopff PRIVATE
+        ${MEDIADECODE}
+        ${MEDIADECODE}/generated
+        ${MEDIADECODE}/generated/glib
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/glib
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/glib/glib
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/glib/gmodule
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/gstreamer/subprojects/gstreamer)
+# The oldest API this uses, so a newer header never pulls in a symbol an older image lacks.
+target_compile_definitions(gstdroidtopff PRIVATE
+        GLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_56 GLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_2_56 GST_DISABLE_GST_DEBUG)
+target_compile_options(gstdroidtopff PRIVATE -O2 -Wall -Wextra -fvisibility=hidden -fstack-protector-strong
+        -D_FORTIFY_SOURCE=2)
+add_dependencies(gstdroidtopff gst_link_stubs)
+target_link_options(gstdroidtopff PRIVATE -Wl,--no-undefined -Wl,-z,relro,-z,now -L${GST_STUB_DIR})
+target_link_libraries(gstdroidtopff -lgstreamer-1.0 -lgobject-2.0 -lglib-2.0)
+page_16k(gstdroidtopff)

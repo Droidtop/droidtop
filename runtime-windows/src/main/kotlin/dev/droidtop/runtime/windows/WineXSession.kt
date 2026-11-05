@@ -154,6 +154,8 @@ class WineXSession(
         if (X86_64Graphics.usesVenus(context, prefix)) {
             environment.addComponent(VtestServerComponent(X86_64Graphics.vtestSocket(context)))
         }
+        // Video in Wine games (Droidtop/tracker#601): the sandboxed decode server, up before the guest starts.
+        environment.addComponent(MediaDecodeServerComponent(WineMediaDecode.socket(context)))
 
         envVars.apply {
             // The prefix's own locale. A Japanese-locale game reads
