@@ -19531,8 +19531,9 @@ a wallpaper colour change and the settings themselves each look again. `OutsideG
 (`current(context)`, a cheap read, and `colors(context)`, a flow): it applies the colour source and is what everything outside Gaming draws with. Its readers:
 `GamingTheme.outsidePalette` (what `MenuTokens` give with no theme held, and every `DroidtopTheme` root outside
 Gaming); Desktop's `GamingTheme(outsideGaming = true)`, which holds the Gaming theme only while it is the source;
-Mobile's taskbar (`StandardTaskbar`: the running dot and the focus ring, held to 3:1 on its dark plate, redrawn on a
-change); Mobile's View-hosted notices, page headers, button bars and job bars (`NoticeViews`, `PageViews`,
+Mobile's taskbar (`StandardTaskbar`, `TaskbarInks`: its plate is the theme's overlay surface at 90 percent, its text
+held to 4.5:1 and the running dot and focus ring to 3:1 on that plate over a dark app and a light one alike, redrawn
+on a change; the plate was a fixed dark constant until Droidtop/tracker#701); Mobile's View-hosted notices, page headers, button bars and job bars (`NoticeViews`, `PageViews`,
 `JobViews`: the accent and the palette over the surface's own background and text, on their next bind); and the role
 tokens plugins read outside Gaming (`RoleTokens.current`).
 
