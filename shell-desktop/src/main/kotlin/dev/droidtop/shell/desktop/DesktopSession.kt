@@ -173,6 +173,8 @@ internal fun BoxScope.DesktopViewport(
     onStartSession: () -> Unit,
     onOpenSetup: () -> Unit,
     prefs: DesktopPrefs.Values,
+    outputNames: List<String> = emptyList(),
+    onPrimarySized: (width: Int, height: Int, scale: Double) -> Unit = { _, _, _ -> },
 ) {
     if (hostBridge != null && primaryOutput != null) {
         var presentFailed by remember { mutableStateOf(false) }
@@ -185,6 +187,17 @@ internal fun BoxScope.DesktopViewport(
             onDispose { input.close() }
         }
         val router = input.router
+        // The primary's touch takes the unnamed call while it is the only output, and its own output's name once
+        // the desktop has another (PointerTarget.choose, Droidtop/tracker#908 step D3): the unnamed call would spread
+        // it over both.
+        androidx.compose.runtime.SideEffect {
+            router.pointerTarget = dev.droidtop.input.PointerTarget.choose(
+                primary = true,
+                surfaceOutput = outputNames.firstOrNull(),
+                outputCount = outputNames.size,
+            )
+        }
+        val primarySized by rememberUpdatedState(onPrimarySized)
         // The keys Android keeps (Super, Alt+Tab, Ctrl+Space) come to this session through droidtop's accessibility
         // service while it is in front, and to nothing at any other time (Droidtop/tracker#697, docs/SPEC.md 6b).
         val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
@@ -220,7 +233,10 @@ internal fun BoxScope.DesktopViewport(
             // scale shrinks with it so the layout keeps its size.
             val factor = DesktopScale.resolutionFactor(currentPrefs.resolution)
             val (outW, outH) = DesktopScale.outputSize(width, height, factor)
-            val sized = hostBridge.setOutputSize(outW, outH, DesktopScale.outputScale(scale, factor))
+            val outputScale = DesktopScale.outputScale(scale, factor)
+            val sized = hostBridge.setOutputSize(outW, outH, outputScale)
+            // An output right of the primary is placed against the primary's box, which this changes.
+            if (sized) primarySized(outW, outH, outputScale)
             router.transform = PointerTransform(
                 viewWidth = width,
                 viewHeight = height,
@@ -437,7 +453,7 @@ internal object DesktopKeyboardTarget {
 
 /** Android's density for the screen [view] is on, or null before it is attached to one (Droidtop/tracker#386). */
 @Suppress("DEPRECATION")
-private fun screenDpi(view: android.view.View): Int? {
+internal fun screenDpi(view: android.view.View): Int? {
     val display = view.display ?: return null
     val metrics = android.util.DisplayMetrics()
     display.getRealMetrics(metrics)

@@ -463,6 +463,10 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                         onRestartSession = { DesktopSessionService.restart(this@MainActivity) },
                         onStopSession = { DesktopSessionService.stop(this@MainActivity) },
                         onLockScreen = { lockScreen(this@MainActivity) },
+                        // With a second output (DesktopSecondScreen, Droidtop/tracker#908 step D3) the primary's touch
+                        // names its own output, and a new primary size places the others again.
+                        outputNames = connected?.outputs?.map { it.outputName }.orEmpty(),
+                        onPrimarySized = { width, height, scale -> DesktopSessionService.primaryResized(width, height, scale) },
                     )
                     if (askDesktopNotifications) {
                         DesktopNotificationPermission.Dialog(

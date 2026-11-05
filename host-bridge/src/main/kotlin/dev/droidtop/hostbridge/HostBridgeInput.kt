@@ -12,6 +12,13 @@ package dev.droidtop.hostbridge
 interface HostBridgeInput {
     fun injectPointerMotion(dx: Double, dy: Double)
     fun injectPointerMotionAbsolute(x: Double, y: Double, extentWidth: Int, extentHeight: Int)
+
+    /**
+     * The pointer at ([x], [y]) of a [extentWidth] x [extentHeight] surface showing the compositor output named
+     * [outputName], wherever that output sits in the layout (Droidtop/tracker#908, steps D1b and D3). False, and
+     * nothing sent, when there is no output of that name.
+     */
+    fun injectPointerMotionAbsolute(outputName: String, x: Double, y: Double, extentWidth: Int, extentHeight: Int): Boolean
     fun injectPointerButton(linuxButtonCode: Int, pressed: Boolean)
     fun injectPointerAxis(horizontal: Double, vertical: Double)
     /**

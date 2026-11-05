@@ -29,9 +29,16 @@ class InputSeat(
      * [extentHeight] — the primary screen's direct-touch use case. Caller
      * (the view/window handling the touch event) is the natural place to
      * know its own bounds, so it's passed in here rather than assumed.
+     *
+     * [outputName]: the compositor output the surface shows, which the point is placed on; null spreads it over the
+     * whole layout, which is the primary only while it is the only output ([PointerTarget], Droidtop/tracker#908).
      */
-    fun onPointerAbsolute(source: InputSource, x: Float, y: Float, extentWidth: Int, extentHeight: Int) {
-        bridge.injectPointerMotionAbsolute(x.toDouble(), y.toDouble(), extentWidth, extentHeight)
+    fun onPointerAbsolute(source: InputSource, x: Float, y: Float, extentWidth: Int, extentHeight: Int, outputName: String? = null) {
+        if (outputName == null) {
+            bridge.injectPointerMotionAbsolute(x.toDouble(), y.toDouble(), extentWidth, extentHeight)
+        } else {
+            bridge.injectPointerMotionAbsolute(outputName, x.toDouble(), y.toDouble(), extentWidth, extentHeight)
+        }
     }
 
     /** [linuxButtonCode]: BTN_LEFT/BTN_RIGHT/BTN_MIDDLE (0x110/0x111/0x112) from linux/input-event-codes.h. */

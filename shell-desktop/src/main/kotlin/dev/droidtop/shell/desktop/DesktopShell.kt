@@ -166,6 +166,16 @@ fun DesktopShell(
     onRestartSession: (() -> Unit)? = null,
     onStopSession: (() -> Unit)? = null,
     onLockScreen: (() -> Unit)? = null,
+    /**
+     * The compositor's outputs by name, the primary's first ([dev.droidtop.hostbridge.DesktopOutput]): with more than
+     * one, the primary's touch names its own (Droidtop/tracker#908, step D3). Empty with no session.
+     */
+    outputNames: List<String> = emptyList(),
+    /**
+     * The primary's output was given a new size ([HostBridge.setOutputSize]): pixels and scale. The session places the
+     * outputs right of it again (Droidtop/tracker#908, step D3).
+     */
+    onPrimarySized: (width: Int, height: Int, scale: Double) -> Unit = { _, _, _ -> },
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
     // The Quick Menu is the tray's, and the windows sheet the taskbar's window list, each a sheet a pad
@@ -318,7 +328,7 @@ fun DesktopShell(
                 .fillMaxSize()
                 .padding(top = if (barAtTop) barHeight else 0.dp, bottom = if (barAtTop) 0.dp else barHeight),
         ) {
-            DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup, prefs)
+            DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup, prefs, outputNames, onPrimarySized)
         }
 
         Taskbar(

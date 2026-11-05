@@ -777,6 +777,73 @@ proposal issue in the tracker". This fills the first direction above.
   windowcast exactly as an Android app is. Never Android's freeform windows
   (2b "Launching from Desktop").
 
+### The desktop on a second screen (Droidtop/tracker#908, step D3, built 2026-11-05)
+
+The Linux desktop can be drawn across two Android screens: the primary's
+output where Desktop runs, and a second output of the same compositor on
+another display (one desktop, windows move between them as on a PC with two
+monitors; moving them from the bar is D4). How it is put there:
+
+- **`DesktopSecondScreen.show(context, display)`** (`:app`) has the session
+  add an output for that display (`DesktopSessionService.extendTo`, step D2,
+  §4) and opens **`DesktopSecondScreenActivity`** on it
+  (`ActivityOptions.setLaunchDisplayId`, a task of its own per display, the
+  way the companion's activity is put on a screen). `hide(displayId)` closes
+  it and removes the output (`retract`). Nothing calls `show` on its own:
+  D5 asks the person once per screen. A debug build has Developer menu >
+  "Debug: desktop on the other screen" to show and hide it for a rig check.
+  It is an ordinary fullscreen window on that display, never an Android
+  freeform window.
+- **What it draws** (`DesktopSecondOutput`, `:shell-desktop`): a surface
+  showing that output (`HostBridge.presentOutput(name, surface)`, stopped
+  with `stopPresenting(name)` before the surface goes, as the primary's is),
+  and a bar of its own at the same edge as the primary's, built from the
+  primary bar's pieces. Its window list is every container window for now;
+  which output a window is on is D4. Start, the tray and Android's apps stay
+  on the primary's bar.
+- **Its size.** The surface's pixels and density are handed back to
+  `extendTo`, which sizes the output exactly as the primary's is sized
+  (Desktop scale with the screen's own density, then the render resolution,
+  `DesktopScale`), so a frame lands 1:1 on the surface and the bar is beside
+  the desktop rather than over it. The size is kept with the output, so a
+  re-place keeps it. It is asked for only once the output exists: asking
+  while the session is still making it would race the first sizing.
+- **Placed again when the primary changes size.** A rotation or a new
+  Desktop scale or resolution resizes the primary's output
+  (DesktopViewport); `DesktopSessionService.primaryResized` then waits until
+  the compositor reports the primary's new size and scale
+  (`SwayOutputs.awaitReported`, `DesktopOutputs.reports`) and extends every
+  added display again, which places it right of the primary's new box. With
+  the primary alone it does nothing.
+- **Touch and pointer.** The second surface has its own
+  `DesktopInputRouter` over the session's one seat, sending absolute motion
+  by name (`injectPointerMotionAbsolute(outputName, ...)`, D1b) so a touch
+  lands under the finger on that output; buttons and scrolling go through
+  the one pointer as before. Once a second output exists the primary's own
+  touch is named too, with the primary's name, since the unnamed call spans
+  the whole layout. The choice is `PointerTarget.choose` (`:input-seat`): the
+  primary alone keeps the unnamed call, byte for byte as before; a second
+  surface never takes it, and sends nothing while its output does not
+  exist.
+- **The pad and the keys stay with the primary surface.** The second
+  screen's window is touch-only, the companion's rule (4c, "A touch-only
+  activity never leaves a key without a window", `TouchOnlySurfaceFocus`):
+  a tap there does not move Android's focused display, so the pad's chords
+  and the hardware and on-screen keyboards keep going through the primary's
+  router into the same seat, and the compositor gives them to whichever
+  window it focused, on either output. Keyboard routing itself is
+  unchanged.
+- **When it closes.** When the session ends, when its output is removed
+  (`retract`, or the session's own retract when Android removes the
+  display), and when the display goes (`CompanionSurfaceLifetime`, which
+  also closes it if Android moves it to the built-in screen). Back does
+  nothing on it.
+- **Not yet:** the screen's role (Settings > Displays, "Extended desktop
+  output") and the question a new screen gets (D5), so the companion's
+  Presentation or idle cover can still be put on the same screen by the
+  second-screen orchestration and cover it; per-output window lists and
+  "move to the other screen" (D4).
+
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 
 droidtop is one app and one process hosting three modes. The user's words:
@@ -3920,9 +3987,9 @@ the `ContainerRuntime` interface that already exists (§3):
   game launch target, re-runs orchestration immediately.
 - Each `DisplayOutput` maps to one headless output inside the primary
   container's compositor (whichever the user's configured — see §2).
-- **Every window is on the primary screen's output**: one shared desktop,
-  nothing hidden away. host-bridge presents one output, the primary, and
-  the taskbar has no "Move to another screen".
+- **Every window is on the primary screen's output** unless the desktop
+  was put on a second screen (D3 below): one shared desktop, nothing
+  hidden away. The taskbar has no "Move to another screen" (D4).
 - **host-bridge tracks every compositor output (2026-11-05,
   Droidtop/tracker#908, step D1a).** The plan on #908: D1 many outputs in
   host-bridge, D2 the session creating a second sway headless output, D3
@@ -3937,7 +4004,7 @@ the `ContainerRuntime` interface that already exists (§3):
   name). The **primary** is the first output bound, the one host-bridge
   presented before: the calls without a name still mean it, and its size
   goes to the head of its name, or the first head when it has none, as
-  before (`output_match.h`). Nothing calls the named calls until D2/D3.
+  before (`output_match.h`). D2 and D3 call the named calls.
 - **Pointer input on a named output (2026-11-05, Droidtop/tracker#908, step
   D1b).** host-bridge's one virtual pointer is not tied to an output, so
   sway maps its absolute motion onto the box around every output in the
@@ -3957,8 +4024,8 @@ the `ContainerRuntime` interface that already exists (§3):
   (`input_manager_reset_all_inputs`) without restoring it, since wlroots
   gives a virtual pointer no output name for sway to map it by again; a
   reload would then silently spread that output's touches over the whole
-  layout. Nothing calls the named form until D3; until then a desktop
-  with a second output still takes the unnamed call.
+  layout. D3 calls the named form, for the second surface and, once a
+  second output exists, for the primary's too.
 - **The session adds and removes a second output (2026-11-05,
   Droidtop/tracker#908, step D2).** `DesktopSessionState.Connected` carries
   `outputs`, one `DesktopOutput` (an Android `DisplayOutput` and the
@@ -3985,8 +4052,23 @@ the `ContainerRuntime` interface that already exists (§3):
   output on the display, D5 decides whether to (asked once per display,
   remembered). The position is set when the output is added; a later
   change of the primary's size (a rotation, another Desktop scale) does
-  not move it until `extendTo` is called again, which D3 is to do when
-  either resizes.
+  not move it until `extendTo` is called again, which D3 does when the
+  primary resizes.
+- **The second output drawn on its display (2026-11-05,
+  Droidtop/tracker#908, step D3).** `DesktopSecondScreen.show(context,
+  display)` extends the session to the display and opens
+  `DesktopSecondScreenActivity` there with `setLaunchDisplayId`; it draws
+  the output (`presentOutput(name, surface)`), a bar of its own, and sends
+  its touch to that output by name. With a second output the primary's
+  touch is named too (`PointerTarget.choose`, the unnamed call stays only
+  while the primary is alone), and a resize of the primary places the
+  added outputs again once the compositor reports the new size
+  (`DesktopSessionService.primaryResized`). The surface's own size is
+  passed back to `extendTo`, so the output matches the surface beside its
+  bar. The window is touch-only like the companion's, so the pad and keys
+  stay with the primary. `hide(displayId)` closes it and retracts. Nothing
+  calls `show` until D5, except a debug build's Developer menu row. The
+  whole of it is in 2b, "The desktop on a second screen".
 - **Per-window placement is not built (corrected 2026-10-29,
   Droidtop/tracker#695).** This section used to promise that any window could
   be reassigned to a different `DisplayOutput` at runtime, sway moving a
@@ -4017,9 +4099,10 @@ the `ContainerRuntime` interface that already exists (§3):
   (§4d), **Virtual controller** (§4), **Extended desktop output** (Desktop
   only: a second headless output in the compositor, sized to the display;
   `:host-bridge` tracks and captures every output and can place pointer
-  input on any of them since #908's D1a and D1b, and the session can add
-  and remove that output since D2, but a surface showing it (D3) is
-  needed before this role or a taskbar "move to" action can exist), or
+  input on any of them since #908's D1a and D1b, the session can add
+  and remove that output since D2, and `DesktopSecondScreen` shows it on
+  its display since D3; the role row itself and the question a new screen
+  gets are D5, and a taskbar "move to" action D4), or
   **Mirror** (Android's
   own mirroring, chosen rather than fallen into). The per-mode
   second-screen role rows are these same rows filtered to the mode. A
@@ -10199,7 +10282,8 @@ app-drawer icon or a floating switcher button:
   activate/set_minimized/unset_minimized/close/set_fullscreen/
   set_rectangle — and host-bridge, though it tracks and captures every
   output since Droidtop/tracker#908's D1a and can place pointer input on
-  any of them since D1b, does not yet have a second one shown; "move to output" is #908's D4), and folding Android tasks droidtop itself
+  any of them since D1b, shows a second one only when D3's
+  `DesktopSecondScreen` is asked to; "move to output" is #908's D4), and folding Android tasks droidtop itself
   launched onto the desktop's display (a game, a Wine activity) into the
   same bar via `LaunchDisplay`'s record — all three are backlog, not
   shipped, corrected here after an earlier draft of this section described

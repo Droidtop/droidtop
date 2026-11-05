@@ -142,11 +142,13 @@ it is not the same as confirmed-working. Treat the implementation below as
 
 ### Known simplifications / not yet implemented
 
-- **Nothing shows a second output yet.** Every output can be captured
-  into its own `Surface` and take pointer input by name
-  (Droidtop/tracker#908 D1a, D1b), but nothing in the app presents a second
-  output yet (D2/D3), and `toplevel`'s output_enter/output_leave are not
-  tracked. An output's box is worked out on this side from its head, so for
+- **A second output is shown only when asked for.** Every output can be
+  captured into its own `Surface` and take pointer input by name
+  (Droidtop/tracker#908 D1a, D1b); the app's `DesktopSecondScreen` shows one
+  on another display (D3, `HostBridgeInput`'s named
+  `injectPointerMotionAbsolute` for its touch), but nothing calls it on its
+  own until D5, and `toplevel`'s output_enter/output_leave are not tracked
+  (which output a window is on is D4). An output's box is worked out on this side from its head, so for
   a scale that is not a multiple of 1/256 (the protocol's fixed point) it
   can be a logical pixel off the compositor's own.
 - **CPU blit, not zero-copy.** Frames are copied pixel-by-pixel from the shm

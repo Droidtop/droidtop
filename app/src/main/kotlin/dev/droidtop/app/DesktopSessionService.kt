@@ -556,7 +556,8 @@ class DesktopSessionService : Service() {
          * Gives the Android display [display] its own output in the desktop (Droidtop/tracker#908, step D2): a new
          * sway headless output, sized to the display's pixels at the scale the primary's output would have on it
          * (the Desktop scale and resolution settings with the display's own density, [DesktopScale]), placed right
-         * of the outputs already there. Nothing shows it yet (D3), and nothing decides to call this yet (D5).
+         * of the outputs already there. [DesktopSecondScreen] shows it there (D3) and calls this again with the size of
+         * the surface it is shown on; nothing decides to show it yet (D5).
          *
          * Idempotent: a display that already has an output keeps it, sized and placed again. The primary's own
          * display is never given a second one. Runs on the session's IO scope; returns false when no session is up.
@@ -580,9 +581,36 @@ class DesktopSessionService : Service() {
             return true
         }
 
-        private suspend fun extendNow(display: DisplayOutput) = outputsLock.withLock {
+        /**
+         * The primary's output was asked for [width] x [height] pixels at [scale] (a rotation, another Desktop scale
+         * or render resolution; DesktopViewport, Droidtop/tracker#908 step D3): every display [extendTo] gave an
+         * output is extended again, which sizes it at the current settings and places it right of the primary's new
+         * box. The placing waits until the compositor reports the primary's new size, since the box is read from
+         * that. Nothing happens with the primary alone, so the one-screen desktop does exactly what it did. Returns
+         * at once; the work runs on the session's IO scope.
+         */
+        fun primaryResized(width: Int, height: Int, scale: Double) {
+            val session = _stateHolder.value as? DesktopSessionState.Connected ?: return
+            if (session.outputs.size <= 1) return
+            val scope = sessionScope ?: return
+            val sway = swayOutputs ?: return
+            scope.launch {
+                val primaryName = session.outputs.first().outputName
+                if (primaryName.isNotEmpty() && !sway.awaitReported(primaryName, width, height, scale)) {
+                    android.util.Log.w(TAG, "$primaryName did not report ${width}x$height scale $scale in time; placing the others anyway")
+                }
+                val now = _stateHolder.value as? DesktopSessionState.Connected ?: return@launch
+                if (now.hostBridge !== session.hostBridge) return@launch
+                // Only outputs that still exist: one retracted meanwhile is not made again.
+                DesktopOutputs.extraDisplays(now.outputs).forEach { extendNow(it, existingOnly = true) }
+            }
+        }
+
+        /** [existingOnly]: only size and place an output the display already has; never make one. */
+        private suspend fun extendNow(display: DisplayOutput, existingOnly: Boolean = false) = outputsLock.withLock {
             val session = _stateHolder.value as? DesktopSessionState.Connected ?: return@withLock
             if (display.androidDisplayId == session.primaryOutput.androidDisplayId) return@withLock
+            if (existingOnly && DesktopOutputs.outputFor(session.outputs, display.androidDisplayId) == null) return@withLock
             val sway = swayOutputs ?: run {
                 android.util.Log.i(TAG, "Not adding an output for display ${display.androidDisplayId}: the compositor is not sway")
                 return@withLock

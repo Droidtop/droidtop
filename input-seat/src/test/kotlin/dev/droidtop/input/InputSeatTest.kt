@@ -25,6 +25,17 @@ class InputSeatTest {
     }
 
     @Test
+    fun `onPointerAbsolute with an output name takes the named call`() {
+        val bridge = FakeHostBridge()
+        val seat = InputSeat(bridge)
+
+        seat.onPointerAbsolute(InputSource.TOUCH, x = 100f, y = 200f, extentWidth = 1920, extentHeight = 1080, outputName = "HEADLESS-2")
+
+        assertEquals(listOf(listOf<Any>("HEADLESS-2", 100.0, 200.0, 1920, 1080)), bridge.namedAbsolutes)
+        assertEquals(emptyList<List<Any>>(), bridge.pointerAbsolutes)
+    }
+
+    @Test
     fun `onPointerButton and onPointerScroll and onKey all pass through unchanged`() {
         val bridge = FakeHostBridge()
         val seat = InputSeat(bridge)

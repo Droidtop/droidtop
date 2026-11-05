@@ -644,6 +644,7 @@ object DroidtopWideSettings {
                         AppSettingsCatalogs.rebuildIndexItem(),
                         UpdatesPage.debugBuildsItem(context),
                         debugCrashItem(context),
+                        debugDesktopSecondScreenItem(context),
                     ),
                 ),
                 // The calibration set for name matching (Droidtop/tracker#318 §3.3): a scrape run with this on writes what
@@ -717,6 +718,41 @@ object DroidtopWideSettings {
             run = { _ ->
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     throw RuntimeException("Debug: forced crash from Global settings")
+                }
+            },
+        )
+    }
+
+    /**
+     * A debug build's way to put the running desktop's second output on the other screen and take it off again
+     * (DesktopSecondScreen, Droidtop/tracker#908 step D3), until step D5 asks the person once per screen.
+     */
+    private fun debugDesktopSecondScreenItem(context: Context): AsyncActionItem? {
+        if (!AppSettingsCatalogs.ctxIsDebuggable(context)) return null
+        return AsyncActionItem(
+            id = "pref_global_debug_desktop_second_screen",
+            title = "Debug: desktop on the other screen",
+            subtitle = "Shows the running desktop's second screen on the other screen, or takes it away again",
+            run = { ctx, _ ->
+                val session = dev.droidtop.app.DesktopSessionService.state.value as? dev.droidtop.app.DesktopSessionState.Connected
+                if (session == null) {
+                    "Start the desktop first"
+                } else {
+                    val other = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        dev.droidtop.runtime.DisplayOutputRepository(ctx).currentOutputsSnapshot()
+                            .firstOrNull { it.androidDisplayId != session.primaryOutput.androidDisplayId }
+                    }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        when {
+                            other == null -> "There is no other screen"
+                            dev.droidtop.app.DesktopSecondScreen.shownOn(other.androidDisplayId) -> {
+                                dev.droidtop.app.DesktopSecondScreen.hide(other.androidDisplayId)
+                                "Taken off the other screen"
+                            }
+                            dev.droidtop.app.DesktopSecondScreen.show(ctx, other) -> "Shown on the other screen"
+                            else -> "The other screen couldn't show it"
+                        }
+                    }
                 }
             },
         )

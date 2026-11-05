@@ -94,4 +94,30 @@ class DesktopOutputsTest {
         assertEquals(retracted, DesktopOutputs.retracted(retracted, 9))
         assertEquals("output HEADLESS-2 unplug", DesktopOutputs.unplugCommand("HEADLESS-2"))
     }
+
+    @Test
+    fun `a surface shows the output of its own display`() {
+        val outputs = listOf(primary, DesktopOutput(display(2), "HEADLESS-2"), DesktopOutput(display(5), "HEADLESS-3"))
+        assertEquals("HEADLESS-1", DesktopOutputs.surfaceOutput(outputs, 0))
+        assertEquals("HEADLESS-2", DesktopOutputs.surfaceOutput(outputs, 2))
+        assertEquals("HEADLESS-3", DesktopOutputs.surfaceOutput(outputs, 5))
+        // A display with no output yet (or no longer) shows none, and no session shows nothing.
+        assertNull(DesktopOutputs.surfaceOutput(outputs, 7))
+        assertNull(DesktopOutputs.surfaceOutput(emptyList(), 0))
+        // An unnamed primary is still the primary's surface.
+        assertEquals("", DesktopOutputs.surfaceOutput(listOf(DesktopOutput(display(0), "")), 0))
+        assertEquals(listOf(2, 5), DesktopOutputs.extraDisplays(outputs).map { it.androidDisplayId })
+        assertTrue(DesktopOutputs.extraDisplays(listOf(primary)).isEmpty())
+    }
+
+    @Test
+    fun `an output reports its size only with the scale it was asked for`() {
+        val placements = listOf(placement("HEADLESS-1", 0, 1920, 1080, 2.25), placement("HEADLESS-2", 853, 1080, 1920))
+        assertTrue(DesktopOutputs.reports(placements, "HEADLESS-1", 1920, 1080, 2.25))
+        // A scale that crossed as 24.8 fixed point is the same scale.
+        assertTrue(DesktopOutputs.reports(placements, "HEADLESS-1", 1920, 1080, 2.2501))
+        assertFalse(DesktopOutputs.reports(placements, "HEADLESS-1", 1920, 1080, 2.0))
+        assertFalse(DesktopOutputs.reports(placements, "HEADLESS-1", 1080, 1920, 2.25))
+        assertFalse(DesktopOutputs.reports(placements, "HEADLESS-9", 1920, 1080, 2.25))
+    }
 }

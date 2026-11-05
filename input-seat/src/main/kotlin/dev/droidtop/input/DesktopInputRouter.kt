@@ -44,6 +44,14 @@ class DesktopInputRouter {
     var transform: PointerTransform? = null
 
     /**
+     * Where absolute pointer motion from this router's surface goes (Droidtop/tracker#908, step D3): the unnamed call
+     * while the desktop has one output, the surface's own output once there are more ([PointerTarget.choose]). Set
+     * by the surface's host whenever the session's outputs change. Buttons, scrolling and relative motion go through
+     * the one pointer whatever this is, so they need no output.
+     */
+    var pointerTarget: PointerTarget = PointerTarget.Layout
+
+    /**
      * Whether the right analog stick drives the pointer. See
      * [onJoystickMotion] for why this covers the right stick and the stick
      * clicks only, and nothing that Compose's focus navigation uses.
@@ -72,9 +80,7 @@ class DesktopInputRouter {
     private val touch = DirectTouchGestures(
         object : DirectTouchGestures.Output {
             override fun moveTo(x: Float, y: Float) {
-                val seat = seat ?: return
-                val point = transform?.map(x, y) ?: return
-                seat.onPointerAbsolute(InputSource.TOUCH, point.x, point.y, point.extentWidth, point.extentHeight)
+                pointAt(InputSource.TOUCH, x, y)
             }
 
             override fun button(evdevButton: Int, pressed: Boolean) {
@@ -245,17 +251,25 @@ class DesktopInputRouter {
             return true
         }
 
-        transform?.map(event.x, event.y)?.let { point ->
-            seat.onPointerAbsolute(
-                InputSource.LAPDOCK_PERIPHERAL,
-                point.x,
-                point.y,
-                point.extentWidth,
-                point.extentHeight,
-            )
-        }
+        pointAt(InputSource.LAPDOCK_PERIPHERAL, event.x, event.y)
         syncMouseButtons(seat, event.buttonState)
         return true
+    }
+
+    /**
+     * Puts the pointer under the view point ([viewX], [viewY]) of this router's surface, on the output
+     * [pointerTarget] names. Nothing without a seat, before the surface is laid out, or with no output to land on.
+     * Plain floats, so a JVM unit test can drive it.
+     */
+    internal fun pointAt(source: InputSource, viewX: Float, viewY: Float) {
+        val seat = seat ?: return
+        val point = transform?.map(viewX, viewY) ?: return
+        val outputName = when (val target = pointerTarget) {
+            PointerTarget.Layout -> null
+            is PointerTarget.Output -> target.name
+            PointerTarget.Nowhere -> return
+        }
+        seat.onPointerAbsolute(source, point.x, point.y, point.extentWidth, point.extentHeight, outputName)
     }
 
     /** A captured trackpad or a relative-mode mouse: deltas, no position. */

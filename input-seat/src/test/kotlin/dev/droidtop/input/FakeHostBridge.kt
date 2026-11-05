@@ -23,6 +23,14 @@ internal class FakeHostBridge : HostBridgeInput {
         pointerAbsolutes += listOf(x, y, extentWidth, extentHeight)
     }
 
+    /** The named calls: the output's name, then x, y and the extent. */
+    val namedAbsolutes = mutableListOf<List<Any>>()
+
+    override fun injectPointerMotionAbsolute(outputName: String, x: Double, y: Double, extentWidth: Int, extentHeight: Int): Boolean {
+        namedAbsolutes += listOf(outputName, x, y, extentWidth, extentHeight)
+        return true
+    }
+
     override fun injectPointerButton(linuxButtonCode: Int, pressed: Boolean) {
         pointerButtons += linuxButtonCode to pressed
     }

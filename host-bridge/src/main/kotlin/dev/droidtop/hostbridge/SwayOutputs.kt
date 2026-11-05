@@ -51,6 +51,15 @@ class SwayOutputs(private val bridge: HostBridge, private val hostSocketDir: Fil
             .also { Log.i(TAG, "Output $name ${width}x$height scale $scale at $x,0: ${if (it) "placed" else "not placed"}") }
     }
 
+    /**
+     * Waits until the compositor reports the output [name] at [width] x [height] pixels and [scale]
+     * ([DesktopOutputs.reports]), so an output placed beside it is placed against its new box. False when it did not
+     * in time.
+     */
+    suspend fun awaitReported(name: String, width: Int, height: Int, scale: Double): Boolean = withContext(Dispatchers.IO) {
+        waitFor { DesktopOutputs.reports(bridge.outputPlacements(), name, width, height, scale).takeIf { it } } != null
+    }
+
     /** Stops presenting the output [name] and has sway remove it. True when sway did. */
     suspend fun unplug(name: String): Boolean = withContext(Dispatchers.IO) {
         bridge.stopPresenting(name)

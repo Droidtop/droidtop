@@ -180,7 +180,7 @@ class HostBridge : HostBridgeInput {
      * [OutputLayout.absoluteMotion] places the point; the motion goes through the same virtual pointer as the call
      * above, so buttons and scrolling need no output.
      */
-    fun injectPointerMotionAbsolute(outputName: String, x: Double, y: Double, extentWidth: Int, extentHeight: Int): Boolean {
+    override fun injectPointerMotionAbsolute(outputName: String, x: Double, y: Double, extentWidth: Int, extentHeight: Int): Boolean {
         if (outputName.isEmpty() || !connected) return false
         val motion = OutputLayout.absoluteMotion(outputPlacements(), outputName, x, y, extentWidth, extentHeight)
             ?: return false

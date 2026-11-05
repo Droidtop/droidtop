@@ -514,6 +514,22 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|navigation" />
 
         <!--
+          The Linux desktop's second output on another display (docs/SPEC.md 2b and 4,
+          Droidtop/tracker#908 step D3), opened there by DesktopSecondScreen.show with
+          setLaunchDisplayId. A task of its own per display (taskAffinity "" and
+          FLAG_ACTIVITY_MULTIPLE_TASK), so starting it never brings the shell's task
+          along, the loop the companion's entry above describes. Configuration
+          changes are taken in place: the surface follows its own size, and a
+          recreation would drop the output's capture for nothing.
+        -->
+        <activity
+            android:name="dev.droidtop.app.DesktopSecondScreenActivity"
+            android:exported="false"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation" />
+
+        <!--
           docs/SPEC.md section 3d's container/distro manager. The
           intent-filter action lets shells in other modules
           (:shell-desktop's taskbar) open it without a compile-time
