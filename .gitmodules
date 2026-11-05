@@ -62,3 +62,7 @@
 [submodule "vendor/lib-net"]
 	path = vendor/lib-net
 	url = https://github.com/Droidtop/lib-net
+[submodule "vendor/mimalloc"]
+	path = vendor/mimalloc
+	url = https://github.com/microsoft/mimalloc
+	shallow = true
