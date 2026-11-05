@@ -206,7 +206,17 @@ class LibpodApiTest {
         assertEquals("/srv", LibpodApi.createRequest("{$image,\"work_dir\":\"/srv\"}", null, listOf(network)).first!!.workdir)
         assertEquals(listOf("/bin/sh"), LibpodApi.createRequest("{$image,\"entrypoint\":[\"/bin/sh\"]}", null, listOf(network)).first!!.entrypoint)
         assertEquals(400, answer("{$image,\"work_dir\":\"srv\"}").first)
-        assertEquals(501, answer("{$image,\"mounts\":[{\"destination\":\"/x\",\"type\":\"bind\",\"source\":\"/etc\"}]}").first)
+        // A bind mount of a host path is refused as -v refuses it (#715); tmpfs is not built.
+        assertEquals(400, answer("{$image,\"mounts\":[{\"destination\":\"/x\",\"type\":\"bind\",\"source\":\"/etc\"}]}").first)
+        assertEquals(501, answer("{$image,\"mounts\":[{\"destination\":\"/tmp\",\"type\":\"tmpfs\",\"source\":\"tmpfs\"}]}").first)
+        assertEquals(
+            listOf("Saves"),
+            LibpodApi.createRequest(
+                "{$image,\"mounts\":[{\"destination\":\"/run/droidtop-mounts/Saves\",\"type\":\"bind\",\"source\":\"/run/droidtop-mounts/Saves\",\"options\":[\"ro\"]}]}",
+                null,
+                listOf(network),
+            ).first!!.volumes,
+        )
         assertTrue(answer("{$image,\"resource_limits\":{\"memory\":{\"limit\":1}}}").second.contains("--memory"))
         assertEquals(501, answer("{$image,\"portmappings\":[{\"container_port\":80,\"host_port\":8080}]}").first)
         assertEquals(501, answer("{$image,\"terminal\":true}").first)
