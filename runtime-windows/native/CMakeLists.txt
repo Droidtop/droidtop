@@ -65,13 +65,25 @@ target_link_libraries(winlator log android aaudio)
 page_16k(winlator)
 
 # libwinlator_11: Java loads it for GPUHelper (Vulkan version and
-# extensions) and Drawable/Pixmap, and calls nothing else in it.
-add_library(winlator_11 SHARED
-        ${UPSTREAM}/winlator/gpu_helper.c
-        ${UPSTREAM}/asurfacerenderer/drawable.c)
-target_compile_options(winlator_11 PRIVATE -O3 -ffast-math -Wno-unused-parameter)
-target_link_libraries(winlator_11 log android jnigraphics dl m)
-page_16k(winlator_11)
+# extensions) and Drawable/Pixmap. Built here for x86_64 only. On arm64 the
+# APK carries GameNative's prebuilt (components.pin), because
+# libvortekrenderer.so needs it too: that copy has the SONAME
+# "libwinlator.so", which vortek's NEEDED binds to once Java has loaded it,
+# and it exports Winlator's ArrayList/ArrayDeque/IntArray/RingBuffer code,
+# whose ring buffer is the shared-memory protocol vortek speaks and has no
+# source. A copy built from gpu_helper.c and drawable.c alone shipped in
+# 2967, and every vortek game died at its first Present on
+# "cannot locate symbol ArrayList_add" (Droidtop/tracker#857).
+# scripts/check-native-links.py now fails a build whose libraries cannot
+# resolve their imports.
+if(NOT ANDROID_ABI STREQUAL "arm64-v8a")
+    add_library(winlator_11 SHARED
+            ${UPSTREAM}/winlator/gpu_helper.c
+            ${UPSTREAM}/asurfacerenderer/drawable.c)
+    target_compile_options(winlator_11 PRIVATE -O3 -ffast-math -Wno-unused-parameter)
+    target_link_libraries(winlator_11 log android jnigraphics dl m)
+    page_16k(winlator_11)
+endif()
 
 if(ANDROID_ABI STREQUAL "arm64-v8a")
     # libadrenotools as its own CMakeLists.txt (and src/hook's) defines the
