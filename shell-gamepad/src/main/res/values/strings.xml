@@ -158,8 +158,8 @@
     <string name="gamepad_scrape_all_systems">Scrape all systems</string>
     <string name="gamepad_scrape_x">Scrape %1$s</string>
     <string name="gamepad_games">Games</string>
-    <string name="gamepad_sources_unreachable">Could not reach your sources</string>
-    <string name="gamepad_sources_unreachable_line">Check the connection, then try again</string>
+    <string name="gamepad_sources_unreachable">You\'re offline</string>
+    <string name="gamepad_sources_unreachable_line">Get games needs a connection. Try again once you\'re back online</string>
     <string name="gamepad_bring_back_saves_from_x">Bring back saves from %1$s</string>
     <string name="gamepad_bring_back_saves_from_x_question">Bring back the saves from %1$s?</string>
     <string name="gamepad_bring_back_saves_detail">The saves here now are kept as a copy, so you can switch back the same way.</string>
