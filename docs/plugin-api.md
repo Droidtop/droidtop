@@ -5680,6 +5680,38 @@ id, versions served, deprecated-since, risk, label), so the table and
 the behaviour cannot drift apart. This document describes that table; it
 does not duplicate it once built.
 
+**Where a plugin's source lives: plugin-core (owner, 2026-11-05).** The
+owner: "ALL plugins should keep the recipe on plugin-core, overlaid onto
+the release branch when needed. That's our standard operation. The plugin
+core is either one half of each new branch, or a base used to reimplement
+from when writing patches and stuff", and "main, master, or etc, shouldn't
+exist. we rename it to "upstream-sync"". Every plugin repository,
+droidtop's and Enginehost's alike, has these branches:
+
+- **`plugin-core`** is the default branch. It holds only the plugin's own
+  recipe: its plugin folder, README, workflows, docs and line declarations.
+  Every change lands here first, through a `ci/` branch. A plugin bundle is
+  built from it.
+- **`upstream-sync`** exists only in a repository that tracks another
+  project (a fork: droidtop-plugin-shizuku, -mmrl, -revanced-manager). It
+  holds that project untouched and only ever fast-forwards to it. The
+  shared sync (droidtop-platforms `sync-upstream.yml` with `line`) merges
+  nothing. A new upstream commit comes back as a `ci/upstream-<line>-<sha>`
+  branch that moves the line's pin on plugin-core.
+- **`plugin/<line>`** is the release branch: the upstream commit the line
+  pins, with plugin-core written over it. It is generated, never edited:
+  `tools/plugin_line.py compose <line> --commit` in droidtop-platforms.
+  The line's `plugin-line.yml` check fails when the branch differs from
+  that composition.
+  - A droidtop plugin declares its lines in
+    `plugin-line/lines/<line>/line.json`.
+  - An Enginehost engine plugin declares them under `enginehost/`, which
+    had the model first.
+  - A plugin with no upstream has no line: plugin-core is its release.
+
+There is no `main` or `master`; a repository's old one is retired once its
+work is on these branches.
+
 ---
 
 ## 8. Process, threading, timeouts and quotas
