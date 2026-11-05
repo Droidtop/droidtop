@@ -158,7 +158,10 @@ object GameProperties {
             )
         }
         return listOf(
-            CatalogGroup("properties_edit", null, edit),
+            // Titled: the Gaming column names an untitled group after the screen, so its entry read "Game
+            // properties" inside Game properties and looked like the heading (Droidtop/tracker#228 rig check,
+            // 2026-11-05: Language and Controls "not on these pages").
+            CatalogGroup("properties_edit", "Language, controls and launch", edit),
             CatalogGroup("properties_drivers", null, drivers),
             CatalogGroup("properties_command", "What will run", show),
         )
