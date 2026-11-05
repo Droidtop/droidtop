@@ -25666,6 +25666,30 @@ what the index says is display data, never a trust decision.
   answers stored (sent back by a key change, or denied before) starts the
   approval list from those answers, not the defaults
   (`PluginGrants.approvalTicked`); the person still sees every tick.
+  **A source can mark a key superseded (Droidtop/tracker#887, owner 2026-11-05).** The owner: "Every key is
+  superceded by the current key. It's a simple check: if it's marked as "superceded", then trust the key it's
+  superceded by, which'll be denoted. We still tell the user the key is changing, of course", and "the place that
+  provides the "superceded" notice has to be the same source the plugin came from for it to be trusted".
+  - **The marker.** A source's own metadata carries `"superseded": [{"keySha256": "<old>", "by": "<current>"}]`, and
+    every old key points at the source's current key. There are no dates, chains or sunsets. Places that carry it:
+    an added catalog's index (an origin's `key`, and `catalog.key`), covered by the index's signature, and a
+    repository's `droidtop-plugin-key.json` (`KeySupersession`).
+  - **Followed only from the same source.** An origin's trust records where it came from (`UserOriginKey.catalog`,
+    `.repo`). A catalog's marker counts only for trust it gave (`PluginCatalog.originState` → `Superseded`), and a
+    repository's only for trust that came through that repository (`PluginRepoUpdates.followRepoMarker`). Two
+    sources sharing a key can mark it differently.
+  - **What following does.** On the catalog's refresh, or before the repository's pass reads releases, the origin's
+    key becomes the new one and the old one is kept as its predecessor (`UserOriginKeys.supersede`). That is the
+    record a confirmed "Trust new key" writes, so an update signed by the new key is the same publisher and keeps
+    its approval, and plugins a key change had sent back to waiting are approved again. A catalog's moved master is
+    accepted the same way.
+  - **The person is told** in a notice, not asked: "<origin> changed its signing key (<new>, was <old>), as <source>
+    says. Its plugins keep their approval". A plugin card approved under the old key reads quietly "signed with an
+    older key".
+  - **What the old key signed stays installed and running**, unless revoked (`PluginBundleInstaller.verifyInstalled`
+    accepts a plugin approved under a predecessor whose bytes are unchanged). New releases are verified under the
+    current key only.
+  - **A key change with no marker** still stops at the person's review ("new key to review", Droidtop/tracker#882).
   **An update is one switch, never an edit in place** (rig 2026-10-17: the
   F95 plugin kept coming back disabled with "manifest.json changed on disk
   since approval"). The installer used to empty the plugin's folder and

@@ -75,6 +75,9 @@ object UserOriginKeys {
 
     fun storeFile(context: Context): File = File(context.filesDir, STORE_NAME)
 
+    /** The same store beside the plugins folder ([PluginStore.root] is `filesDir/plugins`), for a caller that has only that. */
+    fun storeFileBeside(pluginsRoot: File): File = File(pluginsRoot.parentFile, STORE_NAME)
+
     /** Every stored entry, for the "Keys you trust" screen; empty when there is nothing to read. */
     fun load(file: File): Map<String, UserOriginKey> {
         if (!file.isFile) return emptyMap()
@@ -243,6 +246,29 @@ object UserOriginKeys {
             .onFailure { return AddKeyOutcome.Refused("couldn't save the key: ${it.message}") }
         return AddKeyOutcome.Added(entry)
     }
+
+    /**
+     * Follows a source's superseded marker (Droidtop/tracker#887): [origin]'s trusted key becomes [keyBase64], and the
+     * key it replaces joins [UserOriginKey.previous], the record "Trust new key" writes, so plugins approved under the
+     * old key keep their approval and an update signed by the new one is the same publisher. The caller checked the
+     * marker came from the source this trust came from ([KeySupersession.follows]). Null when the origin is not
+     * trusted or the store could not be written.
+     */
+    fun supersede(file: File, origin: String, keyBase64: String): UserOriginKey? {
+        val stored = load(file)
+        val existing = stored[origin] ?: return null
+        val old = keySha256(existing.keyBase64) ?: return null
+        val entry = existing.copy(keyBase64 = keyBase64, previous = (listOf(old) + existing.previous).distinct().take(MAX_PREVIOUS))
+        return runCatching { save(file, stored + (origin to entry)) }.map { entry }.getOrNull()
+    }
+
+    /**
+     * Whether content approved under [approvedKeySha256] stays valid although its origin's key has moved on: the key is
+     * one the origin's key replaced ([UserOriginKey.previous]). The owner: "Whatever K signed stays installed and
+     * running" (Droidtop/tracker#887); revocation is the only way it stops, checked by the caller. Pure.
+     */
+    fun predecessorInForce(entry: UserOriginKey?, approvedKeySha256: String): Boolean =
+        entry != null && approvedKeySha256.lowercase() in entry.previous
 
     /**
      * Whether [verifiedKeySha256], the key a plugin of [origin] is signed by now, is the person's confirmed successor of

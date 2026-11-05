@@ -71,6 +71,18 @@ object PluginSourceKeys {
         }
     }
 
+    /**
+     * The superseded markers a source's key file carries (Droidtop/tracker#887): old key SHA-256 to its successor's,
+     * read from the first of [keyUrlsFor] that answers. Empty when there are none or nothing answered.
+     */
+    fun fetchMarkers(
+        sourceUrl: String,
+        token: String? = null,
+        httpGet: (String) -> ByteArray? = { fetchBytes(it, token) },
+    ): Map<String, String> = keyUrlsFor(sourceUrl).firstNotNullOfOrNull { url ->
+        httpGet(url)?.let { bytes -> runCatching { org.json.JSONObject(String(bytes, Charsets.UTF_8)) }.getOrNull() }
+    }?.let { KeySupersession.markers(it) }.orEmpty()
+
     /** The one real network leg: `Http.request` with the user's GitHub token (the GitHub opener, which sends it to GitHub hosts only), capped at 64 KiB (a key file is well under 1 KiB). */
     private fun fetchBytes(url: String, token: String?): ByteArray? = runCatching {
         // A token (even an empty one) takes the GitHub opener: redirects by hand, https only, the header decided per hop.

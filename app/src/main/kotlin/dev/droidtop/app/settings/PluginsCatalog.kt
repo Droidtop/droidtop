@@ -563,7 +563,11 @@ internal fun AppSettingsCatalogs.pluginCard(
         subtitle = m.presentation.summary ?: pluginSummary(m, enabledPoints),
         inline = pluginDetailScreen(m.id, m.label, m.presentation.summary),
         // The installed version, and the newer one whenever a catalog has it (Droidtop/tracker#792).
-        valueLabel = { "$state · v${m.version}" + (newerVersion?.let { " → $it" } ?: heldVersion?.let { " · $it out, new key to review" } ?: "") },
+        // Approved under a key its origin has since moved on from (Droidtop/tracker#887): said quietly, never a warning.
+        valueLabel = {
+            "$state · v${m.version}" + (newerVersion?.let { " → $it" } ?: heldVersion?.let { " · $it out, new key to review" } ?: "") +
+                (if (UserOriginKeys.predecessorInForce(userKeys[m.origin], record.approvedKeySha256)) " · signed with an older key" else "")
+        },
         // An app's plugin is trusted by its app's signature, not an origin key (Droidtop/tracker#547).
         chip = if (m.kind == PluginKind.APP_INTERFACE) {
             if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) null else dev.droidtop.library.settings.RowTag.UNOFFICIAL

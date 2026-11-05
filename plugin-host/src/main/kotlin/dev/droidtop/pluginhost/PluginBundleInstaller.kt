@@ -294,6 +294,36 @@ object PluginBundleInstaller {
      * certificate format (`manifest.sig`, no `manifest.jws`) is checked on
      * the bounded legacy path ([LegacyBundleSignature]) until it updates.
      */
+    /**
+     * Whether an installed plugin whose signature no longer verifies under its origin's current key stays valid because
+     * it was approved under a key that key superseded (Droidtop/tracker#887): the key is in the origin's
+     * [UserOriginKey.previous] and its sunset has not passed on this device's clock, and neither it nor any certificate
+     * of the plugin's chain is revoked. Its bytes on disk are still the ones verified at install: the manifest's digest
+     * and every payload file are checked against the record as before, so nothing changed since.
+     */
+    private fun approvedUnderPredecessor(pluginsRoot: File, record: PluginRecord, jws: String?, revocations: PluginRevocationList): Boolean {
+        jws ?: return false
+        val origin = record.manifest.origin
+        if (PluginOriginKeys.isOfficial(origin)) return false
+        val entry = UserOriginKeys.load(UserOriginKeys.storeFileBeside(pluginsRoot))[origin]
+        if (!UserOriginKeys.predecessorInForce(entry, record.approvedKeySha256)) return false
+        val own = revocations.forOrigin(origin)
+        val approved = record.approvedKeySha256.lowercase()
+        if (revocations.revokesKey(approved) || own.revokesKey(approved)) return false
+        val chain = chainOf(jws) ?: return false
+        return chain.none { revocations.revokes(it) || own.revokes(it) }
+    }
+
+    /** The certificates a bundle signature's `x5c` header carries, or null when it carries none that read. */
+    private fun chainOf(jws: String): List<java.security.cert.X509Certificate>? = runCatching {
+        val header = org.json.JSONObject(String(java.util.Base64.getUrlDecoder().decode(jws.substringBefore('.')), Charsets.UTF_8))
+        val x5c = header.getJSONArray("x5c")
+        val factory = java.security.cert.CertificateFactory.getInstance("X.509")
+        (0 until x5c.length()).map { i ->
+            factory.generateCertificate(java.util.Base64.getDecoder().decode(x5c.getString(i)).inputStream()) as java.security.cert.X509Certificate
+        }.takeIf { it.isNotEmpty() }
+    }.getOrNull()
+
     fun verifyInstalled(pluginsRoot: File, record: PluginRecord, userKeys: Map<String, String> = emptyMap()): PluginInstallError? {
         // An installed app's plugin is its app's signature and manifest asset, checked again ([AppInterfaces.verifyRecord]).
         if (record.manifest.kind == PluginKind.APP_INTERFACE) return AppInterfaces.verifyAttached(record)
@@ -316,7 +346,7 @@ object PluginBundleInstaller {
                 if (certificateFile.isFile) certificateFile.readText() else null, userKeys, pluginsRoot, revocations,
             )
         }
-        if (verdict is BundleVerdict.Refused) {
+        if (verdict is BundleVerdict.Refused && !approvedUnderPredecessor(pluginsRoot, record, if (jwsFile.isFile) jwsFile.readText() else null, revocations)) {
             return PluginInstallError("signature no longer verifies: ${verdict.reason}")
         }
         for (file in record.manifest.payload) {

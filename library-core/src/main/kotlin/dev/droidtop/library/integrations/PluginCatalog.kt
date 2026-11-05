@@ -208,6 +208,13 @@ object PluginCatalog {
         /** The person trusts a DIFFERENT key for this origin: nothing from this catalog is offered for it, and nothing is changed. */
         data class KeyChanged(val stored: UserOriginKey) : OriginState
 
+        /**
+         * The person trusts a different key, and this catalog, the source that trust came from, marks it superseded by
+         * the key it names now (Droidtop/tracker#887): the refresh follows it ([followSuperseded]), and from then on
+         * it is [Offered]. A key change with no such marker stays [KeyChanged], for the person to review.
+         */
+        data class Superseded(val stored: UserOriginKey) : OriginState
+
 
         data class Unusable(val reason: String) : OriginState
     }
@@ -226,7 +233,16 @@ object PluginCatalog {
         if (PluginOriginKeys.isOfficial(origin.origin)) return OriginState.Unusable("an unofficial catalog cannot offer droidtop's own plugins")
         val declared = origin.keySha256?.lowercase() ?: return OriginState.Unusable("the catalog gives no usable key for it")
         val stored = userKeys[origin.origin] ?: return OriginState.NotTrusted
-        if (UserOriginKeys.keySha256(stored.keyBase64) != declared) return OriginState.KeyChanged(stored)
+        val storedSha = UserOriginKeys.keySha256(stored.keyBase64)
+        if (storedSha != declared) {
+            // The owner: "the place that provides the "superceded" notice has to be the same source the plugin came from
+            // for it to be trusted". The origin's trust must have come from this catalog.
+            val sameSource = stored.catalog == source.id || (stored.catalog == null && stored.repo == null && stored.source == source.indexUrl)
+            if (sameSource && storedSha != null && dev.droidtop.pluginhost.KeySupersession.follows(origin.superseded, storedSha, declared)) {
+                return OriginState.Superseded(stored)
+            }
+            return OriginState.KeyChanged(stored)
+        }
         return OriginState.Offered
     }
 
@@ -556,7 +572,14 @@ object PluginCatalog {
         val checked = checkAdded(context, url, text, source)
         PlatformDatabaseTransport.write(cacheFile(context, source), text)
         val master = checked.index.catalog?.keyBase64
-        if ((source.masterKeyBase64 == null && master != null) || (!source.indexSigned && checked.signed)) {
+        val masterMoved = master != null && source.masterKeyBase64 != null &&
+            UserOriginKeys.keySha256(master) != UserOriginKeys.keySha256(source.masterKeyBase64)
+        if (masterMoved) {
+            // checkAdded let it through only under this catalog's own superseded marker (Droidtop/tracker#887).
+            PluginCatalogSources.put(PluginCatalogSources.storeFile(context), source.copy(masterKeyBase64 = master, indexSigned = source.indexSigned || checked.signed))
+        }
+        followSuperseded(context, PluginCatalogSources.byId(context, source.id) ?: source, checked.index)
+        if (!masterMoved && ((source.masterKeyBase64 == null && master != null) || (!source.indexSigned && checked.signed))) {
             // A master or an index signature that appeared since the catalog was accepted: recording them only
             // makes later fetches stricter. A master that CHANGED never gets here (checkAdded stops it).
             PluginCatalogSources.put(
@@ -566,6 +589,33 @@ object PluginCatalog {
         }
         refreshAddedRevocations(context, PluginCatalogSources.byId(context, source.id) ?: source)
         return checked.index
+    }
+
+    /**
+     * Follows this catalog's superseded markers (Droidtop/tracker#887): each origin whose key the person trusts through
+     * this catalog, and which the catalog marks superseded by the key it names now, is trusted under the new key, with
+     * the old one recorded so its plugins keep their approval and an update signed by the new key is the same
+     * publisher. The person is told: the owner, "We still tell the user the key is changing, of course". A notice, not
+     * a question. Returns the origins followed.
+     */
+    internal fun followSuperseded(context: Context, source: PluginCatalogSource, index: PluginCatalogIndex): List<String> {
+        val file = UserOriginKeys.storeFile(context)
+        val keys = UserOriginKeys.load(file)
+        val followed = index.origins.mapNotNull { origin ->
+            if (originState(source, origin, keys) !is OriginState.Superseded) return@mapNotNull null
+            val newKey = origin.keyBase64 ?: return@mapNotNull null
+            val old = keys[origin.origin]?.keyBase64?.let { UserOriginKeys.fingerprint(it) } ?: "unreadable"
+            UserOriginKeys.supersede(file, origin.origin, newKey) ?: return@mapNotNull null
+            // Plugins an earlier update had sent back to waiting for this key change are approved again, as at "Trust new key".
+            runCatching { PluginStore.keyReplaced(context, origin.origin) }
+            dev.droidtop.library.settings.Notices.flash(
+                "\"${origin.origin}\" changed its signing key (${UserOriginKeys.fingerprint(newKey)}, was $old), as ${source.name} says. Its plugins keep their approval",
+                source = source.name,
+                context = context,
+            )
+            origin.origin
+        }
+        return followed
     }
 
     /**
@@ -627,7 +677,12 @@ object PluginCatalog {
         val declared = info.keyBase64
         if (accepted != null) {
             if (declared == null) error("the catalog had a master key when you accepted it and this copy names none, so it was not read")
-            if (UserOriginKeys.keySha256(declared) != UserOriginKeys.keySha256(accepted)) {
+            val acceptedSha = UserOriginKeys.keySha256(accepted)
+            val declaredSha = UserOriginKeys.keySha256(declared)
+            // The catalog marks the master the person accepted as superseded by the one it names now (Droidtop/tracker#887):
+            // followed, since the marker comes from this very catalog. Anything else stops dead, as before.
+            val marked = acceptedSha != null && declaredSha != null && dev.droidtop.pluginhost.KeySupersession.follows(info.superseded, acceptedSha, declaredSha)
+            if (declaredSha != acceptedSha && !marked) {
                 error(
                     "the catalog's master key changed since you accepted it (you accepted ${UserOriginKeys.fingerprint(accepted)}, " +
                         "it now names ${UserOriginKeys.fingerprint(declared) ?: "an unreadable key"}). Nothing was changed; " +

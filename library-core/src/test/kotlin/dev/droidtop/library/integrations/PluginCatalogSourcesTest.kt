@@ -303,6 +303,23 @@ class PluginCatalogSourcesTest {
     }
 
     @Test
+    fun `a key the catalog marks superseded is followed only for trust that came from this catalog`() {
+        // Droidtop/tracker#887, the owner: "the place that provides the "superceded" notice has to be the same source the
+        // plugin came from for it to be trusted".
+        val named = PluginCatalogIndexParser.parse(index(catalogBlock, disclaimerBlock))!!.origins[0]
+        val marked = named.copy(superseded = mapOf(sha(otherSpki) to sha(spki)))
+        val fromThisCatalog = mapOf("acme" to UserOriginKey("acme", otherSpki, null, catalog = added.id))
+        val fromARepository = mapOf("acme" to UserOriginKey("acme", otherSpki, null, repo = "acme/plugins"))
+        assertTrue(PluginCatalog.originState(added, marked, fromThisCatalog) is PluginCatalog.OriginState.Superseded)
+        assertTrue(PluginCatalog.originState(added, marked, fromARepository) is PluginCatalog.OriginState.KeyChanged)
+        // No marker: a key change goes to the person's review, as before.
+        assertTrue(PluginCatalog.originState(added, named, fromThisCatalog) is PluginCatalog.OriginState.KeyChanged)
+        // A marker naming another key than the one the index names now is not followed.
+        val elsewhere = named.copy(superseded = mapOf(sha(otherSpki) to "e".repeat(64)))
+        assertTrue(PluginCatalog.originState(added, elsewhere, fromThisCatalog) is PluginCatalog.OriginState.KeyChanged)
+    }
+
+    @Test
     fun `install all covers what the catalog offers under a key the person trusts, and nothing before`() {
         val parsed = PluginCatalogIndexParser.parse(index(catalogBlock, disclaimerBlock))!!
         val accepted = added.copy(acceptedDisclaimer = 2)

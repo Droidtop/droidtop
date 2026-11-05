@@ -9,6 +9,7 @@ import dev.droidtop.pluginhost.PluginBundleInstaller
 import dev.droidtop.pluginhost.PluginInstallResult
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginRepos
+import dev.droidtop.pluginhost.PluginSourceKeys
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.pluginhost.UserOriginKey
@@ -384,7 +385,33 @@ object PluginRepoUpdates {
         return result
     }
 
+    /**
+     * Follows [repo]'s superseded marker before its releases are read (Droidtop/tracker#887): when the origin's trust
+     * came through this very repository ([UserOriginKey.repo]), and its key file now names another key and marks the
+     * trusted one superseded by it, that key is trusted from now on, the old one recorded so its plugins keep their
+     * approval. The person is told. Any other key change is left alone: the pass then refuses the new bundles, as before.
+     */
+    internal fun followRepoMarker(context: Context, entry: UserOriginKey, repo: String, token: String?) {
+        if (!PluginRepos.sameRepo(entry.repo, repo)) return
+        val published = (PluginSourceKeys.fetchKey(PluginRepos.sourceUrl(repo), token) as? PluginSourceKeys.FetchResult.Fetched)?.key ?: return
+        if (published.origin != entry.origin) return
+        val trusted = UserOriginKeys.keySha256(entry.keyBase64) ?: return
+        val named = UserOriginKeys.keySha256(published.keyBase64) ?: return
+        if (trusted == named) return
+        val markers = PluginSourceKeys.fetchMarkers(PluginRepos.sourceUrl(repo), token)
+        if (!dev.droidtop.pluginhost.KeySupersession.follows(markers, trusted, named)) return
+        UserOriginKeys.supersede(UserOriginKeys.storeFile(context), entry.origin, published.keyBase64) ?: return
+        runCatching { PluginStore.keyReplaced(context, entry.origin) }
+        dev.droidtop.library.settings.Notices.flash(
+            "\"${entry.origin}\" changed its signing key (${UserOriginKeys.fingerprint(published.keyBase64)}, was " +
+                "${UserOriginKeys.fingerprint(entry.keyBase64)}), as $repo says. Its plugins keep their approval",
+            source = repo,
+            context = context,
+        )
+    }
+
     private fun checkRepo(context: Context, entry: UserOriginKey, repo: String, token: String?, metered: Boolean, install: Boolean, force: Boolean): RepoCheckResult {
+        runCatching { followRepoMarker(context, entry, repo, token) }
         val etag = if (force) null else prefs(context).getString(key("etag", repo), null)
         val headers = buildMap {
             put("Accept", "application/vnd.github+json")

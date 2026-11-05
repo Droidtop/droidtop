@@ -712,6 +712,7 @@ object PluginCatalogScreen {
                 value = when (state) {
                     PluginCatalog.OriginState.NotTrusted -> "Trust its origin first"
                     is PluginCatalog.OriginState.KeyChanged -> "Its key changed"
+                    is PluginCatalog.OriginState.Superseded -> "Moving to its new key; refresh the catalog"
                     is PluginCatalog.OriginState.Unusable -> "Not available (${state.reason})"
                     PluginCatalog.OriginState.Offered -> ""
                 },

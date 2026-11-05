@@ -53,6 +53,8 @@ data class PluginCatalogOrigin(
     val plugins: List<PluginCatalogPlugin>,
     /** The key document's SPKI, base64, when [keySha256] is set: what an added catalog's origin is trusted with on first use, after the person saw its fingerprint. */
     val keyBase64: String? = null,
+    /** The key block's superseded markers, old key SHA-256 to its successor's ([dev.droidtop.pluginhost.KeySupersession], Droidtop/tracker#887). */
+    val superseded: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -76,6 +78,8 @@ data class PluginCatalogInfo(
     val keyBase64: String?,
     /** The organisation's own origin id (e.g. "gamegrab"), listed under [keyBase64]; null without a master. */
     val origin: String? = null,
+    /** The master key block's superseded markers (Droidtop/tracker#887). */
+    val superseded: Map<String, String> = emptyMap(),
 )
 
 /** An added catalog's `disclaimer` block: shown, and accepted by the person, before anything from it is listed. */
@@ -201,7 +205,8 @@ object PluginCatalogIndexParser {
                     ),
                 )
             }
-            origins.add(PluginCatalogOrigin(origin, trust, keySha256, plugins, keyDocument?.second))
+            val superseded = if (keyDocument == null) emptyMap() else dev.droidtop.pluginhost.KeySupersession.markers(originJson.optJSONObject("key"))
+            origins.add(PluginCatalogOrigin(origin, trust, keySha256, plugins, keyDocument?.second, superseded))
         }
         // The added-catalog blocks are optional in the format (droidtop's own index has neither), but one
         // that is present must be whole: a half-readable disclaimer is never shown as if it were the text.
@@ -231,7 +236,8 @@ object PluginCatalogIndexParser {
         }
         val origin = nullableText(json, "origin")
         if (origin != null && (origin != origin.lowercase() || keyBase64 == null)) return null
-        return PluginCatalogInfo(id, name, homepage, trust, keyBase64, origin)
+        val superseded = if (keyBase64 == null) emptyMap() else dev.droidtop.pluginhost.KeySupersession.markers(json.optJSONObject("key"))
+        return PluginCatalogInfo(id, name, homepage, trust, keyBase64, origin, superseded)
     }
 
     private fun parseDisclaimer(json: JSONObject?): PluginCatalogDisclaimer? {
