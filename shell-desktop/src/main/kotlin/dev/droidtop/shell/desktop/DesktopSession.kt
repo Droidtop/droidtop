@@ -119,8 +119,11 @@ import dev.droidtop.shell.gamepad.pc.rememberPcLaunch
 /** Mirrors dev.droidtop.app.DesktopSessionState without :shell-desktop depending on :app. */
 sealed interface DesktopSessionMessage {
     data object Idle : DesktopSessionMessage
-    /** [detail]: the latest line the booting container reported (a first boot installs the desktop), if any. */
-    data class Connecting(val detail: String? = null) : DesktopSessionMessage
+    /**
+     * [detail]: the latest line the booting container reported (a first boot installs the desktop), if any.
+     * [firstStart]: this start downloads and sets up the Linux system, so the page says it takes minutes.
+     */
+    data class Connecting(val detail: String? = null, val firstStart: Boolean = false) : DesktopSessionMessage
     /** [stopped]: the desktop was running and stopped on its own, rather than failing to start. */
     data class Failed(val reason: String, val stopped: Boolean = false) : DesktopSessionMessage
     /** No desktop image has been chosen, so there is no session to start until Desktop setup runs. */
@@ -276,14 +279,18 @@ internal fun BoxScope.DesktopViewport(
                 is DesktopSessionMessage.Connecting -> {
                     Text(stringResource(R.string.desktop_starting), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     // What is going on and how long it takes, nothing about root or the machinery (Droidtop/tracker#693):
-                    // droidtop never asks for root itself, and the line under it is the boot's own progress.
-                    Text(
-                        stringResource(R.string.desktop_starting_detail),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+                    // droidtop never asks for root itself, and the line under it is the boot's own progress. The
+                    // minutes-long download is said only on the start that makes the Linux system: a restart or a
+                    // later start reuses it and is back in seconds (rig 2026-11-04, Droidtop/tracker#687).
+                    if (sessionMessage.firstStart) {
+                        Text(
+                            stringResource(R.string.desktop_starting_detail),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
                     sessionMessage.detail?.let { detail ->
                         Text(
                             detail,

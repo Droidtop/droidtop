@@ -423,7 +423,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                         sessionMessage = when (val state = sessionState) {
                             is DesktopSessionState.Idle ->
                                 if (desktopSetUp) DesktopSessionMessage.Idle else DesktopSessionMessage.NeedsSetup
-                            is DesktopSessionState.Connecting -> DesktopSessionMessage.Connecting(state.detail)
+                            is DesktopSessionState.Connecting -> DesktopSessionMessage.Connecting(state.detail, state.firstStart)
                             is DesktopSessionState.Connected -> DesktopSessionMessage.Idle
                             is DesktopSessionState.Failed -> DesktopSessionMessage.Failed(state.message, state.stopped)
                         },
