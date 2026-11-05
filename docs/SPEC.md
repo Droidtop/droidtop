@@ -451,7 +451,23 @@ nothing else of this section exists:
   container's desktop is Wine-in-the-container, §11's open risk, and no
   launch path assumes it. So Start's Windows rows say "Opens fullscreen over
   the desktop" under each name (Droidtop/tracker#698): the heading alone
-  promised a window. Once running, the game is on the bar beside the
+  promised a window.
+  **How a Windows game or an Android app becomes a window (decided
+  2026-11-05, the coordinator relaying the owner for #698: "Desktop never
+  uses Android freeform windows; app windows go through windowcast").**
+  Desktop never launches anything with Android's freeform windowing
+  (`setLaunchWindowingMode(WINDOWING_MODE_FREEFORM)`, launch bounds, or a
+  freeform display): not an Android app, not an emulator, not a Wine game's
+  Activity. A window on the desktop is a window of the container's
+  compositor. An Activity becomes one only the way "Emulators, and Android
+  apps as windows" designs (#615): on a display of its own, captured and
+  driven by windowcast's Android host agent and shown by windowcast's client
+  in the container as an ordinary window. A Wine game is an Activity
+  (gamenative's renderer, §5b), so it takes that same path, not a second
+  one; Wine-in-the-container stays §11's separate question. Until
+  windowcast's agent and client exist (windowcast's lane, first in #615's
+  order), a game or app started from Desktop stays a fullscreen Activity
+  over the desktop, said as above, and the bar lists it (#352). Once running, the game is on the bar beside the
   container's windows (#352). Placing a window on another output would apply
   to container windows and compositor outputs, not to Activities, and is
   not built (§4c "Per-window placement").
@@ -717,6 +733,10 @@ proposal issue in the tracker". This fills the first direction above.
   the container come first (windowcast's lane); droidtop's display and launch
   piece is small and lands after them, behind a Desktop setting until the rig
   has run it.
+- **Windows games take the same path** (decided 2026-11-05, #698): a Wine
+  game's Activity is launched onto its own display and shown through
+  windowcast exactly as an Android app is. Never Android's freeform windows
+  (2b "Launching from Desktop").
 
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 
