@@ -1,5 +1,9 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -111,13 +115,19 @@ fun SidePanelFrame(
         GatePadInThisDialog()
         HideSystemBarsInThisDialog()
         Box(modifier = Modifier.fillMaxSize()) {
-            // The dimmed page: tapping it closes, as B does.
+            // The dimmed page: tapping it closes, as B does. To a screen reader it is a "Close" button read after the
+            // panel, not an unlabelled first stop (Droidtop/tracker#87, rig 2026-11-04: TalkBack's focus opened on it).
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer { alpha = shown.value }
                     .background(scrim)
-                    .padRow(silent = true) { close() },
+                    .padRow(silent = true) { close() }
+                    .semantics {
+                        contentDescription = "Close"
+                        role = androidx.compose.ui.semantics.Role.Button
+                        traversalIndex = 1f
+                    },
             )
             Column(Modifier.fillMaxSize()) {
                 BoxWithConstraints(

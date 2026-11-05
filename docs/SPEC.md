@@ -19721,6 +19721,12 @@ a device: the screen-reader half of this section (one focus order for pad and Ta
 descriptions read aloud, the 1.3 font-scale layout) and the two controls below. Until a rig run with
 TalkBack on, paired with D-pad-only navigation through Gaming's menus and the Quick Menu, cites its
 result here, read those sentences as the rule the chrome is built to, not as a verified fact.
+The first structural run (rig 2026-11-04, AVD droidtop-rig4-dual, build 2852, TalkBack on, D-pad only; no speech on
+the emulator) found Gaming Home's status, cards and hint bar labelled and focusable, and the Quick Menu's eight tab
+icons described, with two defects since fixed: the side panels' dimmed page (`SidePanelFrame`'s tap-to-close scrim,
+the Quick Menu's and the left menu's) was an unlabelled clickable view and TalkBack's first stop. It is now a "Close"
+button read after the panel. The mode switcher's current mode had no state (fixed with #91, "Accessibility of the
+custom dialogs"). What TalkBack speaks is still unheard: that needs a device.
 
 **Colour vision and text size (Droidtop/tracker#87, owner: "if it's simple. build it").** Two
 choice rows in an **Accessibility** group of Global settings (a catalog, so Gaming's rows and
