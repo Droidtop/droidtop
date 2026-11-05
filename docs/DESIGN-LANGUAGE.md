@@ -53,8 +53,9 @@ what it learned last.
 
 ## Copy
 - Labels are three words or fewer: verbs for actions, nouns for settings.
-- One verb per meaning on A: "Open" wherever A goes into something (a system, a game's page, a place), "Select"
-  only where A chooses or toggles (Droidtop/tracker#681).
+- One verb per meaning on A: "Open" wherever A goes into something (a system, a game's page, a place), "Play"
+  where A starts a game, "Select" only where A chooses or toggles (Droidtop/tracker#681). A themed Retro view's
+  help row is droidtop's words in the theme's style, so it says "Open" and "Play" too, not ES-DE's SELECT and LAUNCH.
 - A warning is a notice: a tone, a title (40 characters or fewer, the condition, never "Warning:"), a body (90 or fewer, the outcome, not the mechanism), one action, and details in Info (Y). Not a grey paragraph, not a "(high risk)" suffix, not a red banner.
 - The why goes in Info; a hint that only restates its title is deleted.
 - A field's label is its title; placeholders are noun phrases; fields hold no instructions; an input error says what is allowed.

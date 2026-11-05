@@ -854,7 +854,9 @@ internal fun GamesSection(
                         // never switch sections (docs/SPEC.md 7j, "Gaming controls"),
                         // and nothing here is a tab strip they could step.
                         // Start and R2 end the theme's row, as real ES-DE's own row ends on START MENU (#510).
-                        val systemListHints = listOf(GamepadAction.A to "Select") + rememberHintList(ShellMenuHints)
+                        // A goes into the system: "Open", the one verb for that (DESIGN-LANGUAGE "Copy", Droidtop/tracker#681).
+                        // This is droidtop's own wording in the theme's row, not the theme's: the rig read "A SELECT" here.
+                        val systemListHints = listOf(GamepadAction.A to "Open") + rememberHintList(ShellMenuHints)
                         val systemView = theme?.views?.get("system")
                         // Same rule as the gamelist's own claim above: a
                         // themed canvas lays the help row out itself,
@@ -1078,7 +1080,8 @@ internal fun GamesSection(
                     focusedGameIndex = focusedGameIndex,
                     hints = rememberHintList(
                         listOf(
-                            HintBinding(GamepadAction.A, "Launch") { gameUnderCursor },
+                            // A starts the game: "Play", the verb the PC library and a game's page use (Droidtop/tracker#681).
+                            HintBinding(GamepadAction.A, "Play") { gameUnderCursor },
                             HintBinding(GamepadAction.Y, "Info") { gameUnderCursor },
                             HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
                             HintBinding(GamepadAction.B, "Back"),
