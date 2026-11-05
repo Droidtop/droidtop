@@ -685,7 +685,7 @@ internal fun LibrarySearchDialog(
         // chip per source, on or off and kept (SourceSelection), turning while its source is asked and saying so when it
         // failed. A press turns it over and searches again.
         if (getGames) {
-            val chips = sourceChips(state)
+            val chips = sourceChips(state, offline)
             if (chips.isNotEmpty()) {
                 add(
                     SearchLine.Chips(SOURCE_CHIPS_KEY, chips, at = chipAt.coerceIn(0, chips.lastIndex)) { chip ->
@@ -696,6 +696,20 @@ internal fun LibrarySearchDialog(
                     },
                 )
             }
+        }
+        // With no network at all every source fails the same way, so the page says that once, first, in the words of
+        // every network page's offline notice, rather than waiting for each source to fail (Droidtop/tracker#594, rig
+        // 2758; #671 had it only below the failures). The failures, their fixes and the empty note are left out then.
+        if (offline && (getGames || state.sources.isNotEmpty())) {
+            add(
+                SearchLine.Entry(
+                    "unreachable",
+                    words(R.string.gamepad_sources_unreachable),
+                    subtitle = words(R.string.gamepad_sources_unreachable_line),
+                    value = words(R.string.gamepad_try_again),
+                    mark = StatusMark.OFFLINE,
+                ) { searchTick++ },
+            )
         }
         if (local == null) {
             add(
@@ -787,7 +801,8 @@ internal fun LibrarySearchDialog(
             }
             when {
                 !state.settled -> add(SearchLine.Note(if (text.isBlank()) "Asking your sources" else "Searching", busy = true))
-                state.rows.isEmpty() && settingsHits.isEmpty() -> add(SearchLine.Note(if (text.isBlank()) "Nothing featured right now" else "No match"))
+                state.rows.isEmpty() && settingsHits.isEmpty() && !(offline && text.isBlank()) ->
+                    add(SearchLine.Note(if (text.isBlank()) "Nothing featured right now" else "No match"))
             }
             if (state.settled) {
                 // Sources that wait for the person: one row that opens the approval, not a line per plugin.
@@ -824,22 +839,9 @@ internal fun LibrarySearchDialog(
                 // A failed source is one compact row below the results (docs/SPEC.md 12a, "One search", Droidtop/tracker#746):
                 // its icon, the attention glyph and its short reason, and A runs the one fix (SourceFix). Several fold into
                 // one row until it is opened. Technical details stay one press away, and a second press copies them.
+                // Offline, the one row at the top says why they all failed (Droidtop/tracker#594).
                 val failed = state.sources.filter { it.failure != null }
-                // With no network at all every source fails the same way, so the page says that once, with Try again,
-                // instead of a row per source blaming each for not answering in time (Droidtop/tracker#671, rig 2758).
-                val unreachable = offline && failed.isNotEmpty()
-                if (unreachable) {
-                    add(
-                        SearchLine.Entry(
-                            "unreachable",
-                            words(R.string.gamepad_sources_unreachable),
-                            subtitle = words(R.string.gamepad_sources_unreachable_line),
-                            value = words(R.string.gamepad_try_again),
-                            mark = StatusMark.ATTENTION,
-                        ) { searchTick++ },
-                    )
-                }
-                if (!unreachable && failed.size > 1 && !failuresOpen) {
+                if (!offline && failed.size > 1 && !failuresOpen) {
                     add(
                         SearchLine.Entry(
                             "failures",
@@ -849,7 +851,7 @@ internal fun LibrarySearchDialog(
                         ) { failuresOpen = true },
                     )
                 }
-                if (!unreachable && (failed.size == 1 || failuresOpen)) failed.forEach { status ->
+                if (!offline && (failed.size == 1 || failuresOpen)) failed.forEach { status ->
                     val source = status.source
                     val record = (source as? PluginGameSource)?.source?.record
                     val access = status.access
@@ -1138,9 +1140,12 @@ private sealed interface SearchLine {
 /** One source in Get games' filter: on or off, still being asked, or failed (its short reason). */
 internal data class SourceChip(val id: String, val label: String, val on: Boolean, val busy: Boolean, val failed: Boolean)
 
-/** The filter's chips: the sources asked, in their order, then the ones turned off. Pure. */
-internal fun sourceChips(state: UnifiedState): List<SourceChip> =
-    state.sources.map { SourceChip(it.source.id, it.source.label, on = true, busy = it.pending, failed = it.failure != null) } +
+/**
+ * The filter's chips: the sources asked, in their order, then the ones turned off. While [offline] none reads as
+ * failed: the page's one offline row says why (Droidtop/tracker#594). Pure.
+ */
+internal fun sourceChips(state: UnifiedState, offline: Boolean = false): List<SourceChip> =
+    state.sources.map { SourceChip(it.source.id, it.source.label, on = true, busy = it.pending, failed = !offline && it.failure != null) } +
         state.off.map { SourceChip(it.id, it.label, on = false, busy = false, failed = false) }
 
 /** "from F95zone · LewdCorner" for a game more than one source has, else null (the row's own detail says it). Pure. */

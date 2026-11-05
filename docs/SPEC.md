@@ -28388,8 +28388,10 @@ without its runtime said "Running". Decisions:
     loading bar, and the rest joins as the sources answer. The search view itself (Get games with no text, and any
     search over the sources) follows the same two rules (Droidtop/tracker#671, rig 2758): "Asking your sources" or
     "Searching" has the loading bar under it and each source's chip a short one beside it while it is asked, never a
-    stock spinner; and with no network at all (`SystemStatus`) the failed sources are one row, "Could not reach your
-    sources", whose A is Try again, instead of a row per source saying it did not answer in time. It is not a row of the left menu (owner, the same day: "THe "get new games" menu needs to be
+    stock spinner; and with no network at all (`SystemStatus`) the search opens with one row, "You're offline" (the
+    words of every network page's notice, Droidtop/tracker#594), whose A is Try again, before any source has failed.
+    The rows per failed source, their fixes (a runtime download among them), the chips' "failed" and "Nothing
+    featured right now" are left out while it shows. It is not a row of the left menu (owner, the same day: "THe "get new games" menu needs to be
   UNDER Updates. The left menu is growing really large, we need to review that"; the review is #621). Kid and Kiosk
   hide it with Updates. Outside Gaming the row opens Gaming on the search, the only place it is drawn, and is left
   out when Gaming is switched off. The "Get games" rows of the game menu,
