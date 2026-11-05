@@ -359,7 +359,8 @@ internal object WineWorkingDirectory {
  */
 object WineLaunchPlan {
     /** Wine's log channels by default: errors only ("-all,err+all"), never the full trace. */
-    const val DEFAULT_WINEDEBUG = "-all,err+all"
+    // DIAGNOSTIC (Droidtop/tracker#897, ci/diag-897): every DLL load and every exception, to see where Wine stops.
+    const val DEFAULT_WINEDEBUG = "-all,err+all,+loaddll,+seh"
 
 
     enum class AudioDriver { PULSEAUDIO, ALSA, NONE }

@@ -18,7 +18,7 @@ public class DXVKHelper {
     public static void setEnvVars(Context context, KeyValueSet config, EnvVars envVars) {
         ImageFs imageFs = ImageFs.find(context);
         envVars.put("DXVK_STATE_CACHE_PATH", imageFs.cache_path);
-        envVars.put("DXVK_LOG_LEVEL", "none");
+        envVars.put("DXVK_LOG_LEVEL", "info"); // DIAGNOSTIC (Droidtop/tracker#897, ci/diag-897)
 
         File rootDir = ImageFs.find(context).getRootDir();
         File dxvkConfigFile = new File(imageFs.config_path+"/dxvk.conf");

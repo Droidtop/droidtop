@@ -31,6 +31,13 @@ function(page_16k target)
     target_link_options(${target} PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
 endfunction()
 
+# DIAGNOSTIC (Droidtop/tracker#897, ci/diag-897, not for landing): no arm64 library is built here; every one
+# comes from GameNative's prebuilts at ce378f01 (components.pin), as before d9ba6c3, to tell whether a
+# source-built native causes the console's black screen.
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    return()
+endif()
+
 add_subdirectory(${UPSTREAM}/virglrenderer virglrenderer)
 add_subdirectory(${UPSTREAM}/xconnectorpatch xconnectorpatch)
 
