@@ -519,9 +519,10 @@ class DroidtopPcGameRuntime(
                 val text = SteamworksOwnership.warning(verdict, shim.appId) +
                     " If you own it, say so under the game's Wine settings, \"Yes, I own this game\"."
                 android.util.Log.w(WinePresentation.LOG_TAG, "Steamworks ownership: $verdict for app ${shim.appId}; starting anyway")
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    android.widget.Toast.makeText(context.applicationContext, text, android.widget.Toast.LENGTH_LONG).show()
-                }
+                // A flash, with the game about to take the screen: Notices posts it as a platform toast then, and keeps it in Recent.
+                dev.droidtop.library.settings.Notices.flash(
+                    text, tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context.applicationContext,
+                )
             }
             val launch = runCatching {
                 SteamworksShim.prepare(
