@@ -148,6 +148,14 @@ object KdeConnectCatalog {
 
     /** Send a file (the system's document picker; the file is read where it is, never copied) and send a text. */
     private fun sendRows(d: KdcDevice): List<CatalogItem> = listOf(
+        ActionItem(
+            id = "kdeconnect_touchpad_${d.id}",
+            title = "Control ${d.name}",
+            subtitle = "This screen and the sticks move its pointer and click",
+            run = { ctx ->
+                ctx.startActivity(dev.droidtop.app.KdeConnectTouchpadActivity.intent(ctx, d.id, d.name).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            },
+        ),
         AsyncActionItem(
             id = "kdeconnect_ring_${d.id}",
             title = "Ring ${d.name}",

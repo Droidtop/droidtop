@@ -1001,6 +1001,11 @@
             android:name=".RemoteInputActivity"
             android:exported="false" />
 
+        <!-- KDE Connect's touchpad: droidtop moves a paired device's pointer (docs/SPEC.md 7p, remote input). -->
+        <activity
+            android:name=".KdeConnectTouchpadActivity"
+            android:exported="false" />
+
         <!-- Pairing a computer running droidtop-agent, opened from Accounts and sources, Computers (docs/SPEC.md 7o). -->
         <activity
             android:name=".PairComputerActivity"

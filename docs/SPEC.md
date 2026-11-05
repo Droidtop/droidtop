@@ -22259,8 +22259,11 @@ client." The plan and its slices are on #645.
       always answers. **Not built:** moving droidtop's pointer from a paired device. That needs an accessibility
       service (`dispatchGesture`) or droidtop's own cursor, both the person's to switch on. Recommendation: droidtop's
       own cursor overlay in Desktop mode first, with the accessibility service as an opt-in for other apps.
-    - *Controller.* A paired, reachable device's rows add **Type on ...**: typed into the field in focus there, then
-      Enter. A touchpad page (pointer, clicks, scroll) is next; the library already sends all of it (`input_send`).
+    - *Controller.* A paired, reachable device's rows add **Type on ...** (typed into the field in focus there, then
+      Enter) and **Control ...**, a full-screen touchpad (`KdeConnectTouchpadActivity`): one finger moves the pointer,
+      a tap clicks, two fingers scroll, a two-finger tap right-clicks; with a controller the left stick moves, the
+      right stick scrolls, A clicks, X right-clicks, Y middle-clicks, the D-pad sends the arrow keys, Start sends
+      Enter and B leaves. Moves are gathered and sent at most every 16 ms.
     - Built to the recommendation, owner to confirm: paired devices may type into droidtop by default, as in the
       official apps; the switch is the library's `input` plugin.
   - **battery, find my device, notifications (slice 6, first part):** droidtop sends its battery (Android's battery
