@@ -2,6 +2,7 @@ package dev.droidtop.ui.shared
 
 import android.content.Context
 import android.view.ViewGroup
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import dev.droidtop.library.settings.ButtonBarItem
@@ -32,6 +33,38 @@ object PageViews {
     fun bindButtonBar(frame: ViewGroup, bar: ButtonBarItem, onPress: (Int) -> Unit) {
         val colors = colorsFor(frame.context)
         composeIn(frame).setContent { ButtonBarView(bar, selected = null, onPress = onPress, colors = colors) }
+    }
+
+    /**
+     * A View [button] drawn as the shell's secondary page button ([PageButtonView], ButtonRole.SECONDARY): sentence
+     * case, never Android's ALL-CAPS, [fill] with a hairline [outline], [ink] at 16sp medium, at least
+     * [PageMetrics.ButtonHeight] tall, [PageMetrics.ButtonCorner] corners, and none of Material's raised elevation.
+     * For a View surface whose labels and visibility change at run time (the companion's Input tab,
+     * Droidtop/tracker#524), where a Compose host per button would be the heavier change.
+     */
+    fun styleSecondary(button: android.widget.Button, fill: Int, ink: Int, outline: Int) {
+        val density = button.resources.displayMetrics.density
+        fun px(dp: androidx.compose.ui.unit.Dp) = (dp.value * density).toInt()
+        button.isAllCaps = false
+        button.setTextColor(ink)
+        button.textSize = 16f
+        button.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+        button.minHeight = px(PageMetrics.ButtonHeight)
+        button.minimumHeight = px(PageMetrics.ButtonHeight)
+        button.minWidth = 0
+        button.minimumWidth = 0
+        button.setPadding(px(16.dp), px(8.dp), px(16.dp), px(8.dp))
+        button.stateListAnimator = null
+        button.elevation = 0f
+        button.background = android.graphics.drawable.RippleDrawable(
+            android.content.res.ColorStateList.valueOf(ink and 0x00FFFFFF or 0x33000000),
+            android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = px(PageMetrics.ButtonCorner).toFloat()
+                setColor(fill)
+                setStroke(maxOf(1, px(1.dp)), outline)
+            },
+            null,
+        )
     }
 
     /** The page colours of a View surface; danger is the notice palette's, derived from the same colours. */

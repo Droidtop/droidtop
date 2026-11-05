@@ -192,6 +192,14 @@ class SecondScreenInputView(
     private val tabs = Button(context)
     private val controllers = TextView(context)
 
+    /** [button] in the shell's secondary look, from the shell's own tokens (the ground this view is drawn on). */
+    private fun shellButton(button: Button) = dev.droidtop.ui.shared.PageViews.styleSecondary(
+        button,
+        fill = dev.droidtop.shell.gamepad.MenuTokens.Card.toArgb(),
+        ink = dev.droidtop.shell.gamepad.MenuTokens.OnSurface.toArgb(),
+        outline = dev.droidtop.shell.gamepad.MenuTokens.CardOutline.toArgb(),
+    )
+
     /** The keyboard ([slab]), set while the view is built: declared before init so init's value is the one kept. */
     private var keys: SlabView? = null
 
@@ -202,6 +210,8 @@ class SecondScreenInputView(
     init {
         orientation = VERTICAL
         setBackgroundColor(dev.droidtop.shell.gamepad.MenuTokens.Ground.toArgb())
+        // Every button here is the shell's secondary button, not Android's grey ALL-CAPS one (Droidtop/tracker#524).
+        listOf(pin, tabs, imePicker, pointerHelp).forEach(::shellButton)
         // Text keeps a 16dp gutter from the screen's edge; the keys and the trackpad run edge to edge (#525).
         val gutter = (GUTTER_DP * resources.displayMetrics.density).toInt()
 
@@ -229,7 +239,7 @@ class SecondScreenInputView(
         chords.addView(
             Button(context).apply {
                 text = "Type from another device"
-                isAllCaps = false
+                shellButton(this)
                 setOnClickListener { RemoteInputActivity.open(context, display?.displayId) }
             },
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT),
@@ -238,7 +248,7 @@ class SecondScreenInputView(
             chords.addView(
                 Button(context).apply {
                     text = macro.name
-                    isAllCaps = false
+                    shellButton(this)
                     setOnClickListener { player.play(macro) }
                 },
                 LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT),
