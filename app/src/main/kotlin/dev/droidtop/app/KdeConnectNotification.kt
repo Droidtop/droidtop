@@ -124,9 +124,37 @@ object KdeConnectNotification {
             is KdcEvent.FileSendFailed -> post(context, FILE_ID, "Could not send ${e.name}", e.why, screen(context, FILE_ID))
             // Written as the shared clipboard writes (64 KB at most); nothing is shown, as in the official apps.
             is KdcEvent.Clipboard -> if (ClipRules.fits(e.text)) AndroidClipboard(context).write(e.text)
+            is KdcEvent.Input -> typeHere(context, e)
             is KdcEvent.Other -> Unit
         }
     }
+
+    /**
+     * Typing from a paired device (docs/SPEC.md 7p, remote input) through "Type from another device"'s one router: into
+     * droidtop's own focused field, else through droidtop's input method into any app's field. Text, Backspace and
+     * Enter are typed; a key it cannot type and a pointer move are not (the pointer needs an accessibility service,
+     * not built). When there is no field, the router's notice is shown once a minute at most.
+     */
+    private fun typeHere(context: Context, e: KdcEvent.Input) {
+        val key = e.key
+        val (back, text, enter) = when {
+            key != null -> Triple(0, key, false)
+            e.specialKey == "backspace" -> Triple(1, "", false)
+            e.specialKey == "enter" || e.specialKey == "linefeed" -> Triple(0, "", true)
+            else -> return
+        }
+        val delivery = runCatching { RemoteInputs.router().deliver(back, text, enter) }.getOrNull() ?: return
+        if (delivery is dev.droidtop.library.credentials.handoff.Delivery.Refused) {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastTypingNotice > 60_000) {
+                lastTypingNotice = now
+                post(context, PING_ID, "Typing from another device", delivery.notice, screen(context, PING_ID))
+            }
+        }
+    }
+
+    @Volatile
+    private var lastTypingNotice = 0L
 
     /**
      * Moves a file the library stored whole in the cache into the person's folder for received files; the name it

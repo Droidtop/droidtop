@@ -151,6 +151,13 @@ object KdeConnectCatalog {
             onPicked = { ctx, uri -> KdeConnect.shareFile(ctx, d.id, uri) ?: "Sending to ${d.name}" },
         ),
         TextInputItem(
+            id = "kdeconnect_type_${d.id}",
+            title = "Type on ${d.name}",
+            subtitle = "Typed into the field in focus there, then Enter",
+            value = "",
+            onChange = { _, text -> if (text.isNotEmpty()) KdeConnect.type(d.id, text, enter = true) },
+        ),
+        TextInputItem(
             id = "kdeconnect_send_text_${d.id}",
             title = "Send text to ${d.name}",
             value = "",
