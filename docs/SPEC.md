@@ -9377,6 +9377,10 @@ proposal) is not built; these helpers are in the one settings tree that already 
   width; the grid sits at its edge in the tool strip's key area, so with the strip off a right-hand grid is drawn
   at the left. A change rebuilds the input method's view (the setting's flags) or, for a panel droidtop draws,
   rebuilds its grid (`KeyboardPanel.rebuildKeys`).
+- **A panel takes the keys' place.** The clipboard, macro and emoji panels open where the keys were, at the keys'
+  height, never taller (`ToolsDeck.panelHeight`; mytop-project/tracker#903, console 3057: the emoji panel covered the
+  whole screen, because it was laid out to match its parent in a frame that wraps its content, and so was measured
+  against the window). They still slide up over the keys as they fade (H12a).
 - **Skin tones (mytop-project/tracker#903 H4).** The emoji data's tone variants (the tab-indented lines of FlorisBoard's
   CLDR list, five for one person, 25 for two) are kept on their emoji (`EmojiEntry.variants`). A long press on an emoji
   that has them shows the plain emoji and every tone in a row above the grid; the one tapped is typed, and its tone is

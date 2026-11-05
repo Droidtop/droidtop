@@ -274,7 +274,10 @@ class ToolsDeck private constructor(
         overlayId = id
         // The panel takes every tap while it is over the keys, so none reaches a key fading out underneath.
         panel.isClickable = true
-        stack.addView(panel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        // The panel takes the keys' place and no more (mytop-project/tracker#903, console 3057: the emoji panel covered the
+        // whole screen). Matching its parent in this wrapping frame measured it against the window, so it grew to the
+        // window's height; it is the keys' height instead, which they keep while hidden.
+        stack.addView(panel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, panelHeight(keyboard.height)))
         // It slides up into place over the keys, which fade and are then hidden, keeping their size
         // (mytop-project/tracker#903 H12a; PanelMotion, under the keyboard's reduce-motion rule).
         PanelMotion.enter(panel, dp(PANEL_SLIDE_DP).toFloat())
@@ -616,6 +619,9 @@ class ToolsDeck private constructor(
          * after the layout form changed, for a surface that is not the input method (which rebuilds itself); [media]
          * is the input method's editor for GIFs and stickers (none for a surface droidtop draws).
          */
+        /** A panel's height: the keys' [keysHeight] when they have been laid out, else the parent's. Pure. */
+        internal fun panelHeight(keysHeight: Int): Int = if (keysHeight > 0) keysHeight else FrameLayout.LayoutParams.MATCH_PARENT
+
         @JvmStatic
         @JvmOverloads
         fun wrap(
