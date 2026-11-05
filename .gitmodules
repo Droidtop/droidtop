@@ -66,3 +66,11 @@
 	path = vendor/mimalloc
 	url = https://github.com/microsoft/mimalloc
 	shallow = true
+[submodule "vendor/gstreamer"]
+	path = vendor/gstreamer
+	url = https://gitlab.freedesktop.org/gstreamer/gstreamer.git
+	shallow = true
+[submodule "vendor/glib"]
+	path = vendor/glib
+	url = https://gitlab.gnome.org/GNOME/glib.git
+	shallow = true
