@@ -191,8 +191,11 @@ interface BrokerEnvironment {
     fun github(call: HttpCall): HttpAnswer =
         throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop makes no GitHub requests for plugins")
 
-    /** D2: downloads [url] into [file] of the plugin's [store] as a job owned by [record]; the job id, or null when it could not start. */
-    fun startDownload(record: PluginRecord, url: String, file: java.io.File, store: PluginDataStore, allow: (String) -> Unit): String? = null
+    /**
+     * D2: downloads [url] into [file] of the plugin's [store] as a job owned by [record], its row named by [DownloadTitle]
+     * from the plugin's own [title] when it gave one; the job id, or null when it could not start.
+     */
+    fun startDownload(record: PluginRecord, url: String, file: java.io.File, store: PluginDataStore, title: String?, allow: (String) -> Unit): String? = null
 
     /** H1: the plugin's own data folder. */
     fun dataStore(pluginId: String): PluginDataStore? = null

@@ -436,9 +436,9 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         }
     }
 
-    override fun startDownload(record: PluginRecord, url: String, file: java.io.File, store: PluginDataStore, allow: (String) -> Unit): String {
+    override fun startDownload(record: PluginRecord, url: String, file: java.io.File, store: PluginDataStore, title: String?, allow: (String) -> Unit): String {
         val name = file.relativeTo(store.root).path.replace(java.io.File.separatorChar, '/')
-        return PluginJobsCenter.startBrokered(record.manifest.id, record.manifest.label, "droidtop", "Download $name") { jobId ->
+        return PluginJobsCenter.startBrokered(record.manifest.id, record.manifest.label, "droidtop", DownloadTitle.of(title, file.name)) { jobId ->
             // The download engine fetches it like every other download (docs/SPEC.md 12a "One download engine"), into
             // droidtop's downloads area, and only a whole file is moved into the plugin's data. Every address, the
             // redirects included, is put to the plugin's `net.domains` check before the engine is given it.

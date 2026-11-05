@@ -284,7 +284,7 @@ internal object HostNetApis {
             val store = HostDataApis.storeOf(env, record)
             val file = store.resolve(name)
             reach(env, record, url)
-            val jobId = env.startDownload(record, url, file, store) { hop -> reach(env, record, hop) }
+            val jobId = env.startDownload(record, url, file, store, args.optString("title").ifBlank { null }) { hop -> reach(env, record, hop) }
                 ?: throw BrokerException(PluginErrorCode.FAILED, "the download could not be started")
             JSONObject().put("jobId", jobId).put("name", name)
         },
