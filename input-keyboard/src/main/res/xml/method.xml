@@ -20,8 +20,12 @@
 <!-- The attributes in this XML file provide configuration information -->
 <!-- for the Input Method Manager. -->
 
+<!-- droidtop: supportsSwitchingToNextInputMethod puts this keyboard in the same rotation as the keyboards that offer a
+     switch key of their own (AOSP's, Gboard). Without it, Android rotates it only among keyboards that do not, so a long
+     press on space found no next keyboard and opened the picker (Droidtop/tracker#717, rig 2783). -->
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
         android:settingsActivity="org.pocketworkstation.pckeyboard.LatinIMESettings"
         android:isDefault="@bool/im_is_default"
         android:supportsInlineSuggestions="true"
+        android:supportsSwitchingToNextInputMethod="true"
 />

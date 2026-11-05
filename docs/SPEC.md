@@ -8674,7 +8674,12 @@ open Android's own pickers.
   the system's picker opens instead, which also offers enabling one. The
   code addresses the keyboard, never the text, so it never reaches a
   container (`HackersKeyCodes` drops it). A space drag still moves the
-  cursor: the drag cancels the long press.
+  cursor: the drag cancels the long press. The keyboard's `method.xml` declares
+  `supportsSwitchingToNextInputMethod`: Android rotates a keyboard only
+  among those that declare it the same way, and AOSP's keyboard and Gboard
+  do, so without it the switch found no next keyboard and opened the picker
+  even with another enabled (rig 2783, 2026-10-30, the long press on space
+  gave "Choose input method" with AOSP's keyboard enabled).
 
 `Keyboards` (`:runtime-common`) is the single surface for all of this,
 and the settings catalog shows the active keyboard, says what it is, and
