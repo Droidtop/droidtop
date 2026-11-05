@@ -3,6 +3,8 @@ package dev.droidtop.app.settings
 import android.content.Context
 import android.net.Uri
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -53,11 +55,15 @@ object DroidtopBackup {
     }
 
     /** Writes the archive to [uri]: [settings] from the settings screen, the rest read here. Disk work. */
-    fun write(context: Context, uri: Uri, settings: JSONObject): String {
+    fun write(context: Context, uri: Uri, settings: JSONObject): String =
+        context.contentResolver.openOutputStream(uri)?.use { raw -> write(context, raw, settings) } ?: error("the file could not be opened")
+
+    /** Writes the archive to [out] (a picked file, or a file sent on to a share). Disk work. */
+    fun write(context: Context, out: OutputStream, settings: JSONObject): String {
         val files = context.filesDir
         val plugins = runCatching { dev.droidtop.pluginhost.PluginStore.installed(context) }.getOrDefault(emptyList())
         var games = 0
-        context.contentResolver.openOutputStream(uri)?.use { raw ->
+        out.let { raw ->
             ZipOutputStream(raw).use { zip ->
                 fun put(name: String, bytes: ByteArray) {
                     zip.putNextEntry(ZipEntry(name))
@@ -88,7 +94,7 @@ object DroidtopBackup {
                     context.getDatabasePath(name).takeIf { it.isFile }?.let { put("databases/$name", it.readBytes()) }
                 }
             }
-        } ?: error("the file could not be opened")
+        }
         return "Backed up droidtop: settings, $games game records, play history, favourites, collections, scraped " +
             "details and a list of ${plugins.size} plugins"
     }
@@ -110,14 +116,18 @@ object DroidtopBackup {
      * Reads the archive at [uri]: its settings are handed back to be applied now, and every file it may hold is staged
      * for the next start. An entry it may not hold is skipped. Disk work.
      */
-    fun stage(context: Context, uri: Uri): Staged {
+    fun stage(context: Context, uri: Uri): Staged =
+        context.contentResolver.openInputStream(uri)?.use { raw -> stage(context, raw) } ?: error("the file could not be opened")
+
+    /** [stage] from [input] (a picked file, or one fetched from a share). Disk work. */
+    fun stage(context: Context, input: InputStream): Staged {
         val pending = File(context.filesDir, PENDING)
         pending.deleteRecursively()
         var settings: JSONObject? = null
         var manifest: JSONObject? = null
         var plugins = emptyList<String>()
         var files = 0
-        context.contentResolver.openInputStream(uri)?.use { raw ->
+        input.let { raw ->
             ZipInputStream(raw).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
@@ -136,7 +146,7 @@ object DroidtopBackup {
                     }
                 }
             }
-        } ?: error("the file could not be opened")
+        }
         val format = manifest?.optInt("format", 0) ?: 0
         check(format in 1..FORMAT) { "not a droidtop backup this version can read" }
         return Staged(settings, files, plugins)

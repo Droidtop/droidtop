@@ -73,6 +73,9 @@ pub fn call(op: &str, args: &str) -> String {
         "share_library" => share_library(&args),
         "share_post_saves" => share_post_saves(&args),
         "remote_test" => remote_test(&args),
+        "remote_list" => remote_list(&args),
+        "remote_put" => remote_put(&args),
+        "remote_get" => remote_get(&args),
         other => Err(Failure::Error(format!("unknown operation {other}"))),
     };
     match result {
@@ -690,6 +693,72 @@ fn remote_test(args: &Value) -> Outcome {
     let share = share_of(args)?.ok_or_else(|| Failure::Error("no share was given".into()))?;
     let entries = share.list(&RemotePath::root()).map_err(remote_failure)?;
     Ok(json!({ "entries": entries.len() }))
+}
+
+fn remote_path(args: &Value, name: &str) -> Result<RemotePath, Failure> {
+    RemotePath::new(args[name].as_str().unwrap_or_default()).map_err(remote_failure)
+}
+
+/// What is in the share's folder `dir`: `{"entries": [{"name", "is_dir", "size", "mtime_ms"}]}`, empty when the
+/// folder is not there.
+fn remote_list(args: &Value) -> Outcome {
+    let share = share_of(args)?.ok_or_else(|| Failure::Error("no share was given".into()))?;
+    let entries = match share.list(&remote_path(args, "dir")?) {
+        Ok(entries) => entries,
+        Err(RemoteError::NotFound(_)) => Vec::new(),
+        Err(e) => return Err(remote_failure(e)),
+    };
+    let entries: Vec<Value> =
+        entries.iter().map(|e| json!({ "name": e.name, "is_dir": e.is_dir, "size": e.size, "mtime_ms": e.mtime_ms })).collect();
+    Ok(json!({ "entries": entries }))
+}
+
+/// Sealed with this device's own key: what droidtop writes to a share the person keeps locked
+/// (Droidtop/tracker#573, owner 2026-11-05: "Encryption should probably be toggleable"). The agent's
+/// sealing (`mailbox::seal`), addressed to this device itself, so only this device opens it.
+fn seal_to_self(args: &Value, bytes: &[u8]) -> Result<Vec<u8>, Failure> {
+    let key = key_of(args)?;
+    Ok(mailbox::seal(&key, &key.peer_id(), bytes)?)
+}
+
+/// Writes the local `file` to the share at `path`, its folders made first; sealed to this device when `seal` is
+/// true (`seed` is then this device's key). `{"bytes": n}`, what went to the share.
+fn remote_put(args: &Value) -> Outcome {
+    let share = share_of(args)?.ok_or_else(|| Failure::Error("no share was given".into()))?;
+    let path = remote_path(args, "path")?;
+    let plain = std::fs::read(path_arg(args, "file")?).map_err(|e| Failure::Error(format!("the file to send could not be read ({e})")))?;
+    let bytes = if args["seal"].as_bool().unwrap_or(false) { seal_to_self(args, &plain)? } else { plain };
+    if let Some(parent) = path.parent().filter(|p| !p.is_root()) {
+        share.make_dirs(&parent).map_err(remote_failure)?;
+    }
+    share.write(&path, &bytes).map_err(remote_failure)?;
+    Ok(json!({ "bytes": bytes.len() }))
+}
+
+/// Reads `path` from the share into the local `file` (written under a temporary name, then renamed). A file this
+/// device sealed is opened with `seed`; one sealed by another device is refused. `{"bytes": n, "sealed": bool}`.
+fn remote_get(args: &Value) -> Outcome {
+    let share = share_of(args)?.ok_or_else(|| Failure::Error("no share was given".into()))?;
+    let bytes = share.read(&remote_path(args, "path")?).map_err(remote_failure)?;
+    let sealed = bytes.starts_with(b"DTM1");
+    let plain = if sealed {
+        let key = key_of(args)?;
+        let me = key.peer_id();
+        match mailbox::open(&key, &bytes, |p| *p == me) {
+            Ok((_, plain)) => plain,
+            Err(_) => {
+                return Err(Failure::Coded("locked_elsewhere", "this was locked by another device, so this device can't open it".into()))
+            }
+        }
+    } else {
+        bytes
+    };
+    let file = path_arg(args, "file")?;
+    let tmp = file.with_extension("part");
+    std::fs::write(&tmp, &plain)
+        .and_then(|_| std::fs::rename(&tmp, &file))
+        .map_err(|e| Failure::Error(format!("the file could not be saved on this device ({e})")))?;
+    Ok(json!({ "bytes": plain.len(), "sealed": sealed }))
 }
 
 // Game folders ----------------------------------------------------------------
