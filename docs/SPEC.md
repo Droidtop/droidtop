@@ -13657,8 +13657,16 @@ plugin never names a path. Uninstall deletes only the folder droidtop
 made. The Stores place lists it after droidtop's five, by its label,
 with the same row and page as theirs, while its plugin runs. Its games
 launch as a built-in store's game with no launch answer of its own does:
-droidtop finds the executable, or the engine, in the installed folder.
-Not built yet: updating from it.
+droidtop finds the executable, or the engine, in the installed folder,
+unless the plugin's entry says it answers `launch` (a program in that
+folder, never outside it). **Updates and the plugin's page (2026-11-05,
+Droidtop/tracker#805, built to the recommendation, owner to confirm):** a
+`library` row may name its `version`; droidtop records the version it
+installed and a different one listed is an update (the plugin's word: no
+version ordering), installed by the same `install` op into the game's own
+folder, which stays installed at its old version until the new files are
+all there. The store's page in Stores links to its plugin's page in
+Settings, Plugins.
 
 ### One consistent way into Settings (directed 2026-09-28)
 

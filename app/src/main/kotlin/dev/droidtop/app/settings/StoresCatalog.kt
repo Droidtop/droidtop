@@ -714,6 +714,20 @@ internal object StoresCatalog {
                 chips = pageChips(context, store, signedIn, jobs),
             ),
             CatalogGroup(id = "store_${store.key}_settings_group", title = "Settings", items = own).takeIf { own.isNotEmpty() },
+            // A plugin's store: the plugin that provides it, where it is approved, turned on and allowed (Droidtop/tracker#805).
+            (store.own as? dev.droidtop.library.integrations.PluginStoreLibrary)?.let { plugin ->
+                CatalogGroup(
+                    id = "store_${store.key}_plugin_group",
+                    title = "Plugin",
+                    items = listOf(
+                        dev.droidtop.library.integrations.AcquireContentSources.pluginPageRow(
+                            "store_${store.key}_plugin_page",
+                            "Open ${plugin.pluginLabel}'s page",
+                            plugin.pluginId,
+                        ),
+                    ),
+                )
+            },
             CatalogGroup(id = "store_${store.key}_library_group", title = "Library", items = library),
             CatalogGroup(id = "store_${store.key}_shop_group", title = "Store", items = shop).takeIf { shop.isNotEmpty() },
             CatalogGroup(

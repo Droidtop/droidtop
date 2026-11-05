@@ -9,6 +9,9 @@ import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
+import dev.droidtop.library.stores.StoreLaunch
+import dev.droidtop.library.stores.StoreUpdateCheck
+import dev.droidtop.library.StoreUpdate
 import dev.droidtop.net.AtomicWrite
 import dev.droidtop.pluginhost.AcquireDownloads
 import dev.droidtop.pluginhost.PluginCrashPolicy
@@ -114,8 +117,53 @@ object PluginStores {
         }
     }
 
-    /** Where droidtop put a store's game ([PluginStoreLibrary.install]): its folder, and whether the download finished there. */
-    internal data class Install(val path: String, val installed: Boolean)
+    /**
+     * Where droidtop put a store's game ([PluginStoreLibrary.install]): its folder, whether the download finished
+     * there, and the version it installed when the plugin named one.
+     */
+    internal data class Install(val path: String, val installed: Boolean, val version: String? = null)
+
+    /** A version as a plugin may name one: one line, at most 64 characters; null for none. Pure. */
+    internal fun versionOf(raw: Any?): String? =
+        (raw as? String)?.trim()?.takeIf { it.isNotEmpty() && it.length <= 64 && !it.contains('\n') }
+
+    /** The version each row of a `library` answer names (`version`), by game id. Pure. */
+    internal fun versionsOf(reply: JSONObject): Map<String, String> {
+        val rows = reply.optJSONArray("games") ?: return emptyMap()
+        return (0 until rows.length()).mapNotNull { i ->
+            val row = rows.optJSONObject(i) ?: return@mapNotNull null
+            val id = row.optString("id").trim().takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            versionOf(row.opt("version"))?.let { id to it }
+        }.toMap()
+    }
+
+    /**
+     * Whether the version installed is the one the store lists now: a different one is an update, by the plugin's
+     * word (droidtop does not order versions it did not make). Null (not known) when either side names none. Pure.
+     */
+    internal fun updateOf(installed: String?, listed: String?): StoreUpdateCheck? {
+        if (installed.isNullOrBlank() || listed.isNullOrBlank()) return null
+        return StoreUpdateCheck(if (installed == listed) StoreUpdate.CURRENT else StoreUpdate.AVAILABLE, listed)
+    }
+
+    /**
+     * A `launch` answer (`{exe, args?, cwd?}`) as a start inside [folder], the game's installed folder: `exe` and `cwd`
+     * are paths in it, never out of it (no `..`, not absolute, no drive), `args` a list of strings. Null for an answer
+     * that names no program there. Pure.
+     */
+    internal fun launchOf(answer: JSONObject, folder: File): StoreLaunch? {
+        fun inside(rel: String?): File? {
+            val text = rel?.trim()?.replace('\\', '/')?.takeIf { it.isNotEmpty() } ?: return null
+            if (text.startsWith("/") || text.contains(':')) return null
+            val parts = text.split('/').filter { it.isNotEmpty() && it != "." }
+            if (parts.isEmpty() || parts.any { it == ".." }) return null
+            return parts.fold(folder) { at, part -> File(at, part) }
+        }
+        val exe = inside(answer.optString("exe")) ?: return null
+        val cwd = answer.optString("cwd").takeIf { it.isNotBlank() }?.let { inside(it) ?: return null } ?: exe.parentFile ?: folder
+        val args = answer.optJSONArray("args")?.let { array -> (0 until array.length()).mapNotNull { array.opt(it) as? String } }.orEmpty()
+        return StoreLaunch(exe, cwd, args)
+    }
 
     /** The installs file's records by game id; a record that is not one is dropped. Pure. */
     internal fun installsOf(text: String?): Map<String, Install> {
@@ -123,18 +171,18 @@ object PluginStores {
         return json.keys().asSequence().mapNotNull { id ->
             val row = json.optJSONObject(id) ?: return@mapNotNull null
             val path = row.optString("path").takeIf { it.startsWith("/") } ?: return@mapNotNull null
-            id to Install(path, row.optBoolean("installed"))
+            id to Install(path, row.optBoolean("installed"), versionOf(row.opt("version")))
         }.toMap()
     }
 
     internal fun installsJson(installs: Map<String, Install>): String = JSONObject().also { json ->
-        installs.forEach { (id, install) -> json.put(id, JSONObject().put("path", install.path).put("installed", install.installed)) }
+        installs.forEach { (id, install) -> json.put(id, JSONObject().put("path", install.path).put("installed", install.installed).putOpt("version", install.version)) }
     }.toString()
 
     /** [games] with what droidtop installed laid over them: a finished install is installed, at its folder. Pure. */
     internal fun withInstalls(games: List<StoreGame>, installs: Map<String, Install>): List<StoreGame> = games.map { game ->
         val install = installs[game.gameId]?.takeIf { it.installed } ?: return@map game
-        game.copy(installed = true, installPath = install.path)
+        game.copy(installed = true, installPath = install.path, installedVersion = install.version)
     }
 
     private val UNSAFE = Regex("[^A-Za-z0-9 ._-]")
@@ -157,9 +205,10 @@ object PluginStores {
         return candidate
     }
 
-    internal fun rowsJson(games: List<StoreGame>): String = JSONArray(games.map { g ->
+    internal fun rowsJson(games: List<StoreGame>, versions: Map<String, String> = emptyMap()): String = JSONArray(games.map { g ->
         JSONObject().put("id", g.gameId).put("title", g.title).put("size", g.sizeBytes).putOpt("art", g.artUrl)
             .put("externalIds", JSONObject(g.externalIds as Map<*, *>)).put("holding", g.holding.name.lowercase())
+            .putOpt("version", versions[g.gameId])
     }).toString()
 }
 
@@ -178,6 +227,15 @@ class PluginStoreLibrary internal constructor(
     override val label: String = entry.label?.takeIf { it.isNotBlank() } ?: record.manifest.label
 
     override val siteUrl: String? = runCatching { JSONObject(entry.extra).optString("site") }.getOrNull()?.takeIf { it.startsWith("https://") }
+
+    /** The plugin that provides this store, whose page the store's page in Stores links to. */
+    val pluginId: String get() = record.manifest.id
+
+    /** The plugin's own label, for that link. */
+    val pluginLabel: String get() = record.manifest.label
+
+    /** Whether the plugin starts its games itself (`"launch": true` in its `library.stores` entry). */
+    private val launches: Boolean = runCatching { JSONObject(entry.extra).optBoolean("launch", false) }.getOrDefault(false)
 
     private fun file(context: Context) = File(File(context.applicationContext.filesDir, "plugin-stores"), "$id.json")
 
@@ -219,7 +277,7 @@ class PluginStoreLibrary internal constructor(
             val reply = policy.handle(record, newCall(PluginStores.POINT, "library", "library.stores", JSONObject().put("store", id), SYNC_MS), timeoutMs = SYNC_MS, crashOnTimeout = false, userInitiated = false)
             if (!reply.ok) return@withContext Result.failure(IllegalStateException(reply.message ?: "$label did not answer"))
             val games = PluginStores.gamesOf(id, reply.data)
-            AtomicWrite.text(file(context), PluginStores.rowsJson(games))
+            AtomicWrite.text(file(context), PluginStores.rowsJson(games, PluginStores.versionsOf(reply.data)))
             StoreChanges.announce(context)
             Result.success(games.size)
         } catch (e: Exception) {
@@ -229,12 +287,48 @@ class PluginStoreLibrary internal constructor(
         }
     }
 
+    /** The kept copy of the last `library` answer, as that answer's own shape. Disk. */
+    private fun keptReply(context: Context): JSONObject? {
+        val text = runCatching { file(context).readText() }.getOrNull() ?: return null
+        return JSONObject().put("games", runCatching { JSONArray(text) }.getOrDefault(JSONArray()))
+    }
+
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
-        val text = runCatching { file(context).readText() }.getOrNull() ?: return@withContext emptyList()
-        PluginStores.withInstalls(
-            PluginStores.gamesOf(id, JSONObject().put("games", runCatching { JSONArray(text) }.getOrDefault(JSONArray()))),
-            installs(context),
-        )
+        val reply = keptReply(context) ?: return@withContext emptyList()
+        PluginStores.withInstalls(PluginStores.gamesOf(id, reply), installs(context))
+    }
+
+    /**
+     * The version installed against the one the store's last `library` answer names (`version`): a different one is
+     * an update, which installs over the game's folder. Unknown when either names none. No call to the plugin.
+     */
+    override suspend fun checkUpdate(context: Context, gameId: String): StoreUpdateCheck? = withContext(Dispatchers.IO) {
+        val install = installs(context)[gameId]?.takeIf { it.installed } ?: return@withContext null
+        val listed = keptReply(context)?.let { PluginStores.versionsOf(it)[gameId] }
+        PluginStores.updateOf(install.version, listed)
+    }
+
+    /**
+     * How the plugin starts [gameId], for a store whose entry says it does (`"launch": true`): `launch {store, id}`
+     * answered with a program in the game's installed folder ([PluginStores.launchOf]). Null for any other store, a
+     * game not installed here, or an answer that names nothing there: droidtop then finds the executable itself.
+     */
+    override suspend fun launch(context: Context, gameId: String): StoreLaunch? {
+        if (!launches) return null
+        val folder = withContext(Dispatchers.IO) { installs(context)[gameId]?.takeIf { it.installed }?.path?.let(::File) } ?: return null
+        return withContext(Dispatchers.IO) {
+            val policy = PluginCrashPolicy(context.applicationContext)
+            try {
+                val call = newCall(PluginStores.POINT, "launch", "library.stores", JSONObject().put("store", id).put("id", gameId), LAUNCH_MS)
+                val reply = policy.handle(record, call, timeoutMs = LAUNCH_MS, crashOnTimeout = false, userInitiated = true)
+                if (reply.ok) PluginStores.launchOf(reply.data, folder) else null
+            } catch (e: Exception) {
+                android.util.Log.w("droidtop.stores", "$label gave no launch for $gameId", e)
+                null
+            } finally {
+                policy.shutdown()
+            }
+        }
     }
 
     override suspend fun installedPath(context: Context, gameId: String): String? = withContext(Dispatchers.IO) {
@@ -244,18 +338,22 @@ class PluginStoreLibrary internal constructor(
     /**
      * Asks the plugin where [gameId]'s files are (`install {store, id}`, a job answered with `download` or `downloads` as
      * a source's acquire is, docs/plugin-api.md 3 A13) and fetches them with Downloads into a new folder for the game
-     * under [root]. The folder is recorded before the download, so a Cancel knows which one is unfinished. Updating an
-     * installed game is not offered yet: the plugin says nothing about versions.
+     * under [root]. The folder is recorded before the download, so a Cancel knows which one is unfinished. An installed
+     * game is updated the same way, into its own folder: it stays recorded as installed (at its old version) until the
+     * new files are all there, so a failed update never makes Cancel remove the game. The version kept is the one the
+     * `install` answer names (`version`), else the one its row named.
      */
     override suspend fun install(context: Context, gameId: String, root: File, progress: StoreProgress): String {
         val game = games(context).firstOrNull { it.gameId == gameId } ?: error("$label no longer lists this game")
-        check(!game.installed) { "${game.title} is installed; uninstall it to install it again" }
         val folder = withContext(Dispatchers.IO) {
-            val earlier = installs(context)[gameId]?.path?.let(::File)
+            val known = installs(context)[gameId]
+            if (known?.installed == true) return@withContext File(known.path)
+            val earlier = known?.path?.let(::File)
             val folder = earlier?.takeIf { it.parentFile == root } ?: PluginStores.freshFolder(root, game.title, "$id-$gameId")
             writeInstalls(context, installs(context) + (gameId to PluginStores.Install(folder.absolutePath, installed = false)))
             folder
         }
+        val listed = withContext(Dispatchers.IO) { keptReply(context)?.let { PluginStores.versionsOf(it)[gameId] } }
         progress.report(-1f, "Asking $label for ${game.title}")
         val answer = PluginViews.runJob(
             context, record, PluginStores.POINT, "install", JSONObject().put("store", id).put("id", gameId), game.title,
@@ -276,8 +374,9 @@ class PluginStoreLibrary internal constructor(
             onPercent = { percent -> if (percent >= 0) progress.report(percent / 100f, "Downloading ${game.title}") },
         )
         check(fetched.ok) { fetched.error ?: "the download of ${game.title} failed" }
+        val version = PluginStores.versionOf(answer.values["version"]) ?: listed
         withContext(Dispatchers.IO) {
-            writeInstalls(context, installs(context) + (gameId to PluginStores.Install(folder.absolutePath, installed = true)))
+            writeInstalls(context, installs(context) + (gameId to PluginStores.Install(folder.absolutePath, installed = true, version = version)))
         }
         StoreChanges.announce(context)
         return "Installed ${game.title}"
@@ -307,5 +406,8 @@ class PluginStoreLibrary internal constructor(
 
     private companion object {
         const val SYNC_MS = 60_000L
+
+        /** How long a launch waits for the plugin's answer before droidtop finds the program itself. */
+        const val LAUNCH_MS = 10_000L
     }
 }

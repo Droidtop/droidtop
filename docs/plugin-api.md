@@ -2815,8 +2815,10 @@ writes real files that droidtop's own scan finds (A2).
 
 **A13 Stores.** EP `library.stores@1` (Droidtop/tracker#220; owner,
 2026-10-01: "we need store/source and downloader integration APIs",
-downloading belonging to sources). Risk high. Built 2026-10-28, in part
-(rows and sign-in; installing and uninstalling).
+downloading belonging to sources). Risk high. Built 2026-10-28 (rows and
+sign-in; installing and uninstalling); updates, `launch` and the plugin's
+link from Stores 2026-11-05 (Droidtop/tracker#805, built to the
+recommendation, owner to confirm).
 - **What it is:** a store droidtop shows beside its own (Steam, GOG,
   Epic, Amazon, itch). A plugin's store is a `StoreLibrary` like theirs
   (`PluginStoreLibrary`, registered in `StoreLibraries` by
@@ -2825,7 +2827,9 @@ downloading belonging to sources). Risk high. Built 2026-10-28, in part
   question for stores: the rows are a store's rows, not entries a plugin
   adds to the library.
 - **Manifest:** a `provides` entry
-  `{"point": "library.stores", "version": 1, "id": "<store>", "label": "<name>", "site": "https://..."}`.
+  `{"point": "library.stores", "version": 1, "id": "<store>", "label": "<name>", "site": "https://...", "launch": false}`.
+  `launch: true` says the plugin answers `launch` (below); without it
+  droidtop never asks.
   `id` is the store half of every library id (`humble:123`): 2 to 24
   lower-case letters and digits, starting with a letter, and not a store
   droidtop already has. If two plugins name the same id, the first one
@@ -2836,12 +2840,15 @@ downloading belonging to sources). Risk high. Built 2026-10-28, in part
   password, and Sign out clears that session and droidtop's copy of the
   rows.
 - **Ops:**
-  - `library {store} -> {games: [{id, title, size?, art?, externalIds?, holding?}]}`:
+  - `library {store} -> {games: [{id, title, size?, art?, externalIds?, holding?, version?}]}`:
     the account's games. `id` is the store's own id (at most 128
     characters, one line). `art` is taken only over https.
     `externalIds` names the same game in other stores (`{"steam":
     "261570"}`), the strongest evidence that two rows are one game.
     `holding` is `owned` (the default), `family`, `free` or `wishlist`.
+    `version` is the version the store has now (one line, at most 64
+    characters), whatever its form: droidtop never orders versions, so a
+    different one from the version installed is an update.
     Each id is taken once, and a row without an id or a title is
     dropped. droidtop keeps the answer as its own copy and lists from
     it with no call; Sync and the automatic sync ask again (60 s budget).
@@ -2852,7 +2859,10 @@ downloading belonging to sources). Risk high. Built 2026-10-28, in part
     in the person's game folder (`<game folder>/<store label>/<title>`,
     "Title (2)" beside a folder that is not droidtop's), fetches the
     files there with Downloads and records the game as installed at
-    that folder. The plugin never names a path. A Cancel removes the
+    that folder. The plugin never names a path. The answer may name the
+    `version` it gives (else the row's is kept). An installed game is
+    updated by the same op into its own folder; it stays installed at its
+    old version until every new file is there. A Cancel removes the
     unfinished folder; Uninstall deletes the folder droidtop made and
     nothing else, with no call to the plugin. droidtop's record of what
     it installed survives Sync and Sign out.
@@ -2862,13 +2872,23 @@ downloading belonging to sources). Risk high. Built 2026-10-28, in part
   Sync, its counts and its installs. It is also signed in from its
   plugin's page (the account row) and read there ("<store>: read your
   games"). It leaves the place when its plugin stops.
-- **Launching** is droidtop's: the store gives no launch answer
-  (`StoreLibrary.launch` is null), so droidtop finds the executable in
-  the installed folder, or the engine that runs it, as it does for a
-  built-in store's game without one. There is no `launch` op. A store
-  whose games need the plugin to start them is B1's (launch providers).
-- **Not built yet:** update (the plugin says nothing about versions, so
-  an installed game is uninstalled to be installed again).
+  - `launch {store, id} -> {exe, args?, cwd?}` (only for an entry with
+    `launch: true`; 10 s): the program to start, `exe` and `cwd` paths in
+    the game's installed folder (never absolute, no `..`, no drive),
+    `args` strings. It is `StoreLibrary.launch`; droidtop runs it the
+    way a built-in store's launch answer is run.
+- **Launching** otherwise is droidtop's: with no `launch` (or an answer
+  naming nothing in the folder), droidtop finds the executable in the
+  installed folder, or the engine that runs it, as it does for a
+  built-in store's game without one. A store whose games need code to
+  start (a prefix to prepare, an image to mount) is B1's (launch
+  providers).
+- **Updates:** the update check compares the version recorded at install
+  with the `version` the last `library` answer named, with no call to the
+  plugin; unknown when either names none.
+- **The plugin's page:** the store's page in Stores has a Plugin group,
+  "Open <plugin>'s page", the plugin's page in Settings, Plugins (where
+  it is approved, turned on and allowed).
 - **Permission:** `provide:library.stores` (high), `web.session`,
   `net.domains`.
 

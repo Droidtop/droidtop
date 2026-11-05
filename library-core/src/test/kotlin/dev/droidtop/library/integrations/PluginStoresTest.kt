@@ -74,4 +74,38 @@ class PluginStoresTest {
             root.deleteRecursively()
         }
     }
+
+    @Test fun `a row's version is kept with the rows, and an install's version reads back`() {
+        val reply = JSONObject("""{"games":[{"id":"1","title":"A","version":"1.2"},{"id":"2","title":"B","version":"  "},{"id":"3","title":"C","version":"x\ny"},{"id":"4","title":"D"}]}""")
+        val versions = PluginStores.versionsOf(reply)
+        assertEquals(mapOf("1" to "1.2"), versions)
+        val kept = JSONObject().put("games", org.json.JSONArray(PluginStores.rowsJson(PluginStores.gamesOf("s", reply), versions)))
+        assertEquals(versions, PluginStores.versionsOf(kept))
+        val installs = mapOf("1" to PluginStores.Install("/games/S/A", installed = true, version = "1.2"))
+        assertEquals(installs, PluginStores.installsOf(PluginStores.installsJson(installs)))
+        assertEquals("1.2", PluginStores.withInstalls(PluginStores.gamesOf("s", reply), installs).first().installedVersion)
+    }
+
+    @Test fun `a different version listed is an update, by the plugin's word, and none named is unknown`() {
+        assertEquals(dev.droidtop.library.StoreUpdate.CURRENT, PluginStores.updateOf("1.2", "1.2")?.update)
+        val newer = PluginStores.updateOf("1.2", "1.3")
+        assertEquals(dev.droidtop.library.StoreUpdate.AVAILABLE, newer?.update)
+        assertEquals("1.3", newer?.latest)
+        assertEquals(null, PluginStores.updateOf(null, "1.3"))
+        assertEquals(null, PluginStores.updateOf("1.2", null))
+    }
+
+    @Test fun `a launch answer starts a program inside the game's folder and nowhere else`() {
+        val folder = java.io.File("/games/S/A")
+        val start = PluginStores.launchOf(JSONObject("""{"exe":"bin\\game.exe","args":["-windowed",3,"-x"]}"""), folder)!!
+        assertEquals(java.io.File("/games/S/A/bin/game.exe"), start.executable)
+        assertEquals(java.io.File("/games/S/A/bin"), start.workingDir)
+        assertEquals(listOf("-windowed", "-x"), start.arguments)
+        assertEquals(java.io.File("/games/S/A/data"), PluginStores.launchOf(JSONObject("""{"exe":"game.exe","cwd":"./data"}"""), folder)!!.workingDir)
+        assertEquals(null, PluginStores.launchOf(JSONObject("""{"exe":"../other/game.exe"}"""), folder))
+        assertEquals(null, PluginStores.launchOf(JSONObject("""{"exe":"/system/bin/sh"}"""), folder))
+        assertEquals(null, PluginStores.launchOf(JSONObject("""{"exe":"C:/Windows/notepad.exe"}"""), folder))
+        assertEquals(null, PluginStores.launchOf(JSONObject("""{"exe":"game.exe","cwd":"../.."}"""), folder))
+        assertEquals(null, PluginStores.launchOf(JSONObject("""{}"""), folder))
+    }
 }
