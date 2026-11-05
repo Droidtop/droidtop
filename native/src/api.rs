@@ -60,6 +60,7 @@ pub fn call(op: &str, args: &str) -> String {
         }
         "find" => find(&args),
         "sync_saves" => sync_saves(&args),
+        "restore_saves" => restore_saves(&args),
         "sync_library" => sync_library(&args),
         "sync_context" => sync_context(&args),
         "sync_context_copy" => sync_context_copy(&args),
@@ -409,6 +410,47 @@ fn sync_saves(args: &Value) -> Outcome {
     let v = located(serde_json::to_value(outcome?)?, &s);
     bye(s);
     Ok(v)
+}
+
+/// Puts a kept copy of a game's saves back on this device
+/// (Droidtop/tracker#822): after "Saves differ" was settled, the side that
+/// was replaced kept its set as its device's copy (`savesync::copy_dir`),
+/// and this brings it back. Needs no computer.
+///
+/// Arguments: those of `sync_saves` (`game`, `prefix`, `user`, `base`,
+/// `roots`, `baseline`, `archive`, `name`) and `device`, the name of the
+/// device whose kept copy to bring back. What is here now is kept first as
+/// this device's copy (`name`), so a restore can be undone the same way;
+/// not when the copy brought back is this device's own, which keeping would
+/// overwrite. Which files are the game's saves is the save locations this
+/// device kept beside the baseline at its last sync of the game
+/// (`savesync::spec_path`); a game never synced here has none, and the op
+/// refuses rather than restore with nothing kept.
+///
+/// The reply: `restored` (files written) and `kept` (files kept first). The
+/// next `sync_saves` sees this device's set changed and offers it to the
+/// computer as usual.
+fn restore_saves(args: &Value) -> Outcome {
+    let a: SavesArgs = serde_json::from_value(args.clone())?;
+    let device = args["device"].as_str().filter(|d| !d.is_empty()).ok_or_else(|| Failure::Error("no device was named".into()))?;
+    let name = a.name.clone().unwrap_or_else(|| "droidtop".into());
+    let copy = savesync::copy_dir(&a.archive, device);
+    if !copy.is_dir() {
+        return Err(Failure::Error(format!("No copy from {device} is kept for this game: older copies are dropped as newer ones come.")));
+    }
+    let spec: droidtop_agent_core::saves::SaveSpec = std::fs::read(savesync::spec_path(&a.baseline))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .ok_or_else(|| Failure::Error("This game's saves were never synced here, so where they are is not known yet.".into()))?;
+    let roots = a.roots();
+    let mut kept = 0;
+    if copy != savesync::copy_dir(&a.archive, &name) {
+        let here = droidtop_agent_core::saves::collect(&spec, &roots);
+        kept = here.iter().filter(|(_, p)| p.is_file()).count();
+        savesync::keep_copy(here.into_iter(), &a.archive, &name)?;
+    }
+    let restored = savesync::restore_copy(&copy, &roots)?;
+    Ok(json!({ "restored": restored, "kept": kept }))
 }
 
 /// Syncs a context by copies (docs/DESIGN.md section 8; adapter protocol 2):
@@ -938,6 +980,58 @@ fn sync_context(args: &Value) -> Outcome {
     );
     bye(s);
     Ok(v)
+}
+
+#[cfg(test)]
+mod restore_tests {
+    use super::*;
+    use std::fs;
+
+    /// A game whose saves are `<base>/save.dat`, synced here once (its spec
+    /// is beside the baseline), with PC's set kept when the handheld's won.
+    #[test]
+    fn a_kept_copy_comes_back_and_what_was_here_is_kept_first() {
+        let root = std::env::temp_dir().join(format!("dta-restore-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let (base, archive) = (root.join("game"), root.join("archive"));
+        fs::create_dir_all(&base).unwrap();
+        fs::write(base.join("save.dat"), "handheld").unwrap();
+        let baseline = root.join("baseline.json");
+        let spec = droidtop_agent_core::saves::SaveSpec { patterns: vec!["<base>/save.dat".into()] };
+        fs::write(savesync::spec_path(&baseline), serde_json::to_vec(&spec).unwrap()).unwrap();
+        let pc_copy = savesync::copy_dir(&archive, "PC");
+        fs::create_dir_all(pc_copy.join("base")).unwrap();
+        fs::write(pc_copy.join("base").join("save.dat"), "pc").unwrap();
+
+        let args = json!({
+            "game": { "key": "title2:g", "title": "G" }, "base": base, "baseline": baseline, "archive": archive,
+            "name": "Handheld", "device": "PC",
+        });
+        let reply: Value = serde_json::from_str(&call("restore_saves", &args.to_string())).unwrap();
+        assert_eq!(reply, json!({ "restored": 1, "kept": 1 }), "{reply}");
+        assert_eq!(fs::read_to_string(base.join("save.dat")).unwrap(), "pc");
+        // What was here is this device's copy now, so the restore can be undone.
+        let mine = savesync::copy_dir(&archive, "Handheld");
+        assert_eq!(fs::read_to_string(mine.join("base").join("save.dat")).unwrap(), "handheld");
+
+        // Undoing it: this device's own copy comes back, and is not kept over itself first.
+        let undo = json!({ "game": args["game"], "base": base, "baseline": baseline, "archive": archive, "name": "Handheld", "device": "Handheld" });
+        let reply: Value = serde_json::from_str(&call("restore_saves", &undo.to_string())).unwrap();
+        assert_eq!(reply, json!({ "restored": 1, "kept": 0 }), "{reply}");
+        assert_eq!(fs::read_to_string(base.join("save.dat")).unwrap(), "handheld");
+
+        // No copy from a device, or no spec yet: refused, nothing touched.
+        let none: Value = serde_json::from_str(&call(
+            "restore_saves",
+            &json!({ "game": args["game"], "base": base, "baseline": baseline, "archive": archive, "device": "Nobody" }).to_string(),
+        ))
+        .unwrap();
+        assert!(none["error"].as_str().unwrap().contains("No copy from Nobody"), "{none}");
+        fs::remove_file(savesync::spec_path(&baseline)).unwrap();
+        let unsynced: Value = serde_json::from_str(&call("restore_saves", &args.to_string())).unwrap();
+        assert!(unsynced["error"].as_str().unwrap().contains("never synced here"), "{unsynced}");
+        fs::remove_dir_all(&root).unwrap();
+    }
 }
 
 #[cfg(test)]

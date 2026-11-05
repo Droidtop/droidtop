@@ -21947,6 +21947,23 @@ Pythia (bi0shacker001/pythia) is a game manager for the computer. It does droidt
   On the handheld that is `files/agent/<id>/archive/<game>/`; on the
   computer, the agent's own `archive/`. The sync's line says when the other
   side's saves were kept.
+- **A kept copy can be brought back** (Droidtop/tracker#822; the
+  coordinator, splitting it out of #814: "pick one; the other is kept and
+  restorable"). The native library's `restore_saves` op takes `sync_saves`'s
+  arguments and `device`, the device whose copy to bring back, and needs no
+  computer.
+  - What is on this device now is kept first as this device's own copy, so a
+    restore can be undone the same way. Not when the copy brought back is
+    this device's own, which keeping would overwrite.
+  - Which files are the game's saves is the save locations this device kept
+    beside the baseline at its last sync (`savesync::spec_path`). A game
+    never synced here has none, and the op refuses rather than restore with
+    nothing kept.
+  - It answers `restored` and `kept` (file counts). The next sync sees this
+    device's set changed and offers it to the computer as usual.
+  - The computer's side is the agent's `Agent::restore_saves` (lib-saves
+    `Saves::restore`), the same rule. The game page's row per kept copy
+    ("Bring back the saves from <device>") is still to come.
 - **A computer that does not answer** is normal away from home. It is
   recorded on its row and is not shown at launch. It is shown when the
   person started the sync. After a game ends, with a cloud folder set, the
