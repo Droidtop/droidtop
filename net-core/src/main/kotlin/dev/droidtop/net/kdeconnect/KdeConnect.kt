@@ -112,10 +112,14 @@ object KdeConnect {
     private suspend fun start(context: Context) = lock.withLock {
         if (_running.value) return@withLock
         val dir = File(context.filesDir, "kdeconnect")
+        // Files other devices share land here first, whole, and are then moved to the folder the person chose for
+        // received files (the same one as "Type from another device"; :app's KdeConnectNotification).
+        val incoming = File(context.cacheDir, "kdeconnect-in")
         // "tablet": a handheld with a screen of its own. The official apps choose what to offer by capability, not by type.
         val reply = call(
             "start",
-            JSONObject().put("state_dir", dir.absolutePath).put("name", name(context)).put("type", "tablet"),
+            JSONObject().put("state_dir", dir.absolutePath).put("receive_dir", incoming.absolutePath)
+                .put("name", name(context)).put("type", "tablet"),
         )
         lastError = AgentNative.failure(reply)
         if (lastError != null) {
@@ -159,6 +163,34 @@ object KdeConnect {
 
     suspend fun ping(id: String): String? = withContext(Dispatchers.IO) {
         AgentNative.failure(call("ping", JSONObject().put("id", id).put("message", "Ping from droidtop")))
+    }
+
+    suspend fun shareText(id: String, text: String): String? = withContext(Dispatchers.IO) {
+        AgentNative.failure(call("share_text", JSONObject().put("id", id).put("text", text)))
+    }
+
+    /**
+     * Sends the document [uri] to [id] without copying it: its descriptor is handed to the library, which closes it
+     * once sent. The outcome comes as [KdcEvent.FileSent] or [KdcEvent.FileSendFailed].
+     */
+    suspend fun shareFile(context: Context, id: String, uri: android.net.Uri): String? = withContext(Dispatchers.IO) {
+        val resolver = context.contentResolver
+        var name = "file"
+        var size = -1L
+        runCatching {
+            resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE), null, null, null)
+                ?.use { c ->
+                    if (c.moveToFirst()) {
+                        c.getString(0)?.let { name = it }
+                        if (!c.isNull(1)) size = c.getLong(1)
+                    }
+                }
+        }
+        val pfd = runCatching { resolver.openFileDescriptor(uri, "r") }.getOrNull() ?: return@withContext "Could not open that file"
+        val fd = pfd.detachFd()
+        val reply = call("share_file", JSONObject().put("id", id).put("fd", fd).put("name", name).put("size", size))
+        // The library owns the descriptor from here and closes it, sent or not.
+        AgentNative.failure(reply)
     }
 
     /** Runs one operation on a device; the failure in words, or null. */
@@ -206,6 +238,14 @@ sealed class KdcEvent {
     data class Paired(val id: String) : KdcEvent()
     data class PairFailed(val id: String, val reason: String) : KdcEvent()
     data class Ping(val id: String, val message: String?) : KdcEvent()
+    data class ShareText(val id: String, val text: String) : KdcEvent()
+    data class ShareUrl(val id: String, val url: String) : KdcEvent()
+    data class FileReceiving(val id: String, val name: String, val size: Long?) : KdcEvent()
+    /** Whole, at [path] in droidtop's cache; moved to the person's folder by :app. */
+    data class FileReceived(val id: String, val name: String, val path: String, val size: Long, val open: Boolean) : KdcEvent()
+    data class FileFailed(val id: String, val name: String, val why: String) : KdcEvent()
+    data class FileSent(val id: String, val name: String, val size: Long) : KdcEvent()
+    data class FileSendFailed(val id: String, val name: String, val why: String) : KdcEvent()
     /** Anything else (reachable, unreachable, unpaired): only the device list changes. */
     data class Other(val kind: String) : KdcEvent()
 
@@ -220,6 +260,17 @@ sealed class KdcEvent {
                 val p = o.optJSONObject("plugin")
                 when (p?.optString("plugin")) {
                     "ping" -> Ping(o.optString("id"), p.optString("message").takeIf { it.isNotEmpty() && !p.isNull("message") })
+                    "share_text" -> ShareText(o.optString("id"), p.optString("text"))
+                    "share_url" -> ShareUrl(o.optString("id"), p.optString("url"))
+                    "file_receiving" -> FileReceiving(
+                        o.optString("id"),
+                        p.optString("name"),
+                        if (p.isNull("size") || !p.has("size")) null else p.optLong("size"),
+                    )
+                    "file_received" -> FileReceived(o.optString("id"), p.optString("name"), p.optString("path"), p.optLong("size"), p.optBoolean("open"))
+                    "file_failed" -> FileFailed(o.optString("id"), p.optString("name"), p.optString("why"))
+                    "file_sent" -> FileSent(o.optString("id"), p.optString("name"), p.optLong("size"))
+                    "file_send_failed" -> FileSendFailed(o.optString("id"), p.optString("name"), p.optString("why"))
                     else -> Other("plugin")
                 }
             }

@@ -47,6 +47,24 @@ class KdeConnectTest {
     }
 
     @Test
+    fun shareEvents() {
+        assertEquals(KdcEvent.ShareText("a", "1234"), KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"share_text","text":"1234"}}""")))
+        assertEquals(KdcEvent.ShareUrl("a", "https://x/"), KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"share_url","url":"https://x/"}}""")))
+        assertEquals(
+            KdcEvent.FileReceiving("a", "save.srm", null),
+            KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"file_receiving","name":"save.srm","size":null}}""")),
+        )
+        assertEquals(
+            KdcEvent.FileReceived("a", "save.srm", "/c/save.srm", 42, false),
+            KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"file_received","name":"save.srm","path":"/c/save.srm","size":42,"open":false}}""")),
+        )
+        assertEquals(
+            KdcEvent.FileSendFailed("a", "x", "timed out"),
+            KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"file_send_failed","name":"x","why":"timed out"}}""")),
+        )
+    }
+
+    @Test
     fun addresses() {
         assertEquals(listOf("100.64.0.2", "192.168.1.9"), KdeConnect.parseAddresses(" 100.64.0.2, 192.168.1.9\n100.64.0.2 "))
         assertEquals(emptyList<String>(), KdeConnect.parseAddresses(""))

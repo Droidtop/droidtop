@@ -22230,8 +22230,18 @@ client." The plan and its slices are on #645.
     broadcast misses (the official apps have no QR pairing; adding by address is theirs too);
   - Asking to pair, Paired (Ping, Unpair) and Available (Pair, and Look again, which announces again).
 - **Device type** `tablet`: the official apps choose what to offer by capability, not by type.
-- **Plugins, as built:** ping both ways (a ping shows as a notification). Share, clipboard and remote input follow in
-  #645's slices 2 to 4; each will have its own switch.
+- **Plugins, as built:**
+  - ping both ways (a ping shows as a notification);
+  - **share (slice 2)**, both ways. A shared link is a notification whose tap opens it (web links only; any other
+    scheme is shown as text). A shared text is a notification showing it whole. A shared file is stored whole by
+    the library in droidtop's cache (`kdeconnect-in/`, `.part` until complete, deleted when it does not arrive whole)
+    and then moved into the folder the person chose for received files, the same one as "Type from another device"
+    (`ReceiveFolder`: the chosen folder, else Download/droidtop through MediaStore), under a name that replaces no
+    file (`FileNames`); the notice says where. A paired, reachable device's rows add **Send a file to ...** (the
+    system's document picker; the document's descriptor is handed to the library, so it is read where it is and never
+    copied) and **Send text to ...**. Built to the recommendation, owner to confirm: received files share Type from
+    another device's folder rather than a folder of their own.
+  - Clipboard and remote input follow in #645's slices 3 and 4; each will have its own switch.
 - **Tailscale** is a VPN plugin, not a client of droidtop's own (owner, above). It feeds its tailnet's online devices
   to the same address list (`kdeconnect_addresses`), slice 5 of #645.
 
