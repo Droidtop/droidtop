@@ -56,4 +56,18 @@ class CompanionCatalogPanelTest {
         val cards = companionSystemCards(::quick, performance, privacy)
         assertEquals(listOf("system"), cards.filter { !it.folded }.map { it.id })
     }
+
+    @Test
+    fun `a screen's titled groups keep their names over their first row, the page top does not`() {
+        val a = ActionItem(id = "a1", title = "One", run = {})
+        val b = ActionItem(id = "b1", title = "Two", run = {})
+        val c = ActionItem(id = "c1", title = "Three", run = {})
+        val groups = listOf(
+            CatalogGroup(id = dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID, title = "Header", items = listOf(a)),
+            CatalogGroup(id = "keys", title = "Keys", items = listOf(b)),
+            CatalogGroup(id = "untitled", title = null, items = listOf(c)),
+            CatalogGroup(id = "empty", title = "Empty", items = emptyList()),
+        )
+        assertEquals(mapOf("b1" to "Keys"), companionHeadings(groups))
+    }
 }

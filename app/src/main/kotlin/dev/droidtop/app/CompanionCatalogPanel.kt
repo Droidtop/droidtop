@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
@@ -54,6 +55,7 @@ import dev.droidtop.library.settings.confirmText
 import dev.droidtop.shell.gamepad.QuickSection
 import dev.droidtop.shell.gamepad.QuickTiles
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import coil3.compose.AsyncImage
@@ -110,6 +112,9 @@ internal fun CompanionCatalogItems(
     items: List<CatalogItem>,
     onChanged: () -> Unit,
     asks: (CatalogItem) -> Boolean = { it.confirmText != null },
+    // A group's title, drawn before the row with this id (its first): a screen's sections keep their names
+    // (Droidtop/tracker#786 S2a2).
+    headings: Map<String, String> = emptyMap(),
 ) {
     var nested by remember { mutableStateOf<CatalogScreen?>(null) }
     val context = LocalContext.current
@@ -167,6 +172,14 @@ internal fun CompanionCatalogItems(
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         items.forEach { item ->
+            headings[item.id]?.let { sectionTitle ->
+                Text(
+                    sectionTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 2.dp).semantics { heading() },
+                )
+            }
             when (item) {
                 is SliderItem -> CatalogSliderRow(item, onChanged)
                 is ToggleItem -> CatalogToggleRow(item, onChanged)
@@ -212,7 +225,16 @@ internal fun CompanionNestedScreen(
 ) {
     val context = LocalContext.current
     var version by remember { mutableStateOf(0) }
-    val items by produceState<List<CatalogItem>?>(null, screen, version) {
+    // A screen of live data (friends, a conversation, a job) says when it changed; its rows are read again then, as
+    // Gaming's Settings does. The first value is what the screen was just built from.
+    androidx.compose.runtime.LaunchedEffect(screen) { screen.live?.drop(1)?.collect { version++ } }
+    // Back from another app's screen (Android's All files access page, a store's page): the rows are read again, so
+    // one that described what that screen changes shows the new state. The first resume is the screen opening.
+    var resumedOnce by remember { mutableStateOf(false) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        if (resumedOnce) version++ else resumedOnce = true
+    }
+    val groups by produceState<List<dev.droidtop.library.settings.CatalogGroup>?>(null, screen, version) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val groups = screen.groups(context)
@@ -224,10 +246,12 @@ internal fun CompanionNestedScreen(
                 } else {
                     groups
                 }
-                shown.flatMap { it.items }
+                shown
             }.getOrDefault(emptyList())
         }
     }
+    val items = groups?.flatMap { it.items }
+    val headings = remember(groups) { companionHeadings(groups.orEmpty()) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (onBack != null) CompanionPill("Back", onClick = onBack)
@@ -244,7 +268,7 @@ internal fun CompanionNestedScreen(
         lead?.let { CompanionNote(it) }
         val list = items
         CompositionLocalProvider(LocalOneLineSubtitles provides screen.panel) {
-            if (list == null) CompanionNote("Reading…") else CompanionCatalogItems(list, onChanged = { version++; onChanged() }, asks = asks)
+            if (list == null) CompanionNote("Reading…") else CompanionCatalogItems(list, onChanged = { version++; onChanged() }, asks = asks, headings = headings)
         }
     }
 }
@@ -514,3 +538,12 @@ private fun CompanionButtonBar(bar: dev.droidtop.library.settings.ButtonBarItem,
 
 /** A folder or document row on a companion that cannot open the system's picker (a Presentation on the second screen). */
 private const val PICK_ON_MAIN_SCREEN = "Choose it from droidtop's Settings on the main screen"
+
+/**
+ * The headings of a screen's groups, by the id of each group's first row: a group with a title and rows, except a
+ * page's top group (its header and bar), which is not a section. Pure.
+ */
+internal fun companionHeadings(groups: List<dev.droidtop.library.settings.CatalogGroup>): Map<String, String> =
+    groups.filter { it.id != dev.droidtop.library.settings.CatalogPage.TOP_GROUP_ID && !it.title.isNullOrBlank() }
+        .mapNotNull { group -> group.items.firstOrNull()?.let { it.id to group.title!! } }
+        .toMap()
