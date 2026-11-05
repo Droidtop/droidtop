@@ -12,7 +12,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import dev.droidtop.library.settings.WordsForTests
 
 /**
  * The PC Games home's shelves and the tab's own lines (docs/SPEC.md 7i),
@@ -20,6 +22,10 @@ import org.junit.Test
  * shelf that would repeat the whole library is left out.
  */
 class PcShelvesTest {
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    @Before
+    fun installWords() = WordsForTests.install()
+
     private val now = 1_700_000_000_000L
 
     private fun game(

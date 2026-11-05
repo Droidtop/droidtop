@@ -6,10 +6,16 @@ import dev.droidtop.library.stores.StoreAchievements
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import dev.droidtop.library.settings.WordsForTests
 
 /** The Achievements row before and without a key (docs/SPEC.md 7h, "RetroAchievements"; Droidtop/tracker#143). */
 class AchievementRowsTest {
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    @Before
+    fun installWords() = WordsForTests.install()
+
     @Test
     fun aGameRetroAchievementsCoversAsksForASignInWhenNoKeyIsStored() {
         val row = achievementRowsFor(RaResult.NotSignedIn).single()

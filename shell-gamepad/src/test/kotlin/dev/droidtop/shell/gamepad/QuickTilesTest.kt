@@ -12,10 +12,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import dev.droidtop.library.settings.WordsForTests
 
 /** The Quick Menu's tile model (see QuickTiles.kt). */
 class QuickTilesTest {
+
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    @Before
+    fun installWords() = WordsForTests.install()
 
     private fun toggle(id: String, on: Boolean) =
         ToggleItem(id = id, title = "Toggle $id", current = on, onToggle = { _, _ -> })

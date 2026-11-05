@@ -18,10 +18,16 @@ import dev.droidtop.library.signInRow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import dev.droidtop.library.settings.WordsForTests
 
 /** The record page's tabs (docs/SPEC.md 7g, "Getting an update"). */
 class SourceRecordPageTest {
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    @Before
+    fun installWords() = WordsForTests.install()
+
     private fun d(section: String, host: String, label: String = host) = UpdateSources.Download(section, host, label, "$section/$host/$label")
 
     private val record = UpdateSources.Record(

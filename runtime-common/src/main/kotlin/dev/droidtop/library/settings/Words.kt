@@ -17,8 +17,19 @@ object Words {
         this.context = context
     }
 
-    fun get(@StringRes id: Int, vararg args: Any): String =
-        checkNotNull(context) { "Words.init has not run: a catalog was built before the Application" }.getString(id, *args)
+    /** A plain-JVM unit test's words, read from the modules' strings.xml ([WordsForTests]); null in the app. */
+    @Volatile private var testLookup: ((Int, Array<out Any>) -> String)? = null
+
+    @androidx.annotation.VisibleForTesting
+    fun installForTests(lookup: (Int, Array<out Any>) -> String) {
+        testLookup = lookup
+    }
+
+    fun get(@StringRes id: Int, vararg args: Any): String {
+        context?.let { return it.getString(id, *args) }
+        testLookup?.let { return it(id, args) }
+        error("Words.init has not run: a catalog was built before the Application")
+    }
 }
 
 /** [Words.get]: one catalog string, with its arguments. */

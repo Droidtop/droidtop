@@ -7,7 +7,9 @@ import dev.droidtop.shell.gamepad.pc.SourceRecordScreen
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import dev.droidtop.library.settings.WordsForTests
 
 /**
  * A folder game's update row shows the update in place (docs/SPEC.md 7g, "Facets in place"; Droidtop/tracker#639): on
@@ -15,6 +17,10 @@ import org.junit.Test
  * pushes the update's own screen wherever Updates is drawn and has nothing of its own to run: no activity can start.
  */
 class UpdateRowInPlaceTest {
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    @Before
+    fun installWords() = WordsForTests.install()
+
     private val row = UpdatesPage.sourceUpdateRow(
         library = { error("the library is asked for only when the update's screen is opened") },
         entryId = "/games/30 Year Old Virgin 0.37",

@@ -7,10 +7,16 @@ import dev.droidtop.library.integrations.OldVersions
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import dev.droidtop.library.settings.WordsForTests
 
 /** The rows that remove a game's older version folders on Versions (docs/SPEC.md 7i; Droidtop/tracker#624). */
 class OldVersionRowsTest {
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    @Before
+    fun installWords() = WordsForTests.install()
+
     private val old = OldVersions.Old(LibraryEntry(id = "/g/Game v0.37", title = "Game v0.37", kind = LibraryEntryKind.RENPY), File("/g/Game v0.37"), "0.37")
     private val sizes = mapOf("/g/Game v0.37" to FolderSizes.Size(1_288_490_189L))
 

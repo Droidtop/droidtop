@@ -10,7 +10,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import dev.droidtop.library.settings.WordsForTests
 
 /**
  * The "About this game" helpers the PC game page draws (PcGamePage.kt;
@@ -20,6 +22,10 @@ import org.junit.Test
  * reads is pinned here rather than only on hardware.
  */
 class PcPageAboutTest {
+    // The rows read words(R.string.x); a plain JVM test reads them from the modules' strings.xml (Droidtop/tracker#177).
+    @Before
+    fun installWords() = WordsForTests.install()
+
     private fun entry(
         description: String? = null,
         developer: String? = null,
