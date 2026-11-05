@@ -33,7 +33,8 @@ class PcFolderScanTest {
         File(temp.root, path).mkdirs()
     }
 
-    private fun file(path: String, contents: String = "x") {
+    // A .pck is a Godot pack only with Godot's header (GameEngineDetector.isGodot, Droidtop/tracker#873).
+    private fun file(path: String, contents: String = if (path.endsWith(".pck")) "GDPC" else "x") {
         val file = File(temp.root, path)
         file.parentFile?.mkdirs()
         file.writeText(contents)

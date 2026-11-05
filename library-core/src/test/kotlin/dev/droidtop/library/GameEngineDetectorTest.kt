@@ -515,8 +515,8 @@ class GameEngineDetectorTest {
         File(tmp.root, "godot/Anomalous").mkdirs()
         File(tmp.root, "godot/Goodbye Eternity").mkdirs()
         File(tmp.root, "godot/loose_linux.x86_64").writeText("ELF")
-        File(tmp.root, "godot/Anomalous/acm2.pck").writeText("pck")
-        File(tmp.root, "godot/Goodbye Eternity/goodbye.pck").writeText("pck")
+        File(tmp.root, "godot/Anomalous/acm2.pck").writeText("GDPC")
+        File(tmp.root, "godot/Goodbye Eternity/goodbye.pck").writeText("GDPC")
 
         val results = GameEngineDetector.scan(tmp.root, emptyMap(), defs)
 
