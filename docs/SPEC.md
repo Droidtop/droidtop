@@ -956,6 +956,11 @@ package from the drawer. It now works like this:
   one component, and `NativeAppProvider` leaves droidtop's own package out
   of the Apps list, so droidtop's icon never shows as an "app" in Gaming or
   Desktop.
+- **Seeing the installed apps.** The manifest holds `QUERY_ALL_PACKAGES`: from Android 11 an app sees other
+  apps' launcher activities only through a matching `<queries>` entry or this permission, and without it
+  `NativeAppProvider`'s `queryIntentActivities` came back empty on real devices (an empty Apps section
+  whatever was installed). droidtop ships a Home app (the Launcher3 fork), the class of app Android grants
+  it to; Daijisho declares the same permission for the same need.
 - A pinned game's shortcut names `LauncherGamesActivity`, the package's one
   launcher activity, as its activity.
 
