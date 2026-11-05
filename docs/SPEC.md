@@ -14850,6 +14850,10 @@ the system chosen on its page counts wherever the folder sits.
 that is a PC store root (Steam, GOG, etc.) or contains engine games shows
 "Steam (PC games: N games)" or "Engine games (N games)" with no system picker. Only folders that are truly
 unrecognized ROM folders show "Not set" and offer the system picker.
+**Superseded (Droidtop/tracker#571 row 31, 2026-11-05):** the page's input became the library's own console
+folders (`SystemFolders`, which already leaves out what it reads as PC or engine games), so those two branches could
+no longer match, and the store and engine checks behind them walked every listed folder on each opening. They are
+deleted; each listed folder shows its system, or "Not set" with the system picker.
 
 **A time limit belongs to the unit of work it can bound, which is one
 folder's own step.** The whole-provider timeouts (60 s streaming, 15 s not) are gone,
