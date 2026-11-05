@@ -584,6 +584,9 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   draw their own maximize and close buttons, the menu stays Minimize and Close. A finger-wide 48 dp grab
   area on the edge is not possible in sway, whose resize area is the border itself. The 8 px border plus
   Maximize and Snap are the compromise.
+  Each window's button on the bar also carries a "⋯" (labelled "Window menu" for a screen reader) that opens the
+  same sheet with a plain tap, so the menu does not depend on a long press (AVD rig 2936, 2026-11-05: a long press on
+  the window's button did nothing, and it was the only touch route to Maximize, Snap and Close).
 - **Restart, Stop and Lock** (Droidtop/tracker#687, the coordinator's Desktop review, decided 2026-10-29).
   Start's System section ends with "Restart desktop" and "Stop desktop" while a session runs, and "Lock
   screen" always. Before, a setting that applies when the desktop next starts (scale, resolution, panel, Tile

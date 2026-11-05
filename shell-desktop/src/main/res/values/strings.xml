@@ -7,6 +7,7 @@
     <string name="desktop_output_failed">Couldn\'t show the desktop.</string>
     <string name="desktop_output_failed_hint">Restart it from Start, under System.</string>
     <string name="desktop_starting_detail">The first start downloads a Linux system and sets up the desktop in it, which takes several minutes.</string>
+    <string name="desktop_window_menu">Window menu</string>
     <string name="desktop_starting">Starting the desktop…</string>
     <string name="desktop_open_on_android_failed">No app on this device could open that.</string>
     <string name="desktop_start_failed">The desktop didn\'t start</string>

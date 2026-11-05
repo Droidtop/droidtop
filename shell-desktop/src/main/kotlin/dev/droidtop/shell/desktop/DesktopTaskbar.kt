@@ -52,6 +52,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -488,7 +490,21 @@ internal fun TaskbarWindowRow(
                 fontWeight = if (toplevel.activated) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
+            // The window's menu by a plain tap, not only by a long press (Droidtop/tracker#686, AVD rig 2936: a long
+            // press on the window's button did nothing, and it was the one touch route to Maximize, Snap and Close).
+            val menuLabel = stringResource(R.string.desktop_window_menu)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .heightIn(min = currentShellWindow().pressTarget)
+                    .widthIn(min = 32.dp)
+                    .clickable(onClickLabel = menuLabel) { menuOpen = true }
+                    .semantics { contentDescription = menuLabel },
+            ) {
+                Text("⋯", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         if (menuOpen) {
             val maximize = stringResource(R.string.desktop_maximize)
