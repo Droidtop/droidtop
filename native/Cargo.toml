@@ -21,7 +21,11 @@ crate-type = ["cdylib", "rlib"]
 # Identity, pairing, the channel, the protocol and the sync rules: Droidtop/lib-sync.
 droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.2" }
 # The person's own shares (Droidtop/tracker#573): Droidtop/lib-net's share client, WebDAV and the backends to come.
-net-remote = { git = "https://github.com/Droidtop/lib-net", tag = "v0.2.1" }
+# S3 as well as WebDAV (lib-net ci/remote-sftp-feature, on top of ci/remote-s3), pinned by that commit until lib-net
+# releases it as v0.2.4; then that tag. Default features off, so no SFTP yet: russh 0.65 needs ed25519-dalek ^3, and the
+# mesh test's droidtop-agent brings windowcast's sspi 0.21, which pins ed25519-dalek =3.0.0-rc.1; one graph can't hold
+# both. SFTP turns on ("sftp") once windowcast takes sspi 0.22 or later.
+net-remote = { git = "https://github.com/Droidtop/lib-net", rev = "43d9236f3605831669355caa755d197c87fe3bba", default-features = false }
 jni = { version = "0.21", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -22615,10 +22615,20 @@ comment by the Cloud storage lane, 2026-11-04), with the owner's two decisions:
     recommendation, owner to confirm: Locked is the default.
   - Store-and-forward letters are sealed on every share, whatever the choice.
 
-**Backends**, in the order they are built: WebDAV (built: Nextcloud, ownCloud, most NAS), SFTP, SMB 2/3,
-S3-compatible, then cloud drives (Dropbox, OneDrive, Google Drive, through OAuth with PKCE and droidtop's client ids
-only) and NFS. Each crate a backend needs is checked first (name, owner, repository, downloads, maintenance, build
-scripts), and the check is recorded in its commit.
+**Backends** (in lib-net's `net-remote`). Each crate a backend needs is checked first (name, owner, repository,
+downloads, maintenance, build scripts), and the check is recorded in its commit.
+- **WebDAV** (built): Nextcloud, ownCloud, most NAS.
+- **S3-compatible** (built): AWS S3, Backblaze B2, Wasabi, Cloudflare R2, MinIO, Garage. "Add S3 storage" takes the
+  service's address, a bucket, a region, a folder inside it, the person's own access key and secret, and whether the
+  bucket is a subdomain (AWS) or a path (most others).
+- **SFTP** (built in lib-net, its server key pinned and accepted by the person; not yet in droidtop):
+  - droidtop builds `net-remote` without its `sftp` feature, because one dependency graph can't hold russh 0.65's
+    `ed25519-dalek ^3` and the `=3.0.0-rc.1` that sspi 0.21 pins. sspi 0.21 comes from windowcast's IronRDP, through
+    droidtop-agent in the native mesh test.
+  - It turns on when windowcast takes sspi 0.22 or later.
+- **SMB 2/3:** waits for the owner's OK to vendor libsmb2's C sources (#573).
+- **Then:** cloud drives (Dropbox, OneDrive, Google Drive, through OAuth with PKCE and droidtop's client ids only) and
+  NFS.
 
 **Settings > Accounts and sources > "Network and cloud storage"** (`StorageSharesCatalog`, `StorageShares`):
 - One row per share, with its state drawn and said: Not tested, Connected, Can't reach it, Sign-in refused,

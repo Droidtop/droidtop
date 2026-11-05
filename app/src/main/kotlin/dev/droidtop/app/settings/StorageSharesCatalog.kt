@@ -47,6 +47,24 @@ object StorageSharesCatalog {
             "a new or reset device can't restore it"
     }
 
+    private const val BUCKET_IN_HOST_LINE = "Reach the bucket as <bucket>.<server>, as AWS does. Off for most other services"
+
+    /** One of an S3 share's own fields, or null for a share of another kind. */
+    private fun s3Field(
+        share: StorageShare,
+        id: String,
+        title: String,
+        value: String,
+        subtitle: String? = null,
+        change: (StorageShare, String) -> StorageShare,
+    ): CatalogItem? = if (share.kind != StorageShares.S3) null else TextInputItem(
+        id = id,
+        title = title,
+        subtitle = subtitle,
+        value = value,
+        onChange = { c, v -> withContext(Dispatchers.IO) { StorageShares.update(c, share.id) { change(it, v) } } },
+    )
+
     private fun mark(state: String): StatusMark = when (state) {
         StorageShares.CONNECTED -> StatusMark.SIGNED_IN
         StorageShares.NOT_TESTED -> StatusMark.ATTENTION
@@ -57,7 +75,7 @@ object StorageSharesCatalog {
     fun group(context: Context): CatalogGroup = CatalogGroup(
         id = "accounts_storage",
         title = "Network and cloud storage",
-        items = StorageShares.all(context).map(::shareRow) + addRow(),
+        items = StorageShares.all(context).map(::shareRow) + addRow() + addS3Row(),
     )
 
     private fun shareRow(share: StorageShare): CatalogItem {
@@ -92,7 +110,7 @@ object StorageSharesCatalog {
                         CatalogGroup(
                             id = "${id}_sign_in",
                             title = "Address and sign-in",
-                            items = listOf(
+                            items = listOfNotNull(
                                 TextInputItem(
                                     id = "${id}_name",
                                     title = "Name",
@@ -102,7 +120,7 @@ object StorageSharesCatalog {
                                 TextInputItem(
                                     id = "${id}_url",
                                     title = "Address",
-                                    subtitle = "The share's WebDAV address",
+                                    subtitle = if (now.kind == StorageShares.S3) "The service's S3 address" else "The share's WebDAV address",
                                     value = now.url,
                                     onChange = { c, v ->
                                         withContext(Dispatchers.IO) {
@@ -110,15 +128,18 @@ object StorageSharesCatalog {
                                         }
                                     },
                                 ),
+                                s3Field(now, "${id}_bucket", "Bucket", now.bucket) { sh, v -> if (StorageShares.bucketProblem(v) == null) sh.copy(bucket = v.trim()) else sh },
+                                s3Field(now, "${id}_region", "Region", now.region, "Blank is us-east-1") { sh, v -> sh.copy(region = v.trim()) },
+                                s3Field(now, "${id}_folder", "Folder", now.folder, "Inside the bucket; blank is its top") { sh, v -> sh.copy(folder = v.trim().trim('/')) },
                                 TextInputItem(
                                     id = "${id}_user",
-                                    title = "User name",
+                                    title = if (now.kind == StorageShares.S3) "Access key" else "User name",
                                     value = now.user,
                                     onChange = { c, v -> withContext(Dispatchers.IO) { StorageShares.update(c, now.id) { it.copy(user = v.trim()) } } },
                                 ),
                                 TextInputItem(
                                     id = "${id}_password",
-                                    title = "Password",
+                                    title = if (now.kind == StorageShares.S3) "Secret key" else "Password",
                                     subtitle = "Kept locked on this device, never in a backup",
                                     value = "",
                                     secret = true,
@@ -130,6 +151,13 @@ object StorageSharesCatalog {
                                     subtitle = "Only for a share on your own network: the password and files travel readable",
                                     current = now.allowPlainHttp,
                                     onToggle = { c, on -> withContext(Dispatchers.IO) { StorageShares.update(c, now.id) { it.copy(allowPlainHttp = on) } } },
+                                ),
+                                if (now.kind != StorageShares.S3) null else ToggleItem(
+                                    id = "${id}_bucket_host",
+                                    title = "Bucket subdomain",
+                                    subtitle = BUCKET_IN_HOST_LINE,
+                                    current = now.bucketInHost,
+                                    onToggle = { c, on -> withContext(Dispatchers.IO) { StorageShares.update(c, now.id) { it.copy(bucketInHost = on) } } },
                                 ),
                             ),
                         ),
@@ -165,6 +193,119 @@ object StorageSharesCatalog {
             ),
         )
     }
+
+    /** Add S3 storage's fields until Add is pressed. The secret field is never shown back. */
+    @Volatile private var s3Name = ""
+    @Volatile private var s3Endpoint = ""
+    @Volatile private var s3Bucket = ""
+    @Volatile private var s3Region = ""
+    @Volatile private var s3AccessKey = ""
+    @Volatile private var s3SecretKey = ""
+    @Volatile private var s3Folder = ""
+    @Volatile private var s3BucketInHost = false
+    @Volatile private var s3PlainHttp = false
+    @Volatile private var s3Trusted = false
+
+    /** Add S3 storage: the service's address, a bucket and the person's own access key. */
+    private fun addS3Row(): CatalogItem = NestedScreenItem(
+        id = "accounts_storage_add_s3",
+        title = "Add S3 storage",
+        subtitle = "AWS S3, Backblaze B2, Wasabi, Cloudflare R2, MinIO or Garage, with your own access key",
+        inline = CatalogScreen(
+            id = "accounts_storage_add_s3_screen",
+            title = "Add S3 storage",
+            groups = {
+                listOf(
+                    CatalogGroup(
+                        id = "accounts_storage_add_s3_group",
+                        title = null,
+                        items = listOf(
+                            TextInputItem(
+                                id = "accounts_storage_add_s3_endpoint",
+                                title = "Address",
+                                subtitle = "The service's S3 address, such as https://s3.eu-central-003.backblazeb2.com",
+                                value = s3Endpoint,
+                                onChange = { _, v -> s3Endpoint = v.trim() },
+                            ),
+                            TextInputItem(id = "accounts_storage_add_s3_bucket", title = "Bucket", value = s3Bucket, onChange = { _, v -> s3Bucket = v.trim() }),
+                            TextInputItem(
+                                id = "accounts_storage_add_s3_region",
+                                title = "Region",
+                                subtitle = "Blank is us-east-1",
+                                value = s3Region,
+                                onChange = { _, v -> s3Region = v.trim() },
+                            ),
+                            TextInputItem(id = "accounts_storage_add_s3_access", title = "Access key", value = s3AccessKey, onChange = { _, v -> s3AccessKey = v.trim() }),
+                            TextInputItem(
+                                id = "accounts_storage_add_s3_secret",
+                                title = "Secret key",
+                                subtitle = "Kept locked on this device. A key limited to this bucket works best",
+                                value = "",
+                                secret = true,
+                                onChange = { _, v -> s3SecretKey = v },
+                            ),
+                            TextInputItem(
+                                id = "accounts_storage_add_s3_folder",
+                                title = "Folder",
+                                subtitle = "Inside the bucket; blank is its top",
+                                value = s3Folder,
+                                onChange = { _, v -> s3Folder = v.trim() },
+                            ),
+                            TextInputItem(
+                                id = "accounts_storage_add_s3_name",
+                                title = "Name",
+                                subtitle = "How it is listed; the bucket's name when left blank",
+                                value = s3Name,
+                                onChange = { _, v -> s3Name = v },
+                            ),
+                            ToggleItem(
+                                id = "accounts_storage_add_s3_host",
+                                title = "Bucket subdomain",
+                                subtitle = BUCKET_IN_HOST_LINE,
+                                current = s3BucketInHost,
+                                onToggle = { _, on -> s3BucketInHost = on },
+                            ),
+                            ToggleItem(
+                                id = "accounts_storage_add_s3_plain",
+                                title = "Allow unencrypted",
+                                subtitle = "Only for a service on your own network: requests and files travel readable",
+                                current = s3PlainHttp,
+                                onToggle = { _, on -> s3PlainHttp = on },
+                            ),
+                            ChoiceItem(
+                                id = "accounts_storage_add_s3_trusted",
+                                title = "What droidtop writes",
+                                subtitle = trustLine(s3Trusted),
+                                options = trustOptions,
+                                current = if (s3Trusted) TRUSTED else LOCKED,
+                                onSelect = { _, v -> s3Trusted = v == TRUSTED },
+                            ),
+                            AsyncActionItem(
+                                id = "accounts_storage_add_s3_run",
+                                title = "Add and test",
+                                run = { ctx, _ ->
+                                    val added = withContext(Dispatchers.IO) {
+                                        StorageShares.addS3(
+                                            ctx, s3Name, s3Endpoint, s3Bucket, s3Region, s3AccessKey, s3SecretKey, s3Folder,
+                                            s3BucketInHost, s3PlainHttp, s3Trusted,
+                                        )
+                                    }
+                                    when (added) {
+                                        is StorageShares.Added.Refused -> added.reason
+                                        is StorageShares.Added.Share -> {
+                                            s3Name = ""; s3Endpoint = ""; s3Bucket = ""; s3Region = ""; s3AccessKey = ""; s3SecretKey = ""
+                                            s3Folder = ""; s3BucketInHost = false; s3PlainHttp = false; s3Trusted = false
+                                            "Added. " + withContext(Dispatchers.IO) { StorageShares.test(ctx, added.share) }
+                                        }
+                                    }
+                                },
+                            ),
+                        ),
+                    ),
+                )
+            },
+        ),
+    )
 
     /** Add share: a WebDAV address and the person's own sign-in. More kinds join this screen as their backends land. */
     private fun addRow(): CatalogItem = NestedScreenItem(

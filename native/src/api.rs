@@ -30,7 +30,7 @@ use droidtop_agent_core::proto::{check_announcements, Announcements, GameRef, Re
 use droidtop_agent_core::saves::{prefix_roots, Roots};
 use droidtop_agent_core::savesync::{self, SaveSyncRequest, Side};
 use droidtop_agent_core::{hex, Error, PAIR_PORT, PORT};
-use net_remote::{Error as RemoteError, Remote, RemotePath, WebDav, WebDavConfig};
+use net_remote::{Error as RemoteError, Remote, RemotePath, S3Config, WebDav, WebDavConfig, S3};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -86,6 +86,7 @@ pub fn call(op: &str, args: &str) -> String {
         Err(Failure::Unreachable(m)) => json!({ "unreachable": m }).to_string(),
         Err(Failure::NotPaired(m)) => json!({ "error": m, "code": droidtop_agent_core::proto::NOT_PAIRED }).to_string(),
         Err(Failure::Coded(code, m)) => json!({ "error": m, "code": code }).to_string(),
+        Err(Failure::HostKey(code, fingerprint, m)) => json!({ "error": m, "code": code, "fingerprint": fingerprint }).to_string(),
     }
 }
 
@@ -96,6 +97,9 @@ enum Failure {
     NotPaired(String),
     /// A failure droidtop tells apart by its code (a share's sign-in refused, an unencrypted address).
     Coded(&'static str, String),
+    /// An SFTP server's key is not the accepted one: the code, the key the server showed (its SHA-256
+    /// fingerprint, for the person to check and accept), and the words.
+    HostKey(&'static str, String, String),
 }
 
 impl From<Error> for Failure {
@@ -734,7 +738,9 @@ fn share_post_saves(args: &Value) -> Outcome {
 //
 // The person's own shares that droidtop reaches itself, through lib-net's share
 // client (Droidtop/tracker#573), named in `share`:
-// `{"kind": "webdav", "url", "user", "password", "allow_plain_http"}`.
+// - `{"kind": "webdav", "url", "user", "password", "allow_plain_http"}`;
+// - `{"kind": "s3", "endpoint", "bucket", "region", "access_key", "secret_key", "folder", "path_style",
+//   "allow_plain_http"}`.
 
 /// The share named in [`args`]' `share`, or None when there is none.
 fn share_of(args: &Value) -> Result<Option<Box<dyn Remote>>, Failure> {
@@ -752,6 +758,19 @@ fn share_of(args: &Value) -> Result<Option<Box<dyn Remote>>, Failure> {
             }
             Ok(Some(Box::new(WebDav::new(config).map_err(remote_failure)?)))
         }
+        "s3" => {
+            let endpoint = text("endpoint").ok_or_else(|| Failure::Coded("bad_address", "the share has no address".into()))?;
+            let bucket = text("bucket").ok_or_else(|| Failure::Coded("bad_address", "the share has no bucket".into()))?;
+            let mut config =
+                S3Config::new(endpoint, bucket, text("access_key").unwrap_or_default(), text("secret_key").unwrap_or_default())
+                    .folder(text("folder").unwrap_or_default())
+                    .path_style(share["path_style"].as_bool().unwrap_or(true))
+                    .allow_plain_http(share["allow_plain_http"].as_bool().unwrap_or(false));
+            if let Some(region) = text("region") {
+                config = config.region(region);
+            }
+            Ok(Some(Box::new(S3::new(config).map_err(remote_failure)?)))
+        }
         other => Err(Failure::Error(format!("droidtop does not know shares of kind {other:?}"))),
     }
 }
@@ -766,6 +785,8 @@ fn remote_failure(e: RemoteError) -> Failure {
         RemoteError::BadPath(_) => Failure::Coded("bad_address", message),
         RemoteError::NotFound(_) => Failure::Coded("not_found", message),
         RemoteError::Refused(_) => Failure::Coded("refused", message),
+        RemoteError::HostKeyUnknown(found) => Failure::HostKey("host_key_unknown", found, message),
+        RemoteError::HostKeyChanged { found, .. } => Failure::HostKey("host_key_changed", found, message),
         _ => Failure::Error(message),
     }
 }

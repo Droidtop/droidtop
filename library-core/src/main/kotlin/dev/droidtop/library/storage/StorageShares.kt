@@ -28,6 +28,12 @@ data class StorageShare(
     /** The share's own words for the last failure, shown under the state. */
     val stateDetail: String? = null,
     val testedAtMs: Long = 0,
+    /** S3: the bucket, its region, and the folder inside it the share starts at. [url] is the service's address. */
+    val bucket: String = "",
+    val region: String = "",
+    val folder: String = "",
+    /** S3: address the bucket as `<bucket>.<server>` (AWS's way) instead of `<server>/<bucket>` (most others). */
+    val bucketInHost: Boolean = false,
 ) {
     val passwordKey: String get() = "droidtop_share_${id}_password"
 
@@ -35,6 +41,7 @@ data class StorageShare(
         .put("id", id).put("name", name).put("kind", kind).put("url", url).put("user", user)
         .put("allow_plain_http", allowPlainHttp).put("trusted", trusted)
         .put("state", state).put("state_detail", stateDetail).put("tested_at", testedAtMs)
+        .put("bucket", bucket).put("region", region).put("folder", folder).put("bucket_in_host", bucketInHost)
 
     companion object {
         fun fromJson(o: JSONObject): StorageShare? {
@@ -52,6 +59,10 @@ data class StorageShare(
                 state = o.optString("state").ifBlank { StorageShares.NOT_TESTED },
                 stateDetail = o.optString("state_detail").takeIf { it.isNotBlank() && it != "null" },
                 testedAtMs = o.optLong("tested_at"),
+                bucket = o.optString("bucket"),
+                region = o.optString("region"),
+                folder = o.optString("folder"),
+                bucketInHost = o.optBoolean("bucket_in_host"),
             )
         }
     }
@@ -67,6 +78,7 @@ object StorageShares {
     private const val KEY = "shares"
 
     const val WEBDAV = "webdav"
+    const val S3 = "s3"
 
     const val NOT_TESTED = "not_tested"
     const val CONNECTED = "connected"
@@ -142,12 +154,62 @@ object StorageShares {
         return Added.Share(share)
     }
 
+    /**
+     * Adds an S3-compatible share (AWS, Backblaze B2, Wasabi, Cloudflare R2, MinIO, Garage): the service's address, a
+     * bucket and the person's own access key, whose secret goes to the vault.
+     */
+    fun addS3(
+        context: Context,
+        name: String,
+        endpoint: String,
+        bucket: String,
+        region: String,
+        accessKey: String,
+        secretKey: String,
+        folder: String,
+        bucketInHost: Boolean,
+        allowPlainHttp: Boolean,
+        trusted: Boolean,
+    ): Added {
+        addressProblem(endpoint, allowPlainHttp)?.let { return Added.Refused(it.replace("A WebDAV address", "An S3 address")) }
+        bucketProblem(bucket)?.let { return Added.Refused(it) }
+        if (accessKey.isBlank() || secretKey.isBlank()) return Added.Refused("Type the access key and its secret")
+        val share = StorageShare(
+            id = UUID.randomUUID().toString().replace("-", "").take(12),
+            name = name.trim().ifBlank { bucket.trim() },
+            kind = S3,
+            url = endpoint.trim(),
+            user = accessKey.trim(),
+            allowPlainHttp = allowPlainHttp,
+            trusted = trusted,
+            bucket = bucket.trim(),
+            region = region.trim(),
+            folder = folder.trim().trim('/'),
+            bucketInHost = bucketInHost,
+        )
+        CredentialStore.put(context, share.passwordKey, secretKey)
+        write(context, read(context) + share)
+        return Added.Share(share)
+    }
+
+    /** Why [bucket] can't be an S3 bucket's name, or null when it can (S3's naming rules, loosely). Pure. */
+    fun bucketProblem(bucket: String): String? {
+        val b = bucket.trim()
+        return when {
+            b.isEmpty() -> "Type the bucket's name"
+            b.length < 3 || b.length > 63 -> "A bucket's name is 3 to 63 characters long"
+            !b.all { it.isLowerCase() || it.isDigit() || it == '-' || it == '.' } -> "A bucket's name has only small letters, digits, - and ."
+            else -> null
+        }
+    }
+
     /** Changes [id] with [change]; a change to where it is or how it signs in clears its state, so it is tested again. */
     fun update(context: Context, id: String, change: (StorageShare) -> StorageShare) {
         write(context, read(context).map { old ->
             if (old.id != id) return@map old
             val new = change(old).copy(id = old.id)
-            val reached = new.url != old.url || new.user != old.user || new.allowPlainHttp != old.allowPlainHttp
+            val reached = new.url != old.url || new.user != old.user || new.allowPlainHttp != old.allowPlainHttp ||
+                new.bucket != old.bucket || new.region != old.region || new.folder != old.folder || new.bucketInHost != old.bucketInHost
             if (reached) new.copy(state = NOT_TESTED, stateDetail = null, testedAtMs = 0) else new
         })
     }
@@ -167,12 +229,28 @@ object StorageShares {
     }
 
     /** What droidtop's native library is given to reach [share], with its password from the vault. Never logged. */
-    fun nativeArgs(context: Context, share: StorageShare): JSONObject = JSONObject()
-        .put("kind", share.kind)
-        .put("url", share.url)
-        .put("user", share.user)
-        .put("password", CredentialStore.get(context, share.passwordKey))
-        .put("allow_plain_http", share.allowPlainHttp)
+    fun nativeArgs(context: Context, share: StorageShare): JSONObject =
+        nativeArgsFor(share, CredentialStore.get(context, share.passwordKey))
+
+    /** [nativeArgs] with the password or secret given. Pure. */
+    fun nativeArgsFor(share: StorageShare, secret: String): JSONObject = when (share.kind) {
+        S3 -> JSONObject()
+            .put("kind", S3)
+            .put("endpoint", share.url)
+            .put("bucket", share.bucket)
+            .put("region", share.region.ifBlank { "us-east-1" })
+            .put("access_key", share.user)
+            .put("secret_key", secret)
+            .put("folder", share.folder)
+            .put("path_style", !share.bucketInHost)
+            .put("allow_plain_http", share.allowPlainHttp)
+        else -> JSONObject()
+            .put("kind", WEBDAV)
+            .put("url", share.url)
+            .put("user", share.user)
+            .put("password", secret)
+            .put("allow_plain_http", share.allowPlainHttp)
+    }
 
     /**
      * Asks [share] whether it answers with its sign-in (its top folder is listed), keeps the state, and returns the

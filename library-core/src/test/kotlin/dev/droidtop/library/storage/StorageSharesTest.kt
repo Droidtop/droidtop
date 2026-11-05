@@ -48,6 +48,40 @@ class StorageSharesTest {
     }
 
     @Test
+    fun anS3ShareTellsTheNativeLibraryItsBucketAndKey() {
+        val share = StorageShare(
+            id = "s3id", name = "Backups", kind = StorageShares.S3, url = "https://s3.eu-central-003.backblazeb2.com",
+            user = "AKIAEXAMPLE", allowPlainHttp = false, trusted = false,
+            bucket = "my-droidtop", region = "eu-central-003", folder = "handheld", bucketInHost = false,
+        )
+        val args = StorageShares.nativeArgsFor(share, "the secret")
+        assertEquals("s3", args.getString("kind"))
+        assertEquals("https://s3.eu-central-003.backblazeb2.com", args.getString("endpoint"))
+        assertEquals("my-droidtop", args.getString("bucket"))
+        assertEquals("eu-central-003", args.getString("region"))
+        assertEquals("AKIAEXAMPLE", args.getString("access_key"))
+        assertEquals("the secret", args.getString("secret_key"))
+        assertEquals("handheld", args.getString("folder"))
+        assertTrue(args.getBoolean("path_style"))
+        // The stored list keeps the bucket and folder, never the secret.
+        val text = JSONArray().put(share.toJson()).toString()
+        assertFalse(text.contains("the secret"))
+        assertEquals(listOf(share), StorageShares.parse(text))
+        // A region left blank is S3's default.
+        assertEquals("us-east-1", StorageShares.nativeArgsFor(share.copy(region = ""), "x").getString("region"))
+        assertEquals("webdav", StorageShares.nativeArgsFor(share.copy(kind = StorageShares.WEBDAV), "x").getString("kind"))
+    }
+
+    @Test
+    fun bucketNamesFollowS3sRules() {
+        assertNull(StorageShares.bucketProblem("my-droidtop.saves"))
+        assertNotNull(StorageShares.bucketProblem(""))
+        assertNotNull(StorageShares.bucketProblem("ab"))
+        assertNotNull(StorageShares.bucketProblem("My_Bucket"))
+        assertNotNull(StorageShares.bucketProblem("a".repeat(64)))
+    }
+
+    @Test
     fun aShareWithNoTrustAnswerIsNotTrusted() {
         val parsed = StorageShares.parse("""[{"id":"x","url":"https://a.example/"},{"name":"no id"}]""")
         assertEquals(1, parsed.size)
