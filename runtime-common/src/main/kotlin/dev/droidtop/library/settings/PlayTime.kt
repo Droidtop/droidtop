@@ -124,6 +124,27 @@ sealed interface PlayStep {
  * the grace. Pure, so the order and the once-only rule are tested (PlayTimeTest). A new instance per game
  * session; [step] is given the clock and the seconds remaining ([PlayTime.remainingSeconds], null for no limit).
  */
+/**
+ * The session timers outside Kid mode (docs/SPEC.md 7f "This session", Droidtop/tracker#721): a reminder every
+ * [SessionTimers.remindMinutes] of one game session, and the game closed after [SessionTimers.closeMinutes], the
+ * way a Kid limit closes it ([PlayEnforcer], the same warning and grace). 0 is off. Counted from the session's start,
+ * not the day's play. Pure.
+ */
+data class SessionTimers(val remindMinutes: Int = 0, val closeMinutes: Int = 0) {
+    /** How many whole reminder intervals [playedSeconds] of this session has passed; 0 with no reminder. */
+    fun remindersDue(playedSeconds: Long): Int =
+        if (remindMinutes <= 0) 0 else (playedSeconds.coerceAtLeast(0L) / (remindMinutes * 60L)).toInt()
+
+    /** The seconds left before the game is closed, for [PlayEnforcer.step]; null with no close timer. */
+    fun closeRemainingSeconds(playedSeconds: Long): Long? =
+        if (closeMinutes <= 0) null else closeMinutes * 60L - playedSeconds
+
+    companion object {
+        val REMIND_CHOICES: List<Int> = listOf(0, 30, 60, 90, 120)
+        val CLOSE_CHOICES: List<Int> = listOf(0, 30, 60, 90, 120, 180)
+    }
+}
+
 class PlayEnforcer(
     private val warnBeforeSeconds: Long = PlayTime.WARN_BEFORE_SECONDS,
     private val graceSeconds: Long = PlayTime.GRACE_SECONDS,
@@ -179,6 +200,23 @@ object PlayTimePrefs {
     }
 
     fun ledger(context: Context): Map<Long, Long> = PlayTime.parse(prefs(context).getString(KEY_LEDGER, null))
+
+    const val KEY_REMIND = "droidtop_session_remind_min"
+    const val KEY_CLOSE = "droidtop_session_close_min"
+
+    /** The session timers outside Kid mode ([SessionTimers]). */
+    fun sessionTimers(context: Context): SessionTimers {
+        val p = prefs(context)
+        return SessionTimers(p.getInt(KEY_REMIND, 0).coerceAtLeast(0), p.getInt(KEY_CLOSE, 0).coerceAtLeast(0))
+    }
+
+    fun setRemind(context: Context, minutes: Int) {
+        prefs(context).edit().putInt(KEY_REMIND, minutes.coerceAtLeast(0)).apply()
+    }
+
+    fun setClose(context: Context, minutes: Int) {
+        prefs(context).edit().putInt(KEY_CLOSE, minutes.coerceAtLeast(0)).apply()
+    }
 
     /** Adds the play from [startMs] to [endMs] to the ledger. */
     @Synchronized

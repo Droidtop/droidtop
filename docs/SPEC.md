@@ -13726,6 +13726,16 @@ is the limits' only measure (per-game time is "Your play", below), and counts
 droidtop's own running-game state, so a game droidtop never saw start is not
 counted.
 
+**This session (Droidtop/tracker#721).** The same page's first group is for the
+person's own play outside Kid mode: **Remind me every** (Off, 30 min, 1 h, 1 h
+30 min, 2 h) and **Close the game after** (Off, 30 min to 3 h), both off by
+default and counted from the start of each game session, not the day's play
+(`SessionTimers`, `PlayTimePrefs.sessionTimers`). `PlayTimeLimiter`'s tick
+says "You have played for 1 h. Time for a break?" each whole interval, as a
+toast and a notification, and the close timer runs through a second
+`PlayEnforcer`: the warning five minutes before, "Your time is up" with the same
+60 seconds, then `Library.quitRunning`. In Kid mode only Kid's limits apply.
+
 **Your play (2026-10-29, Droidtop/tracker#597).** UI review 265: "There is no
 play-time summary anywhere: no total, no per-system, no 'this week'". Kid mode's
 ledger counts all play together, and only in Kid, for its limits. The same

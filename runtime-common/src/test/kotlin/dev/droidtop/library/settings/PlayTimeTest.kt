@@ -102,4 +102,31 @@ class PlayTimeTest {
         assertEquals(PlayStep.Warn(3), e.step(20_000, 150))
         assertTrue(e.step(30_000, 100) is PlayStep.None)
     }
+
+    // Droidtop/tracker#721: the session timers outside Kid mode.
+    @Test
+    fun `a reminder is due once per whole interval of the session`() {
+        val timers = SessionTimers(remindMinutes = 30)
+        assertEquals(0, timers.remindersDue(29 * 60L))
+        assertEquals(1, timers.remindersDue(30 * 60L))
+        assertEquals(2, timers.remindersDue(65 * 60L))
+        assertEquals(0, SessionTimers().remindersDue(10_000L))
+    }
+
+    @Test
+    fun `the close timer counts down from the session start and is off at 0`() {
+        assertEquals(null, SessionTimers().closeRemainingSeconds(100L))
+        assertEquals(60L * 60 - 100, SessionTimers(closeMinutes = 60).closeRemainingSeconds(100L))
+    }
+
+    @Test
+    fun `the close timer warns, says time is up, then quits after the grace, as a Kid limit does`() {
+        val timers = SessionTimers(closeMinutes = 60)
+        val enforcer = PlayEnforcer()
+        assertEquals(PlayStep.None, enforcer.step(0L, timers.closeRemainingSeconds(50 * 60L)))
+        assertEquals(PlayStep.Warn(5), enforcer.step(0L, timers.closeRemainingSeconds(55 * 60L)))
+        assertEquals(PlayStep.TimeUp(PlayTime.GRACE_SECONDS), enforcer.step(1_000L, timers.closeRemainingSeconds(60 * 60L)))
+        assertEquals(PlayStep.None, enforcer.step(30_000L, timers.closeRemainingSeconds(60 * 60L + 30)))
+        assertEquals(PlayStep.Quit, enforcer.step(61_000L, timers.closeRemainingSeconds(60 * 60L + 61)))
+    }
 }

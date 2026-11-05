@@ -34,7 +34,9 @@ import kotlinx.coroutines.withContext
  * ([dev.droidtop.library.Library.quitRunning]), so the emulator saves the way a Quit from the Quick Menu does.
  * Watched from the process, not from a screen: the game is another app and no shell of droidtop is in front.
  * Nothing runs for a person who has set no limit beyond one prefs read per tick, and nothing at all while no
- * game runs. In every mode it also adds the session to the game's own play time ([PlayLogStore], docs/SPEC.md 7f
+ * game runs. Outside Kid mode the session timers do the same for one session (docs/SPEC.md 7f "This session",
+ * Droidtop/tracker#721): a reminder every so many minutes, and the game closed after a set time through its own
+ * [PlayEnforcer], with the same warning and grace. In every mode it also adds the session to the game's own play time ([PlayLogStore], docs/SPEC.md 7f
  * "Your play", Droidtop/tracker#597).
  */
 object PlayTimeLimiter {
@@ -63,7 +65,10 @@ object PlayTimeLimiter {
     /** One game session: runs until the game ends (the collector cancels it). */
     private suspend fun watch(app: Context, game: dev.droidtop.library.LaunchContext) {
         val enforcer = PlayEnforcer()
-        var last = System.currentTimeMillis()
+        val sessionEnforcer = PlayEnforcer()
+        val started = System.currentTimeMillis()
+        var reminded = 0
+        var last = started
         val (title, system) = withContext(Dispatchers.IO) { nameOf(app, game) }
         try {
             while (true) {
@@ -73,7 +78,22 @@ object PlayTimeLimiter {
                 if (kid) PlayTimePrefs.record(app, last, now)
                 PlayLogStore.record(app, game.gameId, title, system, last, now)
                 last = now
-                if (!kid) continue
+                if (!kid) {
+                    val timers = PlayTimePrefs.sessionTimers(app)
+                    val played = (now - started) / 1000L
+                    val due = timers.remindersDue(played)
+                    if (due > reminded) {
+                        reminded = due
+                        tell(app, "You have played for ${dev.droidtop.library.settings.PlayTime.duration(due * timers.remindMinutes * 60L)}", "Time for a break?")
+                    }
+                    when (val step = sessionEnforcer.step(now, timers.closeRemainingSeconds(played))) {
+                        PlayStep.None -> Unit
+                        is PlayStep.Warn -> tell(app, "The game closes soon", "${step.minutesLeft} minutes left of the time you set. Save your game.")
+                        is PlayStep.TimeUp -> tell(app, "Your time is up", "The game closes in ${step.graceSeconds} seconds. Save your game.")
+                        PlayStep.Quit -> quit(app)
+                    }
+                    continue
+                }
                 val (limits, today, week) = PlayTimePrefs.snapshot(app, now)
                 if (!limits.any) continue
                 when (val step = enforcer.step(now, PlayTime.remainingSeconds(limits, today, week))) {

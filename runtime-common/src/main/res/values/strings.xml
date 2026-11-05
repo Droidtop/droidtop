@@ -5,8 +5,15 @@
 -->
 <resources>
     <string name="play_time_play_time">Play time</string>
-    <string name="play_time_limits_for_kid_mode">Limits for Kid mode</string>
-    <string name="play_time_daily_and_weekly_limits_for">Daily and weekly limits for Kid mode</string>
+    <string name="play_time_this_session">This session</string>
+    <string name="play_time_kid_mode">Kid mode</string>
+    <string name="play_time_off">Off</string>
+    <string name="play_time_remind_me_every">Remind me every</string>
+    <string name="play_time_remind_subtitle">A note over the game each time, outside Kid mode</string>
+    <string name="play_time_close_the_game_after">Close the game after</string>
+    <string name="play_time_close_subtitle">A warning five minutes before, then it closes as Quit does, outside Kid mode</string>
+    <string name="play_time_limits_for_kid_mode">Session timers, and limits for Kid mode</string>
+    <string name="play_time_daily_and_weekly_limits_for">Session timers, and Kid mode\'s daily and weekly limits</string>
     <string name="play_time_each_day">Each day</string>
     <string name="play_time_all_games_together">All games together</string>
     <string name="play_time_each_week">Each week</string>
