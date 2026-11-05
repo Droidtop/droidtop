@@ -67,7 +67,19 @@ class LauncherSearchActivity : ComponentActivity() {
                                 icon = hit.icon,
                                 open = { LauncherSearch.launch(this@LauncherSearchActivity, hit) },
                             )
-                        }
+                        } +
+                            // The apps' own shortcuts (Droidtop/tracker#704), read off the main thread.
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                LauncherSearch.findShortcuts(applicationContext, query)
+                            }.map { hit ->
+                                LauncherSearchApp(
+                                    key = "shortcut:${hit.info.`package`}/${hit.info.id}",
+                                    title = hit.title,
+                                    icon = hit.icon,
+                                    open = { LauncherSearch.launch(this@LauncherSearchActivity, hit) },
+                                    detail = "Shortcut · ${hit.appTitle}",
+                                )
+                            }
                     },
                     // The game's page on the Games screen, where Play or Install is (docs/SPEC.md 12a). Standard gives
                     // PC and engine games a page; any other game starts as before.

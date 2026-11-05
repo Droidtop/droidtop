@@ -75,6 +75,71 @@ object LauncherSearch {
             }
         }
 
+    /** An app shortcut that matches a query (Droidtop/tracker#704): its label, its app's name, and its icon if any. */
+    class ShortcutHit(
+        val title: String,
+        val appTitle: String,
+        val icon: Bitmap?,
+        val info: android.content.pm.ShortcutInfo,
+    )
+
+    @Volatile private var shortcutCache: Pair<Long, List<ShortcutHit>>? = null
+    private const val SHORTCUT_CACHE_MS = 30_000L
+    private const val MAX_SHORTCUTS = 6
+
+    /**
+     * The apps' shortcuts (static, dynamic and pinned, every profile) whose label matches every word of [query], with
+     * the drawer's own rule for words. Android serves them only to the default launcher
+     * ([LauncherApps.hasShortcutHostPermission]), so nothing is offered when droidtop is not Home. The list is read
+     * once and kept [SHORTCUT_CACHE_MS], so typing filters it in memory. Off the main thread.
+     */
+    fun findShortcuts(context: Context, query: String): List<ShortcutHit> {
+        if (query.isBlank()) return emptyList()
+        val all = allShortcuts(context.applicationContext)
+        val lower = query.lowercase()
+        val matcher = StringMatcherUtility.StringMatcher.getInstance()
+        return all.filter { StringMatcherUtility.matches(lower, it.title, matcher) }.take(MAX_SHORTCUTS)
+    }
+
+    private fun allShortcuts(app: Context): List<ShortcutHit> {
+        val now = android.os.SystemClock.elapsedRealtime()
+        shortcutCache?.takeIf { now - it.first < SHORTCUT_CACHE_MS }?.let { return it.second }
+        val apps = app.getSystemService(LauncherApps::class.java)
+        if (!runCatching { apps.hasShortcutHostPermission() }.getOrDefault(false)) return emptyList()
+        val query = LauncherApps.ShortcutQuery().setQueryFlags(
+            LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST or
+                LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED,
+        )
+        val density = app.resources.displayMetrics.densityDpi
+        val pm = app.packageManager
+        val hits = app.getSystemService(UserManager::class.java).userProfiles.flatMap { user ->
+            runCatching { apps.getShortcuts(query, user).orEmpty() }.getOrDefault(emptyList())
+        }.filter { it.isEnabled }.distinctBy { it.`package` to it.id }.map { info ->
+            val label = (info.shortLabel ?: info.longLabel)?.toString().orEmpty()
+            val appTitle = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(info.`package`, 0)).toString() }.getOrDefault(info.`package`)
+            val icon = runCatching { apps.getShortcutIconDrawable(info, density)?.let(::toBitmap) }.getOrNull()
+            ShortcutHit(label, appTitle, icon, info)
+        }.filter { it.title.isNotBlank() }
+        shortcutCache = now to hits
+        return hits
+    }
+
+    private fun toBitmap(drawable: android.graphics.drawable.Drawable): Bitmap {
+        val size = 96
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        drawable.setBounds(0, 0, size, size)
+        drawable.draw(canvas)
+        return bitmap
+    }
+
+    /** Starts [hit] through the platform's launcher API, as a long-pressed icon's shortcut does. */
+    fun launch(context: Context, hit: ShortcutHit) {
+        runCatching {
+            context.getSystemService(LauncherApps::class.java).startShortcut(hit.info, null, null)
+        }
+    }
+
     /** Opens [hit] the way the launcher's own icons do: through the platform's launcher API, for its user. */
     fun launch(context: Context, hit: AppHit) {
         context.getSystemService(LauncherApps::class.java)

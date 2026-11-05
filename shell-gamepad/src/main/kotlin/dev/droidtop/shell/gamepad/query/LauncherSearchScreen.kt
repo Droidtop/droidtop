@@ -35,6 +35,8 @@ class LauncherSearchApp(
     val title: String,
     val icon: Bitmap?,
     val open: () -> Unit,
+    /** The row's second line; null reads "App". An app shortcut names its app ("Shortcut · Maps"). */
+    val detail: String? = null,
 )
 
 /**
@@ -114,7 +116,7 @@ fun LauncherSearchScreen(
             ),
             local = { text ->
                 val apps = findApps(text).map { app ->
-                    LocalSearchRow(app.key, SearchRowKind.APP, app.title, APP_DETAIL, app.icon, app.open)
+                    LocalSearchRow(app.key, SearchRowKind.APP, app.title, app.detail ?: APP_DETAIL, app.icon, app.open)
                 }
                 val matching = playable.filter { matchesSearchText(it, text) }.take(MAX_GAME_ROWS).map { game ->
                     // The detail says whether it is here, so the places of one game (docs/SPEC.md 12a) say which one is installed.
