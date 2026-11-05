@@ -35,10 +35,11 @@ import dev.droidtop.ui.shared.JobRing
  * inside a ring that fills as it goes or turns while it does not know, and a small count when more than one thing
  * runs. Nothing is drawn while nothing runs. It lives on the status pill, so Home's band and the pill floating over
  * every other page carry the same spot. A tap opens where the jobs are ([onOpen], the Quick Menu's Downloads tab);
- * touch only, never a stop of the pad, as nothing in the top bar is.
+ * touch only, never a stop of the pad, as nothing in the top bar is. The companion's status line draws the same spot,
+ * opening its droidtop > Downloads page (Droidtop/tracker#786 S5).
  */
 @Composable
-internal fun ActivitySpot(onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun ActivitySpot(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val jobs by remember { PluginJobsCenter.entries() }.collectAsState()
     // One job on the spot while it runs, its fill only moving forward (Droidtop/tracker#834).
     val held = remember { HappeningNow.Held() }

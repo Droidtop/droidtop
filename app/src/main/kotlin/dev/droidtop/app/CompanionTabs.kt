@@ -488,6 +488,11 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                     if (requested != null) {
                         CompanionPill("Hide keyboard", selected = true) { KeyboardTargets.hideCompanion() }
                     }
+                    // What is happening now (Droidtop/tracker#786 S5, #742): the shell's one activity spot, here too; a tap
+                    // opens droidtop > Downloads, where the jobs are. Nothing is drawn while nothing runs.
+                    if (bar.all.any { it.id == CompanionTab.DROIDTOP.id || it.id == CompanionTab.DOWNLOADS.id }) {
+                        dev.droidtop.shell.gamepad.ActivitySpot(onOpen = { showTab(CompanionTab.DOWNLOADS) })
+                    }
                     if (immersive) {
                         StatusCluster(showBatteryPercent = true, onClick = { showTab(CompanionTab.SYSTEM) })
                     }
