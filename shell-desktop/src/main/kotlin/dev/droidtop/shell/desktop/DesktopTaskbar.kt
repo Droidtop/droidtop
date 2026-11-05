@@ -36,6 +36,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -164,13 +166,27 @@ internal fun BoxScope.Taskbar(
     val ownScreens by OwnScreens.open.collectAsState()
     // On a narrow screen the buttons alone fill the bar, and a Row gives its weighted child only what is left: the
     // window list had no width at all on a 411 dp phone, so foot, Enginehost and Settings were open and nowhere on
-    // the bar (Droidtop/tracker#750, rig 2638). Below [BAR_ONE_ROW_MIN] the pins and windows take a strip of their own.
+    // the bar (Droidtop/tracker#750, rig 2638). When the bar's own items leave the window list less than
+    // [WINDOW_LIST_MIN], the pins and windows take a strip of their own. That is worked out from what the items measure,
+    // not from the screen's width: on the 2026-11-04 rig the AVD's bar was 639 dp at the canvas density, over the 600 dp
+    // cut-off this replaced, and Start, Modes, Companion, Clipboard and the tray filled it, so with Foot and PCManFM open
+    // the bar had no window button (Droidtop/tracker#689, #686). Each item's width is the same in either layout, so the
+    // choice does not flip back and forth.
+    var startWidth by remember { mutableIntStateOf(0) }
+    var pinsWidth by remember { mutableIntStateOf(0) }
+    var extrasWidth by remember { mutableIntStateOf(0) }
+    var trayWidth by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
     BoxWithConstraints(
         modifier = Modifier
             .align(if (atTop) Alignment.TopStart else Alignment.BottomStart)
             .fillMaxWidth(),
     ) {
-        val oneRow = maxWidth >= BAR_ONE_ROW_MIN
+        val itemsWidth = with(density) { (startWidth + (if (pins.isEmpty()) 0 else pinsWidth) + extrasWidth + trayWidth).toDp() }
+        val oneRow = maxWidth - itemsWidth >= WINDOW_LIST_MIN
+        val pinChips: @Composable () -> Unit = {
+            Box(modifier = Modifier.onSizeChanged { pinsWidth = it.width }) { TaskbarPinChips(pins, onOpenPin, onUnpin) }
+        }
         val strip: @Composable () -> Unit = {
             if (!oneRow && (pins.isNotEmpty() || toplevels.isNotEmpty() || androidApps.isNotEmpty() || ownScreens.isNotEmpty())) {
                 Row(
@@ -180,7 +196,7 @@ internal fun BoxScope.Taskbar(
                         .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TaskbarPinChips(pins, onOpenPin, onUnpin)
+                    pinChips()
                     TaskbarWindowList(hostBridge, toplevels, androidApps, ownScreens, windows, windowIcons, modifier = Modifier.weight(1f))
                 }
             }
@@ -201,7 +217,7 @@ internal fun BoxScope.Taskbar(
                     .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TaskbarButton(onClick = onOpenStartMenu) {
+                TaskbarButton(onClick = onOpenStartMenu, modifier = Modifier.onSizeChanged { startWidth = it.width }) {
                     Text(stringResource(R.string.desktop_start_menu), maxLines = 1, softWrap = false)
                 }
                 Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
@@ -210,16 +226,21 @@ internal fun BoxScope.Taskbar(
                 // screen has one. The mode switcher stays, by name: Desktop's only other route to the Android home or
                 // Gaming is a long-press of Back (SPEC 2c).
                 val extras: @Composable () -> Unit = {
-                    TaskbarButton(onClick = { openModes(context) }) {
-                        Text(stringResource(R.string.desktop_modes), maxLines = 1, softWrap = false)
+                    Row(
+                        modifier = Modifier.onSizeChanged { extrasWidth = it.width },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TaskbarButton(onClick = { openModes(context) }) {
+                            Text(stringResource(R.string.desktop_modes), maxLines = 1, softWrap = false)
+                        }
+                        KeyboardTaskbarItem()
+                        PluginTaskbarItems()
+                        CompanionTaskbarItem()
+                        ClipboardNotice()
                     }
-                    KeyboardTaskbarItem()
-                    PluginTaskbarItems()
-                    CompanionTaskbarItem()
-                    ClipboardNotice()
                 }
                 if (oneRow) {
-                    TaskbarPinChips(pins, onOpenPin, onUnpin)
+                    pinChips()
                     TaskbarWindowList(hostBridge, toplevels, androidApps, ownScreens, windows, windowIcons, modifier = Modifier.weight(1f))
                     extras()
                 } else {
@@ -233,7 +254,7 @@ internal fun BoxScope.Taskbar(
                         verticalAlignment = Alignment.CenterVertically,
                     ) { extras() }
                 }
-                SystemTray(onClick = onOpenQuickMenu)
+                Box(modifier = Modifier.onSizeChanged { trayWidth = it.width }) { SystemTray(onClick = onOpenQuickMenu) }
             }
             if (atTop) {
                 strip()
@@ -243,8 +264,11 @@ internal fun BoxScope.Taskbar(
     }
 }
 
-/** The narrowest bar that keeps the pins and the window list beside the buttons (docs/SPEC.md 2b). */
-internal val BAR_ONE_ROW_MIN = 600.dp
+/**
+ * The least width the window list keeps beside the bar's buttons, about one window button; with less, the pins and
+ * windows move to a strip of their own (docs/SPEC.md 2b).
+ */
+internal val WINDOW_LIST_MIN = 200.dp
 
 /**
  * A taskbar button with the narrow padding a bar needs. The stock Button's
