@@ -170,6 +170,7 @@ dependencies {
     implementation(libs.xz)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     // Throwaway certificates for the signature tests (docs/SPEC.md 12a); test-only, never shipped.
     testImplementation(project(":test-pki"))
     // RomDatabaseMigrationTest walks the game_metadata migration chain over

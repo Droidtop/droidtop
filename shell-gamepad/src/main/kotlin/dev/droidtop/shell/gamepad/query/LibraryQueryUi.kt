@@ -649,7 +649,11 @@ internal fun LibrarySearchDialog(
                 keep = { result -> currentFilter?.invoke(result) ?: true },
                 featuredWhenEmpty = getGames,
             )
-        }.collect { state = it }
+        }
+            // At most one new state every 150 ms, always the newest (UnifiedSearch.pacedAtMost, Droidtop/tracker#915): every
+            // state rebuilds the whole result list on the main thread, and several sources answering together sent many.
+            .let { with(UnifiedSearch) { it.pacedAtMost() } }
+            .collect { state = it }
     }
 
     // Opening a source's result: its destination is worked out off the main thread, then its detail opens. The row is

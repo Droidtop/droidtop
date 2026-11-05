@@ -8,6 +8,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -257,6 +259,24 @@ object UnifiedSearch {
             .onStart { SourceWarmth.hold(context) }
             .onCompletion { SourceWarmth.release() }
     }
+
+    /**
+     * At most one value every [everyMs], always the newest, and the last one always delivered: what a list drawn on the
+     * main thread applies from [search] (Droidtop/tracker#915). Each source sends several states (starting, ready,
+     * answered), and four sources answering together rebuilt the whole result list on the main thread many times a
+     * second; on a device short of memory that turned typing into "droidtop isn't responding". The first value goes
+     * out at once, so the device's own rows still follow every key.
+     */
+    fun <T> Flow<T>.pacedAtMost(everyMs: Long = APPLY_EVERY_MS): Flow<T> = flow {
+        // conflate: while the delay holds this collector, only the newest value waits upstream.
+        this@pacedAtMost.conflate().collect { value ->
+            emit(value)
+            delay(everyMs)
+        }
+    }
+
+    /** How often [pacedAtMost] lets a new state through. */
+    const val APPLY_EVERY_MS = 150L
 
     /** [search] with the Android parts injected: what the unit tests drive with fake sources. */
     internal fun stream(

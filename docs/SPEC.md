@@ -27739,7 +27739,11 @@ match" for games Gaming listed (console, 2026-10-17).
   (Droidtop/tracker#884: each key recomposed a new set of capsules behind the
   panel, and on a device keeping little file cache, BlueStacks on the rig, that
   paged code in on the UI thread until the field dropped keys and the app stopped
-  responding); the panel's own list still follows every key. The PC search asks the sources for PC games
+  responding); the panel's own list still follows every key. The list takes at
+  most one new state every 150 ms, always the newest, the first at once and the
+  last always (`UnifiedSearch.pacedAtMost`, Droidtop/tracker#915: each source sends
+  several states, starting, ready and answered, and every one rebuilt the whole
+  list on the UI thread; typing fast in Get games on the rig gave an ANR). The PC search asks the sources for PC games
   (`SourceDestinations.PC_PLATFORM`, the plugin API's `windows`) and also drops
   a source's result that names a console system (`SourceDestinations.isPcResult`,
   so a Nyaa PSP or Vita torrent is not a PC result). The result is judged by
