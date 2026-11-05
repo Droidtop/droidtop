@@ -17,9 +17,10 @@ import dev.droidtop.library.settings.Modes
  *
  * - a long-press of the back key (`Activity.onKeyLongPress(KeyEvent.KEYCODE_BACK, ...)`) in the launcher and in
  *   `MainActivity`, the one route from anywhere, though not every device delivers it;
- * - the Android home screen's own long-press menu ("droidtop modes");
+ * - a long-press of Home, Mobile's one route (owner, 2026-10-30, Droidtop/tracker#827; its home screen's
+ *   long-press menu no longer has a row for it);
  * - the Gaming Quick Menu's System tab ("Switch mode");
- * - the Desktop taskbar ("Modes");
+ * - the Desktop taskbar and Start's System section ("Switch mode", the one name, Droidtop/tracker#708);
  * - droidtop's games screen, when it is the only droidtop surface on.
  *
  * Every route opens it through [ModeSwitcher.open]: one translucent activity in `:app` (`ModeSwitcherActivity`)

@@ -551,13 +551,13 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   (`BAR_ONE_ROW_MIN`) used before, and the buttons and tray filled it, so with Foot and PCManFM open the bar had no
   window button and their menus could not be reached.
 - **The Start menu reaches the bar's buttons.** A System section (Terminal while a session runs, Containers,
-  Modes, Settings) is the bar's own four buttons as rows, so a pad with no way to the bar can still open
+  Switch mode, Settings) is the bar's own four buttons as rows, so a pad with no way to the bar can still open
   Settings or the mode switcher and then give the pad back to the container by closing the sheet.
 - **One bar, in droidtop's look** (Droidtop/tracker#555 D4, 2026-10-15). The whole Desktop shell is
   wrapped in `GamingTheme {}`, so the bar, its sheets and the Quick Menu read the palette Gaming reads (the
   active theme's), through `MaterialTheme` and `MenuTokens` alike; the bar's ground is `MenuTokens.Ground`
   and its buttons are flat chips (`MenuTokens.Card`, `RowShape`), not Material's filled pills. droidtop's bar
-  keeps what only Android can do: Start, pins, the running windows and Android apps, Modes, the plugin,
+  keeps what only Android can do: Start, pins, the running windows and Android apps, Switch mode, the plugin,
   companion and clipboard items, and the tray, which opens the Quick Menu. Terminal, Containers and Settings
   are Start's System rows, not bar buttons. The tray is Gaming's status readout (`StatusCluster`, one component,
   Droidtop/tracker#691): the clock in Android's 12 or 24 hour format, the network and battery glyphs with the
@@ -1180,7 +1180,8 @@ finding above) is that app's own fix, not droidtop's.
 **Switching modes is named on every surface (decided 2026-09-25).** The
 mode switcher (`BackButtonMenu`: Mobile, the modes that are on, and
 Settings) opens from a long-press of Back anywhere, and by
-name from Gaming's Quick Menu, System tab ("Switch mode"), and the Desktop taskbar ("Modes"). Mobile's home screen
+name from Gaming's Quick Menu, System tab ("Switch mode"), and the Desktop taskbar and Start's System section ("Switch
+mode" too since 2026-11-05, Droidtop/tracker#708: they read "Modes", a second name for the one sheet). Mobile's home screen
 has no route of its own (owner, 2026-10-30, Droidtop/tracker#827: "Long pressing HOME is what gets the mode switcher.
 Why do we need other routes, we've made the home button the sole controller"): its long-press menu lost its "droidtop
 modes" row, and the left menu Start opens there has no Switch mode. Whether long-press Back, the Quick Menu's row and
