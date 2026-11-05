@@ -2704,7 +2704,7 @@ dependencies = [
 [[package]]
 name = "net-remote"
 version = "0.2.1"
-source = "git+https://github.com/Droidtop/lib-net?rev=5f447d92901734d20af12af5c64f66f83002fecf#5f447d92901734d20af12af5c64f66f83002fecf"
+source = "git+https://github.com/Droidtop/lib-net?tag=v0.2.1#5f447d92901734d20af12af5c64f66f83002fecf"
 dependencies = [
  "base64 0.22.1",
  "httpdate",
