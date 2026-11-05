@@ -7733,6 +7733,15 @@ widens past droidtop's own secrets: even with "All internal storage" on,
 droidtop's private folders and other games' prefixes stay refused (a longer
 `SBX_DENY` rule under the grant).
 
+**Built, Wine side (2026-11-05, Droidtop/tracker#584).** Both toggles are rows in Wine and graphics settings: on a
+game (its own choice, kept as `WineStorageGrants.DEVICE_SYSTEM` and `ALL_STORAGE` and carried as launch overrides) and
+in the shared settings (the shared prefix's extra of the same name, "For every game in the shared prefix"). A game
+whose prefix allows one shows "Allowed by its prefix". At launch `WineStorageGrants` decides `Z:` (`/` only with
+"Device system folders") and the drives that `WineUtils.createDosdevicesSymlinks` links and the launcher binds: a
+drive whose folder is wide is linked only under its toggle, and "All internal storage" adds every mounted volume
+under a free letter. Not built yet: the broker consulting the toggles (with the sandbox lane), the proot side below,
+and a grant's Remove on the game page.
+
 What is "wide" is decided in one place, `WideAccess.classify(folder)` in
 `:runtime-common` (pure, unit-tested): a folder is wide when it is `/`, a
 volume root (`/storage/emulated/N`, `/sdcard`, any `SharedVolume` root), or

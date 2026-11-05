@@ -30,9 +30,9 @@ public abstract class WineUtils {
 
         FileUtils.symlink("../drive_c", dosdevicesPath+"/c:");
         // Z: must point at the resolved imagefs root so the guest sees only opt, home, usr, etc.,
-        // not the parent directory (files) which would expose imagefs_shared, etc.
-        File imagefsRoot = ImageFs.find(context).getRootDir();
-        String zTarget = imagefsRoot.getAbsoluteFile().getCanonicalPath();
+        // not the parent directory (files) which would expose imagefs_shared, etc. The device's own
+        // root only under the "Device system folders" grant (WineStorageGrants, Droidtop/tracker#584).
+        String zTarget = dev.droidtop.runtime.windows.WineStorageGrants.zTarget(context, container);
         FileUtils.symlink(zTarget, dosdevicesPath + "/z:");
 
 
@@ -58,7 +58,10 @@ public abstract class WineUtils {
         }
 
         String gameDirectoryPath = null;
-        for (String[] drive : container.drivesIterator()) {
+        // The drives the grants allow (WineStorageGrants: a whole-volume folder only under "All internal
+        // storage", which also adds every mounted volume), not the stored list as it stands.
+        for (kotlin.Pair<String, String> granted : dev.droidtop.runtime.windows.WineStorageGrants.drives(context, container)) {
+            String[] drive = {granted.getFirst(), granted.getSecond()};
             File linkTarget = new File(drive[1]);
             // Containers saved before the line above carry the old spelling
             // of the same folder; it means this app's own storage.

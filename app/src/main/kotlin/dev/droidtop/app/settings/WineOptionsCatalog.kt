@@ -228,7 +228,7 @@ object WineOptionsCatalog {
             // Frame generation, Steamworks and the translation cache are always a game's own choice, in any prefix.
             !overGame || row.id == WineOptions.LSFG || row.id == WineOptions.STEAMWORKS || row.id == WineOptions.STEAMWORKS_APPID ||
                 row.id == WineOptions.TRANSLATION_CACHE || row.id == WineOptions.PREPARE ||
-                row.id == WineOptions.PREFIX -> row.summary
+                row.id == WineOptions.PREFIX || row.id == WineOptions.GRANT_DEVICE_SYSTEM || row.id == WineOptions.GRANT_ALL_STORAGE -> row.summary
             row.id == WineOptions.WINE -> row.summary + ". Another build gives this game a prefix of its own (a few hundred megabytes); its saves so far stay in the shared one."
             row.ownChoice -> row.summary + ". This game's own choice."
             else -> row.summary + ". The shared setting."

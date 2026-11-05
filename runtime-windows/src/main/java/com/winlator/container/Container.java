@@ -266,7 +266,10 @@ public class Container {
         "graphicsDriver", "graphicsDriverConfig", "dxwrapper", "dxwrapperConfig", "emulator", "box64Version", "fexcoreVersion",
         "lsfgEnabled", "lsfgMultiplier", LAUNCH_ENV,
         // droidtop: a game's own touchscreen gestures over the prefix's (Droidtop/tracker#618 C8).
-        "gestureConfig");
+        "gestureConfig",
+        // droidtop: a game's own wide storage grants (WineStorageGrants, Droidtop/tracker#584).
+        dev.droidtop.runtime.windows.WineStorageGrants.DEVICE_SYSTEM, dev.droidtop.runtime.windows.WineStorageGrants.ALL_STORAGE,
+        dev.droidtop.runtime.windows.WineStorageGrants.GAME_FOLDER);
     private final java.util.Map<String, String> launchOverrides = new java.util.HashMap<>();
 
     public void setLaunchOverrides(java.util.Map<String, String> overrides) {

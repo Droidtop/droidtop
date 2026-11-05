@@ -253,7 +253,8 @@ class WineXSession(
             setFEXCorePreset(prefix.fexCorePreset)
             // Every mapped drive, so a game on an SD card is reachable
             // from inside the prefix rather than only from Android.
-            bindingPaths = prefix.drivesIterator().map { it[1] }.toTypedArray()
+            // As the grants allow them (WineStorageGrants, Droidtop/tracker#584).
+            bindingPaths = WineStorageGrants.drives(context, prefix).map { it.second }.toTypedArray()
             this.envVars = envVars
             setWorkingDir(WineWorkingDirectory.resolve(workingDir, imageFs.rootDir))
             guestExecutable = WineLaunchPlan.guestExecutable(xServer.screenInfo.toString(), target, prefix.execArgs, arguments)
