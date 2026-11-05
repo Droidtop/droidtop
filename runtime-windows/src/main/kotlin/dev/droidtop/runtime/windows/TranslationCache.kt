@@ -15,15 +15,15 @@ import java.security.MessageDigest
  *
  * Each game's cache is a folder of its own under the ImageFs root, which Wine sees as Z: (WineUtils): Box64 reads a
  * unix path, FEX inside Wine a Windows one, so both reach the same folder. It lives in droidtop's own storage, never in
- * the game's folder. Box64 trims its own folder to [GAME_LIMIT_MIB]; FEX has no limit of its own, so [prepare] trims
- * the game's folder before each launch, and every cache together to [TOTAL_LIMIT_MIB], oldest files first.
+ * the game's folder. Box64 trims its own folder to [GAME_LIMIT_BYTES]; FEX has no limit of its own, so [prepare] trims
+ * the game's folder before each launch, and every cache together to [TOTAL_LIMIT_BYTES], oldest files first.
  */
 object TranslationCache {
-    /** One game's cache, both translators together. */
-    const val GAME_LIMIT_MIB = 1024
+    /** One game's cache, both translators together: 1 GB, in the decimal units droidtop shows sizes in. */
+    const val GAME_LIMIT_BYTES = 1_000_000_000L
 
-    /** Every game's cache together. */
-    const val TOTAL_LIMIT_MIB = 4096
+    /** Every game's cache together: 4 GB. */
+    const val TOTAL_LIMIT_BYTES = 4_000_000_000L
 
     private const val DIR = "translation-cache"
     private const val KEY_ENABLED = "droidtop_translation_cache"
@@ -50,7 +50,7 @@ object TranslationCache {
      * The variables that turn both caches on, pointed at [gameDir], which lies under [imageFsRoot] (Wine's Z:).
      * Forward slashes in the Windows path: FEX hands it to std::filesystem, which takes either.
      */
-    internal fun launchEnv(imageFsRoot: File, gameDir: File, limitMiB: Int = GAME_LIMIT_MIB): Map<String, String> {
+    internal fun launchEnv(imageFsRoot: File, gameDir: File, limitMiB: Long = GAME_LIMIT_BYTES / MIB): Map<String, String> {
         val underZ = gameDir.relativeTo(imageFsRoot).invariantSeparatorsPath
         return linkedMapOf(
             "BOX64_DYNACACHE" to "1",
@@ -72,8 +72,8 @@ object TranslationCache {
         val dir = gameDir(imageFsRoot, entryId)
         File(dir, "box64").mkdirs()
         File(dir, "fex").mkdirs()
-        trim(listOf(dir), GAME_LIMIT_MIB * MIB)
-        trim(root(imageFsRoot).listFiles()?.toList().orEmpty(), TOTAL_LIMIT_MIB * MIB)
+        trim(listOf(dir), GAME_LIMIT_BYTES)
+        trim(root(imageFsRoot).listFiles()?.toList().orEmpty(), TOTAL_LIMIT_BYTES)
         return launchEnv(imageFsRoot, dir).entries.joinToString(" ") { (name, value) -> "$name=$value" }
     }
 
@@ -100,11 +100,5 @@ object TranslationCache {
             val length = file.length()
             if (file.delete()) total -= length
         }
-    }
-
-    /** "12 MB" or "1.4 GB", for the row's summary. */
-    fun label(bytes: Long): String = when {
-        bytes >= 1024 * MIB -> "%.1f GB".format(bytes.toDouble() / (1024 * MIB))
-        else -> "${(bytes + MIB - 1) / MIB} MB"
     }
 }

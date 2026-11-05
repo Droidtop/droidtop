@@ -24,6 +24,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.library.format.ValueFormat
 import java.io.File
 
 /** One choice of a [WineOptionRow], as the settings row shows it. */
@@ -211,7 +212,7 @@ object WineOptions {
      */
     private fun translationCacheRow(context: Context, entryId: String?): WineOptionRow {
         val title = "Translation cache"
-        val used = TranslationCache.label(runCatching { TranslationCache.size(context, entryId) }.getOrDefault(0L))
+        val used = ValueFormat.size(runCatching { TranslationCache.size(context, entryId) }.getOrDefault(0L))
         val allOn = TranslationCache.enabled(context)
         if (entryId != null && !allOn) {
             return WineOptionRow(
@@ -223,10 +224,10 @@ object WineOptions {
         val on = if (entryId == null) allOn else translationCacheOn(context, entryId)
         val summary = if (entryId == null) {
             "Keeps the code that x86 translation makes for each game, so the game starts and runs faster the next time. " +
-                "Needs Box64 0.3.8 or FEXCore 2609 or newer. All games: $used of up to ${TranslationCache.label(TranslationCache.TOTAL_LIMIT_MIB * 1024L * 1024L)}."
+                "Needs Box64 0.3.8 or FEXCore 2609 or newer. All games: $used of up to ${ValueFormat.size(TranslationCache.TOTAL_LIMIT_BYTES)}."
         } else {
             "Keeps the code that x86 translation makes for this game, so it starts and runs faster the next time. " +
-                "$used of up to ${TranslationCache.label(TranslationCache.GAME_LIMIT_MIB * 1024L * 1024L)}."
+                "$used of up to ${ValueFormat.size(TranslationCache.GAME_LIMIT_BYTES)}."
         }
         return WineOptionRow(
             TRANSLATION_CACHE, title, summary,

@@ -22347,7 +22347,7 @@ under `<imagefs>/translation-cache/<first 12 bytes of SHA-256 of the entry id>/`
 game's folder). A launch (`DroidtopPcGameRuntime`) puts the variables first in the launch environment, so a variable
 the person set for the game wins:
 - Box64 (DynaCache, from 0.3.8; on by default only from 0.4.4): `BOX64_DYNACACHE=1`, `BOX64_DYNACACHE_FOLDER` (the
-  folder's `box64/`), `BOX64_DYNACACHE_LIMIT` (1024 MiB).
+  folder's `box64/`), `BOX64_DYNACACHE_LIMIT` (953 MiB, the game's 1 GB).
 - FEX (DiskCache, from FEX-2609; also in its Windows ARM64EC and WOW64 modules): `FEX_DISKCACHE=1`,
   `FEX_DISKCACHEPATH=Z:/translation-cache/<key>/fex/`. Wine's Z: is the ImageFs root (`WineUtils`), so FEX inside Wine
   reaches the same folder. FEX maps cache files only when Wine provides its unixlib (proton-wine-tux does), and it has
