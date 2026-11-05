@@ -57,7 +57,8 @@ class CompositorProvisioningTest {
         assertFalse(DesktopPanel.swayConfig(tileWindows = true).contains("floating"))
         // One bar by default: droidtop's, with no Waybar started (#683).
         assertEquals(DesktopPanel.NONE, DesktopPanel.fromId(null))
-        assertFalse(DesktopPanel.swayConfig().contains("waybar"))
+        // "swaybar_command" holds the letters "waybar", so the check is for Waybar's own start line.
+        assertFalse(DesktopPanel.swayConfig().lines().any { it.startsWith("exec waybar") })
         assertTrue("bar bar-0 swaybar_command true" in DesktopPanel.swayConfig().lines())
         assertEquals(DesktopPanel.WAYBAR, DesktopPanel.fromId("waybar"))
         assertEquals(DesktopPanel.SWAYBAR, DesktopPanel.fromId("swaybar"))
