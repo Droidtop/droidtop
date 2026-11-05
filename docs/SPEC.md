@@ -23094,6 +23094,15 @@ pinned SHA-256) into `imagefs/opt/wine-mono`, which Wine sees as `Z:\opt\wine-mo
 registry. Nothing is installed into the prefix itself. The `wine-mono-11.0.0-x86.msi` in `extras.tzst` stays unused:
 installing it would mean a separate msiexec run in each prefix.
 
+### The Visual C++ runtime's record in a prefix (built 2026-11-05, Droidtop/tracker#899)
+
+Wine ships its own `vcruntime140` and `msvcp140`, but not the record the Microsoft redistributable writes
+(`HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\<arch>`). Unreal's bootstrap and many installers read
+that record, so an Unreal game stops at "Microsoft Visual C++ 2015-2022 Redistributable (x64) required".
+`WineVcRuntimes`, run from `WinePrefixPreparation` at each launch, writes the record where the prefix has the DLLs and no
+record: the values a 2022 redistributable writes (14.40.33810), for each architecture whose DLL is there, in both
+registry views. A record from a real install is kept.
+
 ### Translation cache, precache and mixed-arch running (decided 2026-11-04, Droidtop/tracker#865, #866)
 
 The owner, relayed by the coordinator on 2026-11-04, approved the cache plan in #865 (mixed-architecture running

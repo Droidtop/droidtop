@@ -165,6 +165,10 @@ internal object WinePrefixPreparation {
         runCatching { WineXAudioRegistry.repair(File(prefix.rootDir, ".wine/system.reg")) }
             .onSuccess { if (it > 0) Timber.i("Repaired %d XAudio2 class registrations in prefix %s", it, prefix.id) }
             .onFailure { Timber.w(it, "Could not check XAudio2's registration in prefix %s", prefix.id) }
+        // The Visual C++ 2015-2022 runtime's "installed" record, where Wine's DLLs are there without it (Droidtop/tracker#899).
+        runCatching { WineVcRuntimes.ensure(File(prefix.rootDir, ".wine")) }
+            .onSuccess { if (it > 0) Timber.i("Wrote %d Visual C++ runtime records in prefix %s", it, prefix.id) }
+            .onFailure { Timber.w(it, "Could not check the Visual C++ runtime record in prefix %s", prefix.id) }
         // Which backend WINE itself hands audio to. The server droidtop
         // starts (PulseAudio or ALSA) is the other half of the same
         // decision, and both read the prefix's one audioDriver field.
