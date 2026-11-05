@@ -60,9 +60,26 @@ struct OutputHead {
     int32_t x = 0;
     int32_t y = 0;
     bool enabled = false;
+    // What its size in the layout follows from (Droidtop/tracker#908): the
+    // current mode (its OutputMode record holds the size), wl_output.transform
+    // and the scale. Read at `done`, into WaylandGlobals::placements.
+    zwlr_output_mode_v1* current_mode = nullptr;
+    int32_t transform = 0;
+    double scale = 1.0;
     int32_t applied_width = 0;
     int32_t applied_height = 0;
     double applied_scale = 0;
+};
+
+// One wlr-output-management mode: its size, kept so a head's current mode
+// can be read back at `done`. Owned by WaylandGlobals::modes; a headless
+// output with a custom mode gets one such mode that wlroots fills with the
+// custom size (types/wlr_output_management_v1.c, "Fake a single output mode").
+struct OutputMode {
+    WaylandGlobals* globals = nullptr;
+    zwlr_output_mode_v1* mode = nullptr;
+    int32_t width = 0;
+    int32_t height = 0;
 };
 
 // The size asked for one output (setOutputSize), held until its head and a
@@ -115,9 +132,17 @@ struct WaylandGlobals {
     zwlr_output_manager_v1* output_manager = nullptr;
     uint32_t output_manager_version = 0;
     std::vector<std::unique_ptr<OutputHead>> heads;
+    std::vector<std::unique_ptr<OutputMode>> modes;
     uint32_t output_serial = 0;
     bool output_serial_known = false;
     std::map<std::string, WantedOutputSize> wanted;
+
+    // Every head's place in the layout as of the latest `done`, the one
+    // piece of output-management state read off the dispatch thread
+    // (WaylandClient::outputPlacements, for pointer input on a named output).
+    // Guarded by placements_mutex; replaced whole at each `done`.
+    std::mutex placements_mutex;
+    std::vector<OutputPlacement> placements;
 
     // Clipboard. NOT required at connect() time, unlike the five above: a
     // compositor without it still gives a usable desktop, just one whose
@@ -374,11 +399,29 @@ bool uploadKeymap(zwp_virtual_keyboard_v1* keyboard, const char* keymap, size_t 
 
 void applyOutputSize(WaylandGlobals* globals); // fwd decl: manager_done applies a size requested before the serial arrived
 
-void mode_size(void*, zwlr_output_mode_v1*, int32_t, int32_t) {}
+void mode_size(void* data, zwlr_output_mode_v1*, int32_t width, int32_t height) {
+    auto* record = static_cast<OutputMode*>(data);
+    record->width = width;
+    record->height = height;
+}
 void mode_refresh(void*, zwlr_output_mode_v1*, int32_t) {}
 void mode_preferred(void*, zwlr_output_mode_v1*) {}
 void mode_finished(void* data, zwlr_output_mode_v1* mode) {
-    auto version = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(data));
+    auto* record = static_cast<OutputMode*>(data);
+    auto* globals = record->globals;
+    uint32_t version = globals->output_manager_version;
+    // No head may keep pointing at it; its size is unknown until the head
+    // names another current mode.
+    for (auto& head : globals->heads) {
+        if (head->current_mode == mode) head->current_mode = nullptr;
+    }
+    // Erasing the record frees it: nothing below may read `record`.
+    for (auto it = globals->modes.begin(); it != globals->modes.end(); ++it) {
+        if (it->get() == record) {
+            globals->modes.erase(it);
+            break;
+        }
+    }
     if (version >= 3) zwlr_output_mode_v1_release(mode); else zwlr_output_mode_v1_destroy(mode);
 }
 constexpr zwlr_output_mode_v1_listener kModeListener = {
@@ -396,20 +439,29 @@ void head_description(void*, zwlr_output_head_v1*, const char*) {}
 void head_physical_size(void*, zwlr_output_head_v1*, int32_t, int32_t) {}
 void head_mode(void* data, zwlr_output_head_v1*, zwlr_output_mode_v1* mode) {
     auto* globals = static_cast<OutputHead*>(data)->globals;
-    zwlr_output_mode_v1_add_listener(mode, &kModeListener,
-        reinterpret_cast<void*>(static_cast<uintptr_t>(globals->output_manager_version)));
+    auto record = std::make_unique<OutputMode>();
+    record->globals = globals;
+    record->mode = mode;
+    zwlr_output_mode_v1_add_listener(mode, &kModeListener, record.get());
+    globals->modes.push_back(std::move(record));
 }
 void head_enabled(void* data, zwlr_output_head_v1*, int32_t enabled) {
     static_cast<OutputHead*>(data)->enabled = enabled != 0;
 }
-void head_current_mode(void*, zwlr_output_head_v1*, zwlr_output_mode_v1*) {}
+void head_current_mode(void* data, zwlr_output_head_v1*, zwlr_output_mode_v1* mode) {
+    static_cast<OutputHead*>(data)->current_mode = mode;
+}
 void head_position(void* data, zwlr_output_head_v1*, int32_t x, int32_t y) {
     auto* record = static_cast<OutputHead*>(data);
     record->x = x;
     record->y = y;
 }
-void head_transform(void*, zwlr_output_head_v1*, int32_t) {}
-void head_scale(void*, zwlr_output_head_v1*, wl_fixed_t) {}
+void head_transform(void* data, zwlr_output_head_v1*, int32_t transform) {
+    static_cast<OutputHead*>(data)->transform = transform;
+}
+void head_scale(void* data, zwlr_output_head_v1*, wl_fixed_t scale) {
+    static_cast<OutputHead*>(data)->scale = wl_fixed_to_double(scale);
+}
 void head_finished(void* data, zwlr_output_head_v1* head) {
     auto* record = static_cast<OutputHead*>(data);
     auto* globals = record->globals;
@@ -452,6 +504,33 @@ void manager_head(void* data, zwlr_output_manager_v1*, zwlr_output_head_v1* head
     zwlr_output_head_v1_add_listener(head, &kHeadListener, record.get());
     globals->heads.push_back(std::move(record));
 }
+// The heads as they stand at `done`, which is when the protocol says their
+// state is whole. The size is the current mode's; the mode record is looked
+// up here, not at `current_mode`, because the mode's own `size` may follow.
+void publishPlacements(WaylandGlobals* globals) {
+    std::vector<OutputPlacement> placements;
+    placements.reserve(globals->heads.size());
+    for (auto& head : globals->heads) {
+        OutputPlacement placement;
+        placement.name = head->name;
+        placement.enabled = head->enabled;
+        placement.x = head->x;
+        placement.y = head->y;
+        if (head->current_mode) {
+            auto* mode = static_cast<OutputMode*>(zwlr_output_mode_v1_get_user_data(head->current_mode));
+            if (mode) {
+                placement.modeWidth = mode->width;
+                placement.modeHeight = mode->height;
+            }
+        }
+        placement.transform = head->transform;
+        placement.scale = head->scale;
+        placements.push_back(std::move(placement));
+    }
+    std::lock_guard<std::mutex> lock(globals->placements_mutex);
+    globals->placements = std::move(placements);
+}
+
 void manager_done(void* data, zwlr_output_manager_v1*, uint32_t serial) {
     auto* globals = static_cast<WaylandGlobals*>(data);
     globals->output_serial = serial;
@@ -460,6 +539,7 @@ void manager_done(void* data, zwlr_output_manager_v1*, uint32_t serial) {
         LOGI("compositor output head %s: %s at %d,%d", head->name.c_str(),
              head->enabled ? "enabled" : "disabled", head->x, head->y);
     }
+    publishPlacements(globals);
     applyOutputSize(globals);
 }
 void manager_finished(void* data, zwlr_output_manager_v1* manager) {
@@ -1836,6 +1916,12 @@ struct SizeRequest {
     bool supported = false;
 };
 } // namespace
+
+std::vector<OutputPlacement> WaylandClient::outputPlacements() {
+    if (!globals_) return {};
+    std::lock_guard<std::mutex> lock(globals_->placements_mutex);
+    return globals_->placements;
+}
 
 bool WaylandClient::setOutputSize(const std::string& outputName, int32_t width, int32_t height, double scale) {
     SizeRequest request{outputName, width, height, scale};

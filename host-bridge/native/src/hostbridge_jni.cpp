@@ -480,6 +480,44 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeOutputNames(JNIEnv* env, jobject t
     return result;
 }
 
+// Every output-management head's place in the layout, as OutputPlacement objects (HostBridge.kt's
+// injectPointerMotionAbsolute(outputName, ...) maps a point onto one with OutputLayout.kt).
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeOutputPlacements(JNIEnv* env, jobject thiz) {
+    std::vector<hostbridge::OutputPlacement> placements;
+    {
+        std::lock_guard<std::mutex> lock(g_clientsMutex);
+        if (auto* client = findClient(identityHash(env, thiz))) placements = client->outputPlacements();
+    }
+
+    jclass cls = env->FindClass("dev/droidtop/hostbridge/OutputPlacement");
+    if (!cls) {
+        env->ExceptionClear();
+        return env->NewObjectArray(0, env->FindClass("java/lang/Object"), nullptr);
+    }
+    jmethodID ctor = env->GetMethodID(cls, "<init>", "(Ljava/lang/String;ZIIIIID)V");
+    if (!ctor) {
+        env->ExceptionClear();
+        jobjectArray empty = env->NewObjectArray(0, cls, nullptr);
+        env->DeleteLocalRef(cls);
+        return empty;
+    }
+    jobjectArray result = env->NewObjectArray(static_cast<jsize>(placements.size()), cls, nullptr);
+    for (size_t i = 0; i < placements.size(); i++) {
+        const auto& p = placements[i];
+        jstring name = env->NewStringUTF(p.name.c_str());
+        jobject obj = env->NewObject(cls, ctor, name, p.enabled ? JNI_TRUE : JNI_FALSE,
+                                      static_cast<jint>(p.x), static_cast<jint>(p.y),
+                                      static_cast<jint>(p.modeWidth), static_cast<jint>(p.modeHeight),
+                                      static_cast<jint>(p.transform), static_cast<jdouble>(p.scale));
+        env->SetObjectArrayElement(result, static_cast<jsize>(i), obj);
+        env->DeleteLocalRef(obj);
+        env->DeleteLocalRef(name);
+    }
+    env->DeleteLocalRef(cls);
+    return result;
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_dev_droidtop_hostbridge_HostBridge_nativeInjectPointerMotion(JNIEnv* env, jobject thiz, jdouble dx, jdouble dy) {
     std::lock_guard<std::mutex> lock(g_clientsMutex);

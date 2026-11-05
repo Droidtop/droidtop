@@ -161,10 +161,45 @@ class HostBridge : HostBridgeInput {
         nativeInjectPointerMotion(dx, dy)
     }
 
-    /** Absolute pointer position within a [extentWidth] x [extentHeight] logical area. */
+    /**
+     * Absolute pointer position within a [extentWidth] x [extentHeight] logical area, spread over the compositor's
+     * whole layout: the primary output while it is the only one, which is how the desktop uses it. With more than
+     * one output, use the named form below.
+     */
     override fun injectPointerMotionAbsolute(x: Double, y: Double, extentWidth: Int, extentHeight: Int) {
         nativeInjectPointerMotionAbsolute(x, y, extentWidth, extentHeight)
     }
+
+    /**
+     * Puts the pointer at ([x], [y]) of a [extentWidth] x [extentHeight] surface showing the output named
+     * [outputName] (one of [outputNames]): the same place on that output, wherever it sits in the compositor's layout
+     * (Droidtop/tracker#908). A point off the surface stays on the output's edge. False, and nothing sent, when the
+     * compositor has no output of that name in its layout, or offers no wlr-output-management to say where it is.
+     *
+     * Each call reads the layout as the compositor last reported it (no wait on the Wayland thread), and
+     * [OutputLayout.absoluteMotion] places the point; the motion goes through the same virtual pointer as the call
+     * above, so buttons and scrolling need no output.
+     */
+    fun injectPointerMotionAbsolute(outputName: String, x: Double, y: Double, extentWidth: Int, extentHeight: Int): Boolean {
+        if (outputName.isEmpty() || !connected) return false
+        val motion = OutputLayout.absoluteMotion(outputPlacements(), outputName, x, y, extentWidth, extentHeight)
+            ?: return false
+        // Each value fits a uint32 (OutputLayout keeps it there); toInt() keeps its bits, which the JNI side reads
+        // back as unsigned. A Double holds every uint32 exactly.
+        nativeInjectPointerMotionAbsolute(
+            motion.x.toDouble(),
+            motion.y.toDouble(),
+            motion.extentWidth.toInt(),
+            motion.extentHeight.toInt(),
+        )
+        return true
+    }
+
+    /**
+     * Every output's place in the compositor's layout, as wlr-output-management last reported it; empty when not
+     * connected or when the compositor offers no output management. Safe from any thread.
+     */
+    fun outputPlacements(): List<OutputPlacement> = if (connected) nativeOutputPlacements().asList() else emptyList()
 
     /** [linuxButtonCode]: BTN_LEFT/BTN_RIGHT/BTN_MIDDLE from linux/input-event-codes.h (0x110/0x111/0x112). */
     override fun injectPointerButton(linuxButtonCode: Int, pressed: Boolean) {
@@ -318,6 +353,7 @@ class HostBridge : HostBridgeInput {
     private external fun nativeStopPresentingOutput(outputName: String)
     private external fun nativeSetOutputSize(width: Int, height: Int, scale: Double): Boolean
     private external fun nativeSetNamedOutputSize(outputName: String, width: Int, height: Int, scale: Double): Boolean
+    private external fun nativeOutputPlacements(): Array<OutputPlacement>
     private external fun nativeInjectPointerMotion(dx: Double, dy: Double)
     private external fun nativeInjectPointerMotionAbsolute(x: Double, y: Double, extentWidth: Int, extentHeight: Int)
     private external fun nativeInjectPointerButton(linuxButtonCode: Int, pressed: Boolean)

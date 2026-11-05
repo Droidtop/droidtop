@@ -80,7 +80,19 @@ it is not the same as confirmed-working. Treat the implementation below as
   immediately requesting the next frame. `frame.failed` retries rather than
   giving up.
 - **Virtual pointer** — relative motion, absolute motion, button, and axis
-  (scroll) requests, each followed by the required `frame()` call.
+  (scroll) requests, each followed by the required `frame()` call. One
+  pointer, tied to no output, so sway maps absolute motion onto the box
+  around every output in the layout: the primary while it is the only
+  output, which is what the unnamed `injectPointerMotionAbsolute` relies on.
+  For a named output, `HostBridge.injectPointerMotionAbsolute(outputName,
+  ...)` places the point in that output's part of the layout
+  (`OutputLayout.kt`, JVM-tested in `OutputLayoutTest`), from the heads'
+  position, current mode, transform and scale, which the native client
+  publishes at every wlr-output-management `done` (`outputPlacements()`,
+  readable from any thread so motion never waits on the dispatch thread).
+  A per-output pointer (`create_virtual_pointer_with_output`) was not used:
+  `swaymsg reload` resets its mapping and sway has no output name to map it
+  by again.
 - **Clipboard, both directions** (`ext-data-control-v1`) — the compositor's
   `selection` event is read off a pipe on a worker thread and handed up to
   `HostBridge.onContainerClipboardText`; `offerClipboardText` claims the
@@ -130,11 +142,13 @@ it is not the same as confirmed-working. Treat the implementation below as
 
 ### Known simplifications / not yet implemented
 
-- **Only the primary output takes pointer input.** Every output can be
-  captured into its own `Surface`, but absolute pointer motion is still
-  mapped onto one extent, the primary's (Droidtop/tracker#908 D1b). Nothing
-  in the app presents a second output yet (D2/D3), and `toplevel`'s
-  output_enter/output_leave are not tracked.
+- **Nothing shows a second output yet.** Every output can be captured
+  into its own `Surface` and take pointer input by name
+  (Droidtop/tracker#908 D1a, D1b), but nothing in the app presents a second
+  output yet (D2/D3), and `toplevel`'s output_enter/output_leave are not
+  tracked. An output's box is worked out on this side from its head, so for
+  a scale that is not a multiple of 1/256 (the protocol's fixed point) it
+  can be a logical pixel off the compositor's own.
 - **CPU blit, not zero-copy.** Frames are copied pixel-by-pixel from the shm
   buffer to the `ANativeWindow`. Fine for a first correctness pass; will
   matter for real framerate once there's something live to measure against.

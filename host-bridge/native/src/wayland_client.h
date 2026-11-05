@@ -79,6 +79,25 @@ struct ToplevelInfo {
     bool fullscreen = false;
 };
 
+/**
+ * One compositor output's place in the layout, as wlr-output-management
+ * last reported it (at its `done`, when a head's state is whole). The
+ * output's box in the layout follows from it the way wlroots works it out
+ * (wlr_output_layout.c: the position, and the current mode transformed and
+ * divided by the scale); host-bridge's Kotlin side does that sum
+ * (OutputLayout.kt) so a pointer on a named output lands on it.
+ */
+struct OutputPlacement {
+    std::string name;
+    bool enabled = false;
+    int32_t x = 0;            // logical pixels, the head's `position`
+    int32_t y = 0;
+    int32_t modeWidth = 0;    // the current mode, in pixels; 0 while unknown
+    int32_t modeHeight = 0;
+    int32_t transform = 0;    // wl_output.transform
+    double scale = 1.0;
+};
+
 class WaylandClient {
 public:
     ~WaylandClient();
@@ -144,6 +163,13 @@ public:
     // [scale] is the output's scale (logical pixel to physical pixels); 0
     // leaves the compositor's own.
     bool setOutputSize(const std::string& outputName, int32_t width, int32_t height, double scale);
+
+    // Every output-management head's place in the layout, in the order the
+    // compositor announced the heads; empty without output management. A
+    // copy, safe from any thread: it is the one piece of output state kept
+    // for other threads, so pointer input does not wait on the dispatch
+    // thread for each motion.
+    std::vector<OutputPlacement> outputPlacements();
 
     // Input injection — safe to call from a thread other than the one that
     // called connect()/runs the dispatch loop. libwayland-client's requests

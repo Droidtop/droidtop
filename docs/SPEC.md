@@ -183,8 +183,8 @@ Instead, mirror Qubes OS's dom0/AppVM split:
   virtual-input consumer; windowcast attaches as a second client of the same
   compositor, not through droidtop code. Its capture sessions, at most one
   per compositor output (`TrackedOutput::capture`,
-  host-bridge/native/src/wayland_client.cpp:1763), and one virtual pointer
-  and keyboard per connection (wayland_client.cpp:1622-1627) are
+  host-bridge/native/src/wayland_client.cpp:1843), and one virtual pointer
+  and keyboard per connection (wayland_client.cpp:1702-1707) are
   per-connection state, so a second compositor client leaves them untouched,
   and the JNI layer keys every connection by its `HostBridge` object rather
   than holding a singleton (host-bridge/native/src/hostbridge_jni.cpp:117).
@@ -193,7 +193,7 @@ Instead, mirror Qubes OS's dom0/AppVM split:
   Two things it does are compositor-wide by the protocols' own design, and a
   second client has to leave them to host-bridge rather than fight over them:
   the output's mode, which `applyOutputSize` sets to the Android surface's
-  size through wlr-output-management (wayland_client.cpp:521), so a
+  size through wlr-output-management (wayland_client.cpp:601), so a
   second consumer that wants another size captures its own output (sway's
   `create_output` on the headless backend) instead of reconfiguring this
   one; and the clipboard, which the data-control bridge sets for the whole
@@ -3937,8 +3937,28 @@ the `ContainerRuntime` interface that already exists (§3):
   name). The **primary** is the first output bound, the one host-bridge
   presented before: the calls without a name still mean it, and its size
   goes to the head of its name, or the first head when it has none, as
-  before (`output_match.h`). Not yet: pointer input is still mapped onto
-  the primary alone (D1b), and nothing calls the named calls until D2/D3.
+  before (`output_match.h`). Nothing calls the named calls until D2/D3.
+- **Pointer input on a named output (2026-11-05, Droidtop/tracker#908, step
+  D1b).** host-bridge's one virtual pointer is not tied to an output, so
+  sway maps its absolute motion onto the box around every output in the
+  layout (wlroots' `wlr_cursor_absolute_to_layout_coords`). With one output
+  that box is the output, which is why the unnamed
+  `injectPointerMotionAbsolute(x, y, w, h)` still means the primary and is
+  unchanged; with a second output it would spread over both. The named
+  `HostBridge.injectPointerMotionAbsolute(outputName, x, y, w, h)` places
+  the point inside that output's part of the layout instead
+  (`OutputLayout.absoluteMotion`, host-bridge/src/main/kotlin/dev/droidtop/hostbridge/OutputLayout.kt:87):
+  each output's box is worked out from its wlr-output-management head
+  (position, current mode, transform, scale) as wlroots works it out, and
+  a point off the surface stays on that output's edge. Not a virtual
+  pointer per output (`create_virtual_pointer_with_output`): sway maps
+  such a pointer to its output only when it is created, and
+  `swaymsg reload` resets every pointer's mapping
+  (`input_manager_reset_all_inputs`) without restoring it, since wlroots
+  gives a virtual pointer no output name for sway to map it by again; a
+  reload would then silently spread that output's touches over the whole
+  layout. Nothing calls the named form until D3; until then a desktop
+  with a second output still takes the unnamed call.
 - **Per-window placement is not built (corrected 2026-10-29,
   Droidtop/tracker#695).** This section used to promise that any window could
   be reassigned to a different `DisplayOutput` at runtime, sway moving a
@@ -3968,10 +3988,10 @@ the `ContainerRuntime` interface that already exists (§3):
   display's row is a choice of role: **Input surface** (§6c), **Companion**
   (§4d), **Virtual controller** (§4), **Extended desktop output** (Desktop
   only: a second headless output in the compositor, sized to the display;
-  `:host-bridge` tracks and captures every output since #908's D1a, but
-  pointer input on a second output (D1b) and the session's second output
-  (D2) are needed before this role or a taskbar "move to" action can
-  exist), or **Mirror** (Android's
+  `:host-bridge` tracks and captures every output and can place pointer
+  input on any of them since #908's D1a and D1b, but the session's second
+  output (D2) and a surface showing it (D3) are needed before this role or
+  a taskbar "move to" action can exist), or **Mirror** (Android's
   own mirroring, chosen rather than fallen into). The per-mode
   second-screen role rows are these same rows filtered to the mode. A
   display in a fallback mode the add-on is known to come up in (480x640
@@ -10149,8 +10169,8 @@ app-drawer icon or a floating switcher button:
   another output (the protocol itself has no such request — only
   activate/set_minimized/unset_minimized/close/set_fullscreen/
   set_rectangle — and host-bridge, though it tracks and captures every
-  output since Droidtop/tracker#908's D1a, does not yet take pointer input
-  on a second output or have one shown; "move to output" is #908's D4), and folding Android tasks droidtop itself
+  output since Droidtop/tracker#908's D1a and can place pointer input on
+  any of them since D1b, does not yet have a second one shown; "move to output" is #908's D4), and folding Android tasks droidtop itself
   launched onto the desktop's display (a game, a Wine activity) into the
   same bar via `LaunchDisplay`'s record — all three are backlog, not
   shipped, corrected here after an earlier draft of this section described
