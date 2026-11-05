@@ -366,7 +366,7 @@ object DroidtopWideSettings {
                         ChoiceItem(
                             id = "pref_desktop_panel",
                             title = "Desktop panel",
-                            subtitle = "The bar and launcher in the Linux desktop. A change installs what it needs at next start",
+                            subtitle = "A second bar in the Linux desktop, above droidtop's. A change installs what it needs at next start",
                             options = dev.droidtop.runtime.DesktopPanel.entries.map { ChoiceOption(it.id, it.label) },
                             current = dev.droidtop.app.DesktopSetupPrefs.panel(context).id,
                             onSelect = { ctx, value ->

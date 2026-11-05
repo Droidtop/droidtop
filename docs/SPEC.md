@@ -331,16 +331,22 @@ v0.2.0-dev.2398) both names were "not found" in the terminal, the helpers
 having lived only at their full paths.
 
 **The desktop panel (decided 2026-10-09, Droidtop/tracker#353; a status
-strip since 2026-10-29, #683).** The sway desktop starts Waybar by default,
-an ordinary distro package (`waybar`, the same name in Alpine and Debian)
-added to the plan. Desktop settings has "Desktop panel": Waybar (default) or
-Sway's own bar; sfwbar and nwg-panel are alternatives for later. Waybar's
-plan starts `sway -c
+strip since 2026-10-29, #683; off by default since 2026-11-05).** By default
+the sway desktop has no panel of its own: droidtop's bar is the one bar
+(rig 2026-11-04, build 2852, #683: with Waybar the default, the desktop still
+showed Waybar's strip, holding only the workspace "1", above droidtop's bar;
+the issue's own "Done" allows "droidtop's bar absorbs the clock and Waybar is
+off by default", and the clock moved in #691). Desktop settings has "Desktop
+panel": None (default), Waybar, a status strip with the workspaces and the
+tray of the Linux programs, an ordinary distro package (`waybar`, the same
+name in Alpine and Debian) added to the plan, or Sway's own bar; sfwbar and
+nwg-panel are alternatives for later. A person who chose Waybar before keeps
+it. None and Waybar both start `sway -c
 /run/droidtop-app-storage/desktop-launcher/panel/sway.config`, a file
 droidtop rewrites before every start (`DesktopPanel`): it includes
 `/etc/sway/config` (every distro binding and config.d stays), makes the
 stock bar (`bar-0`) run `true` instead of swaybar, starts Waybar with
-droidtop's Waybar config, and binds the stock launcher key (`$mod+d`) to
+droidtop's Waybar config when Waybar is the panel, and binds the stock launcher key (`$mod+d`) to
 `droidtop-open start`, which opens droidtop's Start menu. That Waybar config
 is a 26 px status strip with only what droidtop's bar lacks: the
 workspaces and the tray of the Linux programs. Its clock went to droidtop's

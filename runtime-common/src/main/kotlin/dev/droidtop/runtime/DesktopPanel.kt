@@ -3,24 +3,30 @@ package dev.droidtop.runtime
 import java.io.File
 
 /**
- * The status strip inside the shared sway desktop (docs/SPEC.md 2a "The
- * desktop panel", Droidtop/tracker#353, #683): a stock program from the
- * distro's packages, started by sway, never part of an image. Waybar is the
- * default, showing only what droidtop's bar does not: the workspaces, the
- * Linux tray and the clock. The launcher and the window list are droidtop's
- * bar, so the stock launcher key opens droidtop's Start menu. Sway's own
- * bar is the alternative, and the one to pick to run your own sway config
- * (and your own launcher). sfwbar and nwg-panel are named for later.
+ * The panel inside the shared sway desktop (docs/SPEC.md 2a "The desktop
+ * panel", Droidtop/tracker#353, #683). The default is none: droidtop's bar is
+ * the desktop's one bar, with the launcher, the window list and the clock, so
+ * sway runs droidtop's config without a bar of its own. Waybar, a stock
+ * program from the distro's packages started by sway and never part of an
+ * image, is a status strip for what droidtop's bar does not show: the
+ * workspaces and the Linux tray. Sway's own bar is the one to pick to run
+ * your own sway config (and your own launcher). sfwbar and nwg-panel are
+ * named for later.
  *
  * Only sway takes a panel here: labwc's plan has none of its own.
  */
 enum class DesktopPanel(val id: String, val label: String) {
-    WAYBAR("waybar", "Waybar"),
+    NONE("none", "None, droidtop's bar only"),
+    WAYBAR("waybar", "Waybar: workspaces and the Linux tray"),
     SWAYBAR("swaybar", "Sway's own bar"),
     ;
 
     companion object {
-        val DEFAULT = WAYBAR
+        /**
+         * One bar on screen (Droidtop/tracker#683, rig 2026-11-04: with Waybar the default, the desktop still showed
+         * Waybar's strip above droidtop's bar). A person who chose Waybar keeps it.
+         */
+        val DEFAULT = NONE
 
         fun fromId(id: String?): DesktopPanel = entries.firstOrNull { it.id == id } ?: DEFAULT
 
@@ -32,8 +38,8 @@ enum class DesktopPanel(val id: String, val label: String) {
         /** The package [WAYBAR] adds to the plan, the same name in Alpine and Debian. */
         const val WAYBAR_PACKAGES = "waybar"
 
-        /** sway with droidtop's config, which [WAYBAR] starts instead of plain `sway`. */
-        const val WAYBAR_COMPOSITOR = "sway -c $SWAY_CONFIG"
+        /** sway with droidtop's config, which [NONE] and [WAYBAR] start instead of plain `sway`. */
+        const val DROIDTOP_SWAY = "sway -c $SWAY_CONFIG"
 
         fun hostDir(filesDir: File): File = File(ContainerLauncher.hostDir(filesDir), "panel")
 
@@ -41,7 +47,7 @@ enum class DesktopPanel(val id: String, val label: String) {
          * sway's own config first, so every key binding and the person's
          * /etc/sway/config.d stay as the distro ships them; then the stock
          * bar (bar-0, the id sway gives the config's unnamed bar) runs
-         * `true` instead of swaybar, Waybar starts, and the stock launcher
+         * `true` instead of swaybar, Waybar starts when [panel] is [WAYBAR], and the stock launcher
          * key asks droidtop for its Start menu ([ContainerLauncher.START]),
          * so a keyboard's Super+D opens the same menu as the bar's Start.
          *
@@ -51,12 +57,12 @@ enum class DesktopPanel(val id: String, val label: String) {
          *
          * [background] is the desktop's colour (`#RRGGBB`, [DesktopAppearance.Background]), or null for sway's own.
          */
-        fun swayConfig(tileWindows: Boolean = false, background: String? = null): String = buildString {
+        fun swayConfig(panel: DesktopPanel = DEFAULT, tileWindows: Boolean = false, background: String? = null): String = buildString {
             appendLine("# droidtop's desktop panel (docs/SPEC.md 2a). droidtop rewrites this file at every desktop start.")
             appendLine("# To run your own sway config, choose \"Sway's own bar\" in Desktop settings and edit ~/.config/sway/config.")
             appendLine("include /etc/sway/config")
             appendLine("bar bar-0 swaybar_command true")
-            appendLine("exec waybar -c $WAYBAR_CONFIG")
+            if (panel == WAYBAR) appendLine("exec waybar -c $WAYBAR_CONFIG")
             appendLine("bindsym --no-warn ${'$'}mod+d exec sh ${ContainerLauncher.HELPER} ${ContainerLauncher.START}")
             if (!tileWindows) {
                 appendLine("for_window [all] floating enable")
@@ -91,10 +97,10 @@ enum class DesktopPanel(val id: String, val label: String) {
             """.trimIndent() + "\n"
 
         /** Writes both files under [filesDir]; small, done before each start, off the main thread. */
-        fun writeConfigs(filesDir: File, tileWindows: Boolean = false, background: String? = null) {
+        fun writeConfigs(filesDir: File, panel: DesktopPanel, tileWindows: Boolean = false, background: String? = null) {
             val dir = hostDir(filesDir)
             dir.mkdirs()
-            File(dir, "sway.config").writeText(swayConfig(tileWindows, background))
+            File(dir, "sway.config").writeText(swayConfig(panel, tileWindows, background))
             File(dir, "waybar.json").writeText(waybarConfig())
         }
     }
