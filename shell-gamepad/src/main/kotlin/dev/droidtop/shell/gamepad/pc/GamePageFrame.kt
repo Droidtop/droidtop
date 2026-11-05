@@ -705,16 +705,9 @@ private fun PageHero(entry: LibraryEntry, height: Dp, statuses: List<PageStatus>
     // (Droidtop/tracker#666).
     val coverArt = entry.artworkUri.takeIf { hero == null }
     val sideHero = hero.takeIf { heroNarrow }
-    // With no art at all the band is only the name, so it is only as tall as the name: at the art's height the top
-    // of the page was an empty plate above a one-line title (Droidtop/tracker#666, rig 2783, portrait).
-    val nameOnly = hero == null && coverArt == null && entry.logoUri == null
-    Box(
-        contentAlignment = Alignment.BottomStart,
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (nameOnly) Modifier.heightIn(min = minOf(height, NAME_ONLY_HERO_MIN)) else Modifier.height(height))
-            .background(MenuTokens.Card),
-    ) {
+    // With no art at all the band keeps its full height on a plain plate and the name stands where the logo goes, as
+    // Steam's page does (owner, 2026-11-05, Droidtop/tracker#666).
+    Box(modifier = Modifier.fillMaxWidth().height(height).background(MenuTokens.Card)) {
         if (hero != null && !heroNarrow) {
             AsyncImage(
                 model = hero,
@@ -730,10 +723,7 @@ private fun PageHero(entry: LibraryEntry, height: Dp, statuses: List<PageStatus>
                 .background(Brush.verticalGradient(listOf(Color.Transparent, MenuTokens.Ground))),
         )
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(if (nameOnly) Modifier else Modifier.fillMaxHeight())
-                .padding(horizontal = window.edgePadding),
+            modifier = Modifier.fillMaxSize().padding(horizontal = window.edgePadding),
             horizontalArrangement = Arrangement.spacedBy(Space.Lg),
         ) {
             Column(
@@ -786,9 +776,6 @@ private fun PageHero(entry: LibraryEntry, height: Dp, statuses: List<PageStatus>
         }
     }
 }
-
-/** The least height of a hero band that carries only the name: a logo's height, so a short name still reads as a header. */
-private val NAME_ONLY_HERO_MIN = 96.dp
 
 /** A cover's shape, width over height: the 2:3 of a box cover and of Steam's library capsule. */
 private const val COVER_ASPECT = 2f / 3f
