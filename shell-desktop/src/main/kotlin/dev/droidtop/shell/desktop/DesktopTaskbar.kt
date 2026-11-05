@@ -174,7 +174,7 @@ internal fun BoxScope.Taskbar(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 48.dp)
+                        .heightIn(min = currentShellWindow().pressTarget)
                         .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -195,7 +195,7 @@ internal fun BoxScope.Taskbar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 48.dp)
+                    .heightIn(min = currentShellWindow().pressTarget)
                     .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -244,8 +244,10 @@ internal fun TaskbarButton(onClick: () -> Unit, modifier: Modifier = Modifier, c
     // A flat chip in the Gaming palette, not Material's filled pill (Droidtop/tracker#555 D4).
     androidx.compose.material3.Surface(
         onClick = onClick,
-        // 48 dp, the touch target every one of droidtop's controls keeps (DESIGN-LANGUAGE, Droidtop/tracker#690).
-        modifier = modifier.padding(horizontal = 3.dp).heightIn(min = 48.dp),
+        // The shell's press target (ShellWindow.pressTarget, SPEC 7k): a finger's size where touch comes first, the
+        // shell's 48dp where the pad drives (DESIGN-LANGUAGE, Droidtop/tracker#690). Not a literal 48.dp: the shell lays
+        // out at the canvas density, where 48dp was 81 px, about 31dp of the device's own, on the 2026-11-04 rig run.
+        modifier = modifier.padding(horizontal = 3.dp).heightIn(min = currentShellWindow().pressTarget),
         shape = dev.droidtop.shell.gamepad.MenuTokens.RowShape,
         color = dev.droidtop.shell.gamepad.MenuTokens.Card,
         contentColor = dev.droidtop.shell.gamepad.MenuTokens.OnSurface,
@@ -368,7 +370,7 @@ internal fun TaskbarOwnScreenRow(screen: OwnScreen, onOpen: () -> Unit, onClose:
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .widthIn(max = 180.dp)
-                .heightIn(min = 48.dp)
+                .heightIn(min = currentShellWindow().pressTarget)
                 .anchorFor(anchor)
                 .onSecondaryClick { menuOpen = true }
                 .combinedClickable(onClick = onOpen, onLongClick = { menuOpen = true })
@@ -421,7 +423,7 @@ internal fun TaskbarWindowRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .widthIn(max = 180.dp)
-                .heightIn(min = 48.dp)
+                .heightIn(min = currentShellWindow().pressTarget)
                 .anchorFor(anchor)
                 .onSecondaryClick { menuOpen = true }
                 .combinedClickable(onClick = onTap, onLongClick = { menuOpen = true })
@@ -515,7 +517,7 @@ internal fun TaskbarPinChips(pins: List<TaskbarPin>, onOpen: (TaskbarPin) -> Uni
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier
                         .widthIn(max = 140.dp)
-                        .heightIn(min = 48.dp)
+                        .heightIn(min = currentShellWindow().pressTarget)
                         .anchorFor(anchor)
                         .onSecondaryClick { menuOpen = true }
                         .combinedClickable(onClick = { onOpen(pin) }, onLongClick = { menuOpen = true })
@@ -554,7 +556,7 @@ internal fun TaskbarAppRow(app: RunningApp, onOpen: () -> Unit, onClose: () -> U
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .widthIn(max = 180.dp)
-                .heightIn(min = 48.dp)
+                .heightIn(min = currentShellWindow().pressTarget)
                 .anchorFor(anchor)
                 .onSecondaryClick { menuOpen = true }
                 .combinedClickable(onClick = onOpen, onLongClick = { menuOpen = true })

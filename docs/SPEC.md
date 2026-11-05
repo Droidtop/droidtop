@@ -27039,7 +27039,9 @@ it. The sheet holds the pad and keeps the system bars hidden. A row that has a c
 task, never a second sheet. The running game's sheet (`RunningGameSheet`, #740) is one of them, wherever it is drawn. Desktop's taskbar menus are on it since Droidtop/tracker#690 (a
 window's, a pin's, an Android app's and the clipboard notice's), so `:shell-desktop` has no `DropdownMenu` left, and
 `ActionSheet` and its rows are public for it. The same change made the bar's window, pin and app rows and its tray
-and clipboard buttons at least 48 dp tall, the touch target (DESIGN-LANGUAGE); the tray and clipboard items are the
+and clipboard buttons at least the touch target (DESIGN-LANGUAGE) tall. That size is `ShellWindow.pressTarget`, not
+a literal 48 dp (rig 2026-11-04, build 2852: the bar's buttons measured 81 px on a 420 dpi AVD, about 31 dp of the
+device's own, because the shell lays out at the canvas density, where 48 dp is that much less than a finger); the tray and clipboard items are the
 bar's own `TaskbarButton` chip, not Material's `TextButton`. Mobile's dialogs move onto it in later steps. `scripts/check-ui-rules.sh` lists the raw dialogs left (`raw-dialog`, off until its last site is
 moved).
 
