@@ -22707,6 +22707,32 @@ Now:
   version updated from is kept, `WhatsNew.updatedFrom`), beside What's new
   (every build). `release_channel.py range AFTER THROUGH` prints the same
   merged view for review.
+
+**What the build review finds in the APK, and why (2026-11-05, Droidtop/tracker#550).** The standing build review
+(`Droidtop/build-review`, its profile `profiles/Droidtop/droidtop.yml`) treats anything droidtop's purpose does not
+explain as a finding. The smoke review of v0.2.0-dev.2898 raised these; each is explained or fixed:
+- *APKiD: a DexGuard packer and "Resources Confusion".* droidtop uses no packer: release builds are R8 (`isMinifyEnabled`,
+  `proguard-rules.pro`), whose short obfuscated names match APKiD's DexGuard heuristic, and AGP's release resource-path
+  shortening names files `res/-1.xml`, `res/-A.png` (1,801 entries in 2898), which is what "Resources Confusion" reads.
+  A rebuild from the commit gives the same shapes; nothing is protected against analysis.
+- *Trust-all TLS managers.* libadb-android's `SslUtils$2` is the TLS to the device's own adbd for wireless debugging
+  (`WirelessDebuggingOps`, only ever `127.0.0.1`): adbd's certificate is self-signed and is authenticated by the pairing
+  code's key exchange, which is how adb pairing works. jgit's `NoCheckX509TrustManager` is used only when a repository
+  sets `http.sslVerify false`; droidtop's only jgit use (`ThemeDownloader`, ES-DE themes over https) never does.
+- *Exported components.* `com.android.launcher3.LauncherProvider` is exported with read and write permissions of
+  protection level `signatureOrSystem` (`${applicationId}.permission.READ_SETTINGS` / `WRITE_SETTINGS`), as Launcher3's
+  own is; `dev.droidtop.pluginhost.AppInterfaceDoorService` is the door for app interface plugins (docs/plugin-api.md
+  1.3): exported by design, it answers only an app whose plugin is installed, approved, on and verified, and carries
+  no data. `com.android.launcher3.testing.TestInformationProvider`, Launcher3's test channel, was exported though
+  disabled; it is no longer declared.
+- *Device admin and accessibility.* Device admin is the Standard home screen's Lock screen gesture
+  (`ScreenOffAdminReceiver`, `DevicePolicyManager.lockNow`, not exported, `BIND_DEVICE_ADMIN`), off until the person
+  enables it; accessibility is the HOME button combos over games (Droidtop/tracker#740), off until the person turns it on.
+- *`READ_PHONE_STATE`.* Not droidtop's: the manifest merger implied it for a library declaring no SDK level. droidtop
+  reads no phone state, so it is removed from the merged manifest (`tools:node="remove"`).
+- *The address `1.2.2.1`.* Not an address: in `classes6.dex` it is an ASN.1 object identifier in a crypto library's
+  table (between `1.2.2` and `1.2.2.2`), in `libcrane.so` part of a Go closure name
+  (`marshalCertificate.1.2.2.1`), and in `libwindowcast_client.so` inside an OID table.
 - *A real version.* `release_channel.py fragments` prints every fragment
   grouped, which is rewritten into `CHANGELOG.md` as that version's section;
   the fragments are then removed by name. The grouping and rendering are
