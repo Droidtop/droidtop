@@ -103,7 +103,9 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
 
     suspend fun refresh() {
         withContext(Dispatchers.IO) {
-            entries = ThemeDownloader.parseThemesList(ThemeAssets.userThemesDir(context))
+            // ES-DE's own list, then the themes plugins offer (docs/plugin-api.md 3 C7), each marked with its plugin.
+            entries = ThemeDownloader.parseThemesList(ThemeAssets.userThemesDir(context)) +
+                runCatching { dev.droidtop.library.integrations.PluginThemes.entries(context) }.getOrDefault(emptyList())
             installedDirNames = ThemeAssets.discoverThemes(context).map { it.name }.toSet()
         }
     }
@@ -257,7 +259,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                         // of every theme's images arriving with the index
                         // the way the old clone's working tree made them.
                         val screenshotUrl = entry.screenshots.firstOrNull()?.let {
-                            ThemeDownloader.themesListFileUrl(it.image)
+                            ThemeDownloader.previewUrl(it)
                         }
                         ThemeBrowserRow(
                             entry = entry,
@@ -346,8 +348,9 @@ private fun ThemeBrowserRow(
                     Text(stringResource(R.string.theme_deprecated), color = MenuTokens.NoticeDanger, style = MaterialTheme.typography.labelSmall)
                 }
             }
-            if (entry.author.isNotBlank()) {
-                Text("by ${entry.author}", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
+            val byline = listOfNotNull(entry.author.takeIf { it.isNotBlank() }?.let { "by $it" }, entry.source?.let { "from $it" }).joinToString(", ")
+            if (byline.isNotBlank()) {
+                Text(byline, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
             }
             Text(
                 status ?: if (installed) "Installed — select to check for updates" else "Not installed — select to download",

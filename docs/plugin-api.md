@@ -3234,13 +3234,19 @@ Risk low.
 **C7 Themes and theme assets.** EP `theme.pack@1`. Risk medium.
 - **For:** ES-DE themes, icon packs, sound packs, wallpapers,
   controller-glyph sets and fonts.
-- **Ops:** `list → [{kind, id, label}]` and `files {id} → fd list`.
+- **Ops (ES-DE themes, built 2026-11-05, Droidtop/tracker#714, built to the recommendation, owner to confirm):**
+  `list {kinds: ["esde"]}` → `{themes: [{id, name, author?, url, screenshots?, variants?, colorSchemes?,
+  aspectRatios?, fontSizes?, deprecated?}]}`, at most 100: each theme an https git repository, as ES-DE's own
+  `themes.json` names one, with up to 8 https screenshots. droidtop lists them in Browse themes after ES-DE's own,
+  "from <plugin>", and clones and updates them with the same downloader (`ThemeDownloader`) into the same themes
+  folder, in a folder of their own (`plugin-<plugin id>-<theme id>`). The plugin hands over no files (the `files`
+  op of the first sketch is not offered).
 - **Surfaces:**
-  - G: Theme settings (the real ES-DE engine, §7f);
-  - A: the launcher icon pack and wallpaper pickers;
-  - D: the desktop theme or wallpaper.
+  - G: Browse themes (built), then Theme settings like any downloaded theme (the real ES-DE engine, §7f);
+  - A: the launcher icon pack and wallpaper pickers (not built: other `kinds` are not asked yet);
+  - D: the desktop theme or wallpaper (not built).
 - **Permission:** `provide:theme.pack`.
-- **Status:** not built. Themes today come from the theme downloader.
+- **Status:** ES-DE themes built; icon packs, sounds, wallpapers, glyphs and fonts not yet.
 - **Rules:**
   - Theme XML and images are untrusted input. They are parsed by the
     same engine as downloaded themes, with its limits.

@@ -9972,7 +9972,12 @@ app-drawer icon or a floating switcher button:
   the Compose `ThemeBrowserScreen` from inside that view, because
   per-theme screenshot previews need a different interaction shape than a
   list of rows. Each mode's settings show that mode's own settings first,
-  with shortcuts to the other modes' settings at the bottom.
+  with shortcuts to the other modes' settings at the bottom. **Themes from plugins (2026-11-05, Droidtop/tracker#714,
+  docs/plugin-api.md 3 C7):** after ES-DE's own list, Browse themes lists
+  the ES-DE themes each allowed `theme.pack` plugin offers, "from <plugin>"
+  under the author, and downloads and updates them with the same downloader
+  (an https git repository each, cloned into `plugin-<plugin>-<theme>` in the
+  themes folder), so the engine reads them with the same limits as any theme.
 
   **H4 is not satisfied by the catalog migration alone (decided 2026-09-26,
   owner delegated).** "H4 fixed" means BOTH renderers use the same row

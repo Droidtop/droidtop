@@ -132,7 +132,16 @@ object ThemeDownloader {
         val aspectRatios: List<String>,
         val fontSizes: List<String>,
         val screenshots: List<ThemeScreenshot>,
+        /**
+         * Who offers it, when not ES-DE's own list: a plugin's name (docs/plugin-api.md 3 C7, `theme.pack`,
+         * Droidtop/tracker#714). Its screenshots are then whole https addresses.
+         */
+        val source: String? = null,
     )
+
+    /** Where [screenshot] of a listed theme is: a plugin's whole https address, else a file of ES-DE's own list. */
+    fun previewUrl(screenshot: ThemeScreenshot): String =
+        if (screenshot.image.startsWith("https://")) screenshot.image else themesListFileUrl(screenshot.image)
 
     fun themesListDir(userThemesDir: File): File = File(userThemesDir, THEMES_LIST_DIR_NAME)
 
