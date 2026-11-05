@@ -1201,6 +1201,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         // droidtop patch: the home screen's in-place hint, long-press Home for the
         // mode switcher, until it is done (Droidtop/tracker#829).
         dev.droidtop.shell.standard.HomeHints.onHomeShown(this);
+        // droidtop patch: the pad's hint row above the dock, while a pad is in use (Droidtop/tracker#699).
+        dev.droidtop.shell.standard.StandardPadHints.onHomeShown(this);
         // Process any items that were added while Launcher was away.
         ItemInstallQueue.INSTANCE.get(this)
                 .resumeModelPush(FLAG_ACTIVITY_PAUSED);
@@ -2203,6 +2205,8 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         TestLogging.recordKeyEvent(TestProtocol.SEQUENCE_MAIN, "Key event", event);
+        // droidtop patch: a pad press shows the pad's hint row (Droidtop/tracker#699).
+        dev.droidtop.shell.standard.StandardPadHints.noteKey(event);
         return (event.getKeyCode() == KeyEvent.KEYCODE_HOME) || super.dispatchKeyEvent(event);
     }
 
@@ -2220,6 +2224,8 @@ public class Launcher extends StatefulActivity<LauncherState>
                 break;
         }
         TestLogging.recordMotionEvent(TestProtocol.SEQUENCE_MAIN, "Touch event", ev);
+        // droidtop patch: a finger hides the pad's hint row (Droidtop/tracker#699).
+        dev.droidtop.shell.standard.StandardPadHints.noteTouch(ev);
         return super.dispatchTouchEvent(ev);
     }
 

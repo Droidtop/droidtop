@@ -1864,8 +1864,17 @@ other buttons have a Mobile meaning of their own (`StandardPad`,
 Droidtop/tracker#699): L1/R1 turn the home pages, X opens the focused item's
 own menu (what a long press opens), Y opens the one search, Start opens the
 mode switcher, and B is Android's Back (it closes the drawer, a folder or a
-menu). Not yet: a hint row naming them, and the face-button swap, which
-lives in the Gaming shell's `ControllerLayouts`. Root stays
+menu). **The pad's hint row** (`StandardPadHints`, Droidtop/tracker#699): the shared
+`HintRow` above the dock (`HintViews.padRow`), drawn only while a pad was the
+last input (`PadModality`: the launcher reports pad keys and touches) and gone
+at the first touch, its pills on their own plates over the wallpaper and each
+a tap on its button. A pill shows only while its press does something: L1/R1
+with a page to turn to, X while an item has the focus, Y always. Start's
+"Modes" pill waits for a rig check that Start reaches the mode switcher
+(`START_CONFIRMED`; on 2936 the rig saw no reaction). It waits while the
+in-place "Press and hold Home" hint is up, which sits in the same place.
+Not yet: the face-button swap, which lives in the Gaming shell's
+`ControllerLayouts`. Root stays
 what it has always been for the launcher: never used, never required: none
 of Launcher mode's rows above touch `runtime-linux-root`.
 
