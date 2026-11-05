@@ -1574,6 +1574,8 @@ object AppSettingsCatalogs {
         subtitle = "One source at a time, like real ES-DE. ScreenScraper and the libretro database " +
             "work without an account; TheGamesDB needs a free API key, and your own ScreenScraper " +
             "login raises how much you can scrape per day",
+        // A scrape asks the sources over the network: offline the page says so first (Droidtop/tracker#594).
+        needsNetwork = true,
         groups = { context ->
             listOf(
                 CatalogGroup(
