@@ -22208,8 +22208,11 @@ comment by the Cloud storage lane, 2026-11-04), with the owner's two decisions:
     - **Locked** (the default): what droidtop writes there is sealed with the agent's sealing (XChaCha20-Poly1305
       under this device's key), not a new scheme.
     - **Trusted:** plain files the person can open themselves.
-  - The words on the choice say what each means: who can read the files, and that restoring a locked set on a new
-    device needs this device's key. Built to the lane's recommendation, owner to confirm: Locked is the default.
+  - The words on the choice say what each means: who can read the files, and that only this device can open a
+    locked one. This device's key never leaves it (`DeviceIdentity`: never exported, and a new one is made when the
+    Keystore key is gone), so a new or reset device can't restore a locked set. Whether a locked set should be
+    restorable elsewhere, for example with a recovery passphrase, is put to the owner on #573. Built to the lane's
+    recommendation, owner to confirm: Locked is the default.
   - Store-and-forward letters are sealed on every share, whatever the choice.
 
 **Backends**, in the order they are built: WebDAV (built: Nextcloud, ownCloud, most NAS), SFTP, SMB 2/3,
