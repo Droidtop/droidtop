@@ -161,6 +161,10 @@ internal object WinePrefixPreparation {
                 sharpnessDenoise = prefix.getExtra("sharpnessDenoise", "100").toIntOrNull() ?: 100,
             ),
         )
+        // XAudio2's classes back on their own DLLs where the prefix template put them on xapofx (Droidtop/tracker#898).
+        runCatching { WineXAudioRegistry.repair(File(prefix.rootDir, ".wine/system.reg")) }
+            .onSuccess { if (it > 0) Timber.i("Repaired %d XAudio2 class registrations in prefix %s", it, prefix.id) }
+            .onFailure { Timber.w(it, "Could not check XAudio2's registration in prefix %s", prefix.id) }
         // Which backend WINE itself hands audio to. The server droidtop
         // starts (PulseAudio or ALSA) is the other half of the same
         // decision, and both read the prefix's one audioDriver field.

@@ -22967,6 +22967,16 @@ in Proton. Container setup copies those folders into a new prefix (`ContainerMan
   game's own variables (Game properties, 7i) or the prefix's override it; a person can also set it for one game
   there when ICU itself misbehaves.
 
+### XAudio2's registration in a prefix (built 2026-11-05, Droidtop/tracker#898)
+
+The prefix template droidtop starts from (GameNative's prefix pack) registers XAudio2 2.7's class, in the 32-bit view,
+to `xapofx1_5.dll`. Wine's xapofx DLLs register no COM class and export no `DllGetClassObject`, so every 32-bit game
+that creates XAudio2 through COM fails ("XAudio2Create() error", Date A Live: Rio Reincarnation). A prefix Wine builds
+itself, as Proton's default prefix is made, registers each class to its own `xaudio2_N.dll`. `WineXAudioRegistry`, run
+from `WinePrefixPreparation` at each launch, puts any of XAudio2's 32 classes (XAudio2, XAudio2_Debug,
+AudioVolumeMeter and AudioReverb, versions 2.0 to 2.7) that names an xapofx DLL back on its own DLL, in both views of
+`system.reg`, and touches nothing else. Existing prefixes are repaired at their next start.
+
 ### Translation cache, precache and mixed-arch running (decided 2026-11-04, Droidtop/tracker#865, #866)
 
 The owner, relayed by the coordinator on 2026-11-04, approved the cache plan in #865 (mixed-architecture running
