@@ -537,8 +537,13 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   soon as another one comes to the front, so Settings was gone after one HOME.
 - **A narrow bar gives the windows a strip of their own** (Droidtop/tracker#750, rig 2638). The window list is the
   bar's one weighted slot, so on a 411 dp phone screen the buttons and tray took the whole width and no window,
-  Android app or droidtop screen could show. Below 600 dp (`BAR_ONE_ROW_MIN`) the pins and the window list sit in
-  a second row on the screen side of the buttons, shown only while there is something in it.
+  Android app or droidtop screen could show. When the bar's own items (Start, the pins, Modes and the chips, the
+  tray), at the widths they measure, leave the window list less than 200 dp (`WINDOW_LIST_MIN`, about one window
+  button), the pins and the window list sit in a second row on the screen side of the buttons, shown only while
+  there is something in it. Decided from what the items measure, not from the screen's width (rig 2026-11-04, build
+  2852, Droidtop/tracker#689 and #686): the AVD's bar was 639 dp at the canvas density, over the 600 dp cut-off
+  (`BAR_ONE_ROW_MIN`) used before, and the buttons and tray filled it, so with Foot and PCManFM open the bar had no
+  window button and their menus could not be reached.
 - **The Start menu reaches the bar's buttons.** A System section (Terminal while a session runs, Containers,
   Modes, Settings) is the bar's own four buttons as rows, so a pad with no way to the bar can still open
   Settings or the mode switcher and then give the pad back to the container by closing the sheet.
@@ -554,7 +559,7 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   a line of glyph text ("◤ 3/4", "ETH", "✕", "⚡", "3 new"), and the only clock was Waybar's `date +%H:%M`, 24
   hour always and absent with no session or under labwc. The tray's clock is the desktop's one clock, shown with
   or without a session, and Waybar has none. The tray keeps its own width: on a bar too narrow for every
-  button (under `BAR_ONE_ROW_MIN`), the buttons between Start and the tray share what is left and scroll
+  button (when the windows have their own strip), the buttons between Start and the tray share what is left and scroll
   sideways, and the readout's text never wraps (rig 2026-11-04, build 2852, a 411 dp AVD with the Clipboard chip
   showing: "100%" wrapped one character per line and the tray grew to the bar's full height). Someone on Sway's own bar keeps their own config's status line. The container's windows are in the bar's list, the desktop's only one
   since Waybar dropped its window title (#683): a finger needs a way to raise, minimise and close one.
