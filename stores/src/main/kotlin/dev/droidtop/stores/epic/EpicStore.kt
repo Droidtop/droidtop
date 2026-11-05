@@ -187,9 +187,8 @@ class EpicStore : StoreLibrary {
                 manifest,
                 EpicConstants.containerLanguageToEpicInstallTags(StoreLanguage.current()),
             )
-            val checker = EpicDownloadManager(manager, context.applicationContext)
             val installDir = File(game.installPath)
-            val bad = files.count { file -> !checker.fileExistsWithCorrectHash(File(installDir, file.filename), file.fileSize, file.hash) }
+            val bad = files.count { file -> !EpicDownloadManager.fileExistsWithCorrectHash(File(installDir, file.filename), file.fileSize, file.hash) }
             if (bad == 0) "All ${files.size} files match" else "$bad of ${files.size} files are missing or changed. Update or install again to repair them"
         }
     }
