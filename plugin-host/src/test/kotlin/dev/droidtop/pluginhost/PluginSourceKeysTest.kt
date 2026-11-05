@@ -109,7 +109,7 @@ class PluginSourceKeysTest {
             keyJson("acme", "not a real spki key").toByteArray()
         }
         assertTrue(fetched is PluginSourceKeys.FetchResult.Failed)
-        assertTrue((fetched as PluginSourceKeys.FetchResult.Failed).reason.contains("can be used"))
+        assertTrue((fetched as PluginSourceKeys.FetchResult.Failed).reason.contains("cannot be used"))
     }
 
     @Test
