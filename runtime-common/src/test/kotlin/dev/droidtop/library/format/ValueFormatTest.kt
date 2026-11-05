@@ -96,4 +96,15 @@ class ValueFormatTest {
         assertEquals(ValueFormat.State.UNKNOWN, ValueFormat.State.of("sparkling"))
         assertEquals(ValueFormat.State.UNKNOWN, ValueFormat.State.of(null))
     }
+
+    @Test
+    fun `amounts are a fraction with one unit, both when they differ, and the amount alone with no total`() {
+        val mb = 1024L * 1024
+        val gb = 1024 * mb
+        assertEquals("1.2/3.4 GB", ValueFormat.fraction(12 * gb / 10, 34 * gb / 10))
+        assertEquals("640 MB/3.4 GB", ValueFormat.fraction(640 * mb, 34 * gb / 10))
+        assertEquals("0/3.4 GB", ValueFormat.fraction(0L, 34 * gb / 10))
+        assertEquals("640 MB", ValueFormat.fraction(640 * mb, -1L))
+        assertEquals("12/40", ValueFormat.countFraction(12, 40))
+    }
 }

@@ -58,3 +58,20 @@ enum class JobLook {
         }
     }
 }
+
+/**
+ * What a job is doing, as the icon its status starts with (owner, 2026-11-05, Droidtop/tracker#886: "We can use icons
+ * to represent downloads vs uploads"): ↓ a download, ↑ an upload or a sync's push, and one each for an install, an
+ * update and a check. [words] is the icon's description for a screen reader and a hint; the icon replaces the word on
+ * screen, never adds a sentence.
+ */
+enum class JobIcon(val words: String) {
+    DOWNLOAD("Downloading"),
+    UPLOAD("Uploading"),
+    INSTALL("Installing"),
+    UPDATE("Updating"),
+    VERIFY("Checking"),
+    SYNC("Syncing"),
+    SCAN("Scanning"),
+    WORK("Working"),
+}

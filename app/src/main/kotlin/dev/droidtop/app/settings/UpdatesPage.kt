@@ -320,7 +320,8 @@ object UpdatesPage {
         val versionLine = line(update.step, update.sizeBytes, update.from)
         val jobLine = job?.takeIf { state != State.AVAILABLE && state != State.STARTING }?.let { PluginJobsScreen.oneLine(it) }
         val subtitle = listOfNotNull(versionLine, jobLine).joinToString(" · ")
-        val value = if (state == State.DOWNLOADING && job != null && job.shownPercent in 0..100) "${job.shownPercent}%" else state.label
+        // The compact status while it downloads ("1.2/3.4 GB"), else the state's word (Droidtop/tracker#886).
+        val value = if (state == State.DOWNLOADING && job != null) PluginJobsScreen.compactValue(job) ?: state.label else state.label
         val progress = progressOf(state, job?.shownPercent ?: -1)
         // Pressing a row that is already under way would only join its job: it is drawn, not offered.
         return if (state == State.AVAILABLE || state == State.FAILED) {

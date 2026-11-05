@@ -35,6 +35,25 @@ object ValueFormat {
         else -> "${(bytes / KB).coerceAtLeast(1)} KB"
     }
 
+    /**
+     * Amounts as a fraction, the compact status of a transfer (owner, 2026-11-05, Droidtop/tracker#886: "a fraction
+     * display (downloaded over total)"): "1.2/3.4 GB" with one unit after the total, both units when they differ
+     * ("640 MB/3.4 GB"), and the amount alone while the total is not known ("640 MB"). No "of", no sentence.
+     */
+    fun fraction(done: Long, total: Long): String {
+        if (total <= 0L) return size(done.coerceAtLeast(0L))
+        if (done <= 0L) return "0/${size(total)}"
+        val (doneNumber, doneUnit) = sizeParts(done.coerceAtLeast(0L))
+        val (totalNumber, totalUnit) = sizeParts(total)
+        return if (doneUnit == totalUnit) "$doneNumber/$totalNumber $totalUnit" else "$doneNumber $doneUnit/$totalNumber $totalUnit"
+    }
+
+    /** Counts as a fraction ("12/40"), the compact status of a job counted in items. */
+    fun countFraction(done: Int, total: Int): String = "${done.coerceAtLeast(0)}/$total"
+
+    /** [size] split into its number and its unit. */
+    private fun sizeParts(bytes: Long): Pair<String, String> = size(bytes).let { it.substringBefore(' ') to it.substringAfter(' ') }
+
     /** A size, or blank when nothing is known (a store that names no size). */
     fun sizeOrBlank(bytes: Long): String = if (bytes <= 0L) "" else size(bytes)
 

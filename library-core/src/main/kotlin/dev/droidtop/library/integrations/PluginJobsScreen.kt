@@ -7,6 +7,7 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.JobIcon
 import dev.droidtop.library.settings.JobLook
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.Place
@@ -337,6 +338,53 @@ object PluginJobsScreen {
         JobState.RUNNING -> if (entry.shownPercent >= 0) JobLook.ACTIVE else JobLook.CHECKING
     }
 
+    /**
+     * What [entry] is doing, as the icon its status starts with (owner, 2026-11-05, Droidtop/tracker#886): ↓ a
+     * download, the install icon for a store's install, ↑ a sync's push, a check, a scan, else work. Pure.
+     */
+    fun iconOf(entry: PluginJobsCenter.Entry): JobIcon = when {
+        entry.nativeKind == dev.droidtop.library.stores.StoreInstallJob.KIND -> JobIcon.INSTALL
+        else -> when (HappeningNow.kindOf(entry)) {
+            HappeningNow.Kind.DOWNLOAD -> JobIcon.DOWNLOAD
+            HappeningNow.Kind.SYNC -> JobIcon.SYNC
+            HappeningNow.Kind.SCAN -> JobIcon.SCAN
+            HappeningNow.Kind.UPDATE_CHECK -> JobIcon.VERIFY
+            HappeningNow.Kind.SCRAPE, HappeningNow.Kind.PLUGIN, HappeningNow.Kind.OTHER -> JobIcon.WORK
+        }
+    }
+
+    /**
+     * How much of [entry] is done, compact (Droidtop/tracker#886: "a fraction display (downloaded over total)"):
+     * "1.2/3.4 GB" for bytes ("640 MB" while the total is unknown), "12/40" for items, "42%" for a job that sends only
+     * a percent; null for one that sends nothing to count. Pure.
+     */
+    fun compactValue(entry: PluginJobsCenter.Entry): String? {
+        val numbers = entry.numbers
+        return when {
+            numbers != null && numbers.itemsTotal > 1 && numbers.itemsDone >= 0 -> ValueFormat.countFraction(numbers.itemsDone, numbers.itemsTotal)
+            numbers != null && numbers.bytesDone >= 0 -> ValueFormat.fraction(numbers.bytesDone, numbers.bytesTotal)
+            numbers != null && numbers.itemsTotal > 0 && numbers.itemsDone >= 0 -> ValueFormat.countFraction(numbers.itemsDone, numbers.itemsTotal)
+            entry.shownPercent >= 0 -> "${entry.shownPercent}%"
+            else -> null
+        }
+    }
+
+    /**
+     * The words under a running job's title, which do not change while it counts (Droidtop/tracker#886: "the text
+     * constantly changes as progress updates"): where it stands only when it is not moving (Paused, Waiting for Wi-Fi,
+     * Waiting for the connection), then who runs it. How far, how much and how long are the bar, the value and the
+     * job's page. Pure.
+     */
+    internal fun standingLine(entry: PluginJobsCenter.Entry): String? = when {
+        entry.hold != null -> entry.hold
+        entry.paused -> "Paused"
+        entry.state == JobState.WAITING_FOR_NETWORK -> "Waiting for the connection"
+        entry.state == JobState.WAITING_TO_RETRY -> "Waiting to try again"
+        // A job with nothing to count says its own line, as the only sign of what it does.
+        compactValue(entry) == null -> entry.statusLine.takeIf { it.isNotBlank() }
+        else -> null
+    }
+
     /** How many parts [entry] is counted in, for a segmented bar: its things to do when it counts 2 or more, else 0. Pure. */
     fun partsOf(entry: PluginJobsCenter.Entry): Int = entry.numbers?.itemsTotal?.takeIf { it >= 2 } ?: 0
 
@@ -345,8 +393,20 @@ object PluginJobsScreen {
      * "Jobs and their results"). The same words as the job's row here ([progressLine]), joined, so the game page cannot
      * say less than the Downloads place; a failed job says why.
      */
-    fun oneLine(entry: PluginJobsCenter.Entry, nowMs: Long = System.currentTimeMillis()): String =
-        if (entry.done) outcome(entry).lineSequence().first() else progressLine(entry, JobPace.line(entry, nowMs)).replace("\n", " · ")
+    fun oneLine(entry: PluginJobsCenter.Entry, nowMs: Long = System.currentTimeMillis()): String = when {
+        entry.done -> outcome(entry).lineSequence().first()
+        // Moving: the icon's sign and the value, the compact status (Droidtop/tracker#886), where text is all there is.
+        standingLine(entry) == null -> compactValue(entry)?.let { "${iconSign(iconOf(entry))} $it" }
+            ?: progressLine(entry, JobPace.line(entry, nowMs)).replace("\n", " · ")
+        else -> progressLine(entry, JobPace.line(entry, nowMs)).replace("\n", " · ")
+    }
+
+    /** The sign that stands for [icon] where only text can be drawn: an arrow for a transfer, else the icon's word. Pure. */
+    fun iconSign(icon: JobIcon): String = when (icon) {
+        JobIcon.DOWNLOAD -> "↓"
+        JobIcon.UPLOAD -> "↑"
+        else -> icon.words
+    }
 
     /**
      * One job as one row, wherever a list of jobs is drawn (this screen, a store's page): a running
@@ -371,15 +431,17 @@ object PluginJobsScreen {
                 summaryShown = true,
             )
         }
-        val line = progressLine(entry, JobPace.line(entry, nowMs)).replace("\n", " · ")
+        // ↓ ▬▬▬▭ 1.2/3.4 GB under the title, and words that stay put while it counts (Droidtop/tracker#886).
         return NestedScreenItem(
             id = "plugin_job_${entry.jobId}",
             title = entry.title,
-            subtitle = listOf(line, jobSource(entry)).filter { it.isNotBlank() }.joinToString(" · "),
+            subtitle = listOfNotNull(standingLine(entry), jobSource(entry)).filter { it.isNotBlank() }.joinToString(" · "),
             inline = jobPage(entry.jobId, jobTitle(entry)),
             progress = entry.fraction,
             progressLook = lookOf(entry),
             progressParts = partsOf(entry),
+            progressIcon = iconOf(entry),
+            progressValue = compactValue(entry),
             summaryShown = true,
         )
     }
@@ -427,6 +489,8 @@ object PluginJobsScreen {
                     progress = entry.fraction,
                     progressLook = lookOf(entry),
                     progressParts = partsOf(entry),
+                    progressIcon = iconOf(entry),
+                    progressValue = compactValue(entry),
                 ),
             )
             // A native job with no checkpoint yet pauses to a fresh start, so it may always be paused.

@@ -153,4 +153,25 @@ class PluginJobsScreenTest {
         assertEquals(-1f, PluginJobsScreen.jobRow(noTotal, nowMs = 0L).progress!!, 0.001f)
         assertEquals("Downloading", PluginJobsScreen.progressLine(noTotal, null))
     }
+
+    @Test
+    fun `a running row is an icon, its bar and a fraction, and its words stay put while it counts`() {
+        // Droidtop/tracker#886: "a fraction display (downloaded over total)"; "the text constantly changes".
+        val gb = 1024L * 1024 * 1024
+        val bytes = job("b", 35).copy(nativeKind = "download", numbers = dev.droidtop.pluginhost.JobNumbers(bytesDone = 12 * gb / 10, bytesTotal = 34 * gb / 10))
+        val row = PluginJobsScreen.jobRow(bytes, nowMs = 0L)
+        assertEquals("1.2/3.4 GB", row.progressValue)
+        assertEquals("GOG", row.subtitle)
+        val later = PluginJobsScreen.jobRow(bytes.copy(numbers = bytes.numbers!!.copy(bytesDone = 2 * gb), statusLine = "Downloading… 2.0 GB of 3.4 GB"), nowMs = 0L)
+        assertEquals(row.subtitle, later.subtitle)
+        assertEquals("12/40", PluginJobsScreen.compactValue(job("i").copy(numbers = dev.droidtop.pluginhost.JobNumbers(itemsDone = 12, itemsTotal = 40))))
+        assertEquals("42%", PluginJobsScreen.compactValue(job("p", 42)))
+        assertNull(PluginJobsScreen.compactValue(job("n")))
+        // Standing still says why; a job with nothing to count keeps its own line.
+        assertEquals("Paused · GOG", PluginJobsScreen.jobRow(job("s", 40, paused = true), nowMs = 0L).subtitle)
+        assertEquals("Downloading… 12 MB of 300 MB · GOG", PluginJobsScreen.jobRow(job("n"), nowMs = 0L).subtitle)
+        // Where only text fits (a game's button, a menu row), the icon's sign and the value.
+        assertEquals("${PluginJobsScreen.iconSign(PluginJobsScreen.iconOf(bytes))} 1.2/3.4 GB", PluginJobsScreen.oneLine(bytes, nowMs = 0L))
+        assertEquals("↓", PluginJobsScreen.iconSign(dev.droidtop.library.settings.JobIcon.DOWNLOAD))
+    }
 }

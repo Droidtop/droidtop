@@ -1659,6 +1659,8 @@ private fun CatalogMenuRow(
         progress = item.progress,
         progressLook = item.progressLook,
         progressParts = item.progressParts,
+        progressIcon = item.progressIcon,
+        progressValue = item.progressValue,
         statusMark = item.statusMark,
     )
 }

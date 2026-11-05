@@ -212,6 +212,20 @@ progress as a bar, ring or segmented bar; a job's state as its mark; quantities 
 connection and sync as glyphs; droidtop's badges as glyphs. Words and numbers go beside the drawing, never instead of
 it, every drawing keeps its words for a screen reader, and colour is never the only signal.
 
+**Status is an icon and a value, not a sentence** (owner, 2026-11-05, #886: "We can use icons to represent downloads
+vs uploads, and a fraction display (downloaded over total) to display the amount. Much more compact. We wanna use stuff
+like that as standard"; "the text constantly changes as progress updates, which takes up a lot of space"). Wherever it
+fits (jobs, transfers, storage, counts), in droidtop and Enginehost:
+- What it does is an icon: ↓ a download, ↑ an upload or a sync's push, and one each for install, update and check.
+  The word is the icon's description, for a screen reader and a hint, not text on screen.
+- How much is a fraction: `1.2/3.4 GB`, one unit after the total, both units when they differ (`640 MB/3.4 GB`), the
+  amount alone while the total is unknown, `12/40` for items. No "of", no state sentence.
+- Nothing reflows while it counts: the value sits in a box as wide as its widest value, in tabular figures; the bar
+  shows the motion; no other words in the row change with progress. The row reads `↓ ▬▬▬▭ 1.2/3.4 GB`.
+- Words appear only when the thing stands still and the reason matters (Paused, Waiting for Wi-Fi), and time left
+  and speed are on the job's own page.
+- Where only text fits (a button, a notification), the icon's sign and the value: `↓ 1.2/3.4 GB`.
+
 Chrome carries state or nothing (owner, 2026-10-29, #742: "2 is my choice. Have a contextual spot that shows an icon
 for whatever's currently happening"). An icon in a top bar earns its place by showing something: the bell only while
 something is unread, Friends only while a service reports presence, and one activity spot on the status pill for

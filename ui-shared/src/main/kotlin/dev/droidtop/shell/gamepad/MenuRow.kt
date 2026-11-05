@@ -223,6 +223,10 @@ fun MenuRow(
     progressLook: dev.droidtop.library.settings.JobLook? = dev.droidtop.library.settings.JobLook.of(progress),
     // A job counted in parts (CatalogItem.progressParts): its bar in that many segments (Droidtop/tracker#738).
     progressParts: Int = 0,
+    // A job's compact status (CatalogItem.progressIcon/progressValue, Droidtop/tracker#886): the icon before the bar
+    // and the fixed-width value after it ("1.2/3.4 GB").
+    progressIcon: dev.droidtop.library.settings.JobIcon? = null,
+    progressValue: String? = null,
     // One status glyph beside the title (CatalogItem.statusMark, Droidtop/tracker#644): a plugin that needs you.
     statusMark: dev.droidtop.library.settings.StatusMark? = null,
     // A leading picture the caller draws (an app's own icon in the task manager's list); [accent] and
@@ -340,10 +344,19 @@ fun MenuRow(
             }
             if (progress != null) {
                 Row(Modifier.padding(top = Space.Sm), verticalAlignment = Alignment.CenterVertically) {
+                    // ↓ ▬▬▬▭ 1.2/3.4 GB: what it does as an icon, how far as the bar, how much as a value of one fixed
+                    // width, so nothing in the row moves while it counts (owner, 2026-11-05, Droidtop/tracker#886).
+                    progressIcon?.let { icon ->
+                        JobIconGlyph(icon, MenuTokens.OnSurfaceMuted, Modifier.size(16.dp))
+                        Spacer(Modifier.width(Space.Sm))
+                    }
                     ShellProgressBar(progress, Modifier.weight(1f), progressLook ?: dev.droidtop.library.settings.JobLook.of(progress)!!, parts = progressParts)
-                    // The percent only where the cursor is, in figures that keep their width (Droidtop/tracker#643:
-                    // "Percent only on focus, in tabular figures").
-                    if (selected && progress >= 0f && progressLook == dev.droidtop.library.settings.JobLook.ACTIVE) {
+                    if (progressValue != null) {
+                        Spacer(Modifier.width(Space.Sm))
+                        CompactValue(progressValue, MaterialTheme.typography.labelSmall.tabularFigures(), MenuTokens.OnSurfaceMuted)
+                    } else if (selected && progress >= 0f && progressLook == dev.droidtop.library.settings.JobLook.ACTIVE) {
+                        // The percent only where the cursor is, in figures that keep their width (Droidtop/tracker#643:
+                        // "Percent only on focus, in tabular figures").
                         Spacer(Modifier.width(Space.Sm))
                         Text(
                             "${(progress * 100).toInt()}%",

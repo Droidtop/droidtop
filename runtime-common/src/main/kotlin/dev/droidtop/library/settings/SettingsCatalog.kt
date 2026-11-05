@@ -121,6 +121,13 @@ sealed interface CatalogItem {
      */
     val progressParts: Int get() = 0
 
+    /**
+     * A job row's compact status (Droidtop/tracker#886): the icon before its bar and the fixed-width value after it
+     * ("1.2/3.4 GB"), drawn in tabular figures so nothing in the row moves while it counts. Null for every other row.
+     */
+    val progressIcon: JobIcon? get() = null
+    val progressValue: String? get() = null
+
     /** One status glyph beside the name ([StatusMark]); null for a row that is fine or has no status. */
     val statusMark: StatusMark? get() = null
 
@@ -244,6 +251,8 @@ class ActionItem(
     override val progress: Float? = null,
     override val progressLook: JobLook? = JobLook.of(progress),
     override val progressParts: Int = 0,
+    override val progressIcon: JobIcon? = null,
+    override val progressValue: String? = null,
     override val statusMark: StatusMark? = null,
     override val chip: RowTag? = null,
     override val iconFile: String? = null,
@@ -481,6 +490,8 @@ class NestedScreenItem(
     override val progress: Float? = null,
     override val progressLook: JobLook? = JobLook.of(progress),
     override val progressParts: Int = 0,
+    override val progressIcon: JobIcon? = null,
+    override val progressValue: String? = null,
     override val statusMark: StatusMark? = null,
     override val chip: RowTag? = null,
     override val iconFile: String? = null,

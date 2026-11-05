@@ -21095,7 +21095,15 @@ its look is ACTIVE as soon as one does. The engine's transfer gets the size the 
 job's size for the download policy, else the file's declared size, which a source's descriptor, a file host's or
 debrid service's file list and the web view's Content-Length give), so a server that sends no length still gives a
 percent (held under 100 until the file is whole) and a total. A plugin's own download (`startDownload`) runs with its
-job's handle, so its bytes reach its row. A job row is its title, its bar or mark, and one short line under the title (where
+job's handle, so its bytes reach its row. **A job's status is an icon and a value on its bar** (owner, 2026-11-05, Droidtop/tracker#886, the rule in
+DESIGN-LANGUAGE.md "Status is an icon and a value, not a sentence"): a running row reads `↓ ▬▬▬▭ 1.2/3.4 GB`, the
+icon `PluginJobsScreen.iconOf` (`JobIcon`: download, upload, install for a store's install, update, check, sync, scan,
+work; its word is the description), the value `compactValue` (`ValueFormat.fraction`, `countFraction`, else the
+percent) in `CompactValue`, a box as wide as the widest value of its shape in tabular figures. The words under the
+title do not change while it counts (`standingLine`: the reason it stands still, else nothing, then who runs it);
+time left, speed and the percent are on the job's page. A text-only place (a game's button and menu row, Home's
+cards, the companion's Home, the widget) reads `oneLine`: the icon's sign and the value, `↓ 1.2/3.4 GB`. Updates'
+row shows the same value while it downloads. A job row is its title, its bar or mark, and one short line under the title (where
 it stands, who runs it); it has no value column, which in a narrow pane took the title's width and broke it mid-word
 ("Synct / hing"). Moved so far: the jobs list (Downloads, the Quick Menu's Downloads, Settings' "Downloads and
 installs"); the game menu's Downloads row; Home's activity spot; and on/off, which is a switch everywhere a state is
