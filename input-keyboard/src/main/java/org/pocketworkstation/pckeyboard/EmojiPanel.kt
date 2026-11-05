@@ -34,6 +34,9 @@ internal class EmojiBrowser(
     private val groupRow = LinearLayout(context)
     private var catalog: EmojiCatalog? = null
     private var selected: String = RECENT
+    // An emoji's skin tones, shown above the grid on a long press (Droidtop/tracker#903 H4).
+    private val toneRow = LinearLayout(context)
+    private val toneScroll = HorizontalScrollView(context)
 
     init {
         orientation = VERTICAL
@@ -53,6 +56,13 @@ internal class EmojiBrowser(
         header.addView(button(context.getString(R.string.emoji_search)) { onSearch() })
         header.addView(button(context.getString(R.string.tool_back)) { onBack() })
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        toneScroll.apply {
+            isHorizontalScrollBarEnabled = false
+            isFocusable = false
+            visibility = GONE
+            addView(toneRow)
+        }
+        addView(toneScroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         grid.apply {
             numColumns = GridView.AUTO_FIT
             columnWidth = dp(46)
@@ -61,6 +71,11 @@ internal class EmojiBrowser(
             selector = ColorDrawable(Color.TRANSPARENT)
             this.adapter = this@EmojiBrowser.adapter
             onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ -> onPick(this@EmojiBrowser.adapter.items[position]) }
+            // A long press on an emoji with skin tones offers them all; the one picked is typed and its tone kept.
+            onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
+                val entry = this@EmojiBrowser.adapter.items.getOrNull(position)?.let { catalog?.entryOf(it) }
+                if (entry == null || entry.variants.isEmpty()) false else { showTones(entry); true }
+            }
         }
         addView(grid, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         adapter.show(listOf(context.getString(R.string.emoji_loading)), loading = true)
@@ -79,9 +94,33 @@ internal class EmojiBrowser(
         catalog?.groups?.forEach { group -> groupRow.addView(button(groupLabel(context, group.id)) { select(group.id) }) }
     }
 
+    private fun showTones(entry: EmojiEntry) {
+        toneRow.removeAllViews()
+        (listOf(entry.emoji) + entry.variants).forEach { choice ->
+            toneRow.addView(
+                TextView(context).apply {
+                    text = choice
+                    textSize = 26f
+                    setTextColor(colors.text)
+                    setPadding(dp(8), dp(4), dp(8), dp(4))
+                    setOnClickListener {
+                        EmojiTones.toneOfPick(entry, choice)?.let { tone ->
+                            ToolsPrefs.prefs(context).edit().putInt(EmojiTones.PREF, tone).apply()
+                        }
+                        toneScroll.visibility = GONE
+                        onPick(choice)
+                    }
+                },
+            )
+        }
+        toneScroll.visibility = VISIBLE
+    }
+
     private fun select(id: String) {
         selected = id
-        val items = if (id == RECENT) recent() else catalog?.groups?.firstOrNull { it.id == id }?.entries?.map { it.emoji } ?: emptyList()
+        toneScroll.visibility = GONE
+        val tone = ToolsPrefs.prefs(context).getInt(EmojiTones.PREF, 0)
+        val items = if (id == RECENT) recent() else catalog?.groups?.firstOrNull { it.id == id }?.entries?.map { EmojiTones.shown(it, tone) } ?: emptyList()
         adapter.show(if (items.isEmpty() && id == RECENT) listOf(context.getString(R.string.emoji_recent_empty)) else items, loading = items.isEmpty())
     }
 
@@ -227,9 +266,11 @@ internal class EmojiSearchBar(
                 cells += this
                 results.addView(this)
             }
-            cell.text = entry.emoji
+            // In the skin tone last picked (Droidtop/tracker#903 H4).
+            val shown = EmojiTones.shown(entry, ToolsPrefs.prefs(context).getInt(EmojiTones.PREF, 0))
+            cell.text = shown
             cell.visibility = View.VISIBLE
-            cell.setOnClickListener { onPick(entry.emoji) }
+            cell.setOnClickListener { onPick(shown) }
         }
         for (i in found.size until cells.size) cells[i].visibility = View.GONE
     }

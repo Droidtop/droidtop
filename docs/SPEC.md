@@ -8975,6 +8975,12 @@ proposal) is not built; these helpers are in the one settings tree that already 
   width; the grid sits at its edge in the tool strip's key area, so with the strip off a right-hand grid is drawn
   at the left. A change rebuilds the input method's view (the setting's flags) or, for a panel droidtop draws,
   rebuilds its grid (`KeyboardPanel.rebuildKeys`).
+- **Skin tones (Droidtop/tracker#903 H4).** The emoji data's tone variants (the tab-indented lines of FlorisBoard's
+  CLDR list, five for one person, 25 for two) are kept on their emoji (`EmojiEntry.variants`). A long press on an emoji
+  that has them shows the plain emoji and every tone in a row above the grid; the one tapped is typed, and its tone is
+  kept (`EmojiTones`, `pref_emoji_skin_tone`) for the grid and search from then on: a one-person emoji in that tone, a
+  two-person one where both share it, as Gboard does. A mixed two-person pick is typed without changing the tone. An
+  emoji keeps its tones only while the device's font can draw all of them.
 - **More layouts.** Every locale Android reports is already selectable; the layouts are the existing `xml-*`
   folders and each locale's key text. Locales that have their own key text but were missing from the picker's
   5-row label list now carry it. A reader for HeliBoard-style text layouts is a later item on Droidtop/tracker#342.
