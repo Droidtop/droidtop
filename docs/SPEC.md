@@ -23560,6 +23560,10 @@ explain as a finding. The smoke review of v0.2.0-dev.2898 raised these; each is 
     *inside a container*: the image's own `/bin/su`, run by the container's root to drop a program to the user it
     asked for (`-u`, the image's `User`; #715, non-root first). It runs in the guest and only lowers privileges. Root
     on Android comes only through the enhanced privileges provider (#394); nothing in droidtop runs Android's `su`.
+    **Allowed** (the owner, 2026-11-05: "That's fine. It's not systemwide root"): the build review profile explains it
+    (`api_callers_ok`, source `runtime-common/src/main/kotlin/dev/droidtop/runtime/ContainerUser.kt:22-23`). The rule
+    "no su" is Android's: a container image's own `su`, run by the container's root to lower a program's privileges,
+    is not root on the device.
   - *Trust-all TLS in `org.bouncycastle.est`.* BouncyCastle's `bcpkix` bundles its EST client. droidtop uses
     `bcpkix` only to build its own adb key's certificate (`X500Name`, `JcaX509v3CertificateBuilder`,
     `JcaX509CertificateConverter`, `JcaContentSignerBuilder` in `WirelessDebuggingOps`) and imports nothing from
