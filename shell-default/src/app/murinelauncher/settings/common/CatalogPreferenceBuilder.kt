@@ -502,15 +502,13 @@ class CatalogPreferenceNavigator(
         focusRingAttached = true
         list.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
             override fun onChildViewAttachedToWindow(view: View) {
-                view.isFocusable = true
                 // Also focusable IN touch mode: a plain requestFocus() (the
                 // search-result focus above, and any future caller) is
                 // silently dropped by the framework in touch mode
                 // otherwise -- the same "requestFocus() in onCreate is not
                 // enough" trap DESIGN-LANGUAGE.md already names, here on a
                 // row reached by a tap rather than at screen-open time.
-                view.isFocusableInTouchMode = true
-                view.foreground = ContextCompat.getDrawable(view.context, R.drawable.catalog_row_focus_ring)
+                RowFocusRing.wear(view)
                 focusRowIfRestored(view)
             }
             override fun onChildViewDetachedFromWindow(view: View) {}

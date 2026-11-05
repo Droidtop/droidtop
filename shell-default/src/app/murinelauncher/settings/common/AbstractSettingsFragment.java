@@ -208,6 +208,8 @@ public abstract class AbstractSettingsFragment extends SettingsBasePreferenceFra
 
         // Sticky header support
         listView.post(this::setupStickyHeaders);
+        // droidtop patch: the catalog rows' focus ring on every page, stock ones included (Droidtop/tracker#705).
+        RowFocusRing.attach(listView);
     }
 
     /**
