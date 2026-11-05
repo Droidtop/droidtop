@@ -3719,9 +3719,13 @@ the mechanism things like f95 use to do atomic database syncs". That mechanism i
     tells the receiver, which reads the copy with `context.copy` and `context.open_file` and reports what it took.
   - The screen and the receiver's call are the next slice.
 - **An app with no exporter** (Syncthing-Fork keeps its state in its private folder):
-  - droidtop makes the copy itself, after the person's press. With root, it reads the app's files through a root
-    provider; it never holds root itself (Droidtop/tracker#852). Without root, it uses the app's own export, and the
+  - droidtop makes the copy itself, after the person's press. Without root, it uses the app's own export, and the
     copy says what is missing ("no index: a full rescan will follow").
+  - With root, the app's files are read through the **enhanced privileges provider**: the one provider host app
+    of Droidtop/tracker#852, which holds the device's elevated access. droidtop never holds root itself. The
+    owner, 2026-11-05: "the provider isn't the "shizuku" provider. It's the enhanced privileges provider, and
+    shizuku is one plugin that runs in it. Magisk's hooks are another". So the reader asks the host for root, and
+    whichever of its plugins holds root here serves the call.
   - **The owner, 2026-11-05: Fork is on Syncthing 2.0 ("It's on 2.0")**, so its index is taken as it is.
   - **Stopping the app first, the owner's decision 2026-11-05.** With root, droidtop says so and asks for a yes, then
     force-stops Syncthing-Fork and turns off its start-on-boot itself, before the plugin takes over the device ID.

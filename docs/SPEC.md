@@ -21819,7 +21819,9 @@ streamed by windowcast's host, which the agent embeds (Stream from
   moves a whole copy from one plugin to another that declares the same kind and version, and only reads the source.
   The first use is the owner's Syncthing-Fork setup into droidtop's Syncthing plugin. The owner's answers, 2026-11-05:
   - Fork is on Syncthing 2.0 ("It's on 2.0"), so its index is taken as it is.
-  - With root, reached only through a root provider, droidtop tells the person and asks for a yes, then force-stops
+  - With root, reached only through the enhanced privileges provider (the provider host of Droidtop/tracker#852;
+    the owner: "shizuku is one plugin that runs in it. Magisk's hooks are another"), droidtop tells the person and
+    asks for a yes, then force-stops
     Syncthing-Fork and turns off its start-on-boot itself, before the plugin takes over the device ID. Without root,
     it asks the person to stop Fork and waits.
 - **Paired devices for plugins** (`PairedDevices`, docs/plugin-api.md D21,
