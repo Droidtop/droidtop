@@ -22785,7 +22785,15 @@ client." The plan and its slices are on #645.
     system's document picker; the document's descriptor is handed to the library, so it is read where it is and never
     copied) and **Send text to ...**. Built to the recommendation, owner to confirm: received files share Type from
     another device's folder rather than a folder of their own.
-  - Clipboard and remote input follow in #645's slices 3 and 4; each will have its own switch.
+  - **clipboard (slice 3)**, both ways, under the shared clipboard's rules (`ClipRules`, "Type from another
+    device"): a paired device's clip is written to this one's (64 KB at most; nothing is shown, as in the official
+    apps). This device's clip is sent when it changes while Android lets droidtop see it (droidtop in front, or its
+    input method active: `addPrimaryClipChangedListener`), and by **Send clipboard** under Paired; a clip marked
+    sensitive, one that is not plain text, or one over 64 KB never leaves. On connecting, each side sends its clip
+    with the time it changed, and the newer one wins (kdeconnect-android's rule). A clip that just arrived is not
+    sent back. Built to the recommendation, owner to confirm: the clipboard is shared with every paired device by
+    default, as in the official apps.
+  - Remote input follows in #645's slice 4. Each plugin will have its own switch.
 - **Tailscale** is a VPN plugin, not a client of droidtop's own (owner, above). It feeds its tailnet's online devices
   to the same address list (`kdeconnect_addresses`), slice 5 of #645.
 

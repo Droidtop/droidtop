@@ -56,7 +56,7 @@ object KdeConnectCatalog {
             }
             val paired = devices.filter { it.paired }
             if (paired.isNotEmpty()) {
-                add(CatalogGroup(id = "kdeconnect_paired", title = "Paired", items = paired.flatMap { pairedRows(it) }))
+                add(CatalogGroup(id = "kdeconnect_paired", title = "Paired", items = paired.flatMap { pairedRows(it) } + clipboardRow()))
             }
             val others = devices.filter { !it.paired && it.reachable && it.pairing != "requested_by_peer" }
             add(
@@ -156,6 +156,14 @@ object KdeConnectCatalog {
             value = "",
             onChange = { _, text -> if (text.isNotBlank()) KdeConnect.shareText(d.id, text) },
         ),
+    )
+
+    /** Sends this device's clipboard to the paired devices now, for when it changed while droidtop was not in front. */
+    private fun clipboardRow() = AsyncActionItem(
+        id = "kdeconnect_send_clipboard",
+        title = "Send clipboard",
+        subtitle = "This device's clipboard to the paired devices. Never what is marked sensitive",
+        run = { ctx, _ -> dev.droidtop.app.KdeConnectNotification.sendClipboard(ctx) },
     )
 
     private fun availableRow(d: KdcDevice) = AsyncActionItem(
