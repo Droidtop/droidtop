@@ -26,7 +26,9 @@ serde_json = "1"
 
 [dev-dependencies]
 # The mesh test runs the real agent as one of its computers: droidtop-agent's service, at a release.
-droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", tag = "build-150" }
+# droidtop-agent ci/link-change fd46b33 (Droidtop/tracker#798): the agent on lib-sync 0.1.2, as this library is. build-150
+# is on lib-sync 0.1.1, and the test cannot link two sync-cores. Becomes the agent release that carries it.
+droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "fd46b3304805bd04ff1fc91700d827905b8a82bc" }
 droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.2" }
 
 [profile.release]
