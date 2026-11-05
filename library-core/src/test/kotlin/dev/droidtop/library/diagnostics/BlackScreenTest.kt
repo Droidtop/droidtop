@@ -31,6 +31,17 @@ class BlackScreenTest {
     }
 
     @Test
+    fun aTransparentCopyReadNothingAndIsNotDark() {
+        // Droidtop/tracker#896: a copy of a buffer the device cannot read comes back fully transparent.
+        val transparent = frame(fill = 0)
+        assertTrue(FrameDarkness.isUnreadable(transparent))
+        assertFalse(FrameDarkness.isFlatDark(transparent))
+        // Opaque black is a frame the renderer drew, and stays dark.
+        assertFalse(FrameDarkness.isUnreadable(frame()))
+        assertTrue(FrameDarkness.isFlatDark(frame()))
+    }
+
+    @Test
     fun theScreenIsSaidOnceAfterItHasBeenBlackLongEnough() {
         val watch = BlackScreenWatch(holdMs = 10_000)
         val said = (0L..30_000L step 2_000L).filter { watch.sample(it, windowShown = true, flatDark = true) }

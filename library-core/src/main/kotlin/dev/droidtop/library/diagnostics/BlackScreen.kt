@@ -12,9 +12,17 @@ object FrameDarkness {
     /** How much of the frame may be something else and still be a black screen: the pointer, a stray pixel. */
     const val NOT_DARK_ALLOWANCE = 0.02
 
-    /** Whether [argb] (packed ARGB pixels of one frame) is a black screen. An empty frame is not. */
+    /**
+     * Whether [argb] is not a frame the renderer drew at all: every pixel fully transparent. droidtop's renderers
+     * clear to opaque black and present opaque frames, so even a black screen they drew has alpha 255; a copy that
+     * comes back transparent read nothing (an emulator's GPU buffers that cannot be read back: Droidtop/tracker#896,
+     * Cult of the Lamb's bright title screen on BlueStacks noticed as black). Such a frame says nothing. Pure.
+     */
+    fun isUnreadable(argb: IntArray): Boolean = argb.isNotEmpty() && argb.all { (it ushr 24) == 0 }
+
+    /** Whether [argb] (packed ARGB pixels of one frame) is a black screen. An empty or unreadable frame is not. */
     fun isFlatDark(argb: IntArray): Boolean {
-        if (argb.isEmpty()) return false
+        if (argb.isEmpty() || isUnreadable(argb)) return false
         val allowed = (argb.size * NOT_DARK_ALLOWANCE).toInt()
         var bright = 0
         for (pixel in argb) {

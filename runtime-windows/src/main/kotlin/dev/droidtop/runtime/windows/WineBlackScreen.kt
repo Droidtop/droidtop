@@ -52,6 +52,8 @@ internal class WineBlackScreen(
 
     private val tick = Runnable { sample() }
 
+    private var lastLoggedMs = 0L
+
     /** Starts sampling (the screen is in front). */
     fun resume() {
         if (running) return
@@ -86,6 +88,15 @@ internal class WineBlackScreen(
             PixelCopy.request(view, frame, { result ->
                 val dark = result == PixelCopy.SUCCESS && run {
                     frame.getPixels(pixels, 0, frame.width, 0, 0, frame.width, frame.height)
+                    // What the copy read, once a minute: whether a device's copies are readable at all (#896).
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - lastLoggedMs >= 60_000) {
+                        lastLoggedMs = now
+                        android.util.Log.i(
+                            "droidtop.blackscreen",
+                            "sample: unreadable=${FrameDarkness.isUnreadable(pixels)} opaque=${pixels.count { (it ushr 24) == 0xFF }}/${pixels.size} flatDark=${FrameDarkness.isFlatDark(pixels)}",
+                        )
+                    }
                     FrameDarkness.isFlatDark(pixels)
                 }
                 if (watch.sample(SystemClock.elapsedRealtime(), windowShown(), dark)) {
