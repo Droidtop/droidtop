@@ -316,6 +316,9 @@ object PluginCatalog {
         if (latest.manifestSha256.equals(record.archiveDigest, ignoreCase = true)) return null
         val installed = plugin.releases.firstOrNull { it.manifestSha256.equals(record.archiveDigest, ignoreCase = true) }
         if (installed != null && (compareReleases(latest, installed) ?: 0) <= 0) return null
+        // A build the catalog does not list (from a repository's unstable line, a file) is judged by its own version:
+        // RetroArch 1.7.0 from its repository was offered the catalog's 1.6.0 as an update (Droidtop/tracker#882).
+        if (installed == null && Versions.compareLoose(latest.version, record.manifest.version) <= 0) return null
         return latest
     }
 

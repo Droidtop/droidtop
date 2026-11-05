@@ -25728,8 +25728,12 @@ what the index says is display data, never a trust decision.
   inconsistent, rather than droidtop guessing. A testing or unstable
   release is offered only on a channel that takes it. An installed plugin has
   an UPDATE when the newest stable release's `manifestSha256` differs
-  from the installed record's `archiveDigest` — version strings are
-  deliberately not compared, the digest is the identity. An installed
+  from the installed record's `archiveDigest`, the digest being the identity,
+  and the release is newer than the installed one: by the release order
+  above when the catalog lists the installed build, and by the installed
+  manifest's version when it does not (2026-11-05, Droidtop/tracker#882: the
+  rig had RetroArch 1.7.0 from its repository and was offered the catalog's
+  1.6.0 as an update; built to the recommendation, owner to confirm). An installed
   plugin with no catalog entry at all (side-loaded through the file
   picker) has no catalog update; that path is unchanged.
 - **Trust over updates.** This is the one rule the catalog changed in

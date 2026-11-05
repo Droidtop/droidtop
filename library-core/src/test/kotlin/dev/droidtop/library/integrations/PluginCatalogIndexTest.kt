@@ -347,6 +347,16 @@ class PluginCatalogIndexTest {
         assertEquals(newDigest, PluginCatalog.updateFor(index, record("f".repeat(64)))?.manifestSha256)
     }
 
+    @Test
+    fun `a build the catalog does not list is never offered an older or equal release`() {
+        // Droidtop/tracker#882: RetroArch 1.7.0 from its repository, the catalog's newest stable 1.6.0, offered as an update.
+        val plugin = channelled(Triple("stable", "1.6", "6".repeat(64)))
+        fun installed(version: String) = sampleRecord("f".repeat(64)).let { it.copy(manifest = it.manifest.copy(version = version)) }
+        assertNull("1.6 is older than the installed 1.7", PluginCatalog.updateFor(plugin, installed("1.7"), PluginChannel.STABLE))
+        assertNull("the same version is not an update", PluginCatalog.updateFor(plugin, installed("1.6"), PluginChannel.STABLE))
+        assertEquals("1.6", PluginCatalog.updateFor(plugin, installed("1.5"), PluginChannel.STABLE)?.version)
+    }
+
     private fun channelled(vararg releases: Triple<String, String, String>) = PluginCatalogPlugin(
         id = "droidtop.sample",
         label = "Sample",

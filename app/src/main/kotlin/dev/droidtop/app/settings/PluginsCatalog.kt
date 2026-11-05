@@ -1364,7 +1364,20 @@ internal fun AppSettingsCatalogs.pluginPageTop(
             id = "plugin_${m.id}_update_button",
             label = "Update to ${offer.release.version}",
             role = ButtonRole.PRIMARY,
-            run = { later { ctx -> withContext(Dispatchers.IO) { PluginCatalog.install(ctx, offer.plugin, offer.release) {} } } },
+            // Said at once and where its bar is, then how it ended: the press used to show nothing until the download and
+            // install were over, and a refusal read like any other line (Droidtop/tracker#882).
+            run = {
+                later { ctx ->
+                    Notices.flash("Updating ${m.label} to ${offer.release.version}. Its bar is in Downloads and installs", source = m.label, context = ctx)
+                    val outcome = withContext(Dispatchers.IO) { PluginCatalog.installOutcome(ctx, offer.plugin, offer.release) }
+                    if (outcome.installed) {
+                        outcome.line
+                    } else {
+                        Notices.flash(outcome.line, tone = dev.droidtop.library.settings.NoticeTone.Caution, source = m.label, context = ctx)
+                        null
+                    }
+                }
+            },
         )
         record.disabledReason != null -> buttons += PageButton(
             id = "plugin_${m.id}_retry",

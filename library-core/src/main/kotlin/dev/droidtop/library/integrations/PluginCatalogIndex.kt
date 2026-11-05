@@ -17,7 +17,7 @@ import java.time.Instant
 data class PluginCatalogBundle(val name: String, val url: String, val size: Long, val sha256: String)
 
 data class PluginCatalogRelease(
-    /** The manifest's own version string: display only, never compared (the digest is the identity). */
+    /** The manifest's own version string. The digest is the identity; the version only orders releases (SPEC 12a). */
     val version: String,
     /** "stable" | "testing" | "unstable"; droidtop offers stable-stream releases only. */
     val stream: String,
