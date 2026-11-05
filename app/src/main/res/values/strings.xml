@@ -171,4 +171,7 @@
     <string name="terminal_hint_keyboard">Keyboard</string>
     <string name="terminal_hint_close">Close</string>
     <string name="terminal_clip_label">Terminal text</string>
+    <string name="language_title">Language</string>
+    <string name="language_subtitle">The language droidtop\'s own screens use. Games, apps and themes keep their own</string>
+    <string name="language_follow_android">Follow Android</string>
 </resources>

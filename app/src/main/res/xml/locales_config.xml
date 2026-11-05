@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The languages droidtop's own screens are shipped in (docs/SPEC.md 7k, "Language is part of the system";
+  Droidtop/tracker#627). Android 13 and later list exactly these in the system's per-app language screen, and
+  droidtop's Settings, Appearance, Language reads the same list (AppLanguage). A language joins here in the commit that
+  lands its translation from Weblate, never before. It is written by hand, not generated: the vendored Launcher3 and
+  keyboard carry dozens of languages that droidtop's own screens do not have.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+</locale-config>

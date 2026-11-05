@@ -120,7 +120,21 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:theme="@style/Theme.DroidTop"
+        android:localeConfig="@xml/locales_config"
         tools:replace="android:label,android:icon,android:roundIcon,android:name">
+
+        <!--
+          droidtop's own language (Settings, System, Language; Droidtop/tracker#627): AppCompat keeps the choice
+          itself before Android 13, which keeps it per app from then on.
+        -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
 
         <!--
           The published build is not debuggable, which is what makes it fast,

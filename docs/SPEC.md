@@ -21162,7 +21162,21 @@ underscores, and dashes when there are two or more, become spaces in a name with
 the stored title is untouched, so matching and keys do not move.
 
 **Language is part of the system.** Every user-facing string in droidtop's own chrome is a
-string resource, and English is the source language. A sentence is one resource with
+string resource, and English is the source language. **Translation is Weblate's, and the English people read is a
+translation too** (owner, 2026-11-05, Droidtop/tracker#627: "We don't handle translations ourselves immediately.
+We're just putting the groundwork in place to trivialize it", and "Weblate. Can we also ask for better english
+strings, since our current ones are terrible?"). `values/strings.xml` is the developers' English, Weblate's source
+language "English (developer)" (`en_DEVEL`); `values-en/strings.xml` is a curated English made on Weblate, which
+Android shows to English readers with the developers' English as its fallback, string by string, so contributors
+improve the English without touching code and flag a poor source string there. Weblate pushes to `ci/weblate-<module>`
+branches, never to main. The languages droidtop ships are `res/xml/locales_config.xml` (English only for now), written
+by hand, since the vendored Launcher3 and keyboard carry languages droidtop's own screens do not have; it is the list
+Android 13's per-app language screen shows and Settings > Appearance > **Language** (with Accessibility) offers (`AppLanguage`: Follow Android,
+the default, or a shipped language in its own name, kept by AppCompat's per-app locale, which before Android 13 its
+`AppLocalesMetadataHolderService` stores). A count's words are a `<plurals>` resource read through `plural(...)`
+(`Words.plural`), never `if (n == 1)` in Kotlin; the 63 such sites that remain are converted as their files leave the
+`catalog-literals` and `literal-text` allowlists. How to contribute and what the Weblate project needs:
+docs/translation.md. A sentence is one resource with
 placeholders, never assembled in Kotlin from fragments, because word order is a property of a
 language and not of the code. Plurals use plural resources. A translation is a set of the same
 resources in another language; a string with no translation falls back to English per string,
