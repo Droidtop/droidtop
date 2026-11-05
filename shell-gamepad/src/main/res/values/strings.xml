@@ -160,4 +160,11 @@
     <string name="gamepad_games">Games</string>
     <string name="gamepad_sources_unreachable">Could not reach your sources</string>
     <string name="gamepad_sources_unreachable_line">Check the connection, then try again</string>
+    <string name="gamepad_bring_back_saves_from_x">Bring back saves from %1$s</string>
+    <string name="gamepad_bring_back_saves_from_x_question">Bring back the saves from %1$s?</string>
+    <string name="gamepad_bring_back_saves_detail">The saves here now are kept as a copy, so you can switch back the same way.</string>
+    <string name="gamepad_bring_them_back">Bring them back</string>
+    <string name="gamepad_keep_these_saves">Keep these saves</string>
+    <string name="gamepad_bringing_back">Bringing back…</string>
+    <string name="gamepad_kept_copy_files_x">%1$d files, kept when a save conflict was settled</string>
 </resources>

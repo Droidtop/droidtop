@@ -170,6 +170,19 @@ object StoreSaves {
     }
 
     /** Where [entryId]'s saves are synced: the folder droidtop gives Enginehost for it, else the Wine runtime's prefix. */
+    /** The kept copies of [entryId]'s saves a settled conflict left (Droidtop/tracker#822), newest first. Off the main thread. */
+    suspend fun keptCopies(context: Context, entryId: String): List<ComputerSaves.KeptCopy> = withContext(Dispatchers.IO) {
+        if (Computers.list(context).isEmpty()) emptyList() else runCatching { ComputerSaves.keptCopies(context, entryId) }.getOrDefault(emptyList())
+    }
+
+    /** Brings [copy] back as [entryId]'s saves here: the line to show, and whether it worked. Off the main thread. */
+    suspend fun restore(context: Context, entryId: String, title: String, copy: ComputerSaves.KeptCopy): Pair<String, Boolean> =
+        withContext(Dispatchers.IO) {
+            val prefix = prefixOf(context, entryId) ?: return@withContext "The game's files are not on this device" to false
+            runCatching { ComputerSaves.restore(context, entryId, title, prefix, copy) }
+                .getOrElse { (it.message ?: it.javaClass.simpleName) to false }
+        }
+
     private fun prefixOf(context: Context, entryId: String): WinePrefixLocation? =
         EnginehostSaves.prefixFor(context, entryId) ?: locator?.locate(context, entryId)
 

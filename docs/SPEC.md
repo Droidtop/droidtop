@@ -22320,8 +22320,17 @@ Pythia (bi0shacker001/pythia) is a game manager for the computer. It does droidt
     `[{device, files, newest_ms}]`; `device` is what `restore_saves` takes.
     The layout stays lib-sync's (`savesync::copy_dir`, `copy_files`).
   - The computer's side is the agent's `Agent::restore_saves` (lib-saves
-    `Saves::restore`), the same rule. The game page's row per kept copy
-    ("Bring back the saves from <device>") is still to come.
+    `Saves::restore`), the same rule.
+  - **On the game page** (Droidtop/tracker#822): Details has one row per kept
+    copy over every paired computer's archive for the game, newest first
+    (`ComputerSaves.keptCopies`, read off the main thread and again after a
+    sync or a restore): "Bring back saves from PC", when that copy's newest
+    file is from, and how many files. A asks once, the shell's one
+    confirmation ("Keep these saves" first and under the cursor, then "Bring
+    them back"), and says that what is here is kept as a copy; while it runs
+    the row reads "Bringing back…" and no other copy can start; the result is
+    a notice ("Saves from PC are back: 3 files (this device's 2 are kept as a
+    copy)"). `AgentNative.callList` reads `kept_saves`'s list answer.
 - **A computer that does not answer** is normal away from home. It is
   recorded on its row and is not shown at launch. It is shown when the
   person started the sync. After a game ends, with a cloud folder set, the

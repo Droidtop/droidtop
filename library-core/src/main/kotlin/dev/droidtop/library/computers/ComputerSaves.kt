@@ -154,4 +154,52 @@ object ComputerSaves {
         val there = side(reply.optJSONObject("there"), computer) ?: return null
         return SaveConflict(localLabel?.let { here.copy(device = it) } ?: here, there, computer, computer = true, kept = true)
     }
+
+    /**
+     * A copy of a game's saves kept when a sync overwrote one side (Droidtop/tracker#822): in [computer]'s archive for
+     * the game, the set [device] had ([files] files, newest [newestMs]). [device] is the name `restore_saves` takes.
+     */
+    data class KeptCopy(val computer: Computer, val device: String, val files: Int, val newestMs: Long)
+
+    /** The kept copies of [entryId]'s saves, newest first, over every paired computer. Disk work: never on the main thread. */
+    fun keptCopies(context: Context, entryId: String): List<KeptCopy> = Computers.list(context).flatMap { computer ->
+        val archive = File(Computers.stateDir(context, computer), "archive/${fileKey(entryId)}")
+        if (!archive.isDirectory) return@flatMap emptyList()
+        val list = dev.droidtop.net.peer.AgentNative.callList("kept_saves", JSONObject().put("archive", archive.absolutePath))
+            .getOrNull() ?: return@flatMap emptyList()
+        (0 until list.length()).mapNotNull { i ->
+            list.optJSONObject(i)?.let { o -> KeptCopy(computer, o.optString("device"), o.optInt("files"), o.optLong("newest_ms")) }
+                ?.takeIf { it.device.isNotBlank() && it.files > 0 }
+        }
+    }.sortedByDescending { it.newestMs }
+
+    /**
+     * Puts [copy] back as [entryId]'s saves on this device (`restore_saves`, Droidtop/tracker#822). What is here now is
+     * kept first as this device's own copy, so a restore is undone the same way. The line to show, and whether it
+     * worked. Disk work: never on the main thread.
+     */
+    fun restore(context: Context, entryId: String, title: String, prefix: WinePrefixLocation, copy: KeptCopy): Pair<String, Boolean> {
+        val dir = Computers.stateDir(context, copy.computer)
+        val key = fileKey(entryId)
+        val args = JSONObject()
+            .put("game", JSONObject().put("key", entryId).put("title", title))
+            .put("prefix", File(prefix.prefixDir, "drive_c").absolutePath)
+            .put("user", prefix.user)
+            .put("baseline", File(dir, "saves/$key.json").absolutePath)
+            .put("archive", File(dir, "archive/$key").absolutePath)
+            .put("name", Computers.deviceName(context))
+            .put("device", copy.device)
+            .apply { bases[entryId]?.let { put("base", it) } }
+        val reply = dev.droidtop.net.peer.AgentNative.call("restore_saves", args)
+        dev.droidtop.net.peer.AgentNative.failure(reply)?.let { return it to false }
+        val restored = reply.optInt("restored")
+        val kept = reply.optInt("kept")
+        val line = if (kept > 0) {
+            "Saves from ${copy.device} are back: $restored files (this device's $kept are kept as a copy)"
+        } else {
+            "Saves from ${copy.device} are back: $restored files"
+        }
+        Computers.noteSync(context, copy.computer.id, line)
+        return line to true
+    }
 }

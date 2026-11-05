@@ -1,5 +1,6 @@
 package dev.droidtop.net.peer
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -30,6 +31,21 @@ object AgentNative {
         if (!loaded) return JSONObject().put("error", "this build of droidtop has no computer sync library")
         return runCatching { JSONObject(nativeCall(op, args.toString())) }
             .getOrElse { JSONObject().put("error", it.message ?: it.javaClass.simpleName) }
+    }
+
+    /**
+     * An operation whose answer is a list (`kept_saves`): the list, or the reply's failure as the one line to show.
+     * Blocks like [call].
+     */
+    fun callList(op: String, args: JSONObject = JSONObject()): Result<JSONArray> {
+        if (!loaded) return Result.failure(IllegalStateException("this build of droidtop has no computer sync library"))
+        val text = runCatching { nativeCall(op, args.toString()) }.getOrElse { return Result.failure(it) }
+        return if (text.trimStart().startsWith("[")) {
+            runCatching { JSONArray(text) }
+        } else {
+            val reply = runCatching { JSONObject(text) }.getOrElse { return Result.failure(it) }
+            Result.failure(IllegalStateException(failure(reply) ?: "it gave no list"))
+        }
     }
 
     /** The reply's failure, as the one line to show, or null when it succeeded. */

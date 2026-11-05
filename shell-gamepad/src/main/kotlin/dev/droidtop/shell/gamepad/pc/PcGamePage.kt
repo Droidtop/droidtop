@@ -289,6 +289,13 @@ internal fun PcGamePage(
         value = withContext(Dispatchers.IO) { dev.droidtop.library.SetVersions.get(context, entry.id) }
     }
     var cloudToken by remember(entry.id) { mutableIntStateOf(0) }
+    // The copies a settled save conflict kept (Droidtop/tracker#822): each can be brought back from Details. Read off the
+    // main thread, again after a sync or a restore.
+    val keptCopies by produceState(emptyList<dev.droidtop.library.computers.ComputerSaves.KeptCopy>(), entry.id, cloudToken) {
+        value = dev.droidtop.library.stores.StoreSaves.keptCopies(context, entry.id)
+    }
+    var restoreAsk by remember(entry.id) { mutableStateOf<dev.droidtop.library.computers.ComputerSaves.KeptCopy?>(null) }
+    var restoring by remember(entry.id) { mutableStateOf<dev.droidtop.library.computers.ComputerSaves.KeptCopy?>(null) }
     var cloudStatus by remember(entry.id) { mutableStateOf<String?>(null) }
     val cloudStore = remember(entry) {
         (dev.droidtop.library.PcSource.of(entry) as? dev.droidtop.library.PcSource.Store)?.let { dev.droidtop.library.stores.StoreLibraries.byId(it.storeId) }
@@ -492,9 +499,12 @@ internal fun PcGamePage(
         )
     }
     val tabs = remember { PageTab.values() }
-    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, driversFact?.value, infoRows, copies, oldRows) {
+    val keptRows = remember(keptCopies, restoring) {
+        keptSaveRows(keptCopies, restoring, System.currentTimeMillis()) { copy -> restoreAsk = copy }
+    }
+    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, driversFact?.value, infoRows, copies, oldRows, keptRows) {
         groupRowsByTab(
-            rows + copies + oldRows + listOfNotNull(programFact, driversFact) + pluginRows.facts + infoRows.map { it.toPageFact(context) { screen -> infoScreen = screen } },
+            rows + copies + oldRows + listOfNotNull(programFact, driversFact) + pluginRows.facts + keptRows + infoRows.map { it.toPageFact(context) { screen -> infoScreen = screen } },
             parts,
         )
     }
@@ -873,6 +883,27 @@ internal fun PcGamePage(
     }
     PluginPageScreen(pluginRows)
     programScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { programScreen = null }) }
+    // Bringing back a kept copy replaces the saves here, which are kept as a copy first (Droidtop/tracker#822): asked
+    // once, the safe choice first and under the cursor (the shell's one confirmation).
+    restoreAsk?.let { copy ->
+        dev.droidtop.shell.gamepad.ConfirmDialog(
+            question = words(R.string.gamepad_bring_back_saves_from_x_question, copy.device),
+            detail = words(R.string.gamepad_bring_back_saves_detail),
+            action = words(R.string.gamepad_bring_them_back),
+            keep = words(R.string.gamepad_keep_these_saves),
+            onConfirm = {
+                restoreAsk = null
+                restoring = copy
+                scope.launch {
+                    val (line, _) = dev.droidtop.library.stores.StoreSaves.restore(context, entry.id, GameNaming.displayName(entry.title), copy)
+                    restoring = null
+                    dev.droidtop.library.settings.Notices.flash(line, context = context)
+                    cloudToken++
+                }
+            },
+            onCancel = { restoreAsk = null },
+        )
+    }
     infoScreen?.let { screen -> dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { infoScreen = null }) }
     copyOptions?.let { copy ->
         val from = dev.droidtop.library.originLabel(copy, 1).full
@@ -1877,6 +1908,31 @@ internal const val HERO_MIN_WIDTH_PX = 320
 
 /** Whether hero art this many pixels wide would be blown up to fill the band. Pure. */
 internal fun isNarrowHeroArt(widthPx: Float): Boolean = widthPx > 0f && widthPx < HERO_MIN_WIDTH_PX
+
+/**
+ * One Details row per kept copy of the game's saves (Droidtop/tracker#822): "Bring back saves from PC", when that copy's
+ * newest file is from and how many files, and A asks before putting it back. The copy [restoring] reads as under way.
+ * Pure.
+ */
+internal fun keptSaveRows(
+    copies: List<dev.droidtop.library.computers.ComputerSaves.KeptCopy>,
+    restoring: dev.droidtop.library.computers.ComputerSaves.KeptCopy?,
+    now: Long,
+    onRestore: (dev.droidtop.library.computers.ComputerSaves.KeptCopy) -> Unit,
+): List<PageFact> = copies.map { copy ->
+    val busy = copy == restoring
+    PageFact(
+        title = words(R.string.gamepad_bring_back_saves_from_x, copy.device),
+        value = if (busy) {
+            words(R.string.gamepad_bringing_back)
+        } else {
+            dev.droidtop.library.format.ValueFormat.daysAgo(now, copy.newestMs).replaceFirstChar { it.uppercase() }
+        },
+        subtitle = words(R.string.gamepad_kept_copy_files_x, copy.files),
+        onActivate = if (restoring == null) ({ onRestore(copy) }) else null,
+        tab = PageTab.DETAILS,
+    )
+}
 
 /** The one quiet line under the home's hero card: "Played yesterday · 2 h 5 min". */
 internal fun heroCaption(entry: LibraryEntry, now: Long): String {
