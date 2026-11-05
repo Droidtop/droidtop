@@ -21961,6 +21961,9 @@ Pythia (bi0shacker001/pythia) is a game manager for the computer. It does droidt
     nothing kept.
   - It answers `restored` and `kept` (file counts). The next sync sees this
     device's set changed and offers it to the computer as usual.
+  - `kept_saves {archive}` lists the copies kept for a game, newest first, as
+    `[{device, files, newest_ms}]`; `device` is what `restore_saves` takes.
+    The layout stays lib-sync's (`savesync::copy_dir`, `copy_files`).
   - The computer's side is the agent's `Agent::restore_saves` (lib-saves
     `Saves::restore`), the same rule. The game page's row per kept copy
     ("Bring back the saves from <device>") is still to come.

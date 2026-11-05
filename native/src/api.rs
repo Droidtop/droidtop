@@ -61,6 +61,7 @@ pub fn call(op: &str, args: &str) -> String {
         "find" => find(&args),
         "sync_saves" => sync_saves(&args),
         "restore_saves" => restore_saves(&args),
+        "kept_saves" => kept_saves(&args),
         "sync_library" => sync_library(&args),
         "sync_context" => sync_context(&args),
         "sync_context_copy" => sync_context_copy(&args),
@@ -410,6 +411,37 @@ fn sync_saves(args: &Value) -> Outcome {
     let v = located(serde_json::to_value(outcome?)?, &s);
     bye(s);
     Ok(v)
+}
+
+/// The copies of a game's saves this device keeps (Droidtop/tracker#822), for the game page's rows: each
+/// device's newest copy, kept when its saves were replaced. Arguments: `archive` (the game's archive folder,
+/// as `sync_saves` and `restore_saves` take it). The reply: `[{device, files, newest_ms}]`, newest first;
+/// `device` is what `restore_saves` takes to bring that copy back, `files` how many save files it holds, and
+/// `newest_ms` its newest file's time. The layout is lib-sync's: the folder is `savesync::copy_dir`'s, and
+/// the files `savesync::copy_files` (which leaves out a copy's bookkeeping). A game with none answers `[]`.
+fn kept_saves(args: &Value) -> Outcome {
+    let archive = args["archive"].as_str().map(PathBuf::from).ok_or_else(|| Failure::Error("no archive folder was given".into()))?;
+    let Some(copies) = savesync::copy_dir(&archive, "device").parent().map(PathBuf::from) else {
+        return Ok(json!([]));
+    };
+    let mut kept: Vec<(i64, Value)> = Vec::new();
+    for entry in std::fs::read_dir(&copies).into_iter().flatten().flatten().filter(|e| e.path().is_dir()) {
+        let files = savesync::copy_files(&entry.path());
+        if files.is_empty() {
+            continue;
+        }
+        let newest_ms = files
+            .iter()
+            .filter_map(|(_, p)| std::fs::metadata(p).and_then(|m| m.modified()).ok())
+            .filter_map(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as i64)
+            .max()
+            .unwrap_or(0);
+        let device = entry.file_name().to_string_lossy().into_owned();
+        kept.push((newest_ms, json!({ "device": device, "files": files.len(), "newest_ms": newest_ms })));
+    }
+    kept.sort_by_key(|k| std::cmp::Reverse(k.0));
+    Ok(Value::Array(kept.into_iter().map(|(_, v)| v).collect()))
 }
 
 /// Puts a kept copy of a game's saves back on this device
@@ -1019,6 +1051,16 @@ mod restore_tests {
         let reply: Value = serde_json::from_str(&call("restore_saves", &undo.to_string())).unwrap();
         assert_eq!(reply, json!({ "restored": 1, "kept": 0 }), "{reply}");
         assert_eq!(fs::read_to_string(base.join("save.dat")).unwrap(), "handheld");
+
+        // Both devices' copies are listed, each by the name restore_saves takes.
+        let listed: Value = serde_json::from_str(&call("kept_saves", &json!({ "archive": archive }).to_string())).unwrap();
+        let mut devices: Vec<(String, u64)> =
+            listed.as_array().unwrap().iter().map(|c| (c["device"].as_str().unwrap().to_string(), c["files"].as_u64().unwrap())).collect();
+        devices.sort();
+        assert_eq!(devices, [("Handheld".to_string(), 1), ("PC".to_string(), 1)], "{listed}");
+        assert!(listed[0]["newest_ms"].as_i64().unwrap() > 0, "{listed}");
+        let none: Value = serde_json::from_str(&call("kept_saves", &json!({ "archive": root.join("other") }).to_string())).unwrap();
+        assert_eq!(none, json!([]));
 
         // No copy from a device, or no spec yet: refused, nothing touched.
         let none: Value = serde_json::from_str(&call(
