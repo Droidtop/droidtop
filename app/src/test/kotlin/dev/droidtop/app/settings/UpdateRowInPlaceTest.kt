@@ -22,7 +22,7 @@ class UpdateRowInPlaceTest {
     fun installWords() = WordsForTests.install()
 
     // Built after installWords: a property initializer runs before @Before.
-    private val row by lazy {
+    private val rowItem by lazy {
         UpdatesPage.sourceUpdateRow(
             library = { error("the library is asked for only when the update's screen is opened") },
             entryId = "/games/30 Year Old Virgin 0.37",
@@ -33,6 +33,7 @@ class UpdateRowInPlaceTest {
 
     @Test
     fun `A on a game's update row pushes the update's own screen and runs nothing`() {
+        val row = rowItem
         assertTrue(row is NestedScreenItem)
         assertFalse(row is ActionItem || row is AsyncActionItem)
         val screen = (row as NestedScreenItem).resolve()
@@ -42,6 +43,7 @@ class UpdateRowInPlaceTest {
 
     @Test
     fun `the row says both versions, installed first, in the one row line`() {
+        val row = rowItem
         val nested = row as NestedScreenItem
         assertTrue(nested.subtitle!!.startsWith("v0.37 → v0.38 · from its source"))
         // The value column's line; the label needs no context, but a JVM test has no Android to give it one.
