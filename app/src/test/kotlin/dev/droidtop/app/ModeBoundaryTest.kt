@@ -61,6 +61,7 @@ class ModeBoundaryTest {
         "app/src/main/kotlin/dev/droidtop/app/update/UpdateRelaunch.kt" to (1 to "after droidtop updates itself, it starts again where Home goes"),
         "plugin-host/src/main/kotlin/dev/droidtop/pluginhost/BrokerAskActivity.kt" to (1 to "its own extra of the same name, not a mode"),
         "plugin-host/src/main/kotlin/dev/droidtop/pluginhost/PluginBrokers.kt" to (1 to "asks which app is the home screen, starts nothing"),
+        "runtime-common/src/main/kotlin/dev/droidtop/runtime/requirements/Requirements.kt" to (1 to "the Home role's requirement asks which app opens on Home; starts nothing"),
         "runtime-common/src/main/kotlin/dev/droidtop/runtime/tasks/TaskManager.kt" to (2 to "an ended app leaves the screen by a Home press marked for the mode in use (Modes.EXTRA_MODE_IN_USE); and a query"),
         "shell-default/src/com/android/launcher3/dragndrop/AddItemActivity.java" to (1 to "upstream Launcher3's own home check"),
         "shell-default/src/com/android/launcher3/Launcher.java" to (1 to "Standard's launcher reading the drawer intent it was sent; starts nothing"),
