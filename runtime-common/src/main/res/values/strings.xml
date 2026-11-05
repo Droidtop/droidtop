@@ -235,7 +235,14 @@
     <string name="gaming_how_soon_after_a_tap_your">How soon after a tap your finger must come back down to drag instead of clicking</string>
     <string name="gaming_name_x">Name: %1$s</string>
     <string name="gaming_screensaver">Screensaver</string>
-    <string name="gaming_library_artwork">Library artwork</string>
+    <string name="gaming_screensaver_page_subtitle">When it shows, and what: covers, screenshots, a clock or black</string>
+    <string name="gaming_screensaver_when">When</string>
+    <string name="gaming_screensaver_when_subtitle">After the shell sits idle this long; Android\'s screen timeout still turns the panel off</string>
+    <string name="gaming_screensaver_shows">Shows</string>
+    <string name="gaming_screensaver_dim">Dim</string>
+    <string name="gaming_screensaver_dim_subtitle">Darker, for a dark room and less burn-in</string>
+    <string name="gaming_screensaver_show_name">Show the game\'s name</string>
+    <string name="gaming_screensaver_show_name_subtitle">Under covers and screenshots</string>
     <string name="gaming_while_a_game_runs">While a game runs</string>
     <string name="gaming_android_keyboard_on_second_screen">Android keyboard on second screen</string>
     <string name="gaming_keyboard_displays_on">Keyboard displays on</string>

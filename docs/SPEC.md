@@ -13779,6 +13779,12 @@ The setting has one definition (`ScreensaverPrefs`) that the row writes
 and the shell's idle timer OBSERVES: the row lives inside the shell, so a
 value read once at start left a newly chosen timer on Off until the app
 restarted (rig, build 814).
+**Built (Droidtop/tracker#726):** Settings > Shell behaviour > Screensaver is a page: When (Off, 2, 5 or 10
+minutes), Shows (Game covers, Screenshots, Clock or Black), Dim and Show the game's name, all in
+`ScreensaverPrefs` (`ScreensaverLook`) and observed live. Screenshots are the entries' scraped
+`screenshot` media, looked up on IO (200 at most); the clock moves to a new spot each minute against
+burn-in; Dim draws the whole screensaver at 35%. Still to build: video, a source of favourites or one
+collection, the interval, and A launching the game shown.
 
 **Sleep and return to game (decided 2026-10-09, Droidtop/tracker#86).** The model is the Steam
 Deck's: while a game runs the console never sleeps on its own, the person sleeps it with the power

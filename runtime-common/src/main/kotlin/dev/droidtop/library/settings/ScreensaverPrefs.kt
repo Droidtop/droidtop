@@ -18,8 +18,26 @@ enum class ScreensaverMode(val label: String, val idleSeconds: Int) {
     AFTER_10("After 10 minutes", 600),
 }
 
+/** What the screensaver shows (Droidtop/tracker#726), as ES-DE offers a choice of slideshow. */
+enum class ScreensaverContent(val label: String) {
+    COVERS("Game covers"),
+    SCREENSHOTS("Screenshots"),
+    CLOCK("Clock"),
+    BLACK("Black"),
+}
+
+/** The screensaver's whole look: what it shows, whether it is dimmed, and whether the game's name is under it. */
+data class ScreensaverLook(
+    val content: ScreensaverContent = ScreensaverContent.COVERS,
+    val dim: Boolean = false,
+    val showName: Boolean = true,
+)
+
 object ScreensaverPrefs {
     private const val KEY_MODE = "droidtop_screensaver_mode"
+    private const val KEY_CONTENT = "droidtop_screensaver_content"
+    private const val KEY_DIM = "droidtop_screensaver_dim"
+    private const val KEY_SHOW_NAME = "droidtop_screensaver_show_name"
 
     // OFF by default (directed): a slideshow that appears on its own
     // is an interruption unless somebody asked for it.
@@ -48,6 +66,39 @@ object ScreensaverPrefs {
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         trySend(mode(context))
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    fun look(context: Context): ScreensaverLook {
+        val p = prefs(context)
+        val content = p.getString(KEY_CONTENT, null)?.let { raw -> runCatching { ScreensaverContent.valueOf(raw) }.getOrNull() }
+        return ScreensaverLook(
+            content = content ?: ScreensaverContent.COVERS,
+            dim = p.getBoolean(KEY_DIM, false),
+            showName = p.getBoolean(KEY_SHOW_NAME, true),
+        )
+    }
+
+    fun setContent(context: Context, content: ScreensaverContent) {
+        prefs(context).edit().putString(KEY_CONTENT, content.name).apply()
+    }
+
+    fun setDim(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_DIM, on).apply()
+    }
+
+    fun setShowName(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SHOW_NAME, on).apply()
+    }
+
+    /** The look now and every change to it, as [changes] does for the mode. */
+    fun lookChanges(context: Context): Flow<ScreensaverLook> = callbackFlow {
+        val prefs = prefs(context)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key == KEY_CONTENT || key == KEY_DIM || key == KEY_SHOW_NAME) trySend(look(context))
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(look(context))
         awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 

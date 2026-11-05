@@ -72,6 +72,10 @@ object GamingSettingsCatalog {
     const val ID_SCRAPER = "pref_gaming_scraper"
     const val ID_ACCOUNTS_AND_SOURCES = "pref_gaming_accounts_and_sources"
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
+    const val ID_SCREENSAVER_PAGE = "pref_gaming_screensaver_page"
+    const val ID_SCREENSAVER_CONTENT = "pref_gaming_screensaver_content"
+    const val ID_SCREENSAVER_DIM = "pref_gaming_screensaver_dim"
+    const val ID_SCREENSAVER_NAME = "pref_gaming_screensaver_name"
     const val ID_GAME_AWAKE = "pref_gaming_game_awake"
     const val ID_UI_MODE = "pref_gaming_ui_mode"
     const val ID_CONSOLE_SYSTEMS = "pref_gaming_console_systems"
@@ -1484,22 +1488,64 @@ object GamingSettingsCatalog {
         }
     }
 
-    private fun screensaverItem(context: Context) = ChoiceItem(
-        id = ID_SCREENSAVER,
+    // The screensaver's page (Droidtop/tracker#726): when it shows, what it shows, dimmed or not, and the game's name.
+    private fun screensaverItem(context: Context) = NestedScreenItem(
+        id = ID_SCREENSAVER_PAGE,
         title = words(R.string.gaming_screensaver),
-        // Android's own screen timeout still turns the
-        // panel off, and it wins when it is the shorter
-        // (docs/SPEC.md 7f, "Screensaver").
-        subtitle = words(R.string.gaming_library_artwork),
-        options = ScreensaverMode.entries.map { ChoiceOption(it.name, it.label) },
-        current = ScreensaverPrefs.mode(context).name,
-        onSelect = { ctx, value ->
-            ScreensaverPrefs.setMode(
-                ctx,
-                runCatching { ScreensaverMode.valueOf(value) }.getOrDefault(ScreensaverMode.OFF),
-            )
-        },
+        subtitle = words(R.string.gaming_screensaver_page_subtitle),
+        valueLabel = { ctx -> ScreensaverPrefs.mode(ctx).label },
+        icon = CatalogIcon.SCREENSAVER,
+        inline = CatalogScreen(
+            id = "screensaver",
+            title = words(R.string.gaming_screensaver),
+            groups = { ctx -> listOf(CatalogGroup(id = "screensaver_rows", title = null, items = screensaverRows(ctx))) },
+        ),
     )
+
+    private fun screensaverRows(context: Context): List<CatalogItem> {
+        val look = ScreensaverPrefs.look(context)
+        return listOf(
+            ChoiceItem(
+                id = ID_SCREENSAVER,
+                title = words(R.string.gaming_screensaver_when),
+                // Android's own screen timeout still turns the
+                // panel off, and it wins when it is the shorter
+                // (docs/SPEC.md 7f, "Screensaver").
+                subtitle = words(R.string.gaming_screensaver_when_subtitle),
+                options = ScreensaverMode.entries.map { ChoiceOption(it.name, it.label) },
+                current = ScreensaverPrefs.mode(context).name,
+                onSelect = { ctx, value ->
+                    ScreensaverPrefs.setMode(
+                        ctx,
+                        runCatching { ScreensaverMode.valueOf(value) }.getOrDefault(ScreensaverMode.OFF),
+                    )
+                },
+            ),
+            ChoiceItem(
+                id = ID_SCREENSAVER_CONTENT,
+                title = words(R.string.gaming_screensaver_shows),
+                options = ScreensaverContent.entries.map { ChoiceOption(it.name, it.label) },
+                current = look.content.name,
+                onSelect = { ctx, value ->
+                    runCatching { ScreensaverContent.valueOf(value) }.getOrNull()?.let { ScreensaverPrefs.setContent(ctx, it) }
+                },
+            ),
+            ToggleItem(
+                id = ID_SCREENSAVER_DIM,
+                title = words(R.string.gaming_screensaver_dim),
+                subtitle = words(R.string.gaming_screensaver_dim_subtitle),
+                current = look.dim,
+                onToggle = { ctx, on -> ScreensaverPrefs.setDim(ctx, on) },
+            ),
+            ToggleItem(
+                id = ID_SCREENSAVER_NAME,
+                title = words(R.string.gaming_screensaver_show_name),
+                subtitle = words(R.string.gaming_screensaver_show_name_subtitle),
+                current = look.showName,
+                onToggle = { ctx, on -> ScreensaverPrefs.setShowName(ctx, on) },
+            ),
+        )
+    }
 
     // The Steam Deck's model (docs/SPEC.md 7f, "Sleep and return to game"): the console does not sleep
     // on its own while a game runs, unless the person asks for Android's timer.
