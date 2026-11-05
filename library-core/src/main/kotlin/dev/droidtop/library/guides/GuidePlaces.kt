@@ -1,8 +1,8 @@
 package dev.droidtop.library.guides
 
 import android.content.Context
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
-import java.security.MessageDigest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -38,7 +38,7 @@ object GuidePlaces {
     private val json = Json { ignoreUnknownKeys = true }
 
     private fun file(context: Context, gameId: String): File {
-        val digest = MessageDigest.getInstance("SHA-256").digest(gameId.toByteArray()).joinToString("") { "%02x".format(it) }
+        val digest = Sha256.hex(gameId.toByteArray())
         return File(File(context.filesDir, "guide-places"), "${digest.take(32)}.json")
     }
 

@@ -6,11 +6,11 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import com.android.apksig.ApkSigner
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
 import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.KeyStore
-import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
 import java.util.Date
@@ -52,7 +52,7 @@ object ProviderHost {
      */
     fun certSha256(): String? = cert ?: runCatching {
         val store = KeyStore.getInstance(KEYSTORE).apply { load(null) }
-        (store.getCertificate(KEY_ALIAS) as? X509Certificate)?.let { sha256(it.encoded) }
+        (store.getCertificate(KEY_ALIAS) as? X509Certificate)?.let { Sha256.hex(it.encoded) }
     }.getOrNull()?.also { cert = it }
 
     /** The key and its certificate, made now when there is none: an EC P-256 key that can only sign. */
@@ -73,7 +73,7 @@ object ProviderHost {
         }
         val entry = store.getEntry(KEY_ALIAS, null) as KeyStore.PrivateKeyEntry
         val certificate = entry.certificate as X509Certificate
-        cert = sha256(certificate.encoded)
+        cert = Sha256.hex(certificate.encoded)
         return entry.privateKey to certificate
     }
 
@@ -122,7 +122,7 @@ object ProviderHost {
             } else {
                 context.packageManager.getPackageInfo(PACKAGE, PackageManager.GET_SIGNATURES).signatures
             }
-            signers.orEmpty().filterNotNull().any { sha256(it.toByteArray()).equals(mine, ignoreCase = true) }
+            signers.orEmpty().filterNotNull().any { Sha256.hex(it.toByteArray()).equals(mine, ignoreCase = true) }
         }.getOrDefault(false)
     }
 
@@ -202,8 +202,6 @@ object ProviderHost {
     @Suppress("DEPRECATION")
     private fun versionOf(info: android.content.pm.PackageInfo): Long =
         if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
-
-    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     private const val MIN_SDK = 26
     private const val DAY_MS = 86_400_000L

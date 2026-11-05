@@ -1,12 +1,12 @@
 package dev.droidtop.library.scraper
 
+import dev.droidtop.shared.trust.Sha256
 import android.util.Xml
 import dev.droidtop.net.Http
 import org.xmlpull.v1.XmlPullParser
 import java.net.URL
 import java.net.URLEncoder
 import java.io.File
-import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -132,8 +132,7 @@ object ScreenScraperClient {
                 (if (md5.isNotBlank()) "&md5=$md5&romtaille=$romSizeBytes" else ""),
         )
         val cacheFile = responseCacheDir?.let { dir ->
-            val key = MessageDigest.getInstance("SHA-256").digest(url.toString().toByteArray())
-                .joinToString("") { "%02x".format(it) }
+            val key = Sha256.hex(url.toString().toByteArray())
             File(dir, "screenscraper/$key.json")
         }
         val cached = cacheFile?.takeIf { it.isFile }?.let { runCatching { org.json.JSONObject(it.readText()) }.getOrNull() }

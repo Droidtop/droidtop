@@ -6,8 +6,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.pm.PackageInfoCompat
 import dev.droidtop.library.integrations.AppCatalogs.PackageFacts
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
-import java.security.MessageDigest
 
 /**
  * What an APK file or an installed app is (docs/SPEC.md 10b "Installing apps", Droidtop/tracker#261): its package,
@@ -50,12 +50,9 @@ object AppPackages {
         } else {
             info.signatures
         }
-        val signers = signatures.orEmpty().filterNotNull().map { sha256Hex(it.toByteArray()) }.toSet()
+        val signers = signatures.orEmpty().filterNotNull().map { Sha256.hex(it.toByteArray()) }.toSet()
         return PackageFacts(info.packageName, PackageInfoCompat.getLongVersionCode(info), info.versionName, signers)
     }
-
-    private fun sha256Hex(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     /**
      * Why the downloaded APK must not be installed, or null when it may (pure): it must be the package and version

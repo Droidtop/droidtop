@@ -96,9 +96,7 @@ object UiModePasskey {
     fun valid(passkey: String): Boolean = passkey.length in LENGTHS && passkey.all { it in '0'..'9' }
 
     fun hash(salt: String, passkey: String): String =
-        java.security.MessageDigest.getInstance("SHA-256")
-            .digest("$salt:$passkey".toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        dev.droidtop.shared.trust.Sha256.hex("$salt:$passkey".toByteArray(Charsets.UTF_8))
 
     fun make(passkey: String, salt: String = newSalt()): Stored = Stored(salt, hash(salt, passkey))
 

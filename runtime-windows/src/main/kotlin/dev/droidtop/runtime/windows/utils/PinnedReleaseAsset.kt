@@ -2,10 +2,10 @@ package dev.droidtop.runtime.windows.utils
 
 import android.content.Context
 import dev.droidtop.runtime.windows.RuntimeDownloads
+import dev.droidtop.shared.trust.Sha256
 import com.winlator.core.FileUtils
 import com.winlator.core.TarCompressorUtils
 import java.io.File
-import java.security.MessageDigest
 import timber.log.Timber
 
 /**
@@ -69,19 +69,8 @@ class PinnedReleaseAsset(
         Timber.i("PinnedReleaseAsset: installed %s", tag)
     }
 
-    private fun sha256(file: File): String {
-        if (!file.isFile) return ""
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buf = ByteArray(1 shl 16)
-            while (true) {
-                val n = input.read(buf)
-                if (n < 0) break
-                digest.update(buf, 0, n)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
+    /** A missing file's digest is "", which no pin matches. */
+    private fun sha256(file: File): String = if (file.isFile) Sha256.hex(file) else ""
 
     private companion object {
         const val STAMP = ".release"

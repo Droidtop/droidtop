@@ -1,6 +1,6 @@
 package dev.droidtop.runtime
 
-import java.security.MessageDigest
+import dev.droidtop.shared.trust.Sha256
 
 /**
  * The id a container goes by in the engine's fronts and APIs (docs/SPEC.md 3d, "Container ids"; Droidtop/tracker#555):
@@ -12,8 +12,7 @@ import java.security.MessageDigest
 object EngineIds {
     /** [containerId]'s engine id. */
     fun of(containerId: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest("droidtop-container:$containerId".toByteArray(Charsets.UTF_8))
-        return digest.joinToString("") { "%02x".format(it) }
+        return Sha256.hex("droidtop-container:$containerId".toByteArray(Charsets.UTF_8))
     }
 
     /**

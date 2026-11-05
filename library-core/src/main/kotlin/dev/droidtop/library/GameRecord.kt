@@ -1,8 +1,8 @@
 package dev.droidtop.library
 
 import dev.droidtop.net.AtomicWrite
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
-import java.security.MessageDigest
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -227,7 +227,6 @@ class FileGameRecordStore(private val dir: File) : GameRecordStore {
  * hashing/sharding scheme.
  */
 fun recordPathFor(id: String): String {
-    val hash = MessageDigest.getInstance("SHA-256").digest(id.toByteArray(Charsets.UTF_8))
-        .joinToString("") { "%02x".format(it) }
+    val hash = Sha256.hex(id.toByteArray(Charsets.UTF_8))
     return "${hash.substring(0, 2)}/$hash.json"
 }

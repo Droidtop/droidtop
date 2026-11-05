@@ -3,8 +3,8 @@ package dev.droidtop.runtime.windows
 import android.content.Context
 import com.winlator.xenvironment.ImageFs
 import dev.droidtop.library.settings.CatalogPrefs
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
-import java.security.MessageDigest
 
 /**
  * The translators' code caches, one per game (docs/SPEC.md 9, "Translation cache"; Droidtop/tracker#865).
@@ -42,7 +42,7 @@ object TranslationCache {
 
     /** A folder name for [entryId]: library ids carry characters a path must not. */
     internal fun key(entryId: String): String =
-        MessageDigest.getInstance("SHA-256").digest(entryId.toByteArray()).take(12).joinToString("") { "%02x".format(it) }
+        Sha256.hex(entryId.toByteArray()).take(24)
 
     internal fun gameDir(imageFsRoot: File, entryId: String): File = File(root(imageFsRoot), key(entryId))
 

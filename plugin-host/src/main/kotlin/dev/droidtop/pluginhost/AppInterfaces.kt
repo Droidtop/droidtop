@@ -8,9 +8,9 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import com.android.apksig.ApkVerifier
 import com.android.apksig.util.DataSources
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
 import java.io.FileInputStream
-import java.security.MessageDigest
 import java.util.zip.ZipFile
 import org.json.JSONObject
 
@@ -156,7 +156,7 @@ object AppInterfaces {
         if (existing != null && existing.manifest.app?.packageName != found.packageName) {
             return Result.failure(IllegalStateException("${manifest.id} is already the plugin of ${existing.manifest.app?.packageName}"))
         }
-        val digest = sha256(bytes)
+        val digest = Sha256.hex(bytes)
         val dir = PluginBundleInstaller.versionDir(root, manifest.id, digest)
         if (!File(dir, "manifest.json").isFile) {
             dir.mkdirs()
@@ -197,7 +197,7 @@ object AppInterfaces {
         val cert = AppInterfaceTrust.certOf(found.verdict)
         if (!cert.equals(record.approvedKeySha256, ignoreCase = true)) return PluginInstallError("its app is now signed by a different key; approve it again")
         val bytes = found.manifestBytes ?: return PluginInstallError(PluginRecord.FILES_MISSING)
-        if (sha256(bytes) != record.archiveDigest) return PluginInstallError("its app was updated; approve the new version")
+        if (Sha256.hex(bytes) != record.archiveDigest) return PluginInstallError("its app was updated; approve the new version")
         return null
     }
 
@@ -211,7 +211,7 @@ object AppInterfaces {
     @Suppress("DEPRECATION")
     private fun signersReported(info: PackageInfo): Set<String> {
         val signatures = if (Build.VERSION.SDK_INT >= 28) info.signingInfo?.apkContentsSigners else info.signatures
-        return signatures.orEmpty().filterNotNull().map { sha256(it.toByteArray()) }.toSet()
+        return signatures.orEmpty().filterNotNull().map { Sha256.hex(it.toByteArray()) }.toSet()
     }
 
     /** Size, modification time and the package's update time of every APK: a re-check whenever any of them moves. */
@@ -241,12 +241,10 @@ object AppInterfaces {
             AppInterfaceTrust.ApkCheck(
                 verified = result.isVerified,
                 v2OrV3 = result.isVerifiedUsingV2Scheme || result.isVerifiedUsingV3Scheme,
-                signers = result.signerCertificates.map { sha256(it.encoded) }.toSet(),
+                signers = result.signerCertificates.map { Sha256.hex(it.encoded) }.toSet(),
             )
         }
     }.getOrElse { AppInterfaceTrust.ApkCheck(verified = false, v2OrV3 = false, signers = emptySet()) }
-
-    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     /** The largest manifest asset read: a manifest is a few kilobytes. */
     private const val MAX_MANIFEST_BYTES = 256L * 1024

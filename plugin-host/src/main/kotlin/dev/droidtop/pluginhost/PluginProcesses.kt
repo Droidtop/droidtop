@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import dev.droidtop.shared.trust.Sha256
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -286,7 +287,7 @@ internal object PluginProcesses {
 
     /** `bindIsolatedService` names the instance; the plugin id hashed keeps it short and free of odd characters. */
     private fun instanceName(pluginId: String): String =
-        "p" + java.security.MessageDigest.getInstance("SHA-256").digest(pluginId.toByteArray()).take(8).joinToString("") { "%02x".format(it) }
+        "p" + Sha256.hex(pluginId.toByteArray()).take(16)
 
     private fun bindLocked(context: Context, process: Process): Boolean {
         val connection = object : ServiceConnection {

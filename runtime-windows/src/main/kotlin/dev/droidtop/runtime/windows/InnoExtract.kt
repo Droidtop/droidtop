@@ -4,8 +4,8 @@ import android.content.Context
 import android.os.Build
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.runtime.windows.utils.ComponentCatalog
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
-import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -64,7 +64,7 @@ object InnoExtract {
         val listed = ComponentCatalog.file(context, path)
         val expected = listed.sha256 ?: error("The component catalog does not list the unpacker; try again once it has been checked (Wine builds and sources, Check for new builds)")
         val dest = File(File(context.filesDir, "tools").also { it.mkdirs() }, path.substringAfterLast('/'))
-        if (dest.isFile && sha256Of(dest).equals(expected, ignoreCase = true)) return@withContext dest
+        if (dest.isFile && Sha256.hex(dest).equals(expected, ignoreCase = true)) return@withContext dest
         onStatus("Downloading the unpacker…")
         RuntimeDownloads.fetch(context, path, dest) { onStatus("Downloading the unpacker… ${(it.coerceIn(0f, 1f) * 100).toInt()}%") }
         dest.setReadable(true, false)
@@ -131,19 +131,6 @@ object InnoExtract {
             }
         }
         return Result(process.waitFor(), all.toString())
-    }
-
-    private fun sha256Of(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                digest.update(buffer, 0, count)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private const val MAX_OUTPUT = 32 * 1024

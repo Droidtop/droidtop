@@ -114,9 +114,7 @@ object ContainerLayout {
 
     /** A short stable identity for [provisioning]'s install command (hex SHA-256). */
     fun planId(provisioning: PrimaryProvisioning): String =
-        java.security.MessageDigest.getInstance("SHA-256")
-            .digest(provisioning.installCommand.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        dev.droidtop.shared.trust.Sha256.hex(provisioning.installCommand.toByteArray(Charsets.UTF_8))
 
     private val WAYLAND_SOCKET = Regex("wayland-(\\d+)")
 

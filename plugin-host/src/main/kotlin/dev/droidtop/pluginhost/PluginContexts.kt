@@ -403,18 +403,7 @@ class PluginContexts(
         const val MAX_FILES = 16
 
         /** A file's SHA-256, read in pieces: an index database is too large to hold in memory. */
-        fun sha256(file: File): String {
-            val digest = java.security.MessageDigest.getInstance("SHA-256")
-            file.inputStream().use { input ->
-                val buffer = ByteArray(1 shl 16)
-                while (true) {
-                    val n = input.read(buffer)
-                    if (n < 0) break
-                    digest.update(buffer, 0, n)
-                }
-            }
-            return digest.digest().joinToString("") { "%02x".format(it) }
-        }
+        fun sha256(file: File): String = dev.droidtop.shared.trust.Sha256.hex(file)
 
         private const val NO_COMPUTER = "No computer is paired: pair one under Settings > Accounts and sources > Computers"
         private const val OLD_AGENT = "this droidtop's sync library is older than this context's sync; update droidtop"

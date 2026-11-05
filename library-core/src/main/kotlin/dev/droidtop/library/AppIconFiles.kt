@@ -1,6 +1,6 @@
 package dev.droidtop.library
 
-import java.security.MessageDigest
+import dev.droidtop.shared.trust.Sha256
 
 /**
  * What an installed app's cached icon file is CALLED, and which files in
@@ -34,8 +34,5 @@ object AppIconFiles {
         existing.filter { it !in current }
 
     private fun stateHash(iconState: String): String =
-        MessageDigest.getInstance("SHA-256")
-            .digest(iconState.toByteArray(Charsets.UTF_8))
-            .take(6)
-            .joinToString("") { "%02x".format(it) }
+        Sha256.hex(iconState.toByteArray(Charsets.UTF_8)).take(12)
 }

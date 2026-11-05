@@ -2,8 +2,8 @@ package dev.droidtop.library
 
 import android.content.Context
 import android.os.Environment
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
-import java.security.MessageDigest
 
 /**
  * Screenshots filed under the game they were taken in (docs/SPEC.md "The companion's tabs", Screenshots,
@@ -22,7 +22,7 @@ object GameScreenshots {
 
     /** A game id as a folder name: ids are paths and store keys, so the folder is named by a digest of the id. Pure. */
     fun keyOf(gameId: String): String =
-        MessageDigest.getInstance("SHA-256").digest(gameId.toByteArray()).joinToString("") { "%02x".format(it) }.take(24)
+        Sha256.hex(gameId.toByteArray()).take(24)
 
     /** Keeps [bytes] as [name] under the running game; whether it was, false when no game is running. Disk work. */
     fun save(context: Context, name: String, bytes: ByteArray): Boolean {

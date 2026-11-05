@@ -1,7 +1,7 @@
 package dev.droidtop.runtime
 
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
-import java.security.MessageDigest
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -78,9 +78,7 @@ object ContainerLauncher {
      * where a game lives.
      */
     fun token(entryId: String): String =
-        MessageDigest.getInstance("SHA-256").digest(entryId.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
-            .take(16)
+        Sha256.hex(entryId.toByteArray(Charsets.UTF_8)).take(16)
 
     /** The desktop entry's file name (its desktop file id) for [token]. */
     fun entryFileName(token: String): String = "$ENTRY_PREFIX$token.desktop"

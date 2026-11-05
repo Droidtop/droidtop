@@ -1,5 +1,6 @@
 package dev.droidtop.library.saves
 
+import dev.droidtop.shared.trust.Sha256
 import android.content.Context
 import dev.droidtop.library.GameEngine
 import dev.droidtop.library.LibraryEntry
@@ -8,7 +9,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.file.Files
-import java.security.MessageDigest
 
 /**
  * Copying saves from one copy of a game to another (docs/SPEC.md 7o, "Saves between copies", Droidtop/tracker#745):
@@ -173,7 +173,7 @@ object SaveCopies {
 
     private fun backupsOf(context: Context): File = File(context.applicationContext.filesDir, BACKUPS)
 
-    private fun backupRoot(backups: File, entryId: String): File = File(backups, sha256(entryId).take(24))
+    private fun backupRoot(backups: File, entryId: String): File = File(backups, Sha256.hex(entryId.toByteArray()).take(24))
 
     /** [file]'s path below [folder], or null when it is not below it or the path climbs out. Pure. */
     fun relative(folder: File, file: File): String? {
@@ -184,7 +184,4 @@ object SaveCopies {
     }
 
     private fun isLink(file: File): Boolean = runCatching { Files.isSymbolicLink(file.toPath()) }.getOrDefault(true)
-
-    private fun sha256(text: String): String =
-        MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
 }

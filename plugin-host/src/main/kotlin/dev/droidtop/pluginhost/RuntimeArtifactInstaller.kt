@@ -1,7 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
-import java.security.MessageDigest
 
 /** The download identity shared by the plugin-host runtime installers. */
 data class ArtifactSpec(val url: String, val sha256: String, val version: String)
@@ -44,7 +44,7 @@ object RuntimeArtifactInstaller {
     ) {
         try {
             onProgress(RuntimeArtifactProgress.Verifying)
-            require(sha256(archive).equals(spec.sha256, ignoreCase = true)) { DownloadJobs.DIGEST_MISMATCH }
+            require(Sha256.hex(archive).equals(spec.sha256, ignoreCase = true)) { DownloadJobs.DIGEST_MISMATCH }
             onProgress(RuntimeArtifactProgress.Extracting)
             if (installDir.isDirectory) installDir.deleteRecursively()
             check(installDir.mkdirs() || installDir.isDirectory) { "couldn't create the runtime directory" }
@@ -58,17 +58,4 @@ object RuntimeArtifactInstaller {
     }
 
     fun isInstalled(installDir: File): Boolean = File(installDir, MARKER_FILE).isFile
-
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
 }

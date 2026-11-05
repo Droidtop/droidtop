@@ -25624,7 +25624,7 @@ than droidtop's old code and are intended: a bundle that names the same path
 twice, or holds a link or other special file, is refused (a later entry could
 otherwise replace one the signature covered), and the xz stream of a bundle is
 held to 512 MiB of decoder memory. Bundle paths may use any character but a
-control character, and may never be empty, `.`, `..` or absolute.
+control character, and may never be empty, `.`, `..` or absolute. Every SHA-256 droidtop writes as hexadecimal goes through `Sha256.hex` (Droidtop/tracker#192, 2026-11-05): the digests checked against a catalog or release, the signer fingerprints and the hashed names of folders, caches and records, in every module that reaches `:runtime-common`. Code that hashes while it copies (`PluginBundleInstaller`, `OciFlattener`) keeps its own digest. The stores' Amazon client keeps its raw-byte digests, which are not hex. `:net-core` sits below `:runtime-common`, so `PlatformDatabaseTransport` keeps its one-line digest. The keyboard module depends on nothing, so `OfflineVoice` keeps its own too.
 
 **Shared libraries build and test droidtop (owner, 2026-11-04, Droidtop/tracker#867 D2).** The code droidtop
 shares with Enginehost, Pythia and droidtop-agent moves into library repositories that belong to no program

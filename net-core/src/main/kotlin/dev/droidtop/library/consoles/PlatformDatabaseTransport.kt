@@ -1,6 +1,7 @@
 package dev.droidtop.library.consoles
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import dev.droidtop.net.GitHubAuth
 import dev.droidtop.net.Http
 import java.io.File
@@ -36,15 +37,8 @@ object PlatformDatabaseTransport {
         write(dest, text)
     }
 
-    /** Atomically puts [text] at [dest], creating parent directories. */
-    fun write(dest: File, text: String) {
-        dest.parentFile?.mkdirs()
-        val temp = File(dest.parentFile, dest.name + ".downloading")
-        temp.writeText(text)
-        check(temp.renameTo(dest) || run { dest.delete(); temp.renameTo(dest) }) {
-            "Couldn't move the downloaded ${dest.name} into place"
-        }
-    }
+    /** Atomically puts [text] at [dest], creating parent directories ([AtomicWrite]). */
+    fun write(dest: File, text: String) = AtomicWrite.text(dest, text)
 
     fun sha256(text: String): String = MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
 }

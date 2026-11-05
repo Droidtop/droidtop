@@ -1,8 +1,8 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.shared.trust.Sha256
 import org.json.JSONObject
 import java.io.File
-import java.security.MessageDigest
 
 /** What droidtop read from an APK before installing it: never what the caller said it was. */
 data class ApkInfo(val packageName: String, val label: String, val versionName: String?, val versionCode: Long)
@@ -70,18 +70,7 @@ object PrivInstall {
         return staged
     }
 
-    fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buf = ByteArray(1 shl 16)
-            while (true) {
-                val n = input.read(buf)
-                if (n < 0) break
-                digest.update(buf, 0, n)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
+    fun sha256(file: File): String = Sha256.hex(file)
 
     private fun fail(code: PluginErrorCode, message: String): Nothing = throw BrokerException(code, message)
 }
