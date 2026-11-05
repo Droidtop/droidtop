@@ -19,15 +19,17 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Identity, pairing, the channel, the protocol and the sync rules: Droidtop/lib-sync.
-droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.1" }
+droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.2" }
 jni = { version = "0.21", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [dev-dependencies]
 # The mesh test runs the real agent as one of its computers: droidtop-agent's service, at a release.
-droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", tag = "build-150" }
-droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.1" }
+# droidtop-agent ci/title-key-870 c82c47d (Droidtop/tracker#798, #871, #870): the agent on lib-sync 0.1.2 and games-scan
+# 0.3.0, keying games by catalog id and title2:. Becomes the agent release that carries it.
+droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c82c47db0c1df1f61c2859f8c03952b65c237827" }
+droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.2" }
 
 [profile.release]
 # As droidtop-agent built it.

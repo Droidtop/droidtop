@@ -21915,6 +21915,11 @@ the right ones is the person's call, as in "Removing an older version"
     because there "SampleSE.exe" is "Sample SE" and spacing must not matter. It drops only Latin accents
     (U+0300-U+036F), so a kana keeps its dakuten;
   - search keeps its own word fold (`StoreIdentity.fold`): it compares words typed against words, not identities.
+- **Two keys can be said to be one game** (Droidtop/tracker#798, lib-sync 0.1.2's `link` change; droidtop-agent
+  DESIGN section 16). The native library passes links on only to a computer that stated the hello feature
+  `identity` (`library::LINK_FEATURE`) and leaves them out of the library it shares by cloud folder, whose letters
+  carry no hello (`Change::readable_without_links`). Reading links in droidtop's own library (following `canonical`)
+  is a later change.
 - **In this device's own library, behind switches** (owner, 2026-10-10:
   "Apps should be toggleable"; "Games on the desktop should ALSO be
   toggleable. We don't actually know if the user will want to stream stuff

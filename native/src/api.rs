@@ -523,7 +523,12 @@ impl LocalLibrary {
     }
 }
 
-fn push_changes(ch: &mut Channel<impl Read + Write>, changes: Vec<Change>) -> Result<(), Failure> {
+/// Sends [`changes`]; a library change kind the computer did not say it
+/// reads ([`reads_links`], its hello's `identity`) is left out.
+fn push_changes(ch: &mut Channel<impl Read + Write>, mut changes: Vec<Change>, reads_links: bool) -> Result<(), Failure> {
+    if !reads_links {
+        changes.retain(Change::readable_without_links);
+    }
     if changes.is_empty() {
         return Ok(());
     }
@@ -550,12 +555,13 @@ fn sync_library(args: &Value) -> Outcome {
     let peer_hex = args["peer"].as_str().unwrap_or_default().to_string();
     let mut local = LocalLibrary::read(&key, args)?;
     let mut s = connect(&key, args)?;
+    let reads_links = s.states(droidtop_agent_core::library::LINK_FEATURE);
     let lib = &mut local.lib;
     let ch = &mut s.ch;
     let cursor: Cursor = lib.cursors.get(&peer_hex).copied().unwrap_or_default();
     let (outgoing, seq) = lib.changes_since(cursor.pushed);
     let mut pushed = outgoing.len();
-    push_changes(ch, outgoing)?;
+    push_changes(ch, outgoing, reads_links)?;
     let (mut incoming, their) = pull_changes(ch, cursor.pulled)?;
     // The computer's log is shorter than it was when this device last pulled
     // it: it lost its library (a restore, a reinstall). What this device
@@ -565,7 +571,7 @@ fn sync_library(args: &Value) -> Outcome {
     if their < cursor.pulled {
         let (everything, _) = lib.changes_since(0);
         pushed = everything.len();
-        push_changes(ch, everything)?;
+        push_changes(ch, everything, reads_links)?;
         incoming = pull_changes(ch, 0)?.0;
     }
     let pulled = incoming.iter().filter(|c| lib.apply((*c).clone())).count();
@@ -619,6 +625,8 @@ fn share_library(args: &Value) -> Outcome {
     let peer_hex = peer.to_hex();
     let cursor = local.lib.cursors.get(&peer_hex).copied().unwrap_or_default();
     let (outgoing, seq) = local.lib.changes_since(cursor.pushed);
+    // A letter has no hello to say what its reader reads: no links in it.
+    let outgoing: Vec<Change> = outgoing.into_iter().filter(Change::readable_without_links).collect();
     let posted = outgoing.len();
     if !outgoing.is_empty() {
         let payload = mailbox::pack(&Envelope::Library { changes: outgoing }, &[])?;
