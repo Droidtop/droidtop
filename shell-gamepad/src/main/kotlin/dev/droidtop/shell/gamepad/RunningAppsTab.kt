@@ -97,7 +97,11 @@ internal fun AppsTab(onDismiss: () -> Unit) {
                     GamepadAction.A -> if (apps.isEmpty()) Unit else if (index == 0) {
                         scope.launch {
                             val targets = TaskManager.clearAllTargets(context)
-                            if (TaskPolicy.needsClearAllConfirm(targets.size) && !clearAllArmed) {
+                            if (targets.isEmpty()) {
+                                // Every listed app is protected: say so, not "Nothing to close" (Droidtop/tracker#252).
+                                clearAllArmed = false
+                                message = TaskManager.clearAllKeptLine(context)
+                            } else if (TaskPolicy.needsClearAllConfirm(targets.size) && !clearAllArmed) {
                                 clearAllArmed = true
                                 message = "${PressWords.againSentence}: close ${targets.size}"
                             } else {

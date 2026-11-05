@@ -161,6 +161,12 @@ object TaskManager {
             TaskPolicy.clearAllTargets(refreshNow(context).apps, protectedNow(context), keepDisplays)
         }
 
+    /** What Clear all says when [clearAllTargets] is empty: what it kept and why ([TaskPolicy.clearAllKeptLine]). Reads fresh. */
+    suspend fun clearAllKeptLine(context: Context, keepDisplays: Set<Int> = emptySet()): String =
+        withContext(Dispatchers.IO) {
+            TaskPolicy.clearAllKeptLine(refreshNow(context).apps, protectedNow(context), keepDisplays)
+        }
+
     /** Closes [targets] (from [clearAllTargets]) one after another, re-reads the list, and says what came of it. */
     suspend fun clearAll(context: Context, targets: List<RunningApp>): ClearAllSummary =
         withContext(Dispatchers.IO) {

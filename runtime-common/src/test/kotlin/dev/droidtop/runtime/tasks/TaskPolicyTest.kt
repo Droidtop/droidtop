@@ -133,4 +133,24 @@ class TaskPolicyTest {
         assertEquals(ClearAllSummary(1, 1, 1), mixed)
         assertTrue(mixed.message.startsWith("Closed 1, not confirmed 1, failed 1"))
     }
+
+    @Test
+    fun `when Clear all keeps everything it says what it kept and why`() {
+        // Droidtop/tracker#252, console 3061: Firefox on the companion's own screen was kept, and the page said "Nothing to close".
+        val firefox = RunningApp("org.mozilla.firefox", "Firefox", 0, taskId = null, visible = true)
+        assertTrue(TaskPolicy.clearAllTargets(listOf(firefox), emptySet(), keepDisplays = setOf(0)).isEmpty())
+        assertEquals(
+            "Nothing closed: Firefox is open on this screen, which Clear all leaves alone. Close it from its row.",
+            TaskPolicy.clearAllKeptLine(listOf(firefox), emptySet(), keepDisplays = setOf(0)),
+        )
+        assertEquals(
+            "Nothing closed: a and b are protected. Close one from its row.",
+            TaskPolicy.clearAllKeptLine(listOf(app("a", 2), app("b", 2)), setOf("a", "b"), keepDisplays = setOf(0)),
+        )
+        assertEquals(
+            "Nothing closed: a is open on this screen, which Clear all leaves alone; b is protected. Close one from its row.",
+            TaskPolicy.clearAllKeptLine(listOf(app("a", 0), app("b", 2)), setOf("b"), keepDisplays = setOf(0)),
+        )
+        assertEquals("Nothing to close", TaskPolicy.clearAllKeptLine(emptyList(), emptySet()))
+    }
 }

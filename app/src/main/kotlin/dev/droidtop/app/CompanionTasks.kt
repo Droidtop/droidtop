@@ -168,7 +168,7 @@ internal fun CompanionTasks() {
                             dev.droidtop.library.settings.CompanionPrefs.settings.value.ask,
                         )
                         when {
-                            targets.isEmpty() -> detail = "Nothing to close"
+                            targets.isEmpty() -> detail = TaskManager.clearAllKeptLine(context, keepDisplays = own)
                             asks -> pending = targets
                             else -> clearAll(targets)
                         }

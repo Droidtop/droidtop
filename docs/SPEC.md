@@ -4923,6 +4923,10 @@ a close path of its own. Every call works off the main thread.
     (it may be hosting a running game; closing it by name from the list is still allowed), the system UI,
     any installed home app, and packages in `ProtectedApps` (the user's own set, a string set in
     droidtop's preferences); marking a package protected has no screen yet.
+  - **When it keeps everything, it says what and why** (`TaskPolicy.clearAllKeptLine`; console 3061: Firefox,
+    open on the companion's own screen, was kept and the page read "Nothing to close"): "Nothing closed: Firefox is
+    open on this screen, which Clear all leaves alone. Close it from its row." and the same for protected apps.
+    "Nothing to close" only when nothing is listed.
   - **A confirm only when it matters:** more than `CONFIRM_CLEAR_ALL_ABOVE` (3) targets, the count in the
     question. The Quick Menu's Running apps section uses the shell's arm-then-press-again step; the
     companion asks inline with Close them and Cancel; Mobile shows a dialog.

@@ -110,6 +110,30 @@ object TaskPolicy {
         return apps.filter { it.packageName !in protected && it.packageName !in kept }.distinctBy { it.packageName }
     }
 
+    /**
+     * What Clear all says when it closes nothing ([clearAllTargets] empty) although [apps] lists some: which it kept and
+     * why, never "Nothing to close" over a list that is plainly not empty (Droidtop/tracker#252, console 3061: Firefox,
+     * open on the companion's own screen, was kept as #414 says, and the page read "Nothing to close"). [label] names an
+     * app as the list does. "Nothing to close" only when nothing is listed. Pure.
+     */
+    fun clearAllKeptLine(
+        apps: List<RunningApp>,
+        protected: Set<String>,
+        keepDisplays: Set<Int> = emptySet(),
+        label: (RunningApp) -> String = { it.label.ifBlank { it.packageName } },
+    ): String {
+        val listed = apps.distinctBy { it.packageName }
+        if (listed.isEmpty()) return "Nothing to close"
+        val onThisScreen = listed.filter { app -> apps.any { it.packageName == app.packageName && it.displayId in keepDisplays } }
+        val guarded = listed.filter { it.packageName in protected && it !in onThisScreen }
+        fun names(of: List<RunningApp>) = of.map(label).let { if (it.size <= 2) it.joinToString(" and ") else "${it.size} apps" }
+        val parts = listOfNotNull(
+            onThisScreen.takeIf { it.isNotEmpty() }?.let { "${names(it)} ${if (it.size == 1) "is" else "are"} open on this screen, which Clear all leaves alone" },
+            guarded.takeIf { it.isNotEmpty() }?.let { "${names(it)} ${if (it.size == 1) "is" else "are"} protected" },
+        )
+        return "Nothing closed: " + parts.joinToString("; ") + ". Close ${if (listed.size == 1) "it" else "one"} from its row."
+    }
+
     fun needsClearAllConfirm(targetCount: Int): Boolean = targetCount > CONFIRM_CLEAR_ALL_ABOVE
 
     /**
