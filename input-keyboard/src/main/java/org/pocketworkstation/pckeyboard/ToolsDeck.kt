@@ -43,6 +43,11 @@ class ToolsDeck private constructor(
     private var searchBar: EmojiSearchBar? = null
     private val notice = TextView(context)
     private val inlineRow = LinearLayout(context)
+
+    // Emoji for the word just typed (Droidtop/tracker#903 H4), above the strip; hidden while there are none.
+    private val emojiRow = LinearLayout(context)
+    private val emojiScroll = HorizontalScrollView(context)
+    private var emojiWord = ""
     private val inlineScroll = HorizontalScrollView(context)
 
     // Autofill chips are surfaces of another process; on Android 11 and later they are clipped to this host.
@@ -52,6 +57,13 @@ class ToolsDeck private constructor(
         orientation = VERTICAL
         setBackgroundColor(colors.ground)
         isFocusable = false
+        emojiScroll.apply {
+            isHorizontalScrollBarEnabled = false
+            isFocusable = false
+            visibility = GONE
+            addView(emojiRow)
+        }
+        addView(emojiScroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         addView(buildStrip(), LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         inlineScroll.apply {
             isHorizontalScrollBarEnabled = false
@@ -150,6 +162,45 @@ class ToolsDeck private constructor(
     }
 
     fun clearInlineSuggestions() = showInlineSuggestions(emptyList())
+
+    /**
+     * Offers emoji for [word], the word just before the cursor (Droidtop/tracker#903 H4): up to three, in the tone last
+     * picked; a tap replaces the word with the emoji. An empty word, a [sensitive] field (passwords and fields asking
+     * for no learning, IncognitoRules), the emoji panel switched off or no match hides the row. Called by the input
+     * method as the text before the cursor changes.
+     */
+    fun offerEmoji(word: String, sensitive: Boolean) {
+        val catalog = EmojiAssets.current()
+        if (catalog == null && word.isNotEmpty() && !sensitive && ToolsPrefs.emoji(context)) EmojiAssets.load(context) { }
+        val tone = ToolsPrefs.prefs(context).getInt(EmojiTones.PREF, 0)
+        val found = if (sensitive || !ToolsPrefs.emoji(context) || !sink.takesText) emptyList() else catalog?.suggest(word).orEmpty()
+        if (word == emojiWord && (found.isEmpty() == (emojiScroll.visibility != VISIBLE))) return
+        emojiWord = word
+        emojiRow.removeAllViews()
+        found.map { EmojiTones.shown(it, tone) }.forEach { emoji ->
+            emojiRow.addView(
+                TextView(context).apply {
+                    text = emoji
+                    textSize = 22f
+                    setPadding(dp(12), dp(2), dp(12), dp(2))
+                    setOnClickListener { replaceWord(word, emoji) }
+                },
+            )
+        }
+        emojiScroll.visibility = if (found.isEmpty()) GONE else VISIBLE
+    }
+
+    /** [word], just before the cursor, becomes [emoji]: the composing word finished, its letters deleted, the emoji typed. */
+    private fun replaceWord(word: String, emoji: String) {
+        beforeInsert?.run()
+        repeat(word.length) {
+            sink.key(android.view.KeyEvent.KEYCODE_DEL, true)
+            sink.key(android.view.KeyEvent.KEYCODE_DEL, false)
+        }
+        sink.text(emoji)
+        emojiScroll.visibility = GONE
+        emojiWord = ""
+    }
 
     private fun showNotice(text: String) {
         notice.text = text
