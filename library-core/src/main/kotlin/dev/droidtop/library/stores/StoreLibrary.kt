@@ -115,10 +115,18 @@ sealed interface StoreSignIn {
         val codeInCookie: String? = null,
     ) : StoreSignIn {
         companion object {
-            /** The value of cookie [name] in a `Cookie` header ("a=1; b=2"), or null. Pure. */
-            fun cookieValue(header: String?, name: String): String? =
-                header?.split(';')?.map { it.trim() }?.firstOrNull { it.startsWith("$name=") }
+            /**
+             * [codeInCookie] for a store whose session is several cookies, none named in its client's code (Indiegala):
+             * the whole `Cookie` header of the return page is the sign-in.
+             */
+            const val ALL_COOKIES = "*"
+
+            /** The value of cookie [name] in a `Cookie` header ("a=1; b=2"), the whole header for [ALL_COOKIES], or null. Pure. */
+            fun cookieValue(header: String?, name: String): String? {
+                if (name == ALL_COOKIES) return header?.trim()?.takeIf { it.isNotEmpty() }
+                return header?.split(';')?.map { it.trim() }?.firstOrNull { it.startsWith("$name=") }
                     ?.substringAfter('=')?.takeIf { it.isNotEmpty() }
+            }
         }
     }
 

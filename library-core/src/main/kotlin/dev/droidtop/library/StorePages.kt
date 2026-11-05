@@ -15,7 +15,7 @@ data class Ownership(val store: String, val id: String) {
 }
 
 /** The stores droidtop reads ids for, in the order 7m lists them. */
-val OWNERSHIP_STORES = listOf(PcStoreId.STEAM, PcStoreId.GOG, "epic", "amazon", "itch", "humble")
+val OWNERSHIP_STORES = listOf(PcStoreId.STEAM, PcStoreId.GOG, "epic", "amazon", "itch", "humble", "indiegala")
 
 /** A store id's display name, keyed by the store half of the id. */
 fun storeLabel(store: String): String = when (store) {
@@ -25,6 +25,7 @@ fun storeLabel(store: String): String = when (store) {
     "amazon" -> "Amazon"
     "itch" -> "itch.io"
     "humble" -> "Humble"
+    "indiegala" -> "Indiegala"
     else -> store.replaceFirstChar { it.uppercase() }
 }
 

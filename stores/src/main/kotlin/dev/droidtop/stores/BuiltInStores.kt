@@ -5,6 +5,7 @@ import dev.droidtop.stores.amazon.AmazonStore
 import dev.droidtop.stores.epic.EpicStore
 import dev.droidtop.stores.gog.GOGStore
 import dev.droidtop.stores.humble.HumbleStore
+import dev.droidtop.stores.indiegala.IndiegalaStore
 import dev.droidtop.stores.itch.ItchStore
 import dev.droidtop.stores.steam.SteamStore
 
@@ -21,5 +22,6 @@ object BuiltInStores {
         StoreLibraries.register(AmazonStore())
         StoreLibraries.register(ItchStore())
         StoreLibraries.register(HumbleStore())
+        StoreLibraries.register(IndiegalaStore())
     }
 }

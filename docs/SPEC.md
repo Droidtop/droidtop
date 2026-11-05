@@ -15491,6 +15491,21 @@ follows:
   stripped of its signature; an install reads its order again for a fresh link
   and runs `SingleFileInstall`. The update check compares the installed file's
   MD5 with the one Humble lists. No cloud saves or achievements.
+- **Indiegala** (`IndiegalaStore`, `IndiegalaApi`; Droidtop/tracker#335, built to the
+  recommendation of its design comment, owner to confirm): after Lacro59's
+  playnite-indiegala-plugin (MIT). The library is the account's showcase
+  collection (`login_new/user_info`: `showcase_content.content.user_collection`,
+  each product's id key, name, developer namespace, slug, cover and version
+  list); an install reads the product's details from
+  `developers.indiegala.com/get_product_info` for its download links
+  (`downloadable_versions`: Windows, else Linux, https only) and runs
+  `SingleFileInstall`. Both calls send the client's user agent (`galaClient`).
+  Sign-in is Indiegala's own page; its session is several cookies that no
+  client's code names, so the web sign-in keeps the whole cookie header of the
+  first Indiegala page past the sign-in (`StoreSignIn.WebPage.ALL_COOKIES`),
+  once it reads the collection. A product Indiegala serves only through its own
+  client (`galaclient_only`) is listed and its install says so. The update
+  check compares the installed version with the newest the collection lists.
 - **Amazon Games** (`AmazonStore`): sign-in is Amazon's own page with a
   fresh PKCE session per sign-in (nile's device registration, through
   GameNative's `AmazonAuthManager`); the code comes back on the address
