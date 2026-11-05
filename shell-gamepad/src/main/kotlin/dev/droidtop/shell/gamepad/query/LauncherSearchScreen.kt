@@ -129,7 +129,16 @@ fun LauncherSearchScreen(
                         onDismiss()
                     }
                 }
-                apps + matching + listOfNotNull(web)
+                // A sum answers first (Droidtop/tracker#704): its title starts with the text, so it ranks with the best
+                // matches, and CALC sorts ahead of them; picking it copies the answer.
+                val sum = dev.droidtop.library.integrations.SearchCalculator.answer(text)?.let { value ->
+                    LocalSearchRow("calc", SearchRowKind.CALC, "${text.trim()} = $value", CALC_DETAIL) {
+                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                        clipboard?.setPrimaryClip(android.content.ClipData.newPlainText(CALC_DETAIL, value))
+                        dev.droidtop.library.settings.Notices.flash("$value copied", context = context)
+                    }
+                }
+                listOfNotNull(sum) + apps + matching + listOfNotNull(web)
             },
         )
     }
@@ -143,3 +152,4 @@ private const val NOT_INSTALLED = "Not installed"
 /** A game whose files are not reachable right now (an offline card or share): found, and said so. */
 private const val MISSING = "Missing"
 private const val WEB_TITLE = "Search the web"
+private const val CALC_DETAIL = "Calculator · press to copy"
