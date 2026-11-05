@@ -732,7 +732,7 @@ object PcContainers {
      * it uses; for anything gamenative never had an identity for, one
      * derived from droidtop's own entry id.
      */
-    private fun ownId(entryId: String): String = gamenativeAppId(entryId)
+    internal fun ownId(entryId: String): String = gamenativeAppId(entryId)
         ?: "DROIDTOP_" + java.util.zip.CRC32().apply { update(entryId.toByteArray()) }.value
 
     private fun gamenativeAppId(entryId: String): String? {
