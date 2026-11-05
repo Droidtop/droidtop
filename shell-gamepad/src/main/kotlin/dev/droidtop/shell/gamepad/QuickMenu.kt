@@ -373,7 +373,10 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
     val overlayLevel by PerformanceOverlay.level.collectAsState()
     val overlayCorner by PerformanceOverlay.corner.collectAsState()
     val overlaySize by PerformanceOverlay.size.collectAsState()
-    val canDraw = remember { PerformanceOverlay.canDraw(context) }
+    // Asked again each time the screen comes back, so a grant given in Android's settings shows at once
+    // (Droidtop/tracker#83: read once, the row stayed "Needs display over apps", or offered an overlay it could not draw).
+    val resumes = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val canDraw = remember(resumes.value) { PerformanceOverlay.canDraw(context) }
     val hasShell = remember { PerformanceOverlay.hasShell() }
     // Performance mode is the one catalog item the companion's System > Power card and Game tab draw too
     // (GamingSettingsCatalog.performanceModeItem): built off the main thread, rebuilt after each press.

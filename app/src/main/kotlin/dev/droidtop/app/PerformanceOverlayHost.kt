@@ -41,6 +41,8 @@ object PerformanceOverlayHost {
         val main = Build.VERSION.SDK_INT < 28 || Application.getProcessName() == application.packageName
         if (!main) return
         app = application
+        // The row and the window ask one question (Droidtop/tracker#83).
+        PerformanceOverlay.drawCheck = { ctx -> GameOverlay.canDraw(ctx.applicationContext, LaunchLedger.last?.displayId ?: android.view.Display.DEFAULT_DISPLAY) }
         scope.launch {
             withContext(Dispatchers.IO) { PerformanceOverlay.load(app) }
             PerformanceOverlay.level.collectLatest { level ->

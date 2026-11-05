@@ -4126,6 +4126,11 @@ the `ContainerRuntime` interface that already exists (§3):
   service is on (no grant, as the keyboard overlay does, "Typing on the add-on display") and otherwise an application overlay, which
   needs "Display over other apps": with neither, the Overlay row's value reads "Needs display over apps"
   and A opens that grant's screen (the permission table under "Permissions", Droidtop/tracker#830, lists it).
+  The row and the window ask one question, the drawing code's own (`GameOverlay.canDraw`, installed as
+  `PerformanceOverlay.drawCheck`): the accessibility overlay counts only when the service can give a window on the
+  game's display, not merely when it is connected, and the row asks again each time the Quick Menu comes back, so a
+  grant given in Android's settings shows at once (Droidtop/tracker#83, rig 2783: with the grant off, Overlay cycled
+  to FPS as if it could draw, nothing showed, and the grant was never offered).
   **Where each figure comes from, and what a normal app cannot read.** Nothing Android gives an unprivileged
   app reports another app's frames: Choreographer, FrameMetrics and `dumpsys gfxinfo` see only a process's
   own HWUI windows, and a game draws into a SurfaceView or its own GL surface. The most reliable source is

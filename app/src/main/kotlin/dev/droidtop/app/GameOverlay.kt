@@ -12,6 +12,15 @@ import android.view.WindowManager
  * process only.
  */
 internal object GameOverlay {
+    /**
+     * Whether droidtop may draw over a game on [displayId]: the same two routes [windowContext] takes, asked without
+     * making a window. The Quick Menu's Overlay row reads it through [dev.droidtop.runtime.systemstatus.PerformanceOverlay.canDraw]
+     * (installed in [PerformanceOverlayHost.install]), so the row never offers an overlay droidtop cannot draw, and
+     * offers the grant when it cannot (Droidtop/tracker#83, rig 2783).
+     */
+    fun canDraw(app: Context, displayId: Int): Boolean =
+        AccessibilityTyping.overlayContext(displayId) != null || Settings.canDrawOverlays(app)
+
     /** A context for a window on [displayId] and the window type it takes, or null when droidtop may not draw there. */
     fun windowContext(app: Context, displayId: Int): Pair<Context, Int>? =
         AccessibilityTyping.overlayContext(displayId)?.let { it to WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY }

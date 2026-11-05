@@ -2,7 +2,6 @@ package dev.droidtop.runtime.systemstatus
 
 import android.content.Context
 import android.provider.Settings
-import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
 import dev.droidtop.runtime.tasks.TaskManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,10 +71,17 @@ object PerformanceOverlay {
     }
 
     /**
-     * Whether droidtop can put a window over a game: its accessibility overlay needs no grant (the service must be
-     * on), an app overlay needs "Display over other apps".
+     * The one answer to "can droidtop draw over a game", installed by `:app` from the code that draws
+     * (`GameOverlay.canDraw`: its accessibility overlay when the service can give one, else an app overlay with
+     * "Display over other apps"). Until it is installed, only the grant counts. Droidtop/tracker#83: the row used to
+     * count the service as connected while the drawing code could not use it, so it offered an overlay that never
+     * showed, and never the grant.
      */
-    fun canDraw(context: Context): Boolean = AccessibilityKeyboard.connected || Settings.canDrawOverlays(context)
+    @Volatile
+    var drawCheck: (Context) -> Boolean = { Settings.canDrawOverlays(it) }
+
+    /** Whether droidtop can put a window over a game ([drawCheck]). */
+    fun canDraw(context: Context): Boolean = drawCheck(context)
 
     /** Whether a `priv.shell` provider is running, which FPS, CPU and GPU need. Cheap: no provider call. */
     fun hasShell(): Boolean = TaskManager.shell.capabilities().shellCommand
