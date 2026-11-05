@@ -35,7 +35,8 @@ data class ConsentView(
     /** What the plugin offers other plugins ("Offer <api> to other plugins"), each a tick box. */
     val offers: List<ConsentLine>,
     val uses: List<ConsentUse>,
-    val unsupported: List<String>,
+    /** What this droidtop cannot give the plugin, in words; the declared id only in the detail, for reference (#516). */
+    val unsupported: List<ConsentLine>,
     /** A plugin that asks for `host.full_trust` (docs/plugin-api.md 5.3); without it, it runs contained. */
     val asksFullAccess: Boolean = false,
 ) {
@@ -140,9 +141,32 @@ object PluginConsent {
             asks = asks.sortedByDescending { it.tier.ordinal },
             offers = offers,
             uses = uses,
-            unsupported = manifest.unsupportedDeclarations(),
+            unsupported = unsupportedLines(manifest),
             asksFullAccess = PluginTiers.declaresFullTrust(manifest),
         )
+    }
+
+    /**
+     * [PluginManifest.unsupportedDeclarations] as the approval screen says them: a plain title, the plugin's own label
+     * or reason when it gave one, and the declared id only in the detail. The rig read "permission gpu.render" there
+     * (Droidtop/tracker#516).
+     */
+    internal fun unsupportedLines(manifest: PluginManifest): List<ConsentLine> {
+        val v2 = manifest.v2
+        val ownPermissions = v2.exports.flatMap { api -> api.permissions.map { it.id } }.toSet()
+        return buildList {
+            v2.provides.filter { !ExtensionPoints.supports(it.point, it.version) }.forEach {
+                val title = it.label?.takeIf { l -> l.isNotBlank() }?.let { l -> "A part named \"$l\"" } ?: "A part of the plugin"
+                val why = if (ExtensionPoints.find(it.point) == null) "This droidtop doesn't have it yet" else "It is made for a newer droidtop"
+                add(ConsentLine(title, sentences(why, "What it asked for: ${it.point} ${it.version}")))
+            }
+            v2.permissions.filter { !PluginPermissions.isSupported(it.id) && it.id !in ownPermissions }.forEach {
+                add(ConsentLine("Access this droidtop doesn't have yet", sentences(it.reason, "What it asked for: ${it.id}")))
+            }
+            v2.subscribes.filter { PluginEvent.fromId(it.event) == null && it.event != "library.default_player_changed" }.forEach {
+                add(ConsentLine("News this droidtop doesn't send yet", sentences("What it asked for: ${it.event}")))
+            }
+        }
     }
 
     /** The parameter a scoped permission was declared with, as a sentence: which sites, which apps, which folder. */

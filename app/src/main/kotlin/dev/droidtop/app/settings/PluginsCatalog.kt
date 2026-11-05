@@ -1911,7 +1911,7 @@ internal fun AppSettingsCatalogs.pluginConsentGroups(
                 )
             },
         ),
-        group("unsupported", "Not supported by this version of droidtop", view.unsupported.mapIndexed { i, t -> info("unsupported_$i", t) }),
+        group("unsupported", "Not supported by this version of droidtop", view.unsupported.mapIndexed { i, l -> info("unsupported_$i", l.title, l.detail) }),
     )
 }
 

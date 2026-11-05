@@ -3909,6 +3909,10 @@ other permission here.
   permission CAMERA, which droidtop itself does not have, so no plugin can
   use it through droidtop"). One droidtop requests but no operation uses is
   listed as "Not supported by this version of droidtop".
+- That list says each item in words, never as its id (2026-11-05, Droidtop/tracker#516: the rig read "permission
+  gpu.render"): "Access this droidtop doesn't have yet" with the plugin's own reason, "A part named <label>" for an
+  extension point, "News this droidtop doesn't send yet" for an event. The declared id stays in the detail, after
+  "What it asked for:", for reference.
 - At call time the broker checks the plugin's own grant first, then
   whether droidtop holds the Android permission. If it does not, Android's
   own prompt is shown, but only during a call the person started; from the

@@ -98,7 +98,7 @@ object PluginStore {
             val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
             when (val result = PluginBundleInstaller.install(tmp, root(context), userKeys, hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context), succeeds = dev.droidtop.pluginhost.UserOriginKeys.successorCheck(context))) {
                 is PluginInstallResult.Installed ->
-                    "Installed ${result.record.manifest.label} -- approve it below before it runs"
+                    "Installed ${result.record.manifest.label}. Approve it below before it runs"
                 is PluginInstallResult.Refused -> "Refused: ${result.error.reason}"
             }
         } finally {

@@ -93,7 +93,10 @@ class PluginConsentTest {
         assertEquals("Reads the code you copy.", clip.line.detail)
         // #516: which sites is a sentence under the title, never part of it.
         assertEquals("Only the site api.acme.example.", view.can.single { it.id == "net.domains" }.detail)
-        assertEquals(listOf("extension point future.point", "permission made.up"), view.unsupported)
+        // #516: never the raw id as the title; it stays in the detail for reference.
+        assertEquals(listOf("A part of the plugin", "Access this droidtop doesn't have yet"), view.unsupported.map { it.title })
+        assertTrue(view.unsupported.none { it.title.contains("future.point") || it.title.contains("made.up") })
+        assertTrue(view.unsupported[1].detail!!.endsWith("What it asked for: made.up."))
 
         val shell = view.uses[0]
         assertTrue(shell.optional)
