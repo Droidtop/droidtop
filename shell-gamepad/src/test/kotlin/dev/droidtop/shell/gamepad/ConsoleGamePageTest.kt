@@ -14,6 +14,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -22,6 +23,9 @@ import org.junit.Test
  * and status row say about the emulator.
  */
 class ConsoleGamePageTest {
+    @Before
+    fun installWords() = dev.droidtop.library.settings.WordsForTests.install()
+
     private val day = 24 * 60 * 60 * 1000L
 
     private val rom = LibraryEntry(
