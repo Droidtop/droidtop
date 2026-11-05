@@ -59,7 +59,7 @@ object SteamAccounts {
 class SteamLimits {
     private val claims = ArrayDeque<Long>()
     private var coolUntil = 0L
-    private var lastKey = 0L
+    private var lastKey: Long? = null
 
     /** How many claims may go now, out of [wanted]; 0 while cooling down. */
     @Synchronized
@@ -81,7 +81,7 @@ class SteamLimits {
 
     /** When a key may be redeemed again, or 0 when now is fine. */
     @Synchronized
-    fun keyWaitMs(nowMs: Long): Long = (lastKey + KEY_SPACING_MS - nowMs).coerceAtLeast(0)
+    fun keyWaitMs(nowMs: Long): Long = lastKey?.let { (it + KEY_SPACING_MS - nowMs).coerceAtLeast(0) } ?: 0L
 
     @Synchronized
     fun keyRedeemed(nowMs: Long) {
