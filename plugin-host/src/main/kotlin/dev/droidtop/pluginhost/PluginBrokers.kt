@@ -501,6 +501,10 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun webSession(request: WebSessionRequest): WebSessionResult? = WebSessionActivity.show(appContext, request)
 
+    private val mediaLibrary by lazy { AndroidMediaLibrary(appContext) }
+
+    override fun media(): MediaLibrary = mediaLibrary
+
     override fun hiddenWebSession(request: WebSessionRequest, expiredText: List<String>): HiddenWebSession.Outcome? =
         HiddenWebSession.open(appContext, request, expiredText)
 

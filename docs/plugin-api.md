@@ -2703,12 +2703,17 @@ exist:
 **A9 Media and files library.** API `media.read@1`. Risk high.
 - **For:** a general-computer need: music, video, pictures and
   documents, for a now-playing, gallery, backup or media-server plugin.
-- **Ops:** `query {kind, page}` through MediaStore, run by the host, and
-  `open {id} → fd`, which is read-only.
+- **Ops:** `media.query {kind, page?, size?}` → `{items: [{id, name, mime, size, modifiedMs,
+  durationMs?, width?, height?, title?, artist?, album?}], more}`: `kind` one of `audio`,
+  `video`, `image`, `document` (files Android lists as none of the others); newest first;
+  `size` 1 to 100 (50 by default), `page` from 0. droidtop runs the query on Android's
+  media library (MediaStore), so it lists what droidtop itself may read (everything, with
+  its all-files access). `media.open {id}` → a read-only descriptor for one item, `id` as
+  `query` gave it (`image:123`); never a path.
 - **Surfaces:** G: the companion screen now-playing; A/D: file manager
-  views.
+  views (a plugin's own pages).
 - **Permission:** `media.read` (dangerous).
-- **Status:** not built.
+- **Status:** built (2026-11-05, Droidtop/tracker#714, `HostMediaApis`, `AndroidMediaLibrary`).
 - **Rules:** the host queries MediaStore. A contained plugin (§5.3) has
   no filesystem of its own.
 
