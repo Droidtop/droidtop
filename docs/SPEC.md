@@ -23252,8 +23252,15 @@ Termux's prefix:
   WSI only, Termux's patches except 0005, which droidtop's `0005-vtest-socket-from-env.patch` replaces: the socket is
   `VTEST_SOCKET_NAME`, else `/tmp/.virgl_test`. `.github/workflows/x86_64-venus.yml` builds it and keeps the package as
   an artifact; nothing ships yet.
-- **Next:** the vtest server (`virglrenderer-android` 1.3.0 with Venus, as `libvirgl_vtest.so` in the APK, started per
-  session), then a `venus` driver in `X86_64Graphics`.
+- **Built (slice 2):** the vtest server, `build-scripts/x86_64-venus/vtest-server`: Termux's
+  `virglrenderer-android` 1.3.0 recipe and patches (Venus, replayed on Android's own Vulkan by its 0011) with three
+  changes: no ANGLE (libepoxy opens Android's `libEGL.so` and `libGLESv2.so`), virglrenderer and libepoxy static so the
+  server is one executable (droidtop already ships GameNative's older `libvirglrenderer.so`, and a second library of
+  that name could not sit beside it), and the executable named `libvirgl_vtest.so`. Its socket is given with
+  `--socket-path`. The reuse check (owner, 2026-11-05: "reuse and repurpose existing code whenever possible"): the
+  vendored GameNative virglrenderer predates Venus, so it cannot serve this.
+- **Next (slice 3):** pack the ICD (manifest made relative, its Termux dependencies) and the server, start the server
+  per session on a socket in the session's tmp, and add a `venus` driver to `X86_64Graphics`.
 
 **Inside the guest on x86_64 (decided 2026-10-02, Droidtop/tracker#242).**
 The list above is the app's own natives; the guest process needs its own

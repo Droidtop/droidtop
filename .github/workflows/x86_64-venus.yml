@@ -2,8 +2,9 @@ name: x86_64 Venus driver
 
 # Builds Mesa's Venus Vulkan driver (libvulkan_virtio.so) for droidtop's x86_64 Wine guest from Termux's Mesa recipe
 # and patches, with droidtop's socket patch (build-scripts/x86_64-venus/mesa-venus), and keeps the package as a run
-# artifact. Slice 1 of Droidtop/tracker#608 (a real GPU on x86_64): nothing ships yet. The vtest server that replays
-# Venus on Android's Vulkan, and the driver choice in X86_64Graphics, are the next slices.
+# artifact (slice 1 of Droidtop/tracker#608, a real GPU on x86_64), and the vtest server that replays Venus on Android's
+# own Vulkan, from Termux's virglrenderer-android recipe (build-scripts/x86_64-venus/vtest-server; slice 2). Nothing
+# ships yet: packing both and the driver choice in X86_64Graphics are slice 3.
 
 on:
   push:
@@ -19,6 +20,9 @@ env:
   # The same termux-packages commit the xlib OpenGL build starts from (x86_64-lavapipe.yml), so both Mesa builds
   # share Termux's patches and dependencies.
   TERMUX_PACKAGES_COMMIT: 2e8fa6379b106caa4829407611410025a0973e02
+  # termux-packages at the commit whose virglrenderer-android (1.3.0, Venus, 0011-use-Android-Vulkan) the server is
+  # built from (read 2026-11-05).
+  TERMUX_PACKAGES_COMMIT_VTEST: 789d4606fe4950215443f0f43e80cabafdb3254e
 
 jobs:
   mesa-venus:
@@ -66,5 +70,52 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: x86_64-mesa-venus
+          path: out/*.deb
+          retention-days: 30
+
+  vtest-server:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: termux-packages
+        run: |
+          git init -q "$RUNNER_TEMP/termux-packages"
+          cd "$RUNNER_TEMP/termux-packages"
+          git remote add origin https://github.com/termux/termux-packages
+          git fetch -q --depth 1 origin "$TERMUX_PACKAGES_COMMIT_VTEST"
+          git checkout -q FETCH_HEAD
+
+      - name: Recipe
+        run: bash build-scripts/x86_64-venus/vtest-server/prepare.sh "$RUNNER_TEMP/termux-packages"
+
+      - name: Build
+        run: |
+          cd "$RUNNER_TEMP/termux-packages"
+          ./scripts/run-docker.sh ./build-package.sh -I -a x86_64 virgl-vtest-droidtop
+          ls -la output
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp output/virgl-vtest-droidtop_*_x86_64.deb "$GITHUB_WORKSPACE/out/"
+
+      - name: Check
+        # One executable, linked only against Android's own libraries (virglrenderer and libepoxy are inside it), that
+        # takes its socket on the command line.
+        run: |
+          deb=$(ls out/virgl-vtest-droidtop_*_x86_64.deb)
+          mkdir -p "$RUNNER_TEMP/deb" && dpkg-deb -x "$deb" "$RUNNER_TEMP/deb"
+          bin=$(find "$RUNNER_TEMP/deb" -name libvirgl_vtest.so | head -1)
+          test -n "$bin"
+          file "$bin"
+          readelf -d "$bin" | grep NEEDED | tee "$RUNNER_TEMP/needed"
+          ! grep -E 'libvirglrenderer|libepoxy' "$RUNNER_TEMP/needed"
+          strings "$bin" | grep -m1 -- 'socket-path'
+
+      - name: Upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: x86_64-virgl-vtest
           path: out/*.deb
           retention-days: 30
