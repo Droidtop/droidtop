@@ -1157,6 +1157,7 @@ version = "0.1.0"
 dependencies = [
  "droidtop-agent-service",
  "jni",
+ "kdeconnect-service",
  "serde",
  "serde_json",
  "sync-core",
@@ -2452,6 +2453,45 @@ dependencies = [
  "serde",
  "serde_json",
  "simple_asn1",
+]
+
+[[package]]
+name = "kdeconnect-link"
+version = "0.1.0"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=89afa65869e527f57909538875703ee075143396#89afa65869e527f57909538875703ee075143396"
+dependencies = [
+ "kdeconnect-proto",
+ "rcgen 0.13.2",
+ "rustls",
+ "serde_json",
+ "thiserror 1.0.69",
+ "time",
+ "x509-parser 0.16.0",
+]
+
+[[package]]
+name = "kdeconnect-proto"
+version = "0.1.0"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=89afa65869e527f57909538875703ee075143396#89afa65869e527f57909538875703ee075143396"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "kdeconnect-service"
+version = "0.1.0"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=89afa65869e527f57909538875703ee075143396#89afa65869e527f57909538875703ee075143396"
+dependencies = [
+ "base64 0.22.1",
+ "kdeconnect-link",
+ "kdeconnect-proto",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

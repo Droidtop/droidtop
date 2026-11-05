@@ -37,5 +37,7 @@ dependencies {
     implementation("io.github.bi0shacker001:aria2-engine:${aria2EngineVersion}")
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
+    // org.json is a throwing stub in android.jar; the KDE Connect reply parsers' tests need the real one.
+    testImplementation(libs.json.v20240303)
     testImplementation(libs.kotlinx.coroutines.test)
 }
