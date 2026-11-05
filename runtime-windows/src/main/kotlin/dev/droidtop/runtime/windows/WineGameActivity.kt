@@ -906,15 +906,17 @@ object WinePresentation {
         // however soon; only a failing exit is worth saying.
         if (tool && status == 0) return null
         val atOnce = ranMs < EXITED_AT_ONCE_MS
-        if (status == 0 && (tool || showedWindow)) return null
+        val crashed = status == 0 && crashedAtEnd(output)
+        if (status == 0 && (tool || showedWindow) && !crashed) return null
         val what = if (tool) "program" else "game"
         val title = when {
+            crashed -> "This Windows $what stopped with an error."
             atOnce -> "This Windows $what closed straight after it started."
             status == 0 -> "This Windows $what closed without showing a window."
             else -> "This Windows $what stopped with an error."
         }
         val seconds = (ranMs / 1000).coerceAtLeast(0)
-        val code = "Wine exited with code $status after $seconds s."
+        val code = if (crashed) "Wine reported a crash after $seconds s, though its exit code was 0 (a launcher such as the Steam loader ends with its own code)." else "Wine exited with code $status after $seconds s."
         val lines = output.lines().map(String::trimEnd).filter(String::isNotBlank).takeLast(EXIT_LINES)
         val detail = if (lines.isEmpty()) {
             "$code It printed nothing."
@@ -925,4 +927,25 @@ object WinePresentation {
     }
 
     private const val EXIT_DETAIL_CHARS = 1200
+
+    /**
+     * Whether Wine's last lines say the game crashed: an unhandled exception, an unhandled page fault or a failed
+     * assertion, as Wine itself prints them. A game started through the Steam loader (`steamclient_loader_x64.exe`,
+     * [dev.droidtop.runtime.windows.utils.SteamworksShim]) ends with the loader's code, 0, however the game ended
+     * (Droidtop/tracker#896: Stardew Valley's c0000409 and Slime Rancher's assertion both read "exited with code 0"),
+     * so Wine's own words are what tell. Only the last [CRASH_TAIL_LINES] lines count: a helper that crashed early,
+     * while the game played on, is not the game's end. Pure.
+     */
+    fun crashedAtEnd(output: String): Boolean =
+        output.lines().filter(String::isNotBlank).takeLast(CRASH_TAIL_LINES).any { line -> CRASH_LINES.any { it in line } }
+
+    private val CRASH_LINES = listOf(
+        "err:seh:NtRaiseException Unhandled exception",
+        "wine: Unhandled exception",
+        "wine: Unhandled page fault",
+        "err:msvcrt:_wassert",
+    )
+
+    /** How many of Wine's last non-blank lines may hold the crash. */
+    const val CRASH_TAIL_LINES = 40
 }

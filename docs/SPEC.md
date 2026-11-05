@@ -11608,6 +11608,15 @@ as the hint row says (it was eaten); B still means Keep waiting. **A clean end c
 failure (`nothingRunning`), so the shell does not offer Quit, Restart and Kill for a game that is gone. The run's record
 names the emulator that runs: "None" on an x86_64 device, as the game's Wine page says.
 
+**A crash Wine reports is a crash, whatever the exit code** (Droidtop/tracker#896, part 2). A game started through the
+Steam loader ends with the loader's code, 0, however the game ended: Stardew Valley's unhandled c0000409 and Slime
+Rancher's failed assertion both read "Wine exited with code 0" and Slime Rancher went back to the grid with nothing
+said. When Wine's last 40 lines hold its own crash line (`err:seh:NtRaiseException Unhandled exception`, `wine:
+Unhandled exception`, `wine: Unhandled page fault`, `err:msvcrt:_wassert`; `WinePresentation.crashedAtEnd`), the end is
+reported as "stopped with an error" with those lines. A crash earlier in a long run, while the game played on, does not
+count. A game that closes itself cleanly, with no such line, still just closes; whether that should say anything is
+the owner's to decide.
+
 **Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
 first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
 on screens of its own (its failure screen, its crash watch, its problem report). So an Enginehost launch that

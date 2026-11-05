@@ -212,4 +212,24 @@ class WineLaunchPlanTest {
         listOf(android.view.KeyEvent.KEYCODE_BUTTON_A, android.view.KeyEvent.KEYCODE_DPAD_DOWN)
             .forEach { assertTrue(!WinePresentation.dismissesFailure(it)) }
     }
+
+    @Test
+    fun `a game behind the Steam loader that crashed is reported though the loader exited 0`() {
+        // Droidtop/tracker#896: Stardew Valley (c0000409) and Slime Rancher (an assertion) read "exited with code 0".
+        val stardew = "00c8:err:module:find_forwarded_export module not found for forward 'icuuc68.u_charsToUChars_68'\n" +
+            "00c8:err:seh:NtRaiseException Unhandled exception code c0000409 flags 1 addr 0x6ffffc79dd7e\n"
+        val report = WinePresentation.exitReport(0, 5_000, showedWindow = false, output = stardew)!!
+        assertEquals("This Windows game stopped with an error.", report.title)
+        assertTrue(report.detail.startsWith("Wine reported a crash after 5 s"))
+        assertTrue(report.detail.endsWith("addr 0x6ffffc79dd7e"))
+        val slime = "0148:err:msvcrt:_wassert (L\"!status && vkCreateGraphicsPipelines\",L\"dlls/winevulkan/loader_thunks.c\",3216)"
+        assertEquals("This Windows game stopped with an error.", WinePresentation.exitReport(0, 79_000, showedWindow = true, output = slime)!!.title)
+    }
+
+    @Test
+    fun `a crash early in the run, long before a clean end, is not the game's end`() {
+        val output = "wine: Unhandled page fault on read access to 0 in helper.exe\n" + (1..60).joinToString("\n") { "line $it" }
+        assertTrue(!WinePresentation.crashedAtEnd(output))
+        assertNull(WinePresentation.exitReport(0, 600_000, showedWindow = true, output = output))
+    }
 }
