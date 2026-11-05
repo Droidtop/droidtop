@@ -378,4 +378,30 @@ class QuickTilesTest {
         assertEquals(QuickGlyph.SEARCH, tile.glyph)
         assertFalse((tile.item as ActionItem).inert)
     }
+
+    private fun playing(playing: Boolean, next: Boolean = true, previous: Boolean = true) =
+        dev.droidtop.runtime.systemstatus.NowPlaying("Song", "Artist", "Music", playing, canPrevious = previous, canNext = next, canPlayPause = true)
+
+    private val system = listOf(CatalogGroup(id = "quick_system", title = null, items = listOf(ActionItem(id = "power", title = "Power", run = {}))))
+
+    @Test
+    fun `nothing playing adds no tile`() {
+        assertEquals(system, QuickTiles.withNowPlaying(system, null) {})
+    }
+
+    @Test
+    fun `what is playing leads the tab, with the press it offers`() {
+        val ids = QuickTiles.withNowPlaying(system, playing(true)) {}.single().items.map { it.id }
+        assertEquals(listOf(QuickTiles.ID_NOW_PLAYING, QuickTiles.ID_NEXT_TRACK, QuickTiles.ID_PREVIOUS_TRACK, "power"), ids)
+        val track = QuickTiles.withNowPlaying(system, playing(true)) {}.single().items.first()
+        assertEquals("Song", track.title)
+        assertEquals("Pause", track.value)
+        assertEquals("Play", QuickTiles.withNowPlaying(system, playing(false)) {}.single().items.first().value)
+    }
+
+    @Test
+    fun `a session without next or previous gets no tile for them`() {
+        val ids = QuickTiles.withNowPlaying(system, playing(true, next = false, previous = false)) {}.single().items.map { it.id }
+        assertEquals(listOf(QuickTiles.ID_NOW_PLAYING, "power"), ids)
+    }
 }

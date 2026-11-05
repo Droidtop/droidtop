@@ -84,6 +84,9 @@ data class QuickPanel(val sliders: List<SliderItem>, val tiles: List<QuickTile>)
 /** D-pad directions, named so the movement rules can be tested. */
 enum class QuickMove { UP, DOWN, LEFT, RIGHT }
 
+/** A Now playing tile's press, carried to the media session (QuickTiles.withNowPlaying). */
+enum class MediaPress { PLAY_PAUSE, NEXT, PREVIOUS }
+
 object QuickTiles {
 
     /**
@@ -225,6 +228,37 @@ object QuickTiles {
             run = { open() },
         )
         return groups.mapIndexed { index, group -> if (index == 0) group.copy(items = listOf(tile) + group.items) else group }
+    }
+
+    /** The Now playing tiles' ids. */
+    const val ID_NOW_PLAYING = "quick_now_playing"
+    const val ID_NEXT_TRACK = "quick_next_track"
+    const val ID_PREVIOUS_TRACK = "quick_previous_track"
+
+    /**
+     * [groups] led by what is playing (Droidtop/tracker#716), as the companion's Now playing card shows it: the track,
+     * whose A plays or pauses it, then Next track and Previous track, each only when the session offers it. None for
+     * [now] null (nothing playing, or no notification access). [control] carries a press to the session. Pure.
+     */
+    fun withNowPlaying(groups: List<CatalogGroup>, now: dev.droidtop.runtime.systemstatus.NowPlaying?, control: (MediaPress) -> Unit): List<CatalogGroup> {
+        now ?: return groups
+        val tiles = buildList {
+            if (now.canPlayPause) {
+                add(
+                    ActionItem(
+                        id = ID_NOW_PLAYING,
+                        title = now.title,
+                        subtitle = now.artist ?: now.app,
+                        value = words(if (now.playing) R.string.gamepad_pause else R.string.gamepad_play),
+                        run = { control(MediaPress.PLAY_PAUSE) },
+                    ),
+                )
+            }
+            if (now.canNext) add(ActionItem(id = ID_NEXT_TRACK, title = words(R.string.gamepad_next_track), subtitle = now.app, run = { control(MediaPress.NEXT) }))
+            if (now.canPrevious) add(ActionItem(id = ID_PREVIOUS_TRACK, title = words(R.string.gamepad_previous_track), subtitle = now.app, run = { control(MediaPress.PREVIOUS) }))
+        }
+        if (tiles.isEmpty()) return groups
+        return groups.mapIndexed { index, group -> if (index == 0) group.copy(items = tiles + group.items) else group }
     }
 
     /** Splits the tab into its slider strip and its tile grid. */

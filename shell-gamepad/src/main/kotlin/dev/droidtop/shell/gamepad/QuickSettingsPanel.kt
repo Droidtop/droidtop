@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -105,9 +106,29 @@ internal fun QuickSettingsPanel(
     // The live catalog, rebuilt after every change -- a few preference
     // and system reads, off the main thread because SystemStatus takes a
     // battery broadcast and a connectivity query.
-    val groups by produceState(initialValue = emptyList<CatalogGroup>(), version) {
+    // What is playing (Droidtop/tracker#716): the System tab is read again whenever the session changes.
+    var mediaVersion by remember { mutableStateOf(0) }
+    if (section == QuickSection.SYSTEM) {
+        DisposableEffect(context) {
+            val stop = dev.droidtop.runtime.systemstatus.MediaNow.watch(context) { mediaVersion++ }
+            onDispose { stop() }
+        }
+    }
+    val groups by produceState(initialValue = emptyList<CatalogGroup>(), version, mediaVersion) {
         value = withContext(Dispatchers.IO) {
-            val groups = quickSectionGroups(GamingSettingsCatalog.groups(context), section, dev.droidtop.library.settings.UiModePrefs.get(context))
+            var groups = quickSectionGroups(GamingSettingsCatalog.groups(context), section, dev.droidtop.library.settings.UiModePrefs.get(context))
+            if (section == QuickSection.SYSTEM) {
+                val media = dev.droidtop.runtime.systemstatus.MediaNow.controller(context)
+                val now = dev.droidtop.runtime.systemstatus.MediaNow.nowPlaying(context, media)
+                groups = QuickTiles.withNowPlaying(groups, now) { press ->
+                    val controls = media?.transportControls
+                    when (press) {
+                        MediaPress.PLAY_PAUSE -> if (now?.playing == true) controls?.pause() else controls?.play()
+                        MediaPress.NEXT -> controls?.skipToNext()
+                        MediaPress.PREVIOUS -> controls?.skipToPrevious()
+                    }
+                }
+            }
             if (section == QuickSection.SYSTEM && search != null) QuickTiles.withSearch(groups) { search?.invoke() } else groups
         }
     }
