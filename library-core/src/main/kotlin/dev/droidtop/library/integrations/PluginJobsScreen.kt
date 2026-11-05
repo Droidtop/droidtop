@@ -297,7 +297,7 @@ object PluginJobsScreen {
      * A job that sends only a percent and a line keeps its line under it. Pure.
      */
     internal fun progressLine(entry: PluginJobsCenter.Entry, timeLeft: String?): String {
-        val moving = entry.percent >= 0 || amountLine(entry.numbers, speedBps = null) != null
+        val moving = entry.shownPercent >= 0 || amountLine(entry.numbers, speedBps = null) != null
         // A job's own line, said only by a job that sends no numbers: with numbers, its figures are the detail.
         val own = entry.statusLine.takeIf { entry.numbers == null && it.isNotBlank() }
         val first = when {
@@ -312,7 +312,7 @@ object PluginJobsScreen {
         }
         // The status line is said once: a paused job whose status is "Paused" read "Paused Paused" (tracker#85).
         val second = own?.takeIf { !it.equals(first, ignoreCase = true) }
-        return if ((entry.percent >= 0 || entry.paused) && second != null) "$first\n$second" else first
+        return if ((entry.shownPercent >= 0 || entry.paused) && second != null) "$first\n$second" else first
     }
 
     /**
@@ -320,7 +320,7 @@ object PluginJobsScreen {
      * 300 MB, 4 MB/s", the speed smoothed ([JobPace]). Null when the job gives no figures. Pure but for the pace.
      */
     fun detailLine(entry: PluginJobsCenter.Entry, nowMs: Long): String? {
-        val percent = entry.percent.takeIf { it in 0..100 }?.let { "$it%" }
+        val percent = entry.shownPercent.takeIf { it in 0..100 }?.let { "$it%" }
         val amount = amountLine(entry.numbers, speedBps = JobPace.speed(entry, nowMs) ?: entry.numbers?.downloadBps)
         return listOfNotNull(percent, amount).joinToString(", ").ifEmpty { null }
     }
@@ -334,7 +334,7 @@ object PluginJobsScreen {
         JobState.DONE -> JobLook.DONE
         JobState.HELD, JobState.WAITING_FOR_NETWORK, JobState.WAITING_TO_RETRY -> JobLook.QUEUED
         JobState.PAUSED -> JobLook.PAUSED
-        JobState.RUNNING -> if (entry.percent >= 0) JobLook.ACTIVE else JobLook.CHECKING
+        JobState.RUNNING -> if (entry.shownPercent >= 0) JobLook.ACTIVE else JobLook.CHECKING
     }
 
     /** How many parts [entry] is counted in, for a segmented bar: its things to do when it counts 2 or more, else 0. Pure. */
@@ -377,7 +377,7 @@ object PluginJobsScreen {
             title = entry.title,
             subtitle = listOf(line, jobSource(entry)).filter { it.isNotBlank() }.joinToString(" · "),
             inline = jobPage(entry.jobId, jobTitle(entry)),
-            progress = if (entry.percent >= 0) entry.percent / 100f else -1f,
+            progress = entry.fraction,
             progressLook = lookOf(entry),
             progressParts = partsOf(entry),
             summaryShown = true,
@@ -424,7 +424,7 @@ object PluginJobsScreen {
                     // The page is where the person asked: the figures are here, as well as the calm line.
                     subtitle = listOfNotNull(detailLine(entry, System.currentTimeMillis()), entry.statusLine.takeIf { it.isNotBlank() }).joinToString("\n"),
                     value = progressLine(entry, JobPace.line(entry, System.currentTimeMillis())),
-                    progress = if (entry.percent >= 0) entry.percent / 100f else -1f,
+                    progress = entry.fraction,
                     progressLook = lookOf(entry),
                     progressParts = partsOf(entry),
                 ),

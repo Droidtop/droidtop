@@ -126,6 +126,15 @@ object PluginJobsCenter {
         /** Why a running job is not moving right now; null while it moves ([JobWait]). */
         val wait: JobWait? = null,
     ) {
+        /**
+         * How far it is, 0 to 100, as every surface draws it ([jobPercent]): [percent], else its [numbers]; -1 when it
+         * cannot tell. Read this, not [percent], to draw a bar.
+         */
+        val shownPercent: Int get() = jobPercent(percent, numbers)
+
+        /** [shownPercent] as a bar's fill, 0 to 1, or -1 for the moving track of a job that cannot tell. */
+        val fraction: Float get() = shownPercent.let { if (it < 0) -1f else it / 100f }
+
         /** Where the job stands, from its flags. */
         val state: JobState
             get() = when {
@@ -637,7 +646,10 @@ object PluginJobsCenter {
         state.update { current ->
             listOf(Entry(jobId, callerId, callerLabel, null, title, System.currentTimeMillis(), via = providerLabel)) + current
         }
-        brokeredJobs[jobId] = brokeredScope.launch {
+        // The job's handle is in its context, so a download it runs reports its bytes to its row like any job's
+        // (DownloadJobs.TransferNumbers reads JobHandle.current()); without it a plugin's download had no numbers
+        // (Droidtop/tracker#877).
+        brokeredJobs[jobId] = brokeredScope.launch(JobHandle(jobId)) {
             val reply = try {
                 block(jobId)
             } catch (e: kotlinx.coroutines.CancellationException) {

@@ -15,7 +15,7 @@ object JobsSummary {
      * few times over a download instead of with every report; -1 while none of them knows (an indeterminate bar).
      */
     fun runningPercent(entries: List<PluginJobsCenter.Entry>): Int {
-        val known = entries.filter { !it.done && !it.paused && it.percent >= 0 }.map { it.percent.coerceAtMost(100) }
+        val known = entries.filter { !it.done && !it.paused && it.shownPercent >= 0 }.map { it.shownPercent }
         if (known.isEmpty()) return -1
         return known.average().toInt() / STEP * STEP
     }

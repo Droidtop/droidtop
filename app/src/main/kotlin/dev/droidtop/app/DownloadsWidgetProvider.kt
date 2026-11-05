@@ -42,7 +42,7 @@ class DownloadsWidgetProvider : AppWidgetProvider() {
             val app = context.applicationContext
             DroidtopWidgets.scope.launch {
                 PluginJobsCenter.entries()
-                    .map { jobs -> downloads(jobs).map { it.jobId to it.percent / 5 } + jobs.count { it.paused } }
+                    .map { jobs -> downloads(jobs).map { it.jobId to it.shownPercent / 5 } + jobs.count { it.paused } }
                     .distinctUntilChanged()
                     .debounce(THROTTLE_MS)
                     .collect {
@@ -62,7 +62,7 @@ class DownloadsWidgetProvider : AppWidgetProvider() {
                 DroidtopWidgets.Row(
                     "${job.title} · ${dev.droidtop.library.integrations.PluginJobsScreen.oneLine(job)}",
                     open,
-                    progress = if (job.paused) job.percent.coerceAtLeast(0) else job.percent,
+                    progress = if (job.paused) job.shownPercent.coerceAtLeast(0) else job.shownPercent,
                 )
             }
             val updates = dev.droidtop.library.GameUpdates.waiting(DroidtopWidgets.libraryGames(context)).size

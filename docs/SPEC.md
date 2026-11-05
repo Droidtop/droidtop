@@ -19258,7 +19258,15 @@ of a release in parts or of several files), a job's state is its mark (a check, 
 "Done" or "Failed" in a value column; quantities are meters or sliders with the number beside them; on and off is a
 switch; connection and sync are glyphs; droidtop's own badges are glyphs whose word is their accessible label (an
 ES-DE theme's own badges stay the theme's). Every drawing has its words for a screen reader (`JobLook.words`), and
-colour is never the only signal. A job row is its title, its bar or mark, and one short line under the title (where
+colour is never the only signal. **A download's bar fills from whatever says how far it is** (owner, 2026-11-05,
+Droidtop/tracker#877: "Droidtop still shows text, with a spinner for downloads, not a progress bar"). Every surface
+reads one rule, `PluginJobsCenter.Entry.shownPercent` (`jobPercent`): the percent the job reported, else its bytes
+against a known total, else its items done of its items; only a job none of these describes is the moving track, and
+its look is ACTIVE as soon as one does. The engine's transfer gets the size the caller was told (`expectedBytes`: the
+job's size for the download policy, else the file's declared size, which a source's descriptor, a file host's or
+debrid service's file list and the web view's Content-Length give), so a server that sends no length still gives a
+percent (held under 100 until the file is whole) and a total. A plugin's own download (`startDownload`) runs with its
+job's handle, so its bytes reach its row. A job row is its title, its bar or mark, and one short line under the title (where
 it stands, who runs it); it has no value column, which in a narrow pane took the title's width and broke it mid-word
 ("Synct / hing"). Moved so far: the jobs list (Downloads, the Quick Menu's Downloads, Settings' "Downloads and
 installs"); the game menu's Downloads row; Home's activity spot; and on/off, which is a switch everywhere a state is

@@ -225,7 +225,7 @@ internal object StoresCatalog {
      * re-reading the pages for every other job.
      */
     private val storeJobChanges: Flow<Any?> = PluginJobsCenter.entries()
-        .map { all -> all.filter { it.nativeKind == StoreInstallJob.KIND && !it.done }.map { Triple(it.jobId, it.percent, it.paused) } }
+        .map { all -> all.filter { it.nativeKind == StoreInstallJob.KIND && !it.done }.map { Triple(it.jobId, it.shownPercent, it.paused) } }
         .distinctUntilChanged()
 
     /** [store]'s installs that are running or paused, from the one jobs list. */
@@ -236,7 +236,7 @@ internal object StoresCatalog {
 
     /** A row's progress bar for [jobs]: the first running install's, an empty track while its size is unknown. */
     private fun busyProgress(jobs: List<PluginJobsCenter.Entry>): Float? =
-        jobs.firstOrNull { !it.paused }?.let { if (it.percent >= 0) it.percent / 100f else -1f }
+        jobs.firstOrNull { !it.paused }?.fraction
 
     private suspend fun rootGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val signedInByStore = PcStore.entries.associateWith { it.signedIn(context) }

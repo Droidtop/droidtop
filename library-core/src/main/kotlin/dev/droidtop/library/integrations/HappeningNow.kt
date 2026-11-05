@@ -53,7 +53,7 @@ object HappeningNow {
         val lead = leaders.firstOrNull { it.jobId == keep } ?: leaders.first()
         return Now(
             kind = kindOf(lead),
-            fraction = if (lead.percent < 0) -1f else lead.percent / 100f,
+            fraction = lead.fraction,
             look = PluginJobsScreen.lookOf(lead),
             running = running.size,
             jobId = lead.jobId,

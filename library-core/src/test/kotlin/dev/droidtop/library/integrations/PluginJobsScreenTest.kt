@@ -140,4 +140,17 @@ class PluginJobsScreenTest {
         // A finished row has no bar, but says how it ended by its mark.
         assertEquals(JobLook.FAILED, PluginJobsScreen.jobRow(failed, nowMs = 0L).progressLook)
     }
+
+    @Test
+    fun `a download that sends only its bytes draws a filling bar, not a spinner`() {
+        // Droidtop/tracker#877: "Droidtop still shows text, with a spinner for downloads, not a progress bar".
+        val bytes = job("b").copy(numbers = dev.droidtop.pluginhost.JobNumbers(bytesDone = 120_000_000, bytesTotal = 300_000_000))
+        assertEquals(JobLook.ACTIVE, PluginJobsScreen.lookOf(bytes))
+        assertEquals(0.4f, PluginJobsScreen.jobRow(bytes, nowMs = 0L).progress!!, 0.001f)
+        // With no total yet it is the moving track, and its line says it is downloading.
+        val noTotal = job("n").copy(numbers = dev.droidtop.pluginhost.JobNumbers(bytesDone = 5_000_000))
+        assertEquals(JobLook.CHECKING, PluginJobsScreen.lookOf(noTotal))
+        assertEquals(-1f, PluginJobsScreen.jobRow(noTotal, nowMs = 0L).progress!!, 0.001f)
+        assertEquals("Downloading", PluginJobsScreen.progressLine(noTotal, null))
+    }
 }

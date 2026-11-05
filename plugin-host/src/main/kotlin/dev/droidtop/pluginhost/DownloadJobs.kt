@@ -645,7 +645,7 @@ object DownloadJobs {
                 PluginJobsCenter.entries().collect { list ->
                     list.firstOrNull { it.jobId == jobId }?.takeIf { !it.done }?.let { entry ->
                         onStatus(if (entry.percent in 0..99) "${entry.statusLine} (${entry.percent}%)" else entry.statusLine)
-                        onPercent(entry.percent)
+                        onPercent(entry.shownPercent)
                     }
                 }
             }
@@ -818,7 +818,7 @@ object DownloadJobs {
             }
             val served = torrent?.let { ref ->
                 dev.droidtop.pluginhost.debrid.DebridStep.serve(context, ref, folder, { percent, line -> report(percent, line, null) }) { file, into, line ->
-                    fetchWithEngine(context, file.url, emptyMap(), into, 0L, numbers, { percent, _, _ -> report(percent, line, null) })
+                    fetchWithEngine(context, file.url, emptyMap(), into, 0L, numbers, { percent, _, _ -> report(percent, line, null) }, expectedBytes = file.size ?: 0L)
                 }
             }
             if (served == null) {
@@ -994,6 +994,14 @@ object DownloadJobs {
         }
     }
 
+    /**
+     * The size a job's file was announced at: the policy's size of the whole job ([DownloadGate.ARG_BYTES]) for a job of
+     * one file, else the file's own declared size, which its callers pass as the cap (a source's descriptor, a host's or
+     * debrid service's file, the web view's Content-Length). Zero when none was given. Pure.
+     */
+    internal fun expectedOf(args: Map<String, String>, maxBytes: Long): Long =
+        args[DownloadGate.ARG_BYTES]?.toLongOrNull()?.takeIf { it > 0 && args[ARG_MORE] == null } ?: maxBytes.coerceAtLeast(0L)
+
     /** One file of a job: every download is the download engine's (docs/SPEC.md 12a "One download engine"). */
     private suspend fun transfer(
         context: Context,
@@ -1007,7 +1015,7 @@ object DownloadJobs {
     ) {
         // A host that serves the file encrypted (Mega) gave the key as a header of droidtop's own: it goes to no server.
         val (wire, key) = HostDecryption.split(headers)
-        fetchWithEngine(context, url, wire, destination, maxBytes, numbers, report, sitesGuard(args[ARG_ALLOW_SITES]))
+        fetchWithEngine(context, url, wire, destination, maxBytes, numbers, report, sitesGuard(args[ARG_ALLOW_SITES]), expectedBytes = expectedOf(args, maxBytes))
         if (key == null) return
         // The file is decrypted where it lies and its MAC checked; one that fails is deleted, never placed, and a
         // cancelled or failed decryption leaves nothing half done for a restart to take for a whole file.
@@ -1029,6 +1037,24 @@ object DownloadJobs {
      * whole files before this one ([before]) in its bytes and says which file it is on; its total bytes are known only
      * for a job of one file. Outside a job ([job] null) nothing is told.
      */
+    /**
+     * The percent a transfer reports: the engine's own when it knows the length, else the bytes so far against the size
+     * the caller was told ([expected]), held under 100 until the engine says the file is whole; -1 when neither is known.
+     * Pure.
+     */
+    internal fun percentOf(enginePercent: Int, done: Long?, expected: Long): Int = when {
+        enginePercent >= 0 -> enginePercent
+        expected > 0 && done != null && done >= 0 -> (done * 100 / expected).toInt().coerceIn(0, 99)
+        else -> -1
+    }
+
+    /** The total the job's numbers carry: the engine's when it knows it, else the size the caller was told; -1 for neither. Pure. */
+    internal fun totalOf(engineTotal: Long, expected: Long): Long = when {
+        engineTotal > 0 -> engineTotal
+        expected > 0 -> expected
+        else -> -1
+    }
+
     internal class TransferNumbers(
         private val job: JobHandle?,
         private val before: Long = 0L,
@@ -1088,6 +1114,12 @@ object DownloadJobs {
         allow: ((String) -> Unit)? = null,
         /** Only these bytes of the remote file, first to last ([TransferRequest.range]). */
         range: LongRange? = null,
+        /**
+         * The file's size as the caller was told it (a source's descriptor, a file host's or debrid service's file list,
+         * the page's Content-Length in droidtop's web view): the job's percent and total when the server sends no length,
+         * so the row draws a bar rather than a spinner (Droidtop/tracker#877). Zero when nobody said.
+         */
+        expectedBytes: Long = 0L,
     ) {
         val engine = engineFor(context, requireNotNull(destination.parentFile) { "the download has no folder" })
         try {
@@ -1095,11 +1127,11 @@ object DownloadJobs {
                 engine,
                 TransferRequest(url, headers, destination, maxBytes, range),
                 report = { progress ->
-                    report(progress.percent, progress.line, null)
                     val transfer = progress.transfer
+                    report(percentOf(progress.percent, transfer?.completedLength, expectedBytes), progress.line, null)
                     when {
                         progress.waiting -> numbers.waiting()
-                        transfer != null -> numbers.bytes(transfer.completedLength, transfer.totalLength, transfer.downloadSpeed)
+                        transfer != null -> numbers.bytes(transfer.completedLength, totalOf(transfer.totalLength, expectedBytes), transfer.downloadSpeed)
                     }
                 },
                 size = ValueFormat::size,

@@ -337,7 +337,7 @@ internal fun continueStoreDownload(context: Context, entry: LibraryEntry, stage:
 }
 
 /** How far [this] job is, 0 to 1; null while it does not know. */
-internal fun PluginJobsCenter.Entry.fraction(): Float? = percent.takeIf { it >= 0 }?.let { it.coerceAtMost(100) / 100f }
+internal fun PluginJobsCenter.Entry.fraction(): Float? = shownPercent.takeIf { it >= 0 }?.let { it / 100f }
 
 /** What a store action says for a game whose store this build does not have. */
 internal const val NO_STORE_LINE = "No store in this build installs this game"

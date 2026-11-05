@@ -320,8 +320,8 @@ object UpdatesPage {
         val versionLine = line(update.step, update.sizeBytes, update.from)
         val jobLine = job?.takeIf { state != State.AVAILABLE && state != State.STARTING }?.let { PluginJobsScreen.oneLine(it) }
         val subtitle = listOfNotNull(versionLine, jobLine).joinToString(" · ")
-        val value = if (state == State.DOWNLOADING && job != null && job.percent in 0..100) "${job.percent}%" else state.label
-        val progress = progressOf(state, job?.percent ?: -1)
+        val value = if (state == State.DOWNLOADING && job != null && job.shownPercent in 0..100) "${job.shownPercent}%" else state.label
+        val progress = progressOf(state, job?.shownPercent ?: -1)
         // Pressing a row that is already under way would only join its job: it is drawn, not offered.
         return if (state == State.AVAILABLE || state == State.FAILED) {
             AsyncActionItem(

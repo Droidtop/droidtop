@@ -149,6 +149,9 @@ internal object AcquireDownload {
             },
             onStatus = onStatus,
             onPercent = onPercent,
+            // A file of one part has its size from the source, else from the page droidtop's web view took it from: the
+            // row's bar uses it when the server sends no length (Droidtop/tracker#877), as the download policy does.
+            sizeBytes = if (parts.size == 1) (descriptors.first().size ?: captured.first()?.size ?: 0L) else 0L,
         )
     }
 }

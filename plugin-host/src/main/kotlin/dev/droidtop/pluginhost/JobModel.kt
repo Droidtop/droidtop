@@ -37,6 +37,19 @@ data class JobNumbers(
     val itemsTotal: Int = -1,
 )
 
+/**
+ * How far a job is, 0 to 100, for every bar, ring, widget and notification that draws it: the percent it reported,
+ * else its bytes against a known total, else its items done of its items; -1 when none of these is known (Droidtop/
+ * tracker#877: a download that sent only its bytes stayed a spinner and a line for its whole life). Pure.
+ */
+fun jobPercent(percent: Int, numbers: JobNumbers?): Int = when {
+    percent >= 0 -> percent.coerceAtMost(100)
+    numbers == null -> -1
+    numbers.bytesTotal > 0 && numbers.bytesDone >= 0 -> (numbers.bytesDone * 100 / numbers.bytesTotal).toInt().coerceIn(0, 100)
+    numbers.itemsTotal > 0 && numbers.itemsDone >= 0 -> (numbers.itemsDone * 100 / numbers.itemsTotal).coerceIn(0, 100)
+    else -> -1
+}
+
 /** What "Open" on a job or a line of its report goes to. */
 sealed interface OpenTarget {
     /** A game's page, by its library id. */

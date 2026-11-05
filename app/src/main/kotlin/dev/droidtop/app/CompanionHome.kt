@@ -425,7 +425,7 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
                         )
                     }
                     dev.droidtop.ui.shared.JobProgress(
-                        job.percent.takeIf { it >= 0 }?.let { it / 100f } ?: -1f,
+                        job.fraction,
                         PluginJobsScreen.lookOf(job),
                         companionJobColors(),
                         Modifier.fillMaxWidth().padding(top = 4.dp),

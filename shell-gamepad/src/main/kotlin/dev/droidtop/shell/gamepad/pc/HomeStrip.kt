@@ -142,7 +142,7 @@ internal fun rememberHomeStrip(all: List<LibraryEntry>, systemNames: Map<String,
             val whatsNew = HomeModel.whatsNew(HomeModel.updates(all), added, pluginUpdates = pluginUpdates, attention = attention.size)
             val downloads = jobs.filter { !it.done && PluginJobsCenter.isDownloadKind(it.nativeKind) }.map { job ->
                 HomeCard.Download(
-                    job.jobId, job.title, job.percent,
+                    job.jobId, job.title, job.shownPercent,
                     said = dev.droidtop.library.integrations.PluginJobsScreen.oneLine(job),
                     look = dev.droidtop.library.integrations.PluginJobsScreen.lookOf(job),
                 )

@@ -168,7 +168,7 @@ internal fun LeftMenu(
     // What is waiting, for the dots: read while the menu is open, never polled.
     val jobs by PluginJobsCenter.entries().collectAsState()
     val attention = leftMenuAttention(
-        running = jobs.filter { !it.done && !it.paused }.map { if (it.percent >= 0) it.percent / 100f else -1f },
+        running = jobs.filter { !it.done && !it.paused }.map { it.fraction },
         needYou = jobs.count { job ->
             job.state == dev.droidtop.pluginhost.JobState.FAILED ||
                 job.report?.let { it.count(dev.droidtop.pluginhost.Outcome.NEEDS_PICK) > 0 } == true
