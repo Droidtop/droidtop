@@ -158,7 +158,9 @@ object GameProperties {
             )
         }
         return listOf(
-            CatalogGroup("properties_edit", null, edit),
+            // Named, not untitled: an untitled group is named after the screen, so the column read "Game properties,
+            // Drivers, What will run" and the rows behind the first entry went unseen (Droidtop/tracker#228, rig 2936).
+            CatalogGroup("properties_edit", "Language, controls and launch", edit),
             CatalogGroup("properties_drivers", null, drivers),
             CatalogGroup("properties_command", "What will run", show),
         )

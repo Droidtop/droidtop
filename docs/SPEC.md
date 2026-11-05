@@ -18631,7 +18631,10 @@ article more often than with it.
 game that does not start is a command-line flag or an environment variable
 ("-windowed", `DXVK_HUD=fps`), so a game has a **Game properties** screen
 (`GameProperties.screen`, `:library-core`; a row under the game's options
-beside "Program", which opens it in the same sheet). It has two text fields
+beside "Program", which opens it in the same sheet). Its entries are **Language, controls and launch** (Language,
+Controls, Launch options, Environment variables, Reset), **Drivers** and **What will run**; the first is named, not
+left untitled, because an untitled group takes the screen's own name and the rig took "Game properties" for a heading
+(Droidtop/tracker#228, build 2936). It has two text fields
 and a read-out. **Launch options** are cut into arguments by
 `GameLaunchOptions.tokenize` (spaces, "double" and 'single' quotes, a
 backslash) and added after the program's own arguments and after the ones a
