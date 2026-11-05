@@ -45,7 +45,19 @@ object ToolsPrefs {
 
     fun clipboardHistory(context: Context): Boolean = prefs(context).getBoolean(CLIPBOARD, true)
 
-    fun form(context: Context): KeyboardForm.Form = KeyboardForm.of(prefs(context).getString(KeyboardForm.PREF, null))
+    /** The key grid shape for [context]'s screen and orientation ([KeyboardForm.choose], Droidtop/tracker#903 H1). */
+    fun form(context: Context): KeyboardForm.Form = KeyboardForm.migrate(prefs(context)).let { KeyboardForm.forScreen(
+        prefs(context).getString(KeyboardForm.PREF, null),
+        prefs(context).getString(KeyboardForm.PREF_LANDSCAPE, null),
+        context,
+    ) }
+
+    /** Keeps [form] as the choice for [context]'s current orientation, and in the shared settings. */
+    fun setForm(context: Context, form: KeyboardForm.Form) {
+        val landscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        prefs(context).edit().putString(KeyboardForm.prefFor(landscape), form.id).apply()
+        if (landscape) LatinIME.sKeyboardSettings.formLandscapeChoice = form.id else LatinIME.sKeyboardSettings.formChoice = form.id
+    }
 
     fun inlineAutofill(context: Context): Boolean = InlineRules.wanted(Build.VERSION.SDK_INT, prefs(context).getBoolean(INLINE_AUTOFILL, true))
 
@@ -59,7 +71,9 @@ object ToolsPrefs {
      * once, before building its grid, rather than setting fields one by one (Droidtop/tracker#772).
      */
     fun loadInto(settings: GlobalKeyboardSettings, context: Context) {
-        settings.form = form(context)
+        KeyboardForm.migrate(prefs(context))
+        settings.formChoice = prefs(context).getString(KeyboardForm.PREF, null) ?: ""
+        settings.formLandscapeChoice = prefs(context).getString(KeyboardForm.PREF_LANDSCAPE, null) ?: ""
         settings.spaceDrag = spaceDrag(context)
     }
 

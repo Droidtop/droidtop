@@ -368,12 +368,22 @@
             android:summary="@string/summary_tools_strip"
             />
 
+    <!-- One shape per orientation, as the keyboard's height and mode are (Droidtop/tracker#903 H1). -->
     <org.pocketworkstation.pckeyboard.AutoSummaryListPreference
             android:key="pref_keyboard_form"
             android:title="@string/title_keyboard_form"
             android:entryValues="@array/keyboard_form_values"
             android:entries="@array/keyboard_form_entries"
-            android:defaultValue="full"
+            android:defaultValue="auto"
+            android:persistent="true"
+            />
+
+    <org.pocketworkstation.pckeyboard.AutoSummaryListPreference
+            android:key="pref_keyboard_form_landscape"
+            android:title="@string/title_keyboard_form_landscape"
+            android:entryValues="@array/keyboard_form_values"
+            android:entries="@array/keyboard_form_landscape_entries"
+            android:defaultValue="auto"
             android:persistent="true"
             />
 

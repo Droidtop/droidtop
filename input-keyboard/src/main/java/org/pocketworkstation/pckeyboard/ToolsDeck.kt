@@ -99,14 +99,14 @@ class ToolsDeck private constructor(
 
     private fun tool(label: String, onClick: () -> Unit): Button = flatButton(context, colors, label, onClick = onClick)
 
-    /** Cycles the key grid between full width, split, and one-handed left and right. */
+    /** Cycles the current orientation's key grid between full width, split, and one-handed left and right. */
     private fun formButton(): Button {
         lateinit var button: Button
         fun label() = context.getString(R.string.tool_layout, ToolsPrefs.form(context).id)
         button = tool(label()) {
             val form = KeyboardForm.next(ToolsPrefs.form(context))
-            ToolsPrefs.prefs(context).edit().putString(KeyboardForm.PREF, form.id).apply()
-            LatinIME.sKeyboardSettings.form = form
+            // The current orientation's shape: landscape and portrait keep their own (Droidtop/tracker#903 H1).
+            ToolsPrefs.setForm(context, form)
             button.text = label()
             (keyboard.layoutParams as? FrameLayout.LayoutParams)?.let { it.gravity = formGravity() }
             // The input method rebuilds itself when the setting changes; a panel is told to.

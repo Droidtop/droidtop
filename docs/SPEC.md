@@ -8953,8 +8953,15 @@ proposal) is not built; these helpers are in the one settings tree that already 
 
 ### One-handed and split (Droidtop/tracker#342)
 
-- **One setting, four shapes.** "Key grid shape" (`KeyboardForm`, JVM tested): full width (the default), split, or
-  one-handed at the left or right edge. The Layout button on the tool strip cycles them. The key layouts are not
+- **Four shapes, one setting per orientation.** "Key grid shape" (`KeyboardForm`, JVM tested): full width, split, or
+  one-handed at the left or right edge. The Layout button on the tool strip cycles the current orientation's shape.
+  Since 2026-11-05 (Droidtop/tracker#903 H1) portrait and landscape each have their own, as Hacker's Keyboard's height
+  and mode settings always have ("Key grid shape, portrait" and "Key grid shape, landscape"). Each defaults to
+  Automatic: full width, except landscape on a handheld, which is split, so on the console each thumb reaches its half
+  of the full 5-row grid and nothing of the layout changes. A handheld is a screen whose short side is under 3.75
+  inches (600dp at 160 dpi), read from its pixels and reported dpi, not from dp, because droidtop's own windows lay out
+  at a scaled canvas density. A split or one-handed shape chosen before then is carried into landscape once
+  (`KeyboardForm.migrate`); a stored "full" is not, since the settings screen used to store it as its default. The key layouts are not
   duplicated: `Keyboard.applyForm`, called from the `LatinKeyboard` constructor, scales the loaded keys and, for
   split, opens a 20% gap in the middle (80% scale; a key across the middle, the space bar, is widened over it,
   every key right of it moves), so every layout, locale and Fn layer has the shapes. One-handed uses 70% of the

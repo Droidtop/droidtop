@@ -67,7 +67,15 @@ public final class GlobalKeyboardSettings {
     public boolean spaceDrag = true;
     //
     // Read by LatinKeyboard (droidtop, Droidtop/tracker#342)
-    public KeyboardForm.Form form = KeyboardForm.FULL;
+    /** The key grid shape chosen for portrait (and, before H1, for both); blank when unset. */
+    public String formChoice = "";
+    /** The key grid shape chosen for landscape (Droidtop/tracker#903 H1); blank when unset. */
+    public String formLandscapeChoice = "";
+
+    /** The key grid shape for the screen [context] draws on: {@link KeyboardForm#forScreen}. */
+    public KeyboardForm.Form formFor(android.content.Context context) {
+        return KeyboardForm.forScreen(formChoice, formLandscapeChoice, context);
+    }
     
     /* Updated by LatinIME */
     //
@@ -146,9 +154,16 @@ public final class GlobalKeyboardSettings {
             public int getFlags() { return FLAG_PREF_NONE; }
         });
 
+        // Blank by default, so an unset choice falls to KeyboardForm.choose's orientation default (#903 H1).
         addStringPref(KeyboardForm.PREF, new StringPref() {
-            public void set(String val) { form = KeyboardForm.of(val); }
-            public String getDefault() { return KeyboardForm.FULL.getId(); }
+            public void set(String val) { formChoice = val == null ? "" : val; }
+            public String getDefault() { return ""; }
+            public int getFlags() { return FLAG_PREF_RESET_KEYBOARDS | FLAG_PREF_RECREATE_INPUT_VIEW; }
+        });
+
+        addStringPref(KeyboardForm.PREF_LANDSCAPE, new StringPref() {
+            public void set(String val) { formLandscapeChoice = val == null ? "" : val; }
+            public String getDefault() { return ""; }
             public int getFlags() { return FLAG_PREF_RESET_KEYBOARDS | FLAG_PREF_RECREATE_INPUT_VIEW; }
         });
 

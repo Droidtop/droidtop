@@ -1,7 +1,10 @@
 package org.pocketworkstation.pckeyboard
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** One-handed and split as pure geometry (Droidtop/tracker#342). */
@@ -66,5 +69,43 @@ class KeyboardFormTest {
             seen += form.id
         }
         assertEquals(listOf("split", "left", "right", "full"), seen)
+    }
+
+    // Droidtop/tracker#903 H1: one shape per orientation, split by default in landscape on a handheld.
+
+    @Test fun landscapeOnAHandheldIsSplitUntilSomethingIsChosen() {
+        assertSame(KeyboardForm.SPLIT, KeyboardForm.choose(null, null, landscape = true, handheld = true))
+        assertSame(KeyboardForm.SPLIT, KeyboardForm.choose("auto", "auto", landscape = true, handheld = true))
+        assertSame(KeyboardForm.FULL, KeyboardForm.choose(null, null, landscape = false, handheld = true))
+        assertSame(KeyboardForm.FULL, KeyboardForm.choose(null, null, landscape = true, handheld = false))
+    }
+
+    @Test fun eachOrientationKeepsItsOwnChoice() {
+        assertSame(KeyboardForm.FULL, KeyboardForm.choose("left", "full", landscape = true, handheld = true))
+        assertSame(KeyboardForm.LEFT, KeyboardForm.choose("left", "full", landscape = false, handheld = true))
+        // A portrait choice made after the migration doesn't reach an automatic landscape.
+        assertSame(KeyboardForm.SPLIT, KeyboardForm.choose("right", null, landscape = true, handheld = true))
+    }
+
+    @Test fun theConsoleIsAHandheldAndADisplayIsNot() {
+        // Retroid Pocket 5: 1920x1080 at about 400 ppi, a 2.7 inch short side.
+        assertTrue(KeyboardForm.handheld(1920, 1080, 401f, 401f, smallestWidthDp = 720))
+        // A 1080p 24 inch monitor at about 92 ppi: an 11.7 inch short side.
+        assertFalse(KeyboardForm.handheld(1920, 1080, 92f, 92f, smallestWidthDp = 1080))
+        // An 11 inch tablet, 2560x1600 at 274 ppi: a 5.8 inch short side.
+        assertFalse(KeyboardForm.handheld(2560, 1600, 274f, 274f, smallestWidthDp = 800))
+        // No believable dpi: the dp rule.
+        assertTrue(KeyboardForm.handheld(1920, 1080, 0f, 0f, smallestWidthDp = 480))
+        assertFalse(KeyboardForm.handheld(1920, 1080, 0f, 0f, smallestWidthDp = 720))
+    }
+
+    @Test fun aShapeChosenBeforeH1IsCarriedIntoLandscapeOnce() {
+        assertEquals("split", KeyboardForm.carriedToLandscape("split", landscapeSet = false))
+        assertEquals("right", KeyboardForm.carriedToLandscape("right", landscapeSet = false))
+        // "full" may only be the settings screen's stored default, so landscape stays automatic.
+        assertNull(KeyboardForm.carriedToLandscape("full", landscapeSet = false))
+        assertNull(KeyboardForm.carriedToLandscape("split", landscapeSet = true))
+        assertNull(KeyboardForm.carriedToLandscape(null, landscapeSet = false))
+        assertNull(KeyboardForm.carriedToLandscape("nonsense", landscapeSet = false))
     }
 }

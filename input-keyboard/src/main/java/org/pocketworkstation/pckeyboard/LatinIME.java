@@ -415,6 +415,7 @@ public class LatinIME extends InputMethodService implements
         mSwipeRightAction = prefs.getString(PREF_SWIPE_RIGHT, res.getString(R.string.default_swipe_right));
         mVolUpAction = prefs.getString(PREF_VOL_UP, res.getString(R.string.default_vol_up));
         mVolDownAction = prefs.getString(PREF_VOL_DOWN, res.getString(R.string.default_vol_down));
+        KeyboardForm.migrate(prefs); // droidtop patch (Droidtop/tracker#903 H1): shapes per orientation
         sKeyboardSettings.initPrefs(prefs, res);
 
         

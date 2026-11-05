@@ -711,14 +711,24 @@
     <string name="action_reset">Reset</string>
     <string name="title_tools_strip">Tool strip</string>
     <string name="summary_tools_strip">A row of buttons above the keys: clipboard history, macros and incognito mode.</string>
-    <string name="title_keyboard_form">Key grid shape</string>
+    <string name="title_keyboard_form">Key grid shape, portrait</string>
+    <string name="title_keyboard_form_landscape">Key grid shape, landscape</string>
     <string-array name="keyboard_form_entries">
+        <item>Automatic (full width)</item>
+        <item>Full width</item>
+        <item>Split (a gap in the middle, for two thumbs)</item>
+        <item>One-handed, left</item>
+        <item>One-handed, right</item>
+    </string-array>
+    <string-array name="keyboard_form_landscape_entries">
+        <item>Automatic (split on a handheld, else full width)</item>
         <item>Full width</item>
         <item>Split (a gap in the middle, for two thumbs)</item>
         <item>One-handed, left</item>
         <item>One-handed, right</item>
     </string-array>
     <string-array name="keyboard_form_values" translatable="false">
+        <item>auto</item>
         <item>full</item>
         <item>split</item>
         <item>left</item>
