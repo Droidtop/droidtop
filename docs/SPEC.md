@@ -23448,6 +23448,32 @@ a game go on. Slice 1 claims ASF only and its decoder is a stub returning that s
 locks down with Fibrewall's `SBX_LOCK_COMPUTE` before reading any media; slice 3 seeks; slice 4 is #906's
 hardware-codec mode.
 
+### Redistributable installers (slice 1 built 2026-11-05, Droidtop/tracker#916, #899)
+
+Owner, 2026-11-05 (#916): "bluestacks is waiting on a vcc executable. We should be able to auto-accept those when they
+pop, or handle them programmatically"; with his licence rule: droidtop shows the redistributable's licence in its own
+pad- and touch-friendly sheet (Accept / Decline / "Remember for other games"), remembered acceptances are keyed by
+vendor, product, licence version and a hash of the text, Decline installs nothing, and runtimes droidtop provides need
+no prompt. Slice 1 works on every Wine build, before the game starts, as Steam's install script and Heroic do:
+- `RedistFinder` finds the installers a game ships: Steam's `installscript.vdf` "Run Process" entries (`%INSTALLDIR%`
+  is the game's folder), Unreal's `Engine/Extras/Redist/<language>/`, `_CommonRedist`, GOG's `__redist` (`.exe` only).
+- `PeInfo` reads each one's version resource and the organisation of its Authenticode code-signing certificate (not
+  chain-validated: it identifies, it does not vouch), and `RedistTable` matches both, never the file name: Visual C++
+  2005-2022, PhysX and OpenAL install; DirectX, .NET Framework and XNA are provided (Wine's own DirectX pieces with
+  DXVK/VKD3D, Wine Mono, #895) and never run. The #899 VC++ record stays, but Unreal's prerequisite check wants the real
+  install (Voyage on 3074), so VC++ installs from the game's own copy.
+- `RedistPlan` takes the rows this prefix hasn't run (`.wine/droidtop-redist.json`, one entry per row and
+  architecture) and the launch carries them (launch override `droidtopRedists`). `RedistInstall`, on the game screen
+  before the game's session, shows the licence sheet unless an acceptance is remembered (droidtop's settings file, key
+  `droidtop_redist_licence_<vendor|product|version|sha256>`), then runs the installer out of sight in the prefix with
+  its silent switches (VC++ 2012+ `/install /quiet /norestart`, 2010 `/q /norestart`, 2005/2008 `/q`, PhysX `/quiet`,
+  OpenAL `/s`), records the outcome (0, 3010, 1641 and 1638 are success) and starts the game. Decline is asked again
+  next launch.
+Not yet: the vendors' licence texts (slice 1 shows each licence's vendor, product and published address; the text, and
+so its hash, change when the texts are shipped, which asks again by design), MSI packages, the Wine-side interception
+of installers a game starts while running (proton-wine-tux), the list of accepted licences in Settings, and the fallback
+notice for unknown installers.
+
 ### The allocator a game's Wine uses (built 2026-11-05, Droidtop/tracker#894, owner approved)
 
 Bionic's allocator, Scudo, gives each small size class a fixed 256 MB region in a process. LLVM compiling DXVK's

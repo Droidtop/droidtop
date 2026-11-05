@@ -83,6 +83,8 @@ class WineGameActivity : Activity() {
     private var softKeyboard: WineKeyboard? = null
     private var winHandler: WinHandler? = null
     private var blackScreen: WineBlackScreen? = null
+    /** The redistributables this launch installs before the game, and their licence sheet (Droidtop/tracker#916). */
+    private var redistInstall: dev.droidtop.runtime.windows.redist.RedistInstall? = null
 
     /** The run's setup, said in its record and in a report: Wine, Direct3D, the graphics driver and the emulator. */
     private var setupFacts: List<Pair<String, String>> = emptyList()
@@ -341,7 +343,15 @@ class WineGameActivity : Activity() {
         this.session = session
         startedAtMs = SystemClock.elapsedRealtime()
         startedAtWallMs = System.currentTimeMillis()
+        // The redistributables the game ships that this prefix hasn't run (docs/SPEC.md 9, "Redistributable installers";
+        // Droidtop/tracker#916): installed first, after their licence, out of sight.
+        val redists = dev.droidtop.runtime.windows.redist.RedistPlan.fromJson(
+            prefix.launchOverrides[DroidtopPcGameRuntime.REDISTS_OVERRIDE],
+        )
+        val installer = if (redists.isEmpty()) null else dev.droidtop.runtime.windows.redist.RedistInstall(this, root) { chrome }
+        redistInstall = installer
         startupExecutor.execute {
+            installer?.let { runCatching { it.run(prefix, redists) }.onFailure { e -> android.util.Log.w(WinePresentation.LOG_TAG, "Redistributables not installed", e) } }
             runCatching { session.start(::onGuestTerminated) }
                 .onFailure { failure ->
                     runOnUiThread {
@@ -603,6 +613,8 @@ class WineGameActivity : Activity() {
             if (event.action == KeyEvent.ACTION_UP && WinePresentation.dismissesFailure(event.keyCode)) leaveFailure()
             return true
         }
+        // The redistributables' licence sheet takes the pad while it is up.
+        if (redistInstall?.onKey(event) == true) return true
         // The black-screen notice takes the pad while it is up.
         if (blackScreen?.onKey(event) == true) return true
         // Back with the soft keyboard up closes the keyboard, not the game.

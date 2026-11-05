@@ -271,7 +271,9 @@ public class Container {
         dev.droidtop.runtime.windows.WineStorageGrants.DEVICE_SYSTEM, dev.droidtop.runtime.windows.WineStorageGrants.ALL_STORAGE,
         dev.droidtop.runtime.windows.WineStorageGrants.GAME_FOLDER,
         // droidtop: a game's own allocator (WineAllocator, Droidtop/tracker#894).
-        dev.droidtop.runtime.windows.WineAllocator.KEY);
+        dev.droidtop.runtime.windows.WineAllocator.KEY,
+        // droidtop: the redistributables this launch installs before the game (Droidtop/tracker#916).
+        "droidtopRedists");
     private final java.util.Map<String, String> launchOverrides = new java.util.HashMap<>();
 
     public void setLaunchOverrides(java.util.Map<String, String> overrides) {

@@ -479,8 +479,14 @@ class DroidtopPcGameRuntime(
         // saved settings are not touched.
         // The game's own folder rides along so it stays reachable when a whole-volume drive is not linked
         // (WineStorageGrants, Droidtop/tracker#584).
+        // The redistributables the game ships that this prefix hasn't run yet (docs/SPEC.md 9, "Redistributable
+        // installers"; Droidtop/tracker#916): the game screen installs them, after the licence, before the game.
+        val redists = withContext(Dispatchers.IO) {
+            runCatching { dev.droidtop.runtime.windows.redist.RedistPlan.pending(gameRoot, container.rootDir) }.getOrDefault(emptyList())
+        }
         val overrides = withContext(Dispatchers.IO) { WineOptions.launchOverrides(context, entryId, container) } +
-            (WineStorageGrants.GAME_FOLDER to gameRoot.absolutePath)
+            (WineStorageGrants.GAME_FOLDER to gameRoot.absolutePath) +
+            (if (redists.isEmpty()) emptyMap() else mapOf(REDISTS_OVERRIDE to dev.droidtop.runtime.windows.redist.RedistPlan.toJson(redists)))
 
         // The game's own language and the variables the person set for it
         // (docs/SPEC.md 7i, "Game properties"): laid over this one launch with
@@ -698,6 +704,9 @@ class DroidtopPcGameRuntime(
         // parses a trailing numeric run out of the id, and returns 0 for
         // anything that does not parse.
         const val CONTAINER_ID = "1"
+
+        /** The launch override carrying [dev.droidtop.runtime.windows.redist.RedistPlan]'s pending installs to the game screen. */
+        const val REDISTS_OVERRIDE = "droidtopRedists"
 
         private const val TAG = "droidtop.WineSetup"
 
