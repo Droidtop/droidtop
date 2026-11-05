@@ -44,6 +44,29 @@ object TaskbarPolicy {
     fun without(open: List<String>, key: String): List<String> = open.filterNot { it == key }
 
     /**
+     * The open list from Android's own task list (Droidtop/tracker#702), when droidtop can read it exactly
+     * ([dev.droidtop.runtime.tasks.Fidelity.EXACT], the one list the Quick Menu, the companion and Desktop's bar read):
+     * the apps of [open] still in [running], in the bar's own order, then the other running apps in the task list's
+     * order, the one in [front] always kept, the oldest dropped past [max]. Without an exact list the bar keeps its own
+     * list from the windows it saw come to the front ([withOpened]).
+     */
+    fun openFromTasks(open: List<String>, running: List<String>, front: String?, max: Int = MAX_OPEN_APPS): List<String> {
+        val live = running.distinct()
+        val kept = open.filter { it in live }
+        val added = live.filter { it !in kept }
+        val merged = kept + added
+        val withFront = if (front != null && front in live && front !in merged) merged + front else merged
+        if (withFront.size <= max) return withFront
+        // Past the cap: the oldest go first, but never the one in front.
+        val keep = withFront.takeLast(max).toMutableList()
+        if (front != null && front in withFront && front !in keep) {
+            keep.removeAt(0)
+            keep.add(front)
+        }
+        return keep
+    }
+
+    /**
      * Whether something in front folds the bar on one display by itself (Droidtop/tracker#700): a game from droidtop's
      * library in front on it ([gameHere]), on any display, whose own controls a bar must not cover; or, on a display
      * that is not the default one ([defaultDisplay] false: the console's external screen, a monitor), any app in front

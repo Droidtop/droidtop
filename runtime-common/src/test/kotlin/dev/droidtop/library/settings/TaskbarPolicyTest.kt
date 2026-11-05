@@ -62,4 +62,21 @@ class TaskbarPolicyTest {
         assertTrue(TaskbarPolicy.folds(gameHere = true, appInFront = true, defaultDisplay = true))
         assertFalse(TaskbarPolicy.folds(gameHere = false, appInFront = false, defaultDisplay = false))
     }
+
+    // Droidtop/tracker#702: with Android's task list read exactly, the open list is the running apps.
+    @Test
+    fun `the task list keeps the bar's order, adds the other running apps and drops what stopped`() {
+        assertEquals(
+            listOf("b", "a", "c"),
+            TaskbarPolicy.openFromTasks(open = listOf("x", "b", "a"), running = listOf("a", "c", "b"), front = "a"),
+        )
+    }
+
+    @Test
+    fun `past the cap the oldest go, never the app in front`() {
+        val running = (1..10).map { "app$it" }
+        val open = TaskbarPolicy.openFromTasks(open = listOf("app1"), running = running, front = "app1", max = 3)
+        assertEquals(3, open.size)
+        assertTrue("app1" in open)
+    }
 }

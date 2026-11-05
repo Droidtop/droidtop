@@ -1,5 +1,6 @@
 package dev.droidtop.shell.standard
 
+import dev.droidtop.runtime.tasks.text
 import android.accessibilityservice.AccessibilityService
 import android.app.ActivityOptions
 import android.content.ComponentName
@@ -94,6 +95,13 @@ class StandardTaskbar(private val service: AccessibilityService) {
     private var droidtopIsHome = false
     /** The packages still running, as of the last app switch: the dot, and which opened apps stay listed. */
     private var running: Set<String> = emptySet()
+
+    /**
+     * Whether the last switch read Android's own task list exactly (More controls): the open list is then the running
+     * apps ([TaskbarPolicy.openFromTasks]) and a long press closes the app; otherwise the list is the windows this bar
+     * saw come to the front and a long press only takes the app off the bar (Droidtop/tracker#702).
+     */
+    private var tasksExact = false
     private var desktopInFront = false
 
     /** The mode in use when the last window came to the front (`Modes.lastMode`): the bar is Standard's alone. */
@@ -239,7 +247,12 @@ class StandardTaskbar(private val service: AccessibilityService) {
         val isHome = HomeRolePrefs.isDroidtopHome(service)
         val mode = Modes.lastMode(service)
         val desktop = pkg == service.packageName && mode == Mode.DESKTOP.id
-        val alive = runningPackages(opened + pkg)
+        val snapshot = exactSnapshot()
+        val alive = snapshot?.apps?.mapTo(HashSet()) { it.packageName } ?: opened.plus(pkg).filterTo(HashSet()) { !isStopped(it) }
+        // The running apps the bar can open, in the task list's order, with what launches each.
+        val fromTasks = snapshot?.apps?.map { it.packageName }?.distinct()
+            ?.filter { it != SYSTEM_UI && it != service.packageName && it !in homePackages() }
+            ?.mapNotNull { running -> service.packageManager.getLaunchIntentForPackage(running)?.component?.let { running to it } }
         main.post {
             // droidtop's Desktop session owns the keyboard while it is in front: Meta is the session's Super (SPEC 6b).
             desktopInFront = desktop
@@ -258,7 +271,14 @@ class StandardTaskbar(private val service: AccessibilityService) {
             }
             // An opened app that is no longer running leaves the bar.
             running = alive
-            openKeys = openKeys.filter { it in alive || it == pkg }
+            tasksExact = fromTasks != null
+            if (fromTasks != null) {
+                // The one task list (Droidtop/tracker#702): every running app, not only the ones seen since the bar started.
+                openKeys = TaskbarPolicy.openFromTasks(openKeys, fromTasks.map { it.first }, frontPackage?.takeIf { appInFront })
+                fromTasks.forEach { (key, component) -> if (key in openKeys && key !in openEntries) loadOpenEntry(key, component) }
+            } else {
+                openKeys = openKeys.filter { it in alive || it == pkg }
+            }
             openEntries.keys.retainAll(openKeys.toSet())
             // The pinned apps change only on the home screen: read them again on the way out of it.
             if (appInFront && !wasInFront) refreshPinned() else renderAll()
@@ -266,18 +286,34 @@ class StandardTaskbar(private val service: AccessibilityService) {
     }
 
     /**
-     * Which of [candidates] are still running. Android's task list when droidtop can read it (More controls); without
-     * it Android tells another app only that an app was force-stopped, so an app that closed by itself counts as
-     * running until it is opened again or long-pressed off the bar (docs/SPEC.md 2c). Off the main thread.
+     * Android's task list when droidtop can read it exactly (More controls), else null. Without it Android tells
+     * another app only that an app was force-stopped, so an app that closed by itself counts as running until it is
+     * opened again or long-pressed off the bar (docs/SPEC.md 2c). Off the main thread.
      */
-    private fun runningPackages(candidates: List<String>): Set<String> {
-        val snapshot = runCatching {
-            kotlinx.coroutines.runBlocking { dev.droidtop.runtime.tasks.TaskManager.snapshotWithin(service, RUNNING_MAX_AGE_MS) }
-        }.getOrNull()
-        if (snapshot?.fidelity == dev.droidtop.runtime.tasks.Fidelity.EXACT) {
-            return snapshot.apps.mapTo(HashSet()) { it.packageName }
+    private fun exactSnapshot(): dev.droidtop.runtime.tasks.RunningSnapshot? = runCatching {
+        kotlinx.coroutines.runBlocking { dev.droidtop.runtime.tasks.TaskManager.snapshotWithin(service, RUNNING_MAX_AGE_MS) }
+    }.getOrNull()?.takeIf { it.fidelity == dev.droidtop.runtime.tasks.Fidelity.EXACT }
+
+    /**
+     * A long press on an open app while the task list is exact (Droidtop/tracker#702): it is closed the strongest way
+     * droidtop can, as the Quick Menu's Running apps closes it, and leaves the bar unless the close failed; what came
+     * of it is said unless it simply closed.
+     */
+    private fun closeApp(entry: Entry) {
+        val pkg = entry.key
+        dev.droidtop.runtime.util.AppScopes.io.launch {
+            val outcome = dev.droidtop.runtime.tasks.TaskManager.close(service, pkg)
+            main.post {
+                if (outcome !is dev.droidtop.runtime.tasks.CloseOutcome.Failed) {
+                    openKeys = TaskbarPolicy.without(openKeys, pkg)
+                    openEntries.remove(pkg)
+                    renderAll()
+                }
+                if (outcome != dev.droidtop.runtime.tasks.CloseOutcome.Closed) {
+                    dev.droidtop.library.settings.Notices.flash(outcome.text, context = service)
+                }
+            }
         }
-        return candidates.filterTo(HashSet()) { !isStopped(it) }
     }
 
     private fun isStopped(pkg: String): Boolean = try {
@@ -532,9 +568,11 @@ class StandardTaskbar(private val service: AccessibilityService) {
             open.forEach { entry ->
                 apps.addView(
                     appButton(entry, entry.key in running) {
-                        openKeys = TaskbarPolicy.without(openKeys, entry.key)
-                        openEntries.remove(entry.key)
-                        renderAll()
+                        if (tasksExact) closeApp(entry) else {
+                            openKeys = TaskbarPolicy.without(openKeys, entry.key)
+                            openEntries.remove(entry.key)
+                            renderAll()
+                        }
                     },
                 )
             }

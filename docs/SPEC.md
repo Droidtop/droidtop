@@ -1371,7 +1371,12 @@ type and the data source, which a third-party home cannot have.
   started"). What still runs is Android's task list when droidtop has More controls
   (`TaskManager.snapshotWithin`, the list the Quick Menu shows). Without it Android tells another app only
   that an app was force-stopped, so an app that closed by itself keeps its place and dot until it is opened
-  again or long-pressed off the bar. What a switch means (activity or not, home app or not, droidtop Home
+  again or long-pressed off the bar. With More controls the open list itself is that task list too
+  (Droidtop/tracker#702, `TaskbarPolicy.openFromTasks`): every running app, not only the ones seen since the
+  service connected, in the bar's own order and then the task list's, capped at eight, never dropping the app in
+  front; and a long press on an open app closes it (`TaskManager.close`, as Running apps does), saying what came
+  of it unless it simply closed. One list model, two sources: the window events are the fallback without More
+  controls. What a switch means (activity or not, home app or not, droidtop Home
   or not, what runs) is worked out off the main thread, the home apps are read again only when a package
   changes, and a bar is rebuilt only when what it shows changed.
 - *Recents.* The same single path as the gesture slot: `GLOBAL_ACTION_RECENTS` through the service.
@@ -1404,7 +1409,8 @@ container's windows inside the container.
 **Not built.** Reserving screen space for the taskbar (apps are not resized around it), freeform launching of
 pinned apps into windows, drag from the taskbar into split-screen, per-display foreground tracking (the
 service's window events do not say which display an app came up on, so one foreground state drives every
-bar), work-profile apps in the open list, and a live task list.
+bar), work-profile apps in the open list, and a refresh between app switches (the task list is read at each
+switch, so an app that closes while another stays in front leaves the bar at the next switch).
 ### Accessibility of the custom dialogs (Droidtop/tracker#91)
 
 `BackButtonMenu` (the mode switcher) and `RadioListDialog` (the single-select picker)
