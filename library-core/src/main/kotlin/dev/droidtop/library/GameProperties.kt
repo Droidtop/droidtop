@@ -71,7 +71,7 @@ object GameProperties {
                 ChoiceItem(
                     id = "properties_controls",
                     title = "Controls",
-                    subtitle = "How the pad plays this game; the Quick Menu's Controls row changes the same choice while it runs",
+                    subtitle = "How the pad plays it; the Quick Menu's Controls row changes it while it runs",
                     options = listOf(ChoiceOption(GAMEPAD, GameControls.GAMEPAD_LABEL)) +
                         GameControls.entries.map { ChoiceOption(it.id, it.label) },
                     current = controls?.id ?: GAMEPAD,
