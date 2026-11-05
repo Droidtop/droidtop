@@ -8256,12 +8256,21 @@ What the code holds today, against the rule (2026-11-05, droidtop main):
   verbatim):** "That's fine. Yes. We don't add a check that explicitly checks an account and refuses to run. We DO add a
   check that checks against an account, and warns the user if it can't find the game on it, with the general checkbox
   for 'yes, I own this game'. Any stronger patch is simple to remove from an open source project." So gbe_fork stays as
-  platform enablement, and `SteamworksOwnership` checks the app ID the shim starts as against droidtop's Steam sign-in
-  (`StoreLibraries.byId("steam")`: signed in, and the account's games with how each is held; owned, shared by a family
-  or a held free licence count, "no longer in your library" does not). When the account doesn't list it, or nobody is
-  signed in, droidtop **warns and never refuses**: the game's Steamworks row says so and a "Yes, I own this game" row
-  appears (stored with the app ID it was ticked for, so another app ID asks again), and a launch shows the same warning
-  as a short notice and logs `Steamworks ownership: <verdict> for app <id>; starting anyway`, then starts the game.
+  platform enablement, and droidtop **warns, never refuses**. The owner added (2026-11-05, #718) that Steam's state is
+  ephemeral, so the check is not of current ownership at each launch but a **persistent per-game owned flag**
+  (`SteamworksOwnership`; `steamworks_owned` in the game's own options, `WineGameOptionsPrefs`):
+  - **Set once:** when the person chooses "Yes, I own this game", or the first time droidtop's Steam
+    (`StoreLibraries.byId("steam")`: signed in, the account's games with how each is held) lists the app ID as held:
+    owned, shared by a Steam family, or a held free licence ("no longer in your library" does not count).
+  - **Never cleared** by droidtop: not by a sync, a network failure, a cache clear, or "Use the shared settings again"
+    (it is one of the game's own keys). It lives in the settings file droidtop's backup writes, so it travels with
+    backups; shared preferences are not cache, so a cache clear leaves it.
+  - **At launch:** a flagged game starts with no check and no question. A game never flagged is checked; if the
+    account lists the app, it is flagged and starts; if not, or nobody is signed in, a short notice warns
+    ("... It still starts.") and points to "Yes, I own this game", the log says
+    `Steamworks ownership: <verdict> for app <id>; starting anyway`, and the game starts.
+  - **In the game's Wine settings:** an unflagged game's Steamworks row carries the same warning, with a
+    "Yes, I own this game" row (No / Yes). Yes flags it; No changes nothing.
 - **Vendored GameNative switches, present but unused.** `Container.java:168` (`unpackFiles`, with `needsUnpacking`)
   and `useLegacyDRM` are stored and copied (`ContainerUtils.kt:400-405`), but no droidtop code reads them to act, and
   nothing runs Steamless (`ImageFsInstaller.java:231` only marks its file executable when an extras payload carries

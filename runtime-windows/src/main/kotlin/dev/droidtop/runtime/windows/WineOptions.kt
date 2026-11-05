@@ -125,9 +125,11 @@ object WineOptions {
     private const val STEAMWORKS_APPID_KEY = "steamworks_appid"
 
     /**
-     * "Yes, I own this game" for the Steamworks shim (Droidtop/tracker#718): shown when the app ID isn't on the signed-in
-     * Steam account, stored as the app ID it was ticked for, so another app ID asks again. It only silences the warning;
-     * nothing is ever refused (owner, 2026-11-05).
+     * The game's persistent "owned" flag for the Steamworks shim (Droidtop/tracker#718, [SteamworksOwnership]): set once,
+     * when the person ticks "Yes, I own this game" or the first time droidtop's Steam lists the app on the signed-in
+     * account, and never cleared by droidtop (a sync, a network failure, a cache clear or "Use the shared settings again"
+     * leave it: it is one of [OWN_KEYS]). Its value is the app ID it was set for, kept for the record. A flagged game
+     * starts with no check; nothing is ever refused either way (owner, 2026-11-05).
      */
     const val STEAMWORKS_OWNED = "wine_steamworks_owned"
     private const val STEAMWORKS_OWNED_KEY = "steamworks_owned"
@@ -530,8 +532,10 @@ object WineOptions {
                     return@runCatching
                 }
                 if (rowId == STEAMWORKS_OWNED && entryId != null) {
-                    val stored = WineGameOptionsPrefs.get(app, entryId) - STEAMWORKS_OWNED_KEY
-                    WineGameOptionsPrefs.set(app, entryId, if (value == STEAMWORKS_ON) stored + (STEAMWORKS_OWNED_KEY to (steamworksNeed(app, entryId, gameRoots[entryId]?.let(::File))?.appId?.toString() ?: "")) else stored)
+                    // Set once, never unset: "No" leaves an unflagged game as it is.
+                    if (value == STEAMWORKS_ON) {
+                        markSteamworksOwned(app, entryId, steamworksNeed(app, entryId, gameRoots[entryId]?.let(::File))?.appId)
+                    }
                     return@runCatching
                 }
                 if (rowId == STEAMWORKS_APPID && entryId != null) {
@@ -606,9 +610,15 @@ object WineOptions {
         return SteamworksShim.resolve(own[STEAMWORKS_KEY], own[STEAMWORKS_APPID_KEY]?.toIntOrNull(), detected)
     }
 
-    /** Whether the person ticked "Yes, I own this game" for [appId] on [entryId] (Droidtop/tracker#718). */
-    fun steamworksConfirmed(context: Context, entryId: String?, appId: Int): Boolean =
-        entryId != null && WineGameOptionsPrefs.get(context, entryId)[STEAMWORKS_OWNED_KEY] == appId.toString()
+    /** Whether [entryId] carries the Steamworks owned flag (Droidtop/tracker#718). Disk work. */
+    fun steamworksOwned(context: Context, entryId: String?): Boolean =
+        entryId != null && WineGameOptionsPrefs.get(context, entryId)[STEAMWORKS_OWNED_KEY] != null
+
+    /** Sets [entryId]'s Steamworks owned flag, if it isn't set yet; it is never overwritten or cleared. Disk work. */
+    fun markSteamworksOwned(context: Context, entryId: String?, appId: Int?) {
+        if (entryId == null || steamworksOwned(context, entryId)) return
+        WineGameOptionsPrefs.set(context, entryId, WineGameOptionsPrefs.get(context, entryId) + (STEAMWORKS_OWNED_KEY to (appId?.toString() ?: "")))
+    }
 
     /**
      * The Steamworks rows of [entryId] (docs/SPEC.md 5b, "Steamworks in the prefix"): the switch, the Steam app it starts
@@ -618,7 +628,8 @@ object WineOptions {
     private suspend fun steamworksRows(context: Context, entryId: String, gameRoot: File?): List<WineOptionRow> {
         val own = WineGameOptionsPrefs.get(context, entryId)
         val need = steamworksNeed(context, entryId, gameRoot)
-        val verdict = need?.let { SteamworksOwnership.check(context, it.appId, steamworksConfirmed(context, entryId, it.appId)) }
+        val verdict = need?.let { SteamworksOwnership.check(context, it.appId, steamworksOwned(context, entryId)) }
+        if (need != null && verdict != null && SteamworksOwnership.flagsNow(verdict)) markSteamworksOwned(context, entryId, need.appId)
         val warning = if (need != null && verdict != null && SteamworksOwnership.warns(verdict)) {
             SteamworksOwnership.warning(verdict, need.appId)
         } else {
@@ -653,15 +664,14 @@ object WineOptions {
                 text = true,
             ),
         ) + listOfNotNull(
-            // Only while there is something to confirm, or a confirmation to take back.
-            if (need != null && (warning != null || verdict == SteamworksOwnership.Verdict.CONFIRMED)) {
+            // Only for a game that has never been flagged as owned.
+            if (need != null && warning != null) {
                 WineOptionRow(
                     STEAMWORKS_OWNED, "Yes, I own this game",
-                    "Tick this if you own Steam app ${need.appId}, for example on another account or bought elsewhere. It only " +
-                        "stops the warning; the game starts either way.",
-                    if (verdict == SteamworksOwnership.Verdict.CONFIRMED) STEAMWORKS_ON else STEAMWORKS_OFF,
+                    "Choose Yes if you own Steam app ${need.appId}, for example on another account or bought elsewhere. droidtop " +
+                        "remembers it for this game and doesn't ask again. The game starts either way.",
+                    STEAMWORKS_OFF,
                     listOf(WineOptionChoice(STEAMWORKS_OFF, "No"), WineOptionChoice(STEAMWORKS_ON, "Yes")),
-                    ownChoice = verdict == SteamworksOwnership.Verdict.CONFIRMED,
                 )
             } else {
                 null

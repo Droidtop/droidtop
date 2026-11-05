@@ -1,3 +1,4 @@
 ### Added
-- Windows games: when a game starts through Steamworks as a Steam app your signed-in Steam account doesn't list, droidtop
-  says so (the game still starts). Tick "Yes, I own this game" in its Wine settings and it stops asking.
+- Windows games: a game that starts through Steamworks as a Steam app droidtop hasn't seen on your Steam account says so
+  once (it still starts). Choose "Yes, I own this game" in its Wine settings, or sign in to Steam with an account that
+  has it, and droidtop remembers that for the game and never asks again.

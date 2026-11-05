@@ -508,10 +508,12 @@ class DroidtopPcGameRuntime(
         // are left as they are.
         val shim = withContext(Dispatchers.IO) { WineOptions.steamworksNeed(context, entryId, gameRoot) }
         if (shim != null) {
-            // Is the app on the signed-in Steam account? Only ever a warning, never a refusal (owner, 2026-11-05;
-            // docs/SPEC.md 5b, "DRM: platform enablement"; Droidtop/tracker#718).
+            // A game flagged as owned starts with no check. Otherwise: flag it when the signed-in Steam account lists the
+            // app, else warn. Never a refusal (owner, 2026-11-05; docs/SPEC.md 5b, "DRM: platform enablement"; #718).
             val verdict = withContext(Dispatchers.IO) {
-                SteamworksOwnership.check(context, shim.appId, WineOptions.steamworksConfirmed(context, entryId, shim.appId))
+                SteamworksOwnership.check(context, shim.appId, WineOptions.steamworksOwned(context, entryId)).also {
+                    if (SteamworksOwnership.flagsNow(it)) WineOptions.markSteamworksOwned(context, entryId, shim.appId)
+                }
             }
             if (SteamworksOwnership.warns(verdict)) {
                 val text = SteamworksOwnership.warning(verdict, shim.appId) +

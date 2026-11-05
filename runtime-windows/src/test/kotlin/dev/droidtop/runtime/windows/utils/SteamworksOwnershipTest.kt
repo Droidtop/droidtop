@@ -9,30 +9,33 @@ import org.junit.Test
 
 class SteamworksOwnershipTest {
     @Test
-    fun `a game the account holds is not warned about`() {
-        assertEquals(Verdict.ON_ACCOUNT, SteamworksOwnership.verdict(true, StoreHolding.OWNED, confirmed = false))
-        assertEquals(Verdict.ON_ACCOUNT, SteamworksOwnership.verdict(true, StoreHolding.FAMILY, confirmed = false))
+    fun `a flagged game is never checked or warned about, whatever Steam says now`() {
+        assertEquals(Verdict.FLAGGED, SteamworksOwnership.verdict(flagged = true, signedIn = false, holding = null))
+        assertEquals(Verdict.FLAGGED, SteamworksOwnership.verdict(flagged = true, signedIn = true, holding = StoreHolding.NOT_OWNED))
+        assertFalse(SteamworksOwnership.warns(Verdict.FLAGGED))
+        assertFalse(SteamworksOwnership.flagsNow(Verdict.FLAGGED))
+    }
+
+    @Test
+    fun `the account listing the app flags it and does not warn`() {
+        assertEquals(Verdict.ON_ACCOUNT, SteamworksOwnership.verdict(false, true, StoreHolding.OWNED))
+        assertEquals(Verdict.ON_ACCOUNT, SteamworksOwnership.verdict(false, true, StoreHolding.FAMILY))
+        assertTrue(SteamworksOwnership.flagsNow(Verdict.ON_ACCOUNT))
         assertFalse(SteamworksOwnership.warns(Verdict.ON_ACCOUNT))
     }
 
     @Test
-    fun `a game the account doesn't list, or no longer holds, is warned about`() {
-        assertEquals(Verdict.NOT_FOUND, SteamworksOwnership.verdict(true, null, confirmed = false))
-        assertEquals(Verdict.NOT_FOUND, SteamworksOwnership.verdict(true, StoreHolding.NOT_OWNED, confirmed = false))
+    fun `an unflagged game the account doesn't list, or no longer holds, is warned about`() {
+        assertEquals(Verdict.NOT_FOUND, SteamworksOwnership.verdict(false, true, null))
+        assertEquals(Verdict.NOT_FOUND, SteamworksOwnership.verdict(false, true, StoreHolding.NOT_OWNED))
         assertTrue(SteamworksOwnership.warns(Verdict.NOT_FOUND))
+        assertFalse(SteamworksOwnership.flagsNow(Verdict.NOT_FOUND))
     }
 
     @Test
-    fun `nobody signed in is warned about, since nothing could be checked`() {
-        assertEquals(Verdict.NOT_SIGNED_IN, SteamworksOwnership.verdict(false, null, confirmed = false))
+    fun `an unflagged game with nobody signed in is warned about`() {
+        assertEquals(Verdict.NOT_SIGNED_IN, SteamworksOwnership.verdict(false, false, null))
         assertTrue(SteamworksOwnership.warns(Verdict.NOT_SIGNED_IN))
-    }
-
-    @Test
-    fun `yes I own this game silences the warning`() {
-        assertEquals(Verdict.CONFIRMED, SteamworksOwnership.verdict(true, null, confirmed = true))
-        assertEquals(Verdict.CONFIRMED, SteamworksOwnership.verdict(false, null, confirmed = true))
-        assertFalse(SteamworksOwnership.warns(Verdict.CONFIRMED))
     }
 
     @Test
