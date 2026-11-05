@@ -11,6 +11,7 @@ import dev.droidtop.stores.indiegala.IndiegalaStore
 import dev.droidtop.stores.itch.ItchStore
 import dev.droidtop.stores.steam.SteamStore
 import dev.droidtop.stores.ubisoft.UbisoftStore
+import dev.droidtop.stores.xbox.XboxStore
 
 /**
  * The stores this module runs (docs/SPEC.md 7g, "Stores"), registered with
@@ -29,5 +30,6 @@ object BuiltInStores {
         StoreLibraries.register(BattleNetStore())
         StoreLibraries.register(EAStore())
         StoreLibraries.register(UbisoftStore())
+        StoreLibraries.register(XboxStore())
     }
 }

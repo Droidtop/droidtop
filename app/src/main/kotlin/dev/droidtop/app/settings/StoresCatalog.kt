@@ -68,7 +68,7 @@ import kotlinx.coroutines.withContext
 internal data class PcStore(val key: String) {
     companion object {
         /** droidtop's own stores, in the order the place lists them. */
-        private val OWN = listOf("steam", "gog", "epic", "amazon", "itch", "humble", "indiegala", "battlenet", "ea", "ubisoft")
+        private val OWN = listOf("steam", "gog", "epic", "amazon", "itch", "humble", "indiegala", "battlenet", "ea", "ubisoft", "xbox")
 
         /** droidtop's own, then every store a running plugin provides, by label. */
         val entries: List<PcStore>

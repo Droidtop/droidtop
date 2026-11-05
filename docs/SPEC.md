@@ -15551,6 +15551,17 @@ follows:
   this store lists them and its Install says so; running Ubisoft Connect in a
   Wine prefix (`uplay://launch/<id>`) is the next Ubisoft step on
   Droidtop/tracker#335.
+- **Xbox** (`XboxStore`; Droidtop/tracker#335, built to the recommendation of its
+  design comment, owner to confirm): after Playnite's XboxLibrary (MIT). Sign-in is
+  the Microsoft account's own page (its public desktop client id, the code on
+  `oauth20_desktop.srf`); only the refresh token is kept, and each sync trades it
+  for a Microsoft token, then an Xbox Live user token (`user/authenticate`, RPS
+  ticket) and an XSTS token (`xsts/authorize`, RETAIL), and reads TitleHub's title
+  history for the account (`titlehistory/decoration/detail`). Xbox lists no games
+  an account owns, only those it played, so the rows are the account's played PC
+  games (a package family name, type Game, PC among its devices, Playnite's
+  filter), with Microsoft's platform words dropped from their names. They run only
+  on Windows or an Xbox: Install says so.
 - **Amazon Games** (`AmazonStore`): sign-in is Amazon's own page with a
   fresh PKCE session per sign-in (nile's device registration, through
   GameNative's `AmazonAuthManager`); the code comes back on the address
