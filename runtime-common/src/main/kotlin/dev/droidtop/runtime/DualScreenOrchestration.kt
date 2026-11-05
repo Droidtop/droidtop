@@ -58,9 +58,21 @@ object DualScreenOrchestration {
     /** Where the shell has to be moved so it matches the Main screen choice. */
     enum class ShellMove { NONE, TO_SECOND, TO_BUILT_IN }
 
-    /** A detached display leaves one authoritative shell destination. */
-    fun disconnectedShellDestination(shellDisplayId: Int, availableDisplayIds: Set<Int>): Int? =
-        if (shellDisplayId !in availableDisplayIds) availableDisplayIds.firstOrNull() else null
+    /**
+     * A detached display leaves one authoritative shell destination. Only a display Android has removed counts as
+     * detached ([shellDisplayGone]): while a screen is being attached it can drop out of the presentation-display
+     * list for a moment, and reading that as a detach relaunched the shell on every display event, a dozen times a
+     * second (Droidtop/tracker#785).
+     */
+    fun disconnectedShellDestination(
+        shellDisplayId: Int,
+        availableDisplayIds: Set<Int>,
+        shellDisplayGone: Boolean = true,
+    ): Int? =
+        if (shellDisplayGone && shellDisplayId !in availableDisplayIds) availableDisplayIds.firstOrNull() else null
+
+    /** How long the displays must stay unchanged before a later change is acted on ([settled]). */
+    const val DISPLAY_SETTLE_MS = 400L
 
     fun shouldShowSecondScreenCompanion(displayCount: Int): Boolean = displayCount > 1
 
