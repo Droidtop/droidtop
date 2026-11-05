@@ -285,9 +285,18 @@ object KdeConnectNotification {
             key != null -> Triple(0, key, false)
             e.specialKey == "backspace" -> Triple(1, "", false)
             e.specialKey == "enter" || e.specialKey == "linefeed" -> Triple(0, "", true)
-            else -> return
+            else -> {
+                val code = e.specialKey?.let { dev.droidtop.library.credentials.handoff.RemoteKeys.keyCode(it) } ?: return
+                runCatching { RemoteInputs.router().press(code) }.getOrNull()?.let { refused(context, it) }
+                return
+            }
         }
         val delivery = runCatching { RemoteInputs.router().deliver(back, text, enter) }.getOrNull() ?: return
+        refused(context, delivery)
+    }
+
+    /** Says once a minute at most why typing from another device went nowhere. */
+    private fun refused(context: Context, delivery: dev.droidtop.library.credentials.handoff.Delivery) {
         if (delivery is dev.droidtop.library.credentials.handoff.Delivery.Refused) {
             val now = android.os.SystemClock.elapsedRealtime()
             if (now - lastTypingNotice > 60_000) {

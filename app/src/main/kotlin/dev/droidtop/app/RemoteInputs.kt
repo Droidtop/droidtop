@@ -179,7 +179,8 @@ private object MainThread : FieldThread {
 
 /**
  * droidtop's input method's editor as a target (docs/SPEC.md, "Type from another device", route b): text by
- * `commitText`, Backspace by `deleteSurroundingText` (a selection is replaced by nothing first), Enter as a key event.
+ * `commitText`, Backspace by `deleteSurroundingText` (a selection is replaced by nothing first), Enter and other keys
+ * as key events.
  */
 private class ImeTarget(private val connection: InputConnection, override val secret: Boolean) : RemoteTarget {
     override fun commit(text: String) {
@@ -195,9 +196,11 @@ private class ImeTarget(private val connection: InputConnection, override val se
         if (left > 0) connection.deleteSurroundingText(left, 0)
     }
 
-    override fun enter() {
+    override fun enter() = key(KeyEvent.KEYCODE_ENTER)
+
+    override fun key(keyCode: Int) {
         val now = android.os.SystemClock.uptimeMillis()
-        connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0))
-        connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0))
+        connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0))
+        connection.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0))
     }
 }

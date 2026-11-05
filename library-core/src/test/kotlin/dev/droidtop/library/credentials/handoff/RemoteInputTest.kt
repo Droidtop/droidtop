@@ -48,6 +48,8 @@ class RemoteInputTest {
         override fun backspace(count: Int) { log += "back:$count" }
 
         override fun enter() { log += "enter" }
+
+        override fun key(keyCode: Int) { log += "key:$keyCode" }
     }
 
     private class FakeClipboard : ConsoleClipboard {
@@ -1215,5 +1217,27 @@ class RemoteInputTest {
 
     private companion object {
         const val PHONE = "192.168.1.50"
+    }
+
+    @Test
+    fun `a named key is pressed in the field the route names, or refused without one`() {
+        val own = FakeTarget()
+        val router = RemoteInputRouter(ownField = { own }, ime = { null }, imeSelected = { true })
+        assertEquals(Delivery.Sent(false), router.press(RemoteKeys.keyCode("left")!!))
+        assertEquals(listOf("key:21"), own.log)
+        val none = RemoteInputRouter(ownField = { null }, ime = { null }, imeSelected = { true })
+        assertEquals(Delivery.Refused(RemoteInputRouter.NO_FIELD), none.press(61))
+    }
+
+    @Test
+    fun `kde connect's key names as android key codes`() {
+        assertEquals(61, RemoteKeys.keyCode("tab"))
+        assertEquals(112, RemoteKeys.keyCode("delete"))
+        assertEquals(111, RemoteKeys.keyCode("escape"))
+        assertEquals(131, RemoteKeys.keyCode("f1"))
+        assertEquals(142, RemoteKeys.keyCode("f12"))
+        // Backspace and Enter keep the text path; modifiers alone are not typed.
+        assertNull(RemoteKeys.keyCode("backspace"))
+        assertNull(RemoteKeys.keyCode("control"))
     }
 }

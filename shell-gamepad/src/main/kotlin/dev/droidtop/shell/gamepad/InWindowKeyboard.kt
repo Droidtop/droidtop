@@ -72,6 +72,8 @@ object InWindowKeyboard {
 
         override fun enter() = press(android.view.KeyEvent.KEYCODE_ENTER)
 
+        override fun key(keyCode: Int) = press(keyCode)
+
         private fun press(code: Int) {
             sink.key(code, true)
             sink.key(code, false)

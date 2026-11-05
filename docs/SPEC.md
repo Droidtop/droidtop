@@ -23075,7 +23075,7 @@ client." The plan and its slices are on #645.
   - **remote input (slice 4)**, both directions:
     - *Controlled.* Typing from a paired device goes through "Type from another device"'s one router
       (`RemoteInputRouter`): droidtop's own focused field, else droidtop's input method into any app's field, else
-      the router's notice (once a minute at most). Text, Backspace and Enter are typed; other special keys are not yet.
+      the router's notice (once a minute at most). Text, Backspace and Enter are typed, and so are Tab, the arrows, Page Up and Down, Home, End, Delete, Escape and F1 to F12 (`RemoteKeys`, as key events into the same field). Modifiers alone, and keys held with Ctrl or Alt, are not yet.
       droidtop tells paired devices it takes typing (`keyboardstate` true) while KDE Connect is on, because the router
       always answers. **Not built:** moving droidtop's pointer from a paired device. That needs an accessibility
       service (`dispatchGesture`) or droidtop's own cursor, both the person's to switch on. Recommendation: droidtop's

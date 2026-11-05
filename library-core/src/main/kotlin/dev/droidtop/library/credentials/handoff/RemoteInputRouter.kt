@@ -1,6 +1,6 @@
 package dev.droidtop.library.credentials.handoff
 
-/** Where one person-typed edit lands: a field that can take text, backspaces and Enter. */
+/** Where one person-typed edit lands: a field that can take text, backspaces, Enter and other keys. */
 interface RemoteTarget {
     /** Whether the field takes a password: the console never shows what went in, and the phone's box is masked. */
     val secret: Boolean
@@ -10,6 +10,33 @@ interface RemoteTarget {
     fun backspace(count: Int)
 
     fun enter()
+
+    /** Presses and releases one key ([RemoteKeys]: arrows, Tab, Delete, Escape, F1-F12...), an Android key code. */
+    fun key(keyCode: Int)
+}
+
+/**
+ * Keys a paired device sends by name (KDE Connect's mousepad `specialKey`, kdeconnect-kde's SpecialKeysMap, as
+ * lib-kdeconnect names them) as Android key codes. Backspace and Enter keep their own path (they act on the text);
+ * modifiers alone (control, alt, shift, super) and sysreq or scroll lock are not typed.
+ */
+object RemoteKeys {
+    private val CODES = mapOf(
+        "tab" to 61, // KEYCODE_TAB
+        "left" to 21, // KEYCODE_DPAD_LEFT
+        "up" to 19,
+        "right" to 22,
+        "down" to 20,
+        "page_up" to 92,
+        "page_down" to 93,
+        "home" to 122, // KEYCODE_MOVE_HOME
+        "end" to 123, // KEYCODE_MOVE_END
+        "delete" to 112, // KEYCODE_FORWARD_DEL
+        "escape" to 111,
+    ) + (1..12).associate { "f$it" to 130 + it } // KEYCODE_F1 is 131
+
+    /** The Android key code for [name], or null for a key that is not typed. */
+    fun keyCode(name: String): Int? = CODES[name]
 }
 
 /** Where an edit is delivered, or why it cannot be. */
@@ -66,6 +93,16 @@ class RemoteInputRouter(
         when (val route = route()) {
             is Route.OwnField -> apply(route.target, back, text, enter)
             is Route.Ime -> apply(route.target, back, text, enter)
+            Route.SwitchKeyboard -> Delivery.Refused(SWITCH_KEYBOARD)
+            Route.NoField -> Delivery.Refused(NO_FIELD)
+        }
+    }
+
+    /** Presses one key ([RemoteKeys]) in the field the route names. */
+    fun press(keyCode: Int): Delivery = fieldThread.call {
+        when (val route = route()) {
+            is Route.OwnField -> route.target.also { it.key(keyCode) }.let { Delivery.Sent(it.secret) }
+            is Route.Ime -> route.target.also { it.key(keyCode) }.let { Delivery.Sent(it.secret) }
             Route.SwitchKeyboard -> Delivery.Refused(SWITCH_KEYBOARD)
             Route.NoField -> Delivery.Refused(NO_FIELD)
         }
