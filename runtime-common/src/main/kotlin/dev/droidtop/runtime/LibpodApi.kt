@@ -220,15 +220,30 @@ object LibpodApi {
             }
         }
         listOf(
-            "mounts" to "mounts (bind mounts by path and tmpfs; -v takes a folder you mapped in Containers)",
             "image_volumes" to "image_volumes", "overlay_volumes" to "overlay_volumes", "devices" to "devices",
             "cap_add" to "cap_add", "secrets" to "secrets", "secret_env" to "secret_env", "dns_server" to "dns_server",
             "dns_search" to "dns_search", "hostadd" to "hostadd (--add-host)", "sysctl" to "sysctl", "healthconfig" to "healthconfig",
             "volumes_from" to "volumes_from", "dependencyContainers" to "requires",
         ).forEach { (key, what) -> if (given(key)) return notYet(what) }
 
+        // mounts: a bind mount of a folder the person mapped, named or given by where it appears in the container, goes
+        // through the same rule as -v and volumes (Droidtop/tracker#715, as the Docker API's Mounts); tmpfs stays not built.
+        val mountSpecs = list("mounts").map { el ->
+            val m = el as? JsonObject ?: return refuse(400, "a mounts entry is not an object")
+            val type = string(m, "type") ?: "bind"
+            if (type != "bind") return notYet("mounts of type $type (only a bind mount of a folder you mapped in Containers is taken)")
+            val options = (m["options"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
+            EngineCli.PODMAN.mountSpec(string(m, "source").orEmpty(), string(m, "destination").orEmpty(), "ro" in options)
+        }
+        val mounted = mountSpecs.map { spec ->
+            EngineCli.PODMAN.volume(spec) ?: return refuse(
+                400,
+                "-v and mounts take the name of a folder you mapped in Containers (it appears at ${ContainerLayout.EXTRA_MOUNTS_DIR}/<name>); $spec is not one droidtop can mount",
+            )
+        }
+
         // Volumes: the name of a folder the person mapped, where -v puts it (docs/SPEC.md 3d "Home and folders").
-        val volumes = list("volumes").map { v ->
+        val volumes = mounted + list("volumes").map { v ->
             val volume = v as? JsonObject
             val options = (volume?.get("Options") as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
             val spec = listOfNotNull(string(volume, "Name"), string(volume, "Dest")).joinToString(":") +

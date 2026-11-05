@@ -3352,7 +3352,9 @@ the `ContainerRuntime` interface that already exists (§3):
     droidtop's own; `podman`, Podman's default network, is the device's, as bridge and host are). Answered from
     the D10 feature table: `resource_limits` (`--memory`, `--cpus`, `--pids-limit`), `hostname`, a read-only
     root, `--network none` and a port on another number. Taken since Droidtop/tracker#715: `entrypoint` and
-    `work_dir` (an absolute folder). Answered not built: a non-root `user`, a terminal or open input, `mounts` (a bind mount by path, tmpfs), devices, capabilities, secrets, DNS
+    `work_dir` (an absolute folder). Taken since Droidtop/tracker#715: `user`, and `mounts` of type `bind` whose source is a folder mapped in Containers
+    (by name or `/run/droidtop-mounts/<name>`, the rule `volumes` and `-v` use). Answered not built: a terminal or open
+    input, `mounts` of type `tmpfs` or others, devices, capabilities, secrets, DNS
     settings, extra hosts, sysctls, health checks. Refused: `privileged`, and `--rm` with a restart policy (409).
     The fields Podman's client always sends with what droidtop does anyway (its id mappings, umask, stop timeout,
     systemd mode) are left alone.
