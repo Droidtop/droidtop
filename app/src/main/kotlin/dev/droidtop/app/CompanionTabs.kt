@@ -455,7 +455,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             }
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 if (moreOpen) {
-                    CompanionMoreList(bar.more, shown, badges) { select(it.id) }
+                    CompanionMoreList(bar.more, shown, badges, onSelect = { select(it.id) })
                 } else {
                     CompositionLocalProvider(LocalCompanionNav provides nav, LocalCompanionMode provides mode) {
                         when (shown) {
@@ -562,8 +562,30 @@ private val RAIL_WIDTH = 88.dp
 
 /** More: the tabs that are not on the bar, as large rows with their counts. A tap opens one. */
 @Composable
-private fun CompanionMoreList(tabs: List<CompanionTab>, shown: String, badges: Map<String, Int>, onOpen: (CompanionTab) -> Unit) {
+private fun CompanionMoreList(tabs: List<CompanionTab>, shown: String, badges: Map<String, Int>, onSelect: (CompanionTab) -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // The companion's own settings, on the companion (Droidtop/tracker#786 S2b): the screen Settings shows under
+    // "Companion screen", opened here in place; until S3's droidtop tab, More's last row. Null where the mode hides it.
+    var settingsScreen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
+    val offersSettings by androidx.compose.runtime.produceState(false) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            dev.droidtop.library.settings.ControlAccess.shows(
+                dev.droidtop.library.settings.UiModePrefs.get(context),
+                dev.droidtop.library.settings.GamingSettingsCatalog.ID_DISPLAY_COMPANION,
+                dev.droidtop.library.settings.ControlAccess.GROUP_COMPANION,
+            )
+        }
+    }
+    val openSettings = settingsScreen
+    if (openSettings != null) {
+        Column(modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp)) {
+            CompanionNestedScreen(openSettings, onBack = { settingsScreen = null }, onChanged = {})
+        }
+        return
+    }
+    val onOpen = onSelect
     Column(
         modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -601,8 +623,32 @@ private fun CompanionMoreList(tabs: List<CompanionTab>, shown: String, badges: M
                 }
             }
         }
+        if (offersSettings) {
+            CompanionTile(
+                onClick = {
+                    scope.launch {
+                        settingsScreen = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            dev.droidtop.library.settings.GamingSettingsCatalog.companionScreen(context)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().semantics { role = Role.Button },
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).background(colors.surface).padding(horizontal = 16.dp),
+                ) {
+                    QuickGlyphIcon(QuickGlyph.SETTINGS, tint = colors.onSurface, modifier = Modifier.size(24.dp))
+                    Text(COMPANION_SETTINGS, style = MaterialTheme.typography.titleSmall, color = colors.onSurface, modifier = Modifier.weight(1f))
+                }
+            }
+        }
     }
 }
+
+/** More's last row: the companion's own settings. */
+private const val COMPANION_SETTINGS = "Companion settings"
 
 /** A first-run tip: what something is, until the person dismisses it. Read by TalkBack like any text. */
 @Composable

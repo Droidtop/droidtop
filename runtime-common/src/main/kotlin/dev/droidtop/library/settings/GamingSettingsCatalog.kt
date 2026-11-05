@@ -1563,6 +1563,17 @@ object GamingSettingsCatalog {
         },
     )
 
+    /**
+     * The companion's own settings screen (tabs, opening tab, when a game starts, the screen, Home's sections, the
+     * keyboard), the one Settings shows under "Companion screen", for the companion to open on itself
+     * (Droidtop/tracker#786 S2b). Null where the mode hides it (Kid, Kiosk, Guest), so the person it restricts
+     * cannot reach it. Reads settings files: never on the main thread.
+     */
+    fun companionScreen(context: Context): CatalogScreen? {
+        if (!ControlAccess.shows(UiModePrefs.get(context), ID_DISPLAY_COMPANION, ControlAccess.GROUP_COMPANION)) return null
+        return secondScreenKeyboardItems(context).filterIsInstance<NestedScreenItem>().firstOrNull { it.id == ID_DISPLAY_COMPANION }?.resolve()
+    }
+
     private fun secondScreenKeyboardItems(context: Context): List<CatalogItem> = buildList {
         val elevated = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
         if (elevated) {
