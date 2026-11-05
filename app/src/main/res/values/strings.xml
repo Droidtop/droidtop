@@ -158,4 +158,7 @@
     <string name="storage_full_open_settings">Open storage settings</string>
     <string name="storage_full_try_again">Try again</string>
     <string name="storage_full_still">Still only %1$s free.</string>
+    <!-- The desktop's background picture (DesktopBackgroundPicture, Droidtop/tracker#694). -->
+    <string name="desktop_background_picture_saved">The desktop\'s background picture is set. It shows when the desktop next starts.</string>
+    <string name="desktop_background_picture_failed">Couldn\'t use that picture for the desktop\'s background.</string>
 </resources>

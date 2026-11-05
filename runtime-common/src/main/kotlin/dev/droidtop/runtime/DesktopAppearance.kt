@@ -27,13 +27,17 @@ object DesktopAppearance {
             mapOf("ADW_DEBUG_COLOR_SCHEME" to "prefer-light")
         }
 
-    /** The desktop's background colours. [MATCH], the default, is droidtop's own ground in light or dark. */
+    /**
+     * The desktop's background colours. [MATCH], the default, is droidtop's own ground in light or dark. [PICTURE] is
+     * a picture the person chose (DesktopPanel.BACKGROUND_PICTURE), over droidtop's ground where it does not reach.
+     */
     enum class Background(val id: String, val label: String, private val darkColor: String, private val lightColor: String) {
         MATCH("match", "Match droidtop", "#1E1F24", "#ECEDF1"),
         BLACK("black", "Black", "#000000", "#000000"),
         SLATE("slate", "Slate", "#2B3440", "#2B3440"),
         BLUE("blue", "Deep blue", "#14284B", "#14284B"),
         GREEN("green", "Forest", "#1D3A2C", "#1D3A2C"),
+        PICTURE("picture", "A picture…", "#1E1F24", "#ECEDF1"),
         ;
 
         /** The colour as sway's `output bg` takes it. */
