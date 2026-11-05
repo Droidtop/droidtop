@@ -45,6 +45,17 @@ object NotificationsStore {
         val canReply: Boolean = false,
         /** A message: the app posts it as `MessagingStyle` or in the message category. */
         val message: Boolean = false,
+        /**
+         * Status, not a message ([NotificationRows.isStatus]): ongoing, a foreground service, no-clear, or carrying
+         * progress. Surfaces never list it as a message row (Droidtop/tracker#786 S13a).
+         */
+        val status: Boolean = false,
+        /** How far it has got, 0 to 1; negative while under way with no fraction; null without progress. */
+        val progress: Float? = null,
+        /** The longer text ([NotificationRows.lines]) behind a row's expand; null when [text] already says it all. */
+        val detail: String? = null,
+        /** The app's icon, cached per package off the main thread ([NotificationApps]); null while unknown. */
+        val icon: android.graphics.Bitmap? = null,
     )
 
     private val mutableItems = MutableStateFlow<List<Item>>(emptyList())

@@ -106,7 +106,14 @@ internal fun CompanionTile(
  * the game, Droidtop/tracker#786 addendum 2) is drawn as a title, in the name's own case.
  */
 @Composable
-internal fun CompanionSectionHeader(label: String, open: Boolean, summary: String? = null, name: Boolean = false, onToggle: () -> Unit) {
+internal fun CompanionSectionHeader(
+    label: String,
+    open: Boolean,
+    summary: String? = null,
+    name: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
+    onToggle: () -> Unit,
+) {
     val colors = MaterialTheme.colorScheme
     CompanionTile(onClick = onToggle, shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -142,6 +149,12 @@ internal fun CompanionSectionHeader(label: String, open: Boolean, summary: Strin
                 )
             } else {
                 Spacer(Modifier.weight(1f))
+            }
+            // What a folded heading shows in place of a line of text (the folded Notifications' app icons).
+            if (!open && trailing != null) {
+                Spacer(Modifier.width(8.dp))
+                trailing()
+                Spacer(Modifier.width(8.dp))
             }
             Text(if (open) "−" else "+", style = MaterialTheme.typography.titleMedium, color = colors.onSurfaceVariant)
         }

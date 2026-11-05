@@ -5195,8 +5195,23 @@ droidtop 0.2.0-dev.1931).
      four), and the number of games with an update waiting (the library's own `availableUpdate`).
   4. **Social**: unread conversations and friends in a game, from the same rows the Social tab draws; a tap
      opens that conversation on the Social tab. Not in Kiosk and Kid.
-  5. **Notifications** (`CompanionNotificationsSection`, slice C6, Droidtop/tracker#414): folded, its heading is
-     the count and the newest line; open, Clear all and up to twelve rows. One row model serves Home and the
+  5. **Notifications** (`CompanionNotificationsSection`, slice C6, Droidtop/tracker#414; the model is slice S13a,
+     Droidtop/tracker#786 addendum 2, item 6: "Notifications treat status as messages"): folded, its heading is the
+     count and the apps' icons, never one item's text; open, "Clear N" (only when at least one row clears, naming how
+     many, and it asks first through the one question card with "Keep them" first) and up to twelve rows.
+     **The one model** (`NotificationRows` in runtime-common, built by `DroidtopNotificationListener` on one
+     background thread; the callback only asks for a rebuild, and app labels, icons and whether an app provides a VPN
+     are looked up once per package, `NotificationApps`): a notification that is ongoing, a foreground service,
+     no-clear or carries a progress extra is **status** (`Item.status`, with `progress` from `EXTRA_PROGRESS`,
+     `EXTRA_PROGRESS_MAX`, negative while indeterminate). Status is never a message row: on Home it is listed apart and
+     folded under "Running in the background" (icon, title, short line, a real bar), and the one with progress takes
+     the status line's activity spot (`ActivitySpot`, the shell's and now also the companion's top row) with the app's
+     icon in the ring while no droidtop job runs. Android's own status (charging, USB and wireless debugging) and a VPN
+     app's status are dropped, since droidtop's own indicators show them. Each row is the app's icon (its label is
+     the icon's description, not an "App: " prefix), the title and one short line; a longer text (`Item.detail`, the
+     big text or inbox lines, never printed whole) sits behind More. Apps' own "Tap to ..." sentences are dropped for
+     every surface (`NotificationRows.body`, which was the Quick Menu's alone). The shell's Quick Menu draws the same
+     model and groups the same status under its "Active" heading. One row model serves Home and the
      Social tab (which lists the message notifications, `MessagingStyle` or the message category, above its
      conversations): Reply where the app takes a typed reply, Open (a button, a long-press and a TalkBack
      action; the app opens on the companion's screen) and Dismiss (a button, a swipe and a TalkBack action).

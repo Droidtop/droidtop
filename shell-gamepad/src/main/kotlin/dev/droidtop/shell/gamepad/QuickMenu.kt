@@ -649,10 +649,11 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
         }
     }
     val posted by NotificationsStore.items.collectAsState()
-    // What can be cleared first, then what an app keeps up while it runs under one "Active" heading: whether a
-    // notification can be cleared is a property of the group, not something to read on every row (Droidtop/tracker#674).
-    val items = remember(posted) { posted.sortedBy { !it.clearable } }
-    val activeStart = items.indexOfFirst { !it.clearable }
+    // The notifications first, then what an app keeps up while it runs under one "Active" heading: status is a
+    // property of the group, not something to read on every row (Droidtop/tracker#674), and it is the one model's
+    // status, the same split the companion draws (NotificationRows.isStatus, Droidtop/tracker#786 S13a).
+    val items = remember(posted) { posted.sortedBy { it.status } }
+    val activeStart = items.indexOfFirst { it.status }
     val recent by dev.droidtop.library.settings.Notices.recent.collectAsState()
     // The dot says what was new when the tab opened; leaving the tab marks it read.
     val unreadAtOpen = remember { dev.droidtop.library.settings.Notices.unread.value }
@@ -829,7 +830,8 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MenuTokens.OnSurface,
                             )
-                            val body = notificationBody(note.text)
+                            // The model already left out the app's touch instructions (NotificationRows.body).
+                            val body = note.text
                             if (body.isNotBlank()) {
                                 Text(
                                     body,
@@ -900,16 +902,3 @@ private fun PluginsTab(
         CatalogSheet(root = screen, onExit = close)
     }
 }
-
-/**
- * A notification's text as the Quick Menu shows it: without the app's own sentences telling a finger what to do
- * ("Tap to turn off wireless debugging"), which are wrong advice on a pad, where A opens it and the footer says so
- * (Droidtop/tracker#674). The rest of the text is the app's, unchanged. Pure, for the tests.
- */
-internal fun notificationBody(text: String): String =
-    text.split(Regex("(?<=[.!?])\\s+"))
-        .filterNot { TOUCH_INSTRUCTION.containsMatchIn(it.trim()) }
-        .joinToString(" ")
-        .trim()
-
-private val TOUCH_INSTRUCTION = Regex("^(tap|touch|click)\\b", RegexOption.IGNORE_CASE)

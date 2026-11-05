@@ -441,6 +441,10 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                         CompanionPill("Hide keyboard", selected = true) { KeyboardTargets.hideCompanion() }
                     }
                     if (immersive) {
+                        // The shell's one activity spot leads droidtop's status line here too: a running job, or an
+                        // app's status with progress (Droidtop/tracker#742, #786 S13a). A tap turns to Home, which
+                        // lists both.
+                        dev.droidtop.shell.gamepad.ActivitySpot(onOpen = { select(CompanionTab.HOME.id) })
                         StatusCluster(showBatteryPercent = true, onClick = {
                             if (bar.all.any { it.id == CompanionTab.SYSTEM.id }) select(CompanionTab.SYSTEM.id)
                         })

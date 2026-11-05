@@ -26,6 +26,72 @@ object NotificationRows {
         if (item.clearable) add(Action.DISMISS)
     }
 
+    /**
+     * Status, not a message (Droidtop/tracker#786 addendum 2, item 6: "A notification that is ongoing, a foreground
+     * service, NO_CLEAR, or carries a progress extra is status").
+     */
+    fun isStatus(ongoing: Boolean, foregroundService: Boolean, noClear: Boolean, hasProgress: Boolean): Boolean =
+        ongoing || foregroundService || noClear || hasProgress
+
+    /** Android's own packages, whose status notifications are charging, USB and wireless debugging. */
+    private val SYSTEM_PACKAGES = setOf("android", "com.android.systemui")
+
+    /**
+     * A status notification droidtop's own indicators already show, so no surface lists it: Android's own (charging,
+     * wireless debugging) and a VPN app's while it provides the VPN ([vpnProvider]), which the status line's VPN mark
+     * says ("Charging, wireless debugging and VPN are already shown by droidtop's own indicators, so their
+     * notifications are dropped").
+     */
+    fun dropped(status: Boolean, packageName: String, vpnProvider: Boolean): Boolean =
+        status && (packageName in SYSTEM_PACKAGES || vpnProvider)
+
+    /** A progress extra as a fraction: 0 to 1, -1 while indeterminate, null without one. */
+    fun progress(now: Int, max: Int, indeterminate: Boolean): Float? = when {
+        indeterminate -> -1f
+        max > 0 -> (now.toFloat() / max).coerceIn(0f, 1f)
+        else -> null
+    }
+
+    /**
+     * A row's one short line and the longer text behind its expand. The line is the app's text (or the first line of
+     * the big text when it has none), without the app's own touch instructions ([body]); the detail is the big text
+     * or the inbox lines, only when it says more than the line. Android's whole big text was printed before, which
+     * status apps fill with technical detail ("internal context data", the owner, on the RP5 capture).
+     */
+    fun lines(text: String?, bigText: String?, textLines: List<String>): Pair<String, String?> {
+        val longer = bigText?.takeIf { it.isNotBlank() } ?: textLines.filter { it.isNotBlank() }.joinToString("\n").takeIf { it.isNotBlank() }
+        val source = text?.takeIf { it.isNotBlank() } ?: longer?.lineSequence()?.firstOrNull { it.isNotBlank() }.orEmpty()
+        val line = body(source.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty())
+        val detail = longer?.let(::body)?.takeIf { it.isNotBlank() && it != line && it != body(source) }
+        return line to detail
+    }
+
+    /**
+     * Text without the app's own sentences telling a finger what to do ("Tap to turn off wireless debugging",
+     * "Tap for more options."), which are wrong advice on a pad and noise on a touch row (Droidtop/tracker#674,
+     * #786). The rest is the app's, unchanged. One rule for every surface; it was the Quick Menu's alone.
+     */
+    fun body(text: String): String =
+        text.split(Regex("(?<=[.!?])\\s+"))
+            .filterNot { TOUCH_INSTRUCTION.containsMatchIn(it.trim()) }
+            .joinToString(" ")
+            .trim()
+
+    private val TOUCH_INSTRUCTION = Regex("^(tap|touch|click)\\b", RegexOption.IGNORE_CASE)
+
+    /** The rows a list shows as notifications: everything that is not status. */
+    fun rows(items: List<NotificationsStore.Item>): List<NotificationsStore.Item> = items.filter { !it.status }
+
+    /** What is running in the background, listed apart from the rows and never as a message. */
+    fun status(items: List<NotificationsStore.Item>): List<NotificationsStore.Item> = items.filter { it.status }
+
+    /** How many Clear all would clear: zero means no Clear all is offered. */
+    fun clearCount(items: List<NotificationsStore.Item>): Int = items.count { it.clearable }
+
+    /** The apps a folded heading shows by icon: each once, newest first, at most [max]. */
+    fun headerApps(items: List<NotificationsStore.Item>, max: Int = 5): List<NotificationsStore.Item> =
+        items.distinctBy { it.packageName }.take(max)
+
     /** The rows Social shows: the messages, newest first as the store keeps them. */
     fun messages(items: List<NotificationsStore.Item>): List<NotificationsStore.Item> = items.filter { it.message }
 

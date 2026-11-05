@@ -119,6 +119,13 @@
     <string name="companion_social_messages">Messages</string>
     <string name="companion_notifications_tap_to_show">Tap to show</string>
     <string name="companion_notifications_now_playing">Now playing · %1$s</string>
+    <string name="companion_notifications_heading">Notifications</string>
+    <string name="companion_notifications_clear">Clear %1$d</string>
+    <string name="companion_notifications_clear_question">Clear %1$d notifications? Ongoing ones stay.</string>
+    <string name="companion_notifications_keep">Keep them</string>
+    <string name="companion_notifications_running">Running in the background</string>
+    <string name="companion_notifications_more">More</string>
+    <string name="companion_notifications_less">Less</string>
     <string name="remote_input_type_from_another_device">Type from another device</string>
     <string name="remote_input_open_it_in_a_browser">Open it in a browser on the same network. Nothing is typed until you confirm the code here.</string>
     <string name="remote_input_confirm">Confirm</string>
