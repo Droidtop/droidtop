@@ -19,6 +19,7 @@ import dev.droidtop.library.GameLanguage
 import dev.droidtop.library.GameLaunchOptions
 import dev.droidtop.library.PcProvisionResult
 import dev.droidtop.library.WineGameSettingsPrefs
+import dev.droidtop.library.WindowsLaunchResolver
 import dev.droidtop.library.lutris.DllOverrides
 import dev.droidtop.library.lutris.WinePrefixChanges
 import dev.droidtop.runtime.NativeLinuxGameSession
@@ -426,14 +427,33 @@ class DroidtopPcGameRuntime(
                 onFailure = { PcLaunchResult(false, it.message ?: "couldn't return to the running game") },
             )
         }
+        return when (val resolved = resolveWindowsLaunch(executable, gameRoot, workingDir, arguments, entryId)) {
+            is WindowsLaunchPlan.Refused -> PcLaunchResult(false, resolved.reason)
+            is WindowsLaunchPlan.Ready ->
+                launchInPrefix(wineEngine, resolved.container, resolved.target, resolved.workingDir, resolved.arguments, entryId)
+        }
+    }
+
+    /**
+     * Everything a Windows launch of [entryId] decides before Wine starts: the prefix (the game's own, else the
+     * shared one), the game's choices over it, its language and variables, its translation cache, and the
+     * Steamworks shim's target. Laid onto the container's launch overrides; [launchWindows] and the "Prepare for
+     * first launch" run ([prepareFirstLaunch]) both start from it, so the two cannot drift apart.
+     */
+    private suspend fun resolveWindowsLaunch(
+        executable: File,
+        gameRoot: File,
+        workingDir: File,
+        arguments: List<String>,
+        entryId: String?,
+    ): WindowsLaunchPlan {
         // The same rule the game's Wine settings resolve with, so the
         // prefix somebody edited is the prefix this starts in: the game's
         // own when it has one, droidtop's shared one otherwise. (This used
         // to ask for the shared one always, so a game's own prefix was
         // configurable but never launched into.)
         val container = PcContainers.forGame(context, entryId)
-            ?: return PcLaunchResult(
-                false,
+            ?: return WindowsLaunchPlan.Refused(
                 // Names the real action that now exists. This used to say
                 // "create one under Desktop mode > Containers", a screen
                 // that had never been built -- pointing someone at a
@@ -447,8 +467,7 @@ class DroidtopPcGameRuntime(
         // Which prefix and build the launch took, so a mismatch with a settings row can be read off the log.
         android.util.Log.i(TAG, "Launching ${entryId ?: "a program"} in prefix ${container.id} on Wine $wine")
         if (X86_64GuestLibs.isX86_64Host() && !WineOptionPlan.runsOnX86Host(wine)) {
-            return PcLaunchResult(
-                false,
+            return WindowsLaunchPlan.Refused(
                 "$wine cannot run on this x86_64 device; choose Proton 10 or later under this game's Wine and graphics, " +
                     "or run Set up Windows games again",
             )
@@ -482,17 +501,40 @@ class DroidtopPcGameRuntime(
                     GameLanguage.bySteam(gameSettings?.language),
                 )
             }.getOrElse {
-                return PcLaunchResult(false, "couldn't set up Steamworks for this game: ${it.message ?: it}")
+                return WindowsLaunchPlan.Refused("couldn't set up Steamworks for this game: ${it.message ?: it}")
             }
             val env = listOf(cacheEnv, launch.env.entries.joinToString(" ") { (name, value) -> "$name=$value" }, ownEnv)
                 .filter { it.isNotEmpty() }
                 .joinToString(" ")
             container.setLaunchOverrides(overrides + (Container.LAUNCH_ENV to env))
-            return launchInPrefix(wineEngine, container, launch.target.absolutePath, launch.workingDir, launch.arguments, entryId)
+            return WindowsLaunchPlan.Ready(container, launch.target.absolutePath, launch.workingDir, launch.arguments)
         }
         val env = listOf(cacheEnv, ownEnv).filter { it.isNotEmpty() }.joinToString(" ")
         container.setLaunchOverrides(if (env.isEmpty()) overrides else overrides + (Container.LAUNCH_ENV to env))
-        return launchInPrefix(wineEngine, container, executable.absolutePath, workingDir, arguments, entryId)
+        return WindowsLaunchPlan.Ready(container, executable.absolutePath, workingDir, arguments)
+    }
+
+    /**
+     * The "Prepare for first launch" run of [entryId] (docs/SPEC.md 9, "Prepare for first launch"; Droidtop/tracker#866):
+     * the launch [launchWindows] would make, started out of sight and silent by [WinePrecache], so the translation cache
+     * holds the game's start-up code before the person's first real start. Refuses while a game is on screen, when the
+     * cache is off for this game, and when droidtop cannot tell which program starts the game. Returns the summary.
+     */
+    suspend fun prepareFirstLaunch(
+        entryId: String,
+        gameRoot: File,
+        report: (percent: Int, statusLine: String) -> Unit,
+    ): String {
+        check(OwnGameScreens.current == null) { "A game is running. Stop it, then prepare this one." }
+        check(TranslationCache.enabled(context) && WineOptions.translationCacheOn(context, entryId)) {
+            "The translation cache is off for this game, so there is nothing to prepare. Turn it on under the game's Wine settings."
+        }
+        val windows = withContext(Dispatchers.IO) { WindowsLaunchResolver.forEntry(context, entryId, gameRoot) }
+            ?: error("Choose which program starts this game first (the game's settings, Program to run).")
+        return when (val plan = resolveWindowsLaunch(windows.executable, gameRoot, windows.workingDir, windows.arguments, entryId)) {
+            is WindowsLaunchPlan.Refused -> error(plan.reason)
+            is WindowsLaunchPlan.Ready -> WinePrecache.run(context, plan, entryId, windows.executable, report)
+        }
     }
 
     override fun prefixState(entryId: String?): PcPrefixState? {
@@ -756,6 +798,12 @@ object PcContainers {
  * library game ([DroidtopPcGameRuntime.launchWindows]) and a file opened
  * with droidtop ([WinePrefixes.open]) both come through here.
  */
+/** What [DroidtopPcGameRuntime] decided for a Windows launch: ready to start in [container], or refused with [reason]. */
+internal sealed interface WindowsLaunchPlan {
+    data class Ready(val container: Container, val target: String, val workingDir: File, val arguments: List<String>) : WindowsLaunchPlan
+    data class Refused(val reason: String) : WindowsLaunchPlan
+}
+
 internal suspend fun launchInPrefix(
     engine: WineEngine,
     container: Container,

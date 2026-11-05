@@ -68,7 +68,15 @@ class WineXSession(
     private val workingDir: File,
     private val xServer: XServer,
     private val arguments: List<String> = emptyList(),
+    /**
+     * No audio server and no audio variables, whatever the prefix says: the "Prepare for first launch" run
+     * (WinePrecache) starts the game out of sight and must not be heard.
+     */
+    private val silent: Boolean = false,
 ) {
+
+    private val audioDriver: WineLaunchPlan.AudioDriver
+        get() = if (silent) WineLaunchPlan.AudioDriver.NONE else WineLaunchPlan.audioDriverOf(prefix.audioDriver)
 
     private var environment: XEnvironment? = null
 
@@ -156,7 +164,7 @@ class WineXSession(
             put("WINEDEBUG", WineLaunchPlan.DEFAULT_WINEDEBUG)
             // EnvVars parses a string or copies another EnvVars; there is
             // no map overload, so the plan's pairs go in one at a time.
-            WineLaunchPlan.audioEnvVars(prefix.audioDriver, rootPath).forEach { (name, value) -> put(name, value) }
+            if (!silent) WineLaunchPlan.audioEnvVars(prefix.audioDriver, rootPath).forEach { (name, value) -> put(name, value) }
             WineLaunchPlan.controllerEnvVars(prefix.isSdlControllerAPI, prefix.inputType)
                 .forEach { (name, value) -> put(name, value) }
             // The prefix's own variables last, so a person who set one by
@@ -181,7 +189,7 @@ class WineXSession(
         // gets no audio server rather than a crash. Which backend WINE
         // hands audio to is the same field, written into the prefix's
         // registry by the preparation above.
-        when (WineLaunchPlan.audioDriverOf(prefix.audioDriver)) {
+        when (audioDriver) {
             WineLaunchPlan.AudioDriver.PULSEAUDIO -> environment.addComponent(
                 PulseAudioComponent(
                     UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.PULSE_SERVER_PATH),

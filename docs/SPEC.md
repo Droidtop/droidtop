@@ -22548,10 +22548,30 @@ Library > Windows games for every game (On, Off, Clear now, total size). A game'
 variables, so the cache starts working once a game runs Box64 0.3.8+ or FEXCore 2609+ (the bundled defaults are 0.4.2
 and 2605; the catalog has Box64 0.4.4 and FEXCore 2609).
 
-**Not built yet, in this order:** the proton-wine-tux default (behind its console check), the "Prepare for first
-launch" job (#866 option 2), then mixed-architecture running (#865). FEX also has a work-in-progress ahead-of-time path
-(`EnableCodeCachingWIP` code maps compiled by `FEXOfflineCompiler32/64.exe`, from FEX-2609): recorded on #866 as a
-follow-up, not part of the approved scope.
+**Prepare for first launch (built; #866 option 2, the design posted there on 2026-11-05).** A game's Wine settings
+have a row, "Prepare for first launch", offered when the game's folder is known and its translation cache is on. Its
+choices are "Not now", "Prepare now (while charging)" and "Prepare now, on battery". Either "Prepare" starts
+`PrepareFirstLaunchJob`, one entry in Downloads and installs with progress and Cancel (not pausable: no checkpoint).
+- **Never automatic on battery** (the owner): the job refuses unless the device is charging, except when the person
+  picked the battery choice. It refuses while a game is on screen, when the cache is off, and when droidtop cannot tell
+  which program starts the game.
+- **The run** (`DroidtopPcGameRuntime.prepareFirstLaunch`, `WinePrecache`) makes the launch a real start makes. Both go
+  through `resolveWindowsLaunch`: the same prefix, the game's choices, its variables, its cache, the Steamworks shim. It
+  starts a `WineXSession` with `silent = true` (no audio server, no audio variables) on an `XServer` that has no
+  renderer, so nothing is on screen. It stops after 3 minutes, or once the cache has grown and then been quiet for 30
+  seconds, or when the game ends by itself, the way Stop stops a game. Cancel stops it too, and the cache keeps what it
+  gained.
+- **The record:** the row says how much was prepared and when ("Prepared: 420 MB of translated code (5 min ago)"). It
+  says "prepare it again" once the game's executable changed size or time (an update).
+- **Open, for the rig:** whether a game with no renderer gets as far as its menu. With DXVK over Turnip or Wrapper the
+  swapchain may fail or wait, and the cache then holds only what ran before it. The fallback is a 1x1 off-screen
+  surface. Also open: whether the run continues with the screen off, and starting a game while a run is going kills
+  the run (every launch clears stale Wine processes first).
+
+**Not built yet:** mixed-architecture running (#865). The proton-wine-tux default waits for its console check
+(`ci/proton-wine-tux-default`). FEX also has a work-in-progress ahead-of-time path (`EnableCodeCachingWIP` code maps
+compiled by `FEXOfflineCompiler32/64.exe`, from FEX-2609): recorded on #866 as a follow-up, not part of the approved
+scope.
 
 ### What droidtop-components may re-host, and the catalog's signature (decided 2026-10-08, Droidtop/tracker#319, #313)
 

@@ -24,6 +24,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.library.WindowsLaunchResolver
 import dev.droidtop.library.format.ValueFormat
 import java.io.File
 
@@ -126,13 +127,26 @@ object WineOptions {
     private const val CACHE_OFF = "off"
     private const val CACHE_CLEAR = "clear"
 
+    /** The "Prepare for first launch" row (docs/SPEC.md 9; Droidtop/tracker#866): a game's, when its folder is known. */
+    const val PREPARE = "wine_prepare_first_launch"
+    private const val PREPARED_KEY = "prepared"
+    private const val PREPARE_IDLE = "idle"
+    private const val PREPARE_NOW = "now"
+    private const val PREPARE_ON_BATTERY = "battery"
+
+    /**
+     * The folder of each game whose rows were last read: [select] is handed no folder, and the row is always read
+     * (its screen drawn) before it can be picked.
+     */
+    private val gameRoots = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     /** The container field the game's gestures are laid over at launch (`Container.LAUNCH_OVERRIDE_KEYS`). */
     const val GESTURE_OVERRIDE = "gestureConfig"
     private const val STEAMWORKS_ON = "on"
     private const val STEAMWORKS_OFF = "off"
 
     /** A game's choices that are not prefix settings: kept when its Wine choices change or are dropped. */
-    private val OWN_KEYS = setOf(LSFG_KEY, STEAMWORKS_KEY, STEAMWORKS_APPID_KEY, CACHE_KEY)
+    private val OWN_KEYS = setOf(LSFG_KEY, STEAMWORKS_KEY, STEAMWORKS_APPID_KEY, CACHE_KEY, PREPARED_KEY)
 
     /**
      * Where the choices made before Set up Windows games are kept (in [WineGameOptionsPrefs], under a name no
@@ -200,7 +214,58 @@ object WineOptions {
      */
     private suspend fun gameRows(context: Context, entryId: String?, gameRoot: String?): List<WineOptionRow> =
         listOf(translationCacheRow(context, entryId)) +
+            (if (entryId != null && gameRoot != null) listOf(prepareRow(context, entryId, gameRoot)) else emptyList()) +
             if (entryId == null) emptyList() else listOf(lsfgRow(context, entryId)) + steamworksRows(context, entryId, gameRoot?.let(::File))
+
+    /**
+     * "Prepare for first launch": starts the game out of sight once so its first real start is faster. The summary says
+     * what it costs and, once done, how much it prepared and when, or that the game changed since. Picking a choice
+     * starts the job ([PrepareFirstLaunchJob]); the row itself always reads "Not now". Disk work.
+     */
+    private fun prepareRow(context: Context, entryId: String, gameRoot: String): WineOptionRow {
+        gameRoots[entryId] = gameRoot
+        val title = "Prepare for first launch"
+        if (!TranslationCache.enabled(context) || !translationCacheOn(context, entryId)) {
+            return WineOptionRow(PREPARE, title, "Needs the translation cache, which is off for this game.", "Off", emptyList())
+        }
+        val record = prepared(context, entryId)
+        val stamp = runCatching { WindowsLaunchResolver.forEntry(context, entryId, File(gameRoot))?.executable?.let(::stampOf) }.getOrNull()
+        val state = when {
+            record == null -> "Not prepared yet."
+            stamp != null && record.stamp != stamp ->
+                "The game changed since it was prepared (${ValueFormat.ago(System.currentTimeMillis(), record.atMs)}); prepare it again."
+            else -> "Prepared: ${ValueFormat.size(record.bytes)} of translated code (${ValueFormat.ago(System.currentTimeMillis(), record.atMs)})."
+        }
+        return WineOptionRow(
+            PREPARE, title,
+            "Starts the game once out of sight and muted, for up to three minutes, so its first real start does not translate " +
+                "everything. Uses the processor fully meanwhile; best while charging. $state",
+            PREPARE_IDLE,
+            listOf(
+                WineOptionChoice(PREPARE_IDLE, "Not now"),
+                WineOptionChoice(PREPARE_NOW, "Prepare now (while charging)"),
+                WineOptionChoice(PREPARE_ON_BATTERY, "Prepare now, on battery"),
+            ),
+        )
+    }
+
+    private data class Prepared(val bytes: Long, val atMs: Long, val stamp: String)
+
+    private fun prepared(context: Context, entryId: String): Prepared? =
+        WineGameOptionsPrefs.get(context, entryId)[PREPARED_KEY]?.split('|')?.takeIf { it.size == 3 }?.let { (bytes, at, stamp) ->
+            val b = bytes.toLongOrNull()
+            val a = at.toLongOrNull()
+            if (b != null && a != null) Prepared(b, a, stamp) else null
+        }
+
+    /** What tells a game update apart: the executable's size and time, as one string. */
+    private fun stampOf(executable: File): String = "${executable.length()}-${executable.lastModified()}"
+
+    /** Kept when a "Prepare for first launch" run ends ([WinePrecache]): what it prepared, when, and for which build of the game. */
+    internal fun recordPrepared(context: Context, entryId: String, bytes: Long, executable: File) {
+        val stored = WineGameOptionsPrefs.get(context, entryId) - PREPARED_KEY
+        WineGameOptionsPrefs.set(context, entryId, stored + (PREPARED_KEY to "$bytes|${System.currentTimeMillis()}|${stampOf(executable)}"))
+    }
 
     /** Whether [entryId]'s own choice leaves its translation cache on (the setting for every game is [TranslationCache.enabled]). */
     fun translationCacheOn(context: Context, entryId: String?): Boolean =
@@ -300,6 +365,13 @@ object WineOptions {
             previous?.join()
             runCatching {
                 WindowsBackbone.awaitReady(app)
+                if (rowId == PREPARE && entryId != null) {
+                    val root = gameRoots[entryId]
+                    if (value != PREPARE_IDLE && root != null) {
+                        PrepareFirstLaunchJob.start(app, entryId, title ?: entryId, root, onBattery = value == PREPARE_ON_BATTERY)
+                    }
+                    return@runCatching
+                }
                 if (rowId == TRANSLATION_CACHE) {
                     when {
                         value == CACHE_CLEAR -> TranslationCache.clear(app, entryId)

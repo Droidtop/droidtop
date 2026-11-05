@@ -37,6 +37,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // Native jobs register before attach restores any, so a paused scrape found on
         // disk can be resumed (docs/SPEC.md 12a "Jobs").
         dev.droidtop.library.scraper.LibraryScrapeJob.register(appContext)
+        // "Prepare for first launch" (docs/SPEC.md 9; Droidtop/tracker#866), started only from a game's Wine settings.
+        dev.droidtop.runtime.windows.PrepareFirstLaunchJob.register(appContext)
         // The games the scrape of PC and engine games works through: the library's own index, walked
         // only when it has none yet (never a second scan of its own).
         dev.droidtop.library.scraper.LibraryScrapeJob.libraryGames = { ctx ->
