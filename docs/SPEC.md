@@ -5744,7 +5744,10 @@ droidtop 0.2.0-dev.1931).
      follows Android's own lock-screen "show sensitive content"; Always; or Never. A hidden text reads "Tap to
      show". **Now playing** (`CompanionNowPlayingCard`) sits under the pins: the newest media session's title,
      artist and app with Previous, Play or Pause and Next, read through notification access and its change
-     callbacks while shown. Kid and Kiosk show neither.
+     callbacks while shown. Kid and Kiosk show neither. Gaming's Quick Menu shows the same session on its System
+     tab (Droidtop/tracker#716): after Search, a tile for the track whose A plays or pauses it, then Next track and
+     Previous track when the session offers them, all re-read as the session changes; nothing plays, no tiles. One
+     reader serves both (`MediaNow`, runtime-common).
   6. **System**: storage free and total, and All controls (the System tab).
   7. **Widgets**: the user's Android widgets, then Add widget and Remove widget, the same on every host:
      Add opens `CompanionWidgetPickActivity` (Android's picker needs an Activity result, which the

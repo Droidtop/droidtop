@@ -246,8 +246,8 @@ internal fun CompanionNowPlayingCard() {
         val listener = ComponentName(context, DroidtopNotificationListener::class.java)
         var watched: MediaController? = null
         val callback = object : MediaController.Callback() {
-            override fun onPlaybackStateChanged(playbackState: PlaybackState?) { state = nowPlaying(context, watched) }
-            override fun onMetadataChanged(metadata: MediaMetadata?) { state = nowPlaying(context, watched) }
+            override fun onPlaybackStateChanged(playbackState: PlaybackState?) { state = dev.droidtop.runtime.systemstatus.MediaNow.nowPlaying(context, watched) }
+            override fun onMetadataChanged(metadata: MediaMetadata?) { state = dev.droidtop.runtime.systemstatus.MediaNow.nowPlaying(context, watched) }
             override fun onSessionDestroyed() { state = null }
         }
         fun follow(sessions: List<MediaController>?) {
@@ -255,7 +255,7 @@ internal fun CompanionNowPlayingCard() {
             watched = sessions?.firstOrNull()
             watched?.registerCallback(callback)
             controller = watched
-            state = nowPlaying(context, watched)
+            state = dev.droidtop.runtime.systemstatus.MediaNow.nowPlaying(context, watched)
         }
         val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { follow(it) }
         runCatching {
@@ -294,18 +294,3 @@ internal fun CompanionNowPlayingCard() {
     }
 }
 
-private fun nowPlaying(context: Context, controller: MediaController?): NowPlaying? {
-    controller ?: return null
-    val metadata = controller.metadata
-    val app = runCatching {
-        val pm = context.packageManager
-        pm.getApplicationLabel(pm.getApplicationInfo(controller.packageName, 0)).toString()
-    }.getOrDefault(controller.packageName)
-    return NowPlaying.from(
-        title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE),
-        artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST),
-        app = app,
-        state = controller.playbackState?.state,
-        actions = controller.playbackState?.actions ?: 0L,
-    )
-}

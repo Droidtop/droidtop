@@ -86,7 +86,7 @@ object NotificationsStore {
         Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /** The listener service's class: the per-service screen Android 11 and later can open names it. */
-    private const val LISTENER_CLASS = "dev.droidtop.app.DroidtopNotificationListener"
+    internal const val LISTENER_CLASS = "dev.droidtop.app.DroidtopNotificationListener"
 
     /**
      * Opens the system screen that grants notification access: droidtop's own switch on Android 11 and later
