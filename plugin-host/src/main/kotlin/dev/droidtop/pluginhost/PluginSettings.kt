@@ -81,7 +81,7 @@ class PluginSettings(private val dir: File) {
         if (record.manifest.v2.settings.none { it.id == id }) return "no such setting"
         val json = read(record.manifest.id)
         val texts = json.optJSONObject("texts") ?: JSONObject()
-        texts.put(id, JSONObject().apply { value?.let { put("value", it.take(MAX_PUSHED)) }; sub?.let { put("sub", it.take(MAX_PUSHED)) })
+        texts.put(id, JSONObject().apply { value?.let { put("value", it.take(MAX_PUSHED)) }; sub?.let { put("sub", it.take(MAX_PUSHED)) } })
         write(record.manifest.id, json.put("texts", texts))
         return null
     }
