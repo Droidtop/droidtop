@@ -25012,6 +25012,16 @@ otherwise replace one the signature covered), and the xz stream of a bundle is
 held to 512 MiB of decoder memory. Bundle paths may use any character but a
 control character, and may never be empty, `.`, `..` or absolute.
 
+**Shared libraries build and test droidtop (owner, 2026-11-04, Droidtop/tracker#867 D2).** The code droidtop
+shares with Enginehost, Pythia and droidtop-agent moves into library repositories that belong to no program
+(owner: "The scaffold belongs to wach one. The libraries are shared, and don't "belong" to either"), each
+"versioned and pinned by each app; each repo's CI builds and tests every app that uses it". droidtop takes a
+library as a submodule under `vendor/`, as it takes droidtop-shared. A library's CI calls
+`.github/workflows/library-check.yml` with its submodule path and the commit under test; that workflow checks out
+droidtop's `main`, moves only that submodule to the commit, and runs every module's unit tests and the debug
+build through droidtop's own build setup (`.github/actions/android-setup`), so how droidtop builds stays in
+droidtop. Started by hand it builds the branch it is started on.
+
 **Signatures: certificate chains to droidtop's signing root (owner, 2026-10-15,
 Droidtop/tracker#550; replaces "Per-plugin keys and the plugin master" of
 2026-10-08).** The master seeds behind the old P-256 plugin master were
