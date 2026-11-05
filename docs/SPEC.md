@@ -538,7 +538,10 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   Quick Menu's frame already did). Before, the activity showed them, the Quick Menu hid them, the Start
   menu, windows list and search left them, and focus coming back showed them again, so the desktop
   resized under the person as sheets opened and closed. A swipe from the edge shows them for a moment.
-  Mobile keeps the system bars.
+  Mobile keeps the system bars. Standard keeps them too unless the person turns on Settings > Home > **Hide
+  status bar** or **Hide navigation bar** (Droidtop/tracker#703; off by default, the second only where the device
+  draws a navigation bar). They hide the home's own bars with a swipe to show them for a moment
+  (`StandardSystemBars`, applied as the home resumes), so an app opened from it keeps its own.
 - **One listener feeds the container's window list.** The bridge has room for one change listener, so the
   taskbar and the windows sheet read the same list.
 - **Android apps and games started from Desktop are in the bar** (Droidtop/tracker#352). A game or an app

@@ -1203,6 +1203,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         dev.droidtop.shell.standard.HomeHints.onHomeShown(this);
         // droidtop patch: the pad's hint row above the dock, while a pad is in use (Droidtop/tracker#699).
         dev.droidtop.shell.standard.StandardPadHints.onHomeShown(this);
+        // droidtop patch: Settings > Home's hidden system bars (Droidtop/tracker#703).
+        dev.droidtop.shell.standard.StandardSystemBars.apply(this);
         // Process any items that were added while Launcher was away.
         ItemInstallQueue.INSTANCE.get(this)
                 .resumeModelPush(FLAG_ACTIVITY_PAUSED);

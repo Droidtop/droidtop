@@ -57,6 +57,8 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val HOME_BUTTON_ACTION: String = "pref_gesture_home_button_action"
         const val SMARTSPACE_MODE: String = "pref_smartspace_mode"
         const val TASKBAR: String = "pref_taskbar"
+        const val HIDE_STATUS_BAR: String = "pref_hide_status_bar"
+        const val HIDE_NAVIGATION_BAR: String = "pref_hide_navigation_bar"
         private const val REQUEST_DEVICE_ADMIN = 1001
 
         @JvmStatic @RequiresApi(Build.VERSION_CODES.P)
@@ -163,6 +165,8 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
                 }
                 return true
             }
+            // Only where the device draws a navigation bar to hide (Droidtop/tracker#703).
+            HIDE_NAVIGATION_BAR -> return dev.droidtop.shell.standard.StandardSystemBars.hasNavigationBar(requireActivity().window.decorView)
             BLUR_PREVIEW -> {
                 // Shown only where Android can blur; the card says so when it is on and the device cannot after all.
                 preference as SwitchPreferenceCompat

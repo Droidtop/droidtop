@@ -73,6 +73,20 @@
         android:defaultValue="true"
         android:persistent="true" />
 
+    <!-- droidtop: the home's system bars (Droidtop/tracker#703, StandardSystemBars). -->
+    <SwitchPreferenceCompat
+        android:key="pref_hide_status_bar"
+        android:title="@string/pref_hide_status_bar_title"
+        android:summary="@string/pref_hide_bar_desc"
+        android:defaultValue="false"
+        android:persistent="true" />
+    <SwitchPreferenceCompat
+        android:key="pref_hide_navigation_bar"
+        android:title="@string/pref_hide_navigation_bar_title"
+        android:summary="@string/pref_hide_bar_desc"
+        android:defaultValue="false"
+        android:persistent="true" />
+
     <PreferenceCategory android:title="@string/pref_subcategory_layout">
 
         <app.murinelauncher.widget.radio.RadioGroupPreference
