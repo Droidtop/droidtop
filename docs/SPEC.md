@@ -2877,6 +2877,12 @@ the `ContainerRuntime` interface that already exists (§3):
   a stopped desktop or a lost network resume where the download stopped; a restart of droidtop
   re-runs the job. The marker makes a finished install free to check. Turning the switch off
   ends a waiting job and does not remove installed fonts.
+  The job is not an automatic download (2026-11-05, after the 2026-11-04 rig run found a fresh
+  desktop with only DejaVu and nothing saying why): the fonts belong to the desktop the person
+  set up, so only the network rule holds it, never the update window or a running game. A
+  desktop that stops under the install is waited out, not reported as a failure, and each wait,
+  the install and its outcome are logged under `droidtop.DesktopFonts`, so a desktop without
+  the fonts can be told from one whose job is waiting for Wi-Fi.
 - **A real terminal into any container** — a computer the user can't
   open a shell on isn't a computer. **Decided and built 2026-09-02, the
   other way round from this section's original sketch**: droidtop does
