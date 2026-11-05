@@ -112,6 +112,9 @@ internal object PluginProcesses {
      * for the plugin's site keeps it loaded, so the request the person is passing the check for goes on in the process
      * that met it (Droidtop/tracker#783). Whether it counted; when it did, [release] lets go.
      */
+    /** The runtime of [pluginId]'s process while it is bound and started; null otherwise. Never starts one. */
+    fun running(pluginId: String): IPluginRuntime? = synchronized(lock) { byPlugin[pluginId]?.runtime }
+
     fun keep(pluginId: String): Boolean = synchronized(lock) {
         val process = byPlugin[pluginId]?.takeIf { it.runtime != null } ?: return false
         process.users++

@@ -20,11 +20,19 @@ import org.json.JSONObject
  */
 class NativePluginRunner(
     context: Context,
-    private val onCrash: (pluginId: String, capability: String, reason: String) -> Unit,
+    onCrash: (pluginId: String, capability: String, reason: String) -> Unit,
     private val onJobProgress: (pluginId: String, jobId: String, percent: Int, statusLine: String, resumePayload: String?) -> Unit = { _, _, _, _, _ -> },
     private val onJobComplete: (pluginId: String, jobId: String, result: PluginResult) -> Unit = { _, _, _ -> },
 ) : PluginRunner {
     private val appContext = context.applicationContext
+
+    private val reportCrash = onCrash
+
+    /** A crash is reported, and the plugin's load is no longer trusted: its next call loads it again (#884). */
+    private fun onCrash(pluginId: String, capability: String, reason: String) {
+        loads.forget(pluginId)
+        reportCrash(pluginId, capability, reason)
+    }
 
     /** The runtime each plugin was loaded on by this runner. */
     private val runtimes = ConcurrentHashMap<String, IPluginRuntime>()
@@ -115,6 +123,24 @@ class NativePluginRunner(
         val id = record.manifest.id
         loadFailures.remove(id)
         if (record.manifest.kind == PluginKind.APP_INTERFACE) return loadApp(record)
+        // Once per process, not once per call (Droidtop/tracker#884): a plugin already loaded in its live process is
+        // ready, and calls at the same time share one load ([LoadOnce]).
+        return loads.load(id, "${tier.name}|${record.archiveDigest}", alive = { runtime -> stillLoaded(id, runtime) }) {
+            if (loadFresh(record, installDir, tier)) runtimes[id] else null
+        }
+    }
+
+    /** Each plugin's load in its live process ([LoadOnce]); dropped on an unload or a crash. */
+    private val loads = LoadOnce<IPluginRuntime>()
+
+    /** Whether [runtime], the process [pluginId] was loaded in, is still its live process: the same binder, alive, and still running it. */
+    private fun stillLoaded(pluginId: String, runtime: IPluginRuntime): Boolean {
+        val binder = runtime.asBinder()
+        return runtimes[pluginId]?.asBinder() === binder && binder.isBinderAlive && PluginProcesses.running(pluginId)?.asBinder() === binder
+    }
+
+    private suspend fun loadFresh(record: PluginRecord, installDir: String, tier: PluginTier): Boolean {
+        val id = record.manifest.id
         // An open plugin with only the network hole runs isolated, its sockets the broker's (docs/plugin-api.md 5.6).
         val grants = withContext(Dispatchers.IO) { PluginGrants.forContext(appContext).read(id) }
         val isolatedNet = tier == PluginTier.OPEN && PluginTiers.runsIsolated(PluginTiers.holes(record, grants))
@@ -262,6 +288,7 @@ class NativePluginRunner(
     }
 
     override fun unload(pluginId: String) {
+        loads.forget(pluginId)
         relayed.remove(pluginId)
         runCatching { runtimes[pluginId]?.unloadPlugin(pluginId) }
     }
