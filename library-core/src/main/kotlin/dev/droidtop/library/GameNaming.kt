@@ -369,8 +369,8 @@ object GameNaming {
      * [sameGame]'s comparison key: the game-identity fold ([TitleKeys]) without its separators, [TitleKeys.compact],
      * so spacing a distribution added or took away does not split a game (`ThiefofHearts` beside `Thief of Hearts`,
      * the real folder set GameGroupingTest keeps whole). The cross-device key is [TitleKeys.slug], which keeps word
-     * breaks (the owner's Lutris form, Droidtop/tracker#870); whether this test should keep them too is the owner's to
-     * decide, because doing so splits real libraries.
+     * breaks (the owner's Lutris form, Droidtop/tracker#870); keeping them here too would split real libraries, so this is
+     * built to the recommendation, owner to confirm.
      */
     fun nameKey(name: String): String = TitleKeys.compact(name)
 

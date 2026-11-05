@@ -21904,7 +21904,9 @@ the right ones is the person's call, as in "Removing an older version"
     so two names that are one key everywhere are one game here, and spellings that differ only in spacing still merge
     as before. Making it the slug itself was tried and splits real libraries: the Thief of Hearts set
     (`ThiefofHeartsPart3-0.0.9-pc` beside `Part1` and `Part2`, GameGroupingTest) became two games, because a name
-    joined in lower case has no word breaks to read. Whether to accept that is the owner's call on #870;
+    joined in lower case has no word breaks to read. Built to the recommendation (keep merges spacing-blind), owner to
+    confirm on Droidtop/tracker#870 (2026-11-05: the owner away overnight, the coordinator: "Build the recommended
+    option where a decision is his");
   - store matching (`StoreIdentity.titleKey`: the wishlist, new games, search de-duplication, card identity) is the
     slug with its own store rules on top ("&" as "and", punctuation a word break, a leading "The" and edition labels
     dropped) and joined with nothing between the words, the form card keys are stored in, which does not change;
