@@ -43,7 +43,7 @@ class GameLaunchOptionsTest {
     }
 
     @Test
-    fun `the .NET globalization switches are kept, other DOTNET_ variables are not`() {
+    fun `the dotnet globalization switches are kept, other DOTNET_ variables are not`() {
         val parsed = GameLaunchOptions.parseEnvironment("DOTNET_SYSTEM_GLOBALIZATION_USENLS=1 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0 DOTNET_ROOT=x")
         assertEquals(
             mapOf("DOTNET_SYSTEM_GLOBALIZATION_USENLS" to "1", "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT" to "0"),
