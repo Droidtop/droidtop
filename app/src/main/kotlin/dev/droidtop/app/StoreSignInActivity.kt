@@ -17,6 +17,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -208,6 +209,13 @@ class StoreSignInActivity : AppCompatActivity() {
                     super.onPageFinished(view, url)
                     if (url == null || view == null || captured.get()) return
                     if (codeFromAddress(store, signIn, url)) return
+                    signIn.codeInCookie?.let { name ->
+                        // The store's session itself is the sign-in (Humble): its cookie, once the return page is reached.
+                        if (signIn.isReturnPage(url)) {
+                            StoreSignIn.WebPage.cookieValue(CookieManager.getInstance().getCookie(url), name)?.let { finishWith(store, it) }
+                        }
+                        return
+                    }
                     val field = signIn.codeInBody ?: return
                     if (!signIn.isReturnPage(url)) return
                     // The store wrote the code into the page as JSON.

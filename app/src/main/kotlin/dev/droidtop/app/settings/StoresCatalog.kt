@@ -62,15 +62,15 @@ import kotlinx.coroutines.withContext
  * own screen (a QR code, or a password Steam checks and droidtop does not keep).
  *
  * A plugin's store (docs/plugin-api.md 3 A13, Droidtop/tracker#220) is one more: it is registered in
- * [StoreLibraries] while its plugin runs, and [entries] lists it after droidtop's five, with the same
+ * [StoreLibraries] while its plugin runs, and [entries] lists it after droidtop's own, with the same
  * row and page. Its sign-in is the plugin's own site account, opened like a web sign-in.
  */
 internal data class PcStore(val key: String) {
     companion object {
         /** droidtop's own stores, in the order the place lists them. */
-        private val OWN = listOf("steam", "gog", "epic", "amazon", "itch")
+        private val OWN = listOf("steam", "gog", "epic", "amazon", "itch", "humble")
 
-        /** droidtop's five, then every store a running plugin provides, by label. */
+        /** droidtop's own, then every store a running plugin provides, by label. */
         val entries: List<PcStore>
             get() = OWN.map(::PcStore) + StoreLibraries.all().filter { it.id !in OWN }.sortedBy { it.label.lowercase() }.map { PcStore(it.id) }
     }

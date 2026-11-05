@@ -102,14 +102,25 @@ sealed interface StoreSignIn {
      * page the web view reached is the one the store returns to after a
      * sign-in; [codeInUrl] reads the code off that page's address. A store
      * that writes the code into the page's body instead ([codeInBody]) has
-     * it read from the body's JSON field of that name.
+     * it read from the body's JSON field of that name. A store whose sign-in
+     * leaves no code, only its site session (Humble), names the session
+     * cookie ([codeInCookie]): its value, read from the web view once the
+     * return page loads, is what [StoreLibrary.completeSignIn] is given.
      */
     class WebPage(
         val url: String,
         val isReturnPage: (String) -> Boolean,
         val codeInUrl: (String) -> String?,
         val codeInBody: String? = null,
-    ) : StoreSignIn
+        val codeInCookie: String? = null,
+    ) : StoreSignIn {
+        companion object {
+            /** The value of cookie [name] in a `Cookie` header ("a=1; b=2"), or null. Pure. */
+            fun cookieValue(header: String?, name: String): String? =
+                header?.split(';')?.map { it.trim() }?.firstOrNull { it.startsWith("$name=") }
+                    ?.substringAfter('=')?.takeIf { it.isNotEmpty() }
+        }
+    }
 
     /** A personal key the person makes at [keyPage] and pastes into droidtop. */
     class ApiKey(val keyPage: String) : StoreSignIn

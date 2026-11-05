@@ -15410,7 +15410,28 @@ follows:
   archive-bomb-guarded zip, 7z and RAR extractor GameNative's mods importer
   used, now clearing folders through `SafeDelete`). itch.io names no version
   and keeps no file list: no update check, no verify. A download restarts from
-  the beginning after a pause; it is one file.
+  the beginning after a pause; it is one file. The download and the unpacking
+  are `SingleFileInstall` (`:stores` util), the one path every store that sells
+  a game as one file uses (itch.io, Humble): the file comes down on droidtop's
+  download engine under one name per game (`<store>_<id>.download`), is checked
+  against the store's MD5 when it gives one (a damaged file is dropped, not
+  resumed), and a zip, 7z or RAR is unpacked while anything else (a lone exe, an
+  installer) is kept under its own name.
+- **Humble Bundle** (`HumbleStore`, `HumbleApi`; Droidtop/tracker#335, built to the
+  recommendation of its design comment, owner to confirm): the DRM-free games of the
+  account's orders (`/api/v1/user/order`, then `/api/v1/orders?gamekeys=` in
+  batches of 40), one row per product that has a Windows or Linux build (the
+  Windows one first; books, soundtracks and Mac-only products are not rows, nor
+  are Steam keys, which are Steam's once redeemed). Sign-in is Humble's own page
+  in droidtop's web view; Humble leaves no code, only its session, so the web
+  sign-in names a cookie (`StoreSignIn.WebPage.codeInCookie`,
+  `_simpleauth_sess`) that `StoreSignInActivity` reads once the return page
+  (`/home/library`) loads, and the store checks it reads the orders before
+  keeping it (`humble/session.json`; a 401 drops it: "Sign in to Humble
+  again"). The library is kept in `humble/library.json` with each file's link
+  stripped of its signature; an install reads its order again for a fresh link
+  and runs `SingleFileInstall`. The update check compares the installed file's
+  MD5 with the one Humble lists. No cloud saves or achievements.
 - **Amazon Games** (`AmazonStore`): sign-in is Amazon's own page with a
   fresh PKCE session per sign-in (nile's device registration, through
   GameNative's `AmazonAuthManager`); the code comes back on the address
