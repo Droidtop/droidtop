@@ -141,7 +141,8 @@ internal fun runningTabs(gameRunning: Boolean, wantsInput: Boolean): List<Compan
  * - Chosen tabs never move for a running tab. Plugins sits under More unless chosen; one plugin's panel
  *   ([plugins]) can itself be a chosen tab.
  * - When the tabs and More need more than [extent] (in [labelSizes]' unit, More's own size [moreSize]), chosen
- *   tabs move into More from the right end, first in its list, and come back when there is room. An [extent] of
+ *   tabs move into More from the right end, first in its list, and come back when there is room. Home and Device
+ *   never move ([ControlAccess.NEVER_IN_MORE], Droidtop/tracker#786). An [extent] of
  *   zero or less means not measured yet: nothing moves.
  */
 internal fun slots(
@@ -171,7 +172,12 @@ internal fun slots(
     fun needed() = (bar + runningTabs).sumOf { size(it).toDouble() }.toFloat() +
         if (moved.isNotEmpty() || rest.isNotEmpty()) moreSize else 0f
     if (extent > 0f) {
-        while (needed() > extent && bar.isNotEmpty()) moved.add(0, bar.removeAt(bar.lastIndex))
+        // From the right end, but never Home or Device (ControlAccess.NEVER_IN_MORE): they stay on the bar.
+        while (needed() > extent) {
+            val last = bar.indexOfLast { it.panel !in ControlAccess.NEVER_IN_MORE }
+            if (last < 0) break
+            moved.add(0, bar.removeAt(last))
+        }
     }
     return CompanionBarLayout(bar + runningTabs, moved + rest)
 }

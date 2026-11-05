@@ -5299,7 +5299,12 @@ droidtop 0.2.0-dev.1931).
   a stream or a PC game runs, unless already chosen), then More, always last, holding every other tab. Chosen
   tabs never move for a running one. Labels wrap to two lines; the bar measures them at the current font and
   passes their sizes in, and when they do not fit, chosen tabs move into More from the right end and come back
-  when there is room, so the person decides what goes first by their order. Where the mode hides the Companion
+  when there is room, so the person decides what goes first by their order. Home and Device never move into More
+  (`ControlAccess.NEVER_IN_MORE`, Droidtop/tracker#786). **Device and droidtop** (`ControlPanel.DEVICE`,
+  `ControlPanel.DROIDTOP`, owner decision of 2026-10-30) are the companion's own panels: the Quick Menu never lists
+  them (`ControlAccess.COMPANION_ONLY`), and only Full allows them, default-deny for every other mode. Any of
+  their pages can be a tab of its own, stored as `page:<parent>/<page>` (`CompanionPrefs.pageId`), whose panel is
+  its parent's, so a mode that denies the panel denies the page. Their tabs and pages are drawn from S3. Where the mode hides the Companion
   group (Kid, Kiosk) nobody can choose, so the bar is the mode's whole tab set. Defaults: Home, System, Apps,
   Social in Gaming and Mobile; Input, Home, System, Apps in Desktop. A tab under More passes its badge to
   More (the Social unread count, spoken with it). Every entry has the tab role, its selected state and a spoken

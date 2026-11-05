@@ -15,20 +15,24 @@ class ControlAccessTest {
      * Every mode's sets, written out. A mode added to [UiMode] is missing here and fails this test until its
      * sets are decided and written down.
      */
+    /** Every panel but the companion's own Device and droidtop (Droidtop/tracker#786): the Quick Menu's whole set. */
+    private val quickMenuPanels = ControlPanel.entries.toSet() - ControlPanel.DEVICE - ControlPanel.DROIDTOP
+
     private val expected: Map<UiMode, Triple<Set<ControlPanel>, Set<ControlPanel>, Set<ControlRow>>> = mapOf(
         UiMode.FULL to Triple(
             setOf(
                 ControlPanel.HOME, ControlPanel.GAME, ControlPanel.SYSTEM, ControlPanel.APPS, ControlPanel.PERFORMANCE,
                 ControlPanel.INPUT, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.CONNECTIONS,
+                ControlPanel.DEVICE, ControlPanel.DROIDTOP,
             ),
-            ControlPanel.entries.toSet(),
+            quickMenuPanels,
             ControlRow.entries.toSet(),
         ),
-        UiMode.KIOSK to Triple(restrictedCompanion, ControlPanel.entries.toSet() - ControlPanel.PROFILE, restrictedRows),
-        UiMode.KID to Triple(restrictedCompanion, ControlPanel.entries.toSet() - ControlPanel.PROFILE, restrictedRows + ControlRow.PLAY_TIME),
+        UiMode.KIOSK to Triple(restrictedCompanion, quickMenuPanels - ControlPanel.PROFILE, restrictedRows),
+        UiMode.KID to Triple(restrictedCompanion, quickMenuPanels - ControlPanel.PROFILE, restrictedRows + ControlRow.PLAY_TIME),
         UiMode.GUEST to Triple(
             restrictedCompanion,
-            ControlPanel.entries.toSet() -
+            quickMenuPanels -
                 setOf(ControlPanel.NOTIFICATIONS, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.DOWNLOADS, ControlPanel.PROFILE),
             restrictedRows,
         ),
@@ -118,6 +122,16 @@ class ControlAccessTest {
         assertTrue(ControlAccess.shows(UiMode.KID, ControlRow.PLAY_TIME))
         assertFalse(ControlAccess.shows(UiMode.GUEST, ControlRow.PLAY_TIME) || ControlAccess.shows(UiMode.KIOSK, ControlRow.PLAY_TIME))
         // Kid and Kiosk keep every Quick Menu section but the owner's Profile (Droidtop/tracker#586).
-        assertEquals(ControlPanel.entries.toSet() - ControlPanel.PROFILE, ControlAccess.panels(UiMode.KID, ControlSurface.QUICK_MENU))
+        assertEquals(quickMenuPanels - ControlPanel.PROFILE, ControlAccess.panels(UiMode.KID, ControlSurface.QUICK_MENU))
+    }
+
+    @Test
+    fun `Device and droidtop are the companion's alone, and only Full has them`() {
+        for (mode in UiMode.entries) {
+            assertFalse(ControlPanel.DEVICE in ControlAccess.panels(mode, ControlSurface.QUICK_MENU))
+            assertFalse(ControlPanel.DROIDTOP in ControlAccess.panels(mode, ControlSurface.QUICK_MENU))
+            val companion = ControlAccess.panels(mode, ControlSurface.COMPANION)
+            assertEquals("$mode", mode == UiMode.FULL, ControlPanel.DEVICE in companion && ControlPanel.DROIDTOP in companion)
+        }
     }
 }

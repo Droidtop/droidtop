@@ -51,4 +51,15 @@ class CompanionPrefsTest {
         assertEquals(ControlPanel.APPS, CompanionPrefs.panelOf("apps"))
         assertEquals(null, CompanionPrefs.panelOf("tasks"))
     }
+
+    @Test
+    fun `a page tab names its parent panel, so the mode's rule for the panel holds for the page`() {
+        val display = CompanionPrefs.pageId(ControlPanel.DEVICE, "display")
+        assertEquals("page:device/display", display)
+        assertEquals(ControlPanel.DEVICE, CompanionPrefs.panelOf(display))
+        assertEquals(ControlPanel.DROIDTOP, CompanionPrefs.panelOf(CompanionPrefs.pageId(ControlPanel.DROIDTOP, "backup")))
+        // Only Device's and droidtop's pages can be tabs; a page with no name, or under another panel, is nothing.
+        assertEquals(null, CompanionPrefs.panelOf("page:device/"))
+        assertEquals(null, CompanionPrefs.panelOf("page:home/pins"))
+    }
 }

@@ -23,6 +23,14 @@ enum class ControlPanel {
 
     /** The person's own name and picture (Droidtop/tracker#586): the owner's, so the restricted modes leave it out. */
     PROFILE,
+
+    /**
+     * The companion's two management tabs (Droidtop/tracker#786 plan 4.2, owner decision 1 of 2026-10-30): Device
+     * (Display, Sound, Network, Battery, Storage, Apps, Privacy...) and droidtop (Mode, Look, Library, Plugins,
+     * Backup...). Companion-only: the Quick Menu has its own sections. Default-deny: only Full lists them.
+     */
+    DEVICE,
+    DROIDTOP,
 }
 
 /**
@@ -73,12 +81,22 @@ object ControlAccess {
     /** The optional passkey for leaving Kid, Kiosk and Guest. */
     const val ID_UI_MODE_PASSKEY = "pref_ui_mode_passkey"
 
+    /** Panels only the companion draws: the Quick Menu never lists them, whatever the mode. */
+    val COMPANION_ONLY: Set<ControlPanel> = setOf(ControlPanel.DEVICE, ControlPanel.DROIDTOP)
+
+    /**
+     * Tabs that never move into More when the bar is short of room (Droidtop/tracker#786 plan 4.2): Home and Device,
+     * the companion's two always-there places. The others move in from the right end as before.
+     */
+    val NEVER_IN_MORE: Set<ControlPanel> = setOf(ControlPanel.HOME, ControlPanel.DEVICE)
+
     private val FULL = ControlRules(
         companionPanels = setOf(
             ControlPanel.HOME, ControlPanel.GAME, ControlPanel.SYSTEM, ControlPanel.APPS, ControlPanel.PERFORMANCE,
             ControlPanel.INPUT, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.CONNECTIONS,
+            ControlPanel.DEVICE, ControlPanel.DROIDTOP,
         ),
-        quickMenuPanels = ControlPanel.entries.toSet(),
+        quickMenuPanels = ControlPanel.entries.toSet() - COMPANION_ONLY,
         readOnlyPanels = emptySet(),
         rows = ControlRow.entries.toSet(),
         pinIds = null,
@@ -100,7 +118,7 @@ object ControlAccess {
      */
     private val RESTRICTED = ControlRules(
         companionPanels = setOf(ControlPanel.HOME, ControlPanel.GAME, ControlPanel.PERFORMANCE),
-        quickMenuPanels = ControlPanel.entries.toSet() - ControlPanel.PROFILE,
+        quickMenuPanels = ControlPanel.entries.toSet() - COMPANION_ONLY - ControlPanel.PROFILE,
         readOnlyPanels = setOf(ControlPanel.PERFORMANCE),
         rows = setOf(ControlRow.PINS, ControlRow.GAME_RESUME, ControlRow.GAME_QUIT, ControlRow.STATS),
         pinIds = setOf(GamingSettingsCatalog.ID_SYSTEM_VOLUME, GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS),
@@ -129,7 +147,7 @@ object ControlAccess {
      * Kiosk, when set.
      */
     private val GUEST = RESTRICTED.copy(
-        quickMenuPanels = ControlPanel.entries.toSet() -
+        quickMenuPanels = ControlPanel.entries.toSet() - COMPANION_ONLY -
             setOf(ControlPanel.NOTIFICATIONS, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.DOWNLOADS, ControlPanel.PROFILE),
     )
 

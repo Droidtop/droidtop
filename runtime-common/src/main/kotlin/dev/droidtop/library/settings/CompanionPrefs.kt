@@ -136,14 +136,29 @@ object CompanionPrefs {
     const val GAME_START_NONE = "none"
     const val PLUGIN_PREFIX = "plugin:"
 
+    /**
+     * A Device or droidtop page chosen as its own tab (Droidtop/tracker#786 plan 4.2): `page:<parent>/<page>`, the
+     * parent panel's id first, so a mode that denies the panel denies the page with it ([panelOf]).
+     */
+    const val PAGE_PREFIX = "page:"
+
+    /** The tab id of [page] under [parent]. */
+    fun pageId(parent: ControlPanel, page: String): String = PAGE_PREFIX + id(parent) + "/" + page
+
     val MODES = listOf("GAMING", "STANDARD", "DESKTOP")
 
     /** The id of a built-in tab. */
     fun id(panel: ControlPanel): String = panel.name.lowercase()
 
     /** The panel a tab id names (a plugin panel names [ControlPanel.PLUGINS]); null for an id nothing knows. */
-    fun panelOf(id: String): ControlPanel? =
-        if (id.startsWith(PLUGIN_PREFIX)) ControlPanel.PLUGINS else ControlPanel.entries.firstOrNull { id(it) == id }
+    fun panelOf(id: String): ControlPanel? = when {
+        id.startsWith(PLUGIN_PREFIX) -> ControlPanel.PLUGINS
+        // A page names its parent: only Device's and droidtop's pages can be tabs of their own.
+        id.startsWith(PAGE_PREFIX) -> id.removePrefix(PAGE_PREFIX).substringBefore('/').let { parent ->
+            ControlAccess.COMPANION_ONLY.firstOrNull { id(it) == parent && id.substringAfter('/', "").isNotBlank() }
+        }
+        else -> ControlPanel.entries.firstOrNull { id(it) == id }
+    }
 
     /** Defaults (docs/SPEC.md "The companion's tabs"): Desktop leads with Input, the others with Home. */
     fun defaultChosen(mode: String): List<String> = if (mode == "DESKTOP") {

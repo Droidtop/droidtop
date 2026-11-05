@@ -139,4 +139,13 @@ class CompanionTabsTest {
         assertTrue(companionImmersive(dev.droidtop.display.SecondaryDisplayContent.Mode.DESKTOP))
         assertFalse(companionImmersive(dev.droidtop.display.SecondaryDisplayContent.Mode.STANDARD))
     }
+
+    @Test
+    fun `however short the bar, Home never moves into More`() {
+        val sizes = mapOf("home" to 100f, "system" to 100f, "apps" to 100f, "social" to 100f)
+        // Room for More alone: every tab but Home moves under it (Droidtop/tracker#786 plan 4.2).
+        val squeezed = slots(gamingDefault, UiMode.FULL, emptyList(), 120f, sizes, moreSize = 100f)
+        assertEquals(listOf("home"), ids(squeezed.tabs))
+        assertEquals(listOf("system", "apps", "social"), ids(squeezed.more).take(3))
+    }
 }
