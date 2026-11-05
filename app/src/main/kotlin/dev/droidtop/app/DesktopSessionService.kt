@@ -32,8 +32,12 @@ import kotlinx.coroutines.launch
 sealed interface DesktopSessionState {
     data object Idle : DesktopSessionState
 
-    /** [detail] is the latest thing the container reported while booting (a first boot installs the desktop), if any. */
-    data class Connecting(val detail: String? = null) : DesktopSessionState
+    /**
+     * [detail] is the latest thing the container reported while booting (a first boot installs the desktop), if any.
+     * [firstStart]: this start made the Linux system, so it downloads and installs, which takes minutes; a restart or
+     * a later start reuses it (Droidtop/tracker#687, #693).
+     */
+    data class Connecting(val detail: String? = null, val firstStart: Boolean = false) : DesktopSessionState
     data class Connected(
         val hostBridge: HostBridge,
         val primaryOutput: DisplayOutput,
@@ -101,6 +105,10 @@ class DesktopSessionService : Service() {
     /** Why the session is ending on its own (its compositor went away), for the page shown after it; null when it was stopped. */
     @Volatile
     private var endedBecause: String? = null
+
+    /** Whether this session made its primary container ([findOrCreatePrimary]): its start is the long first one. */
+    @Volatile
+    private var firstStart = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) stopSelf()
@@ -222,7 +230,7 @@ class DesktopSessionService : Service() {
             .onFailure { android.util.Log.w(TAG, "Writing the desktop panel's config failed", it) }
         try {
             runtime.start(primary, provisioning) { line ->
-                _stateHolder.value = DesktopSessionState.Connecting(line)
+                _stateHolder.value = DesktopSessionState.Connecting(line, firstStart)
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             // The session was stopped while booting (the notification's
@@ -300,7 +308,8 @@ class DesktopSessionService : Service() {
             android.util.Log.i(TAG, "Reusing the primary container made from ${repository.id}")
             return existing
         }
-        _stateHolder.value = DesktopSessionState.Connecting("Downloading ${repository.repository}")
+        firstStart = true
+        _stateHolder.value = DesktopSessionState.Connecting("Downloading ${repository.repository}", firstStart = true)
         val image = CraneImageCatalogResolver(applicationContext).resolveCurrent(repository)
         android.util.Log.i(
             TAG,
