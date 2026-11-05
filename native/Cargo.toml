@@ -26,6 +26,9 @@ droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidto
 # mesh test's droidtop-agent brings windowcast's sspi 0.21, which pins ed25519-dalek =3.0.0-rc.1; one graph can't hold
 # both. SFTP turns on ("sftp") once windowcast takes sspi 0.22 or later.
 net-remote = { git = "https://github.com/Droidtop/lib-net", rev = "43d9236f3605831669355caa755d197c87fe3bba", default-features = false }
+# KDE Connect, both ways (Droidtop/tracker#645, SPEC 7q): kdeconnect_<op> is passed to
+# lib-kdeconnect's operation table.
+kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", tag = "v0.1.0" }
 jni = { version = "0.21", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

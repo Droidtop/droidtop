@@ -139,6 +139,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // A download ending is one short flash, grouped while it is up (Droidtop/tracker#643).
         dev.droidtop.library.integrations.JobNotices.start()
         dev.droidtop.app.LaunchWatchNotification.start(appContext)
+        // KDE Connect, when the person left it on, and its notices (docs/SPEC.md "KDE Connect").
+        dev.droidtop.app.KdeConnectNotification.start(appContext)
         AppSettingsCatalogs.ensureRegistered()
         dev.droidtop.library.settings.HomeRows.forgetLaunchLog = { ctx -> dev.droidtop.app.LibraryCore.library(ctx).forgetStarts() }
         dev.droidtop.library.settings.LibraryRescan.handler = { ctx, onStatus ->

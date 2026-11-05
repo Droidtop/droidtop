@@ -1,0 +1,160 @@
+package dev.droidtop.app.settings
+
+import android.content.Context
+import dev.droidtop.library.settings.ActionItem
+import dev.droidtop.library.settings.AsyncActionItem
+import dev.droidtop.library.settings.CatalogGroup
+import dev.droidtop.library.settings.CatalogIcon
+import dev.droidtop.library.settings.CatalogItem
+import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.net.kdeconnect.KdcDevice
+import dev.droidtop.net.kdeconnect.KdeConnect
+import dev.droidtop.net.peer.AgentNative
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * Settings > Accounts and sources > KDE Connect (docs/SPEC.md "KDE Connect", Droidtop/tracker#645): droidtop as a
+ * KDE Connect device. The switch, the name the others see, devices added by address, and the devices: a request
+ * to pair with its code, Accept and Refuse; the paired ones with Ping and Unpair; the others with Pair. A catalog
+ * screen, so both Settings surfaces draw it, and live: it is built again when a device comes, goes or asks.
+ */
+object KdeConnectCatalog {
+    const val SCREEN_ID = "kdeconnect"
+
+    fun screen() = CatalogScreen(
+        id = SCREEN_ID,
+        title = "KDE Connect",
+        subtitle = "Pair phones and computers running KDE Connect, or Pythia",
+        groups = { context -> groups(context) },
+        live = KdeConnect.changes,
+        needsNetwork = true,
+    )
+
+    fun linkRow(on: Boolean) = NestedScreenItem(
+        id = "accounts_kdeconnect_link",
+        title = "KDE Connect",
+        subtitle = "Phones and computers with the KDE Connect app, or Pythia",
+        registryId = SCREEN_ID,
+        valueLabel = { if (on) "on" else "off" },
+        icon = CatalogIcon.DESKTOP,
+    )
+
+    private suspend fun groups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val on = KdeConnect.isOn(context)
+        val devices = KdeConnect.devices()
+        buildList {
+            add(CatalogGroup(id = "kdeconnect_switch", title = null, items = switchRows(context, on)))
+            if (!on || !KdeConnect.running.value) return@buildList
+            val asking = devices.filter { it.pairing == "requested_by_peer" }
+            if (asking.isNotEmpty()) {
+                add(CatalogGroup(id = "kdeconnect_asking", title = "Asking to pair", items = asking.flatMap { requestRows(it) }))
+            }
+            val paired = devices.filter { it.paired }
+            if (paired.isNotEmpty()) {
+                add(CatalogGroup(id = "kdeconnect_paired", title = "Paired", items = paired.flatMap { pairedRows(it) }))
+            }
+            val others = devices.filter { !it.paired && it.reachable && it.pairing != "requested_by_peer" }
+            add(
+                CatalogGroup(
+                    id = "kdeconnect_available",
+                    title = "Available",
+                    items = others.map { availableRow(it) }.ifEmpty {
+                        listOf(
+                            ActionItem(
+                                id = "kdeconnect_none",
+                                title = "No other devices found yet",
+                                subtitle = "Open KDE Connect on the phone or computer, on the same network",
+                            ),
+                        )
+                    } + refreshRow(),
+                ),
+            )
+        }
+    }
+
+    private fun switchRows(context: Context, on: Boolean): List<CatalogItem> = buildList {
+        if (!AgentNative.available) add(ActionItem(id = "kdeconnect_missing", title = "KDE Connect isn't in this build"))
+        add(
+            ToggleItem(
+                id = "kdeconnect_on",
+                title = "KDE Connect",
+                subtitle = KdeConnect.lastError?.takeIf { on && !KdeConnect.running.value }
+                    ?: "Other devices on this network can find this one and ask to pair. Nothing is shared before you accept",
+                current = on,
+                onToggle = { ctx, value -> KdeConnect.setOn(ctx, value) },
+            ),
+        )
+        add(
+            TextInputItem(
+                id = "kdeconnect_name",
+                title = "Name",
+                subtitle = "What other devices show for this one",
+                value = KdeConnect.name(context),
+                onChange = { ctx, text -> KdeConnect.setName(ctx, text) },
+            ),
+        )
+        add(
+            TextInputItem(
+                id = "kdeconnect_addresses",
+                title = "Devices by address",
+                subtitle = "IP addresses to reach besides this network's own, separated by commas (a device on another network, or one the network's broadcast misses)",
+                value = KdeConnect.addresses(context).joinToString(", "),
+                onChange = { ctx, text -> KdeConnect.setAddresses(ctx, text) },
+            ),
+        )
+    }
+
+    private fun place(d: KdcDevice) = listOfNotNull(d.type.replaceFirstChar { it.uppercase() }, d.address).joinToString(", ")
+
+    private fun requestRows(d: KdcDevice): List<CatalogItem> = listOf(
+        AsyncActionItem(
+            id = "kdeconnect_accept_${d.id}",
+            title = "Accept ${d.name}",
+            subtitle = "Pair only if ${d.name} shows the same code: ${d.verificationKey ?: "…"}",
+            run = { _, _ -> KdeConnect.accept(d.id) ?: "Paired with ${d.name}" },
+        ),
+        AsyncActionItem(
+            id = "kdeconnect_refuse_${d.id}",
+            title = "Refuse ${d.name}",
+            run = { _, _ -> KdeConnect.refuse(d.id) ?: "Refused" },
+        ),
+    )
+
+    private fun pairedRows(d: KdcDevice): List<CatalogItem> = listOf(
+        AsyncActionItem(
+            id = "kdeconnect_paired_${d.id}",
+            title = d.name,
+            subtitle = if (d.reachable) "Connected. ${place(d)}. Press to ping it" else "Not reachable now",
+            run = { _, _ -> if (d.reachable) KdeConnect.ping(d.id) ?: "Ping sent" else "${d.name} is not reachable now" },
+        ),
+        AsyncActionItem(
+            id = "kdeconnect_unpair_${d.id}",
+            title = "Unpair ${d.name}",
+            confirmTitle = "Unpair ${d.name}? It has to be paired again before it can reach this device.",
+            confirmKeep = "Keep it paired",
+            run = { _, _ -> KdeConnect.unpair(d.id) ?: "Unpaired ${d.name}" },
+        ),
+    )
+
+    private fun availableRow(d: KdcDevice) = AsyncActionItem(
+        id = "kdeconnect_pair_${d.id}",
+        title = d.name,
+        subtitle = if (d.pairing == "requested") {
+            "Asked to pair. Check ${d.name} shows ${d.verificationKey ?: "the same code"}, and accept there"
+        } else {
+            "Pair. ${place(d)}"
+        },
+        run = { _, _ -> KdeConnect.pair(d.id) ?: "Asked ${d.name} to pair" },
+    )
+
+    private fun refreshRow() = AsyncActionItem(
+        id = "kdeconnect_refresh",
+        title = "Look again",
+        subtitle = "Tells the devices on this network that this one is here",
+        run = { _, _ -> KdeConnect.refresh() ?: "Asked again" },
+    )
+}
