@@ -23142,8 +23142,10 @@ and which droidtop never uploads, start afresh at each launch, since a damaged o
 every run. And `GST_PLUGIN_FEATURE_RANK` takes `asfdemux` out of autoplugging: the converter claims ASF at rank
 marginal + 1, which wins under Proton because Proton's GStreamer has no asfdemux, but the base system's does and has no
 WMV decoder, so it took the game's WMV intro, failed to negotiate a decoder and the game waited for its video for good.
-With asfdemux out the converter plays its blank video (`blank.mkv`, AV1 with Opus), so the base system's GStreamer
-needs an AV1 decoder; that is a rig check, not yet known.
+With asfdemux out the converter plays its blank video. Proton's `blank.mkv` is AV1, which this Wine's winegstreamer
+cannot map and the base system cannot decode (console, main 3061: the source reader never produced a sample and Unity
+waited for one for good), so droidtop's `blank.mkv` keeps Proton's Opus audio and 4 s but carries uncompressed I420
+video (64x48, 5 fps), which needs nothing beyond matroskademux.
 
 ### The allocator a game's Wine uses (built 2026-11-05, Droidtop/tracker#894, owner approved)
 
