@@ -94,6 +94,7 @@ import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.ui.shared.holdKeyFocus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -572,6 +573,13 @@ internal fun LibrarySearchDialog(
     var statusLine by remember { mutableStateOf<String?>(null) }
     // Bumped to search again after the person fixed something (installed a runtime, approved a plugin).
     var searchTick by remember { mutableIntStateOf(0) }
+    // Whether the device has no network at all (the one status source, read off the main thread): every source then
+    // fails for the same reason, and the page says so once.
+    val offline by produceState(false, context) {
+        dev.droidtop.runtime.systemstatus.SystemStatus.flow(context)
+            .flowOn(Dispatchers.IO)
+            .collect { value = it.network == dev.droidtop.runtime.systemstatus.NetworkKind.NONE }
+    }
     // What a failed source reported in its own words, shown on request under its plain sentence (Droidtop/tracker#167), by source id.
     var technicalDetails by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     // Whether the folded "N sources need attention" row was opened; a new search folds them again.
@@ -774,7 +782,7 @@ internal fun LibrarySearchDialog(
                 }
             }
             when {
-                !state.settled -> add(SearchLine.Note(if (text.isBlank()) "Asking your sources" else "Searching"))
+                !state.settled -> add(SearchLine.Note(if (text.isBlank()) "Asking your sources" else "Searching", busy = true))
                 state.rows.isEmpty() && settingsHits.isEmpty() -> add(SearchLine.Note(if (text.isBlank()) "Nothing featured right now" else "No match"))
             }
             if (state.settled) {
@@ -813,7 +821,21 @@ internal fun LibrarySearchDialog(
                 // its icon, the attention glyph and its short reason, and A runs the one fix (SourceFix). Several fold into
                 // one row until it is opened. Technical details stay one press away, and a second press copies them.
                 val failed = state.sources.filter { it.failure != null }
-                if (failed.size > 1 && !failuresOpen) {
+                // With no network at all every source fails the same way, so the page says that once, with Try again,
+                // instead of a row per source blaming each for not answering in time (Droidtop/tracker#671, rig 2758).
+                val unreachable = offline && failed.isNotEmpty()
+                if (unreachable) {
+                    add(
+                        SearchLine.Entry(
+                            "unreachable",
+                            words(R.string.gamepad_sources_unreachable),
+                            subtitle = words(R.string.gamepad_sources_unreachable_line),
+                            value = words(R.string.gamepad_try_again),
+                            mark = StatusMark.ATTENTION,
+                        ) { searchTick++ },
+                    )
+                }
+                if (!unreachable && failed.size > 1 && !failuresOpen) {
                     add(
                         SearchLine.Entry(
                             "failures",
@@ -823,7 +845,7 @@ internal fun LibrarySearchDialog(
                         ) { failuresOpen = true },
                     )
                 }
-                if (failed.size == 1 || failuresOpen) failed.forEach { status ->
+                if (!unreachable && (failed.size == 1 || failuresOpen)) failed.forEach { status ->
                     val source = status.source
                     val record = (source as? PluginGameSource)?.source?.record
                     val access = status.access
@@ -1041,7 +1063,7 @@ internal fun LibrarySearchDialog(
                 lines.forEach { line ->
                     when (line) {
                         is SearchLine.Header -> MenuSectionLabel(line.text)
-                        is SearchLine.Note -> SourceNote(line.text)
+                        is SearchLine.Note -> SourceNote(line.text, line.busy)
                         is SearchLine.Entry -> SearchEntryRow(line, selected = line.key == focusKey) {
                             focusKey = line.key
                             line.onPick()
@@ -1076,7 +1098,8 @@ internal data class SearchSwitch(val label: String, val on: Boolean, val toggle:
 /** What the search dialog draws, top to bottom: a heading, a muted line, or a row the pad's cursor can stop on. */
 private sealed interface SearchLine {
     data class Header(val text: String) : SearchLine
-    data class Note(val text: String) : SearchLine
+    /** A quiet line; [busy] draws the shell's loading bar under it while something is asked (Droidtop/tracker#671). */
+    data class Note(val text: String, val busy: Boolean = false) : SearchLine
 
     /** A line the pad's cursor stops on; A runs [onPick]. */
     sealed interface Stop : SearchLine {
@@ -1142,13 +1165,10 @@ private fun SourceChipRow(line: SearchLine.Chips, cursorAt: Int?, onPick: (Int) 
                     selected = cursorAt == index,
                     onClick = { onPick(index) },
                 )
-                // Turning while its source is asked (show, then say).
+                // Moving while its source is asked (show, then say): the shell's loading bar, short, not a stock spinner
+                // in its own colour (Droidtop/tracker#671, rig 2758).
                 if (chip.busy) {
-                    androidx.compose.material3.CircularProgressIndicator(
-                        modifier = Modifier.padding(start = 4.dp).size(14.dp),
-                        strokeWidth = 2.dp,
-                        color = MenuTokens.OnSurfaceMuted,
-                    )
+                    dev.droidtop.shell.gamepad.ShellLoading(Modifier.padding(start = 6.dp).width(dev.droidtop.shell.gamepad.ProgressLook.InlineLoadingWidth))
                 }
             }
         }
@@ -1190,6 +1210,10 @@ private fun SearchEntryRow(entry: SearchLine.Entry, selected: Boolean, onPick: (
 
 /** One muted line under the rows: a source's outcome when it has no rows to show. */
 @Composable
-private fun SourceNote(text: String) {
-    Text(text, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 4.dp))
+private fun SourceNote(text: String, busy: Boolean = false) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text(text, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
+        // The shell's one loading look (DESIGN-LANGUAGE, "one JobProgress everywhere"), never a bare spinner.
+        if (busy) dev.droidtop.shell.gamepad.ShellLoading(Modifier.padding(top = 4.dp).width(dev.droidtop.shell.gamepad.ProgressLook.LoadingWidth))
+    }
 }
