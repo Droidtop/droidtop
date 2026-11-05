@@ -161,4 +161,7 @@
     <!-- The desktop's background picture (DesktopBackgroundPicture, Droidtop/tracker#694). -->
     <string name="desktop_background_picture_saved">The desktop\'s background picture is set. It shows when the desktop next starts.</string>
     <string name="desktop_background_picture_failed">Couldn\'t use that picture for the desktop\'s background.</string>
+    <!-- KDE Connect's touchpad (docs/SPEC.md 7p). -->
+    <string name="kdeconnect_touchpad_title">Controlling %1$s</string>
+    <string name="kdeconnect_touchpad_help">Drag to move, tap to click, two fingers to scroll. B leaves</string>
 </resources>
