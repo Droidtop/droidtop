@@ -287,7 +287,8 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         envVars.put("PREFIX", rootDir.getPath() + "/usr");
         envVars.put("WINE_DISABLE_FULLSCREEN_HACK", "1");
         envVars.put("ENABLE_UTIL_LAYER", "1");
-        envVars.put("GST_PLUGIN_FEATURE_RANK", "ximagesink:3000");
+        // droidtop: and asfdemux out of autoplugging, so Proton's media converter takes ASF media (Droidtop/tracker#897).
+        envVars.put("GST_PLUGIN_FEATURE_RANK", dev.droidtop.runtime.windows.WineMediaConverter.GST_FEATURE_RANK);
         envVars.put("ALSA_CONFIG_PATH", rootDir.getPath() + "/usr/share/alsa/alsa.conf" + ":" + rootDir.getPath() + "/usr/etc/alsa/conf.d/android_aserver.conf");
         envVars.put("ALSA_PLUGIN_DIR", rootDir.getPath() + "/usr/lib/alsa-lib");
         envVars.put("OPENSSL_CONF", rootDir.getPath() + "/usr/etc/tls/openssl.cnf");

@@ -23130,6 +23130,16 @@ console). `WineMediaConverter`, at each launch, sets all six as Proton does: the
 folder, kept in droidtop's assets and unpacked once into `files/mediaconv`). A prefix's or game's own value wins.
 GameNative sets these only behind a per-container switch that is off by default, with paths under its own package.
 
+The console run of main 3057 (2026-11-05) showed three more gaps, fixed the same way. STEAM_COMPAT_TRANSCODED_MEDIA_PATH,
+where the converter leaves its "placeholder used" tag files and which Steam sets under Proton, is the prefix's
+`mediaconv/` folder. The dump databases (`audiov2.foz`, `video.foz`), which only record media for Valve to transcode
+and which droidtop never uploads, start afresh at each launch, since a damaged one ("Wrong check sum") is otherwise read
+every run. And `GST_PLUGIN_FEATURE_RANK` takes `asfdemux` out of autoplugging: the converter claims ASF at rank
+marginal + 1, which wins under Proton because Proton's GStreamer has no asfdemux, but the base system's does and has no
+WMV decoder, so it took the game's WMV intro, failed to negotiate a decoder and the game waited for its video for good.
+With asfdemux out the converter plays its blank video (`blank.mkv`, AV1 with Opus), so the base system's GStreamer
+needs an AV1 decoder; that is a rig check, not yet known.
+
 ### Translation cache, precache and mixed-arch running (decided 2026-11-04, Droidtop/tracker#865, #866)
 
 The owner, relayed by the coordinator on 2026-11-04, approved the cache plan in #865 (mixed-architecture running
