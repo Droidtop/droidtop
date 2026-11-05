@@ -47,4 +47,6 @@ internal fun CatalogIcon.drawableRes(): Int = when (this) {
     CatalogIcon.ANDROID_SETTINGS -> R.drawable.ic_catalog_android_settings
     CatalogIcon.INTEGRATIONS -> R.drawable.ic_catalog_integrations
     CatalogIcon.SEARCH -> R.drawable.ic_catalog_search
+    CatalogIcon.SOCIAL -> R.drawable.ic_catalog_social
+    CatalogIcon.DOWNLOADS -> R.drawable.ic_catalog_downloads
 }

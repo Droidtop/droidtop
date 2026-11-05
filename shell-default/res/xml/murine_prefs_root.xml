@@ -64,21 +64,21 @@
     <PreferenceCategory
         android:key="pref_places"
         android:title="@string/pref_subcategory_places">
-        <Preference android:key="pref_place_stores" android:icon="@drawable/ic_settings_general" />
-        <Preference android:key="pref_place_social" android:icon="@drawable/ic_settings_general" />
-        <Preference android:key="pref_place_plugin_jobs" android:icon="@drawable/ic_settings_general" />
-        <Preference android:key="pref_place_updates" android:icon="@drawable/ic_settings_general" />
-        <Preference android:key="pref_place_plugins" android:icon="@drawable/ic_settings_general" />
+        <Preference android:key="pref_place_stores" />
+        <Preference android:key="pref_place_social" />
+        <Preference android:key="pref_place_plugin_jobs" />
+        <Preference android:key="pref_place_updates" />
+        <Preference android:key="pref_place_plugins" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/pref_subcategory_other_shells">
         <Preference
-            android:icon="@drawable/ic_settings_general"
+            android:icon="@drawable/ic_catalog_desktop"
             android:title="@string/pref_category_desktop_title"
             android:summary="@string/pref_category_desktop_desc"
             android:fragment="app.murinelauncher.settings.SettingsDesktopFragment"/>
         <Preference
-            android:icon="@drawable/ic_settings_general"
+            android:icon="@drawable/ic_catalog_gaming"
             android:title="@string/pref_category_gaming_title"
             android:summary="@string/pref_category_gaming_desc"
             android:fragment="app.murinelauncher.settings.SettingsGamingFragment"/>

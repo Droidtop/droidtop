@@ -19,16 +19,20 @@ private const val DOWNLOADS_SCREEN = "plugin_jobs"
 private const val UPDATES_SCREEN = "updates"
 private const val PLUGINS_SCREEN = "plugins"
 
-enum class Place(val screenId: String, val title: String, val listed: Boolean = true) {
+/**
+ * [icon] is the place's glyph wherever it is a row that opens it (Standard's settings root, Droidtop/tracker#705: every
+ * place there used to share Android's one settings cog).
+ */
+enum class Place(val screenId: String, val title: String, val icon: CatalogIcon, val listed: Boolean = true) {
     // "Game sources" (Droidtop/tracker#397 slice E): stores, game folders and imports, one place.
-    STORES(STORES_SCREEN, "Game sources"),
-    SOCIAL(SOCIAL_SCREEN, "Social"),
-    DOWNLOADS(DOWNLOADS_SCREEN, "Downloads and Updates"),
+    STORES(STORES_SCREEN, "Game sources", CatalogIcon.LIBRARY),
+    SOCIAL(SOCIAL_SCREEN, "Social", CatalogIcon.SOCIAL),
+    DOWNLOADS(DOWNLOADS_SCREEN, "Downloads and Updates", CatalogIcon.DOWNLOADS),
     // A page of Downloads and Updates, reached by its "Updates · N available" row there, never a row of its own (the owner,
     // 2026-10-30, Droidtop/tracker#792: "An updates link should be in the Downloads and Updates tab. Not there directly,
     // but a shortcut").
-    UPDATES(UPDATES_SCREEN, "Updates", listed = false),
-    PLUGINS(PLUGINS_SCREEN, "Plugins"),
+    UPDATES(UPDATES_SCREEN, "Updates", CatalogIcon.SYSTEM_UPDATES, listed = false),
+    PLUGINS(PLUGINS_SCREEN, "Plugins", CatalogIcon.INTEGRATIONS),
     ;
 
     companion object {

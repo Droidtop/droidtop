@@ -55,6 +55,8 @@ enum class CatalogIcon {
     INPUT, CONTROLLER, KEYBOARD,
     DISPLAY, SYSTEM_UPDATES, ANDROID_SETTINGS,
     INTEGRATIONS, SEARCH,
+    // The places' own glyphs (Place.icon, Droidtop/tracker#705): Social and Downloads had none of their own.
+    SOCIAL, DOWNLOADS,
 }
 
 /**

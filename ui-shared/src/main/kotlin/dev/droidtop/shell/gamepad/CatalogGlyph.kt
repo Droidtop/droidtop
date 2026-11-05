@@ -1,6 +1,8 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Category
@@ -65,6 +67,8 @@ fun CatalogIcon.glyph(): ImageVector = when (this) {
     CatalogIcon.ANDROID_SETTINGS -> Icons.Outlined.Android
     CatalogIcon.INTEGRATIONS -> Icons.Outlined.Extension
     CatalogIcon.SEARCH -> Icons.Outlined.Search
+    CatalogIcon.SOCIAL -> Icons.Outlined.Group
+    CatalogIcon.DOWNLOADS -> Icons.Outlined.Download
 }
 
 /**

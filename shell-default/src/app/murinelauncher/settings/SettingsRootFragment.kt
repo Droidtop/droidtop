@@ -3,6 +3,7 @@ package app.murinelauncher.settings
 import androidx.annotation.VisibleForTesting
 import androidx.preference.Preference
 import app.murinelauncher.settings.common.AbstractSettingsFragment
+import app.murinelauncher.settings.common.drawableRes
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
 import com.android.launcher3.util.DisplayController
@@ -28,6 +29,8 @@ public final class SettingsRootFragment: AbstractSettingsFragment() {
             val place = Place.byScreenId(preference.key.removePrefix(PLACE_KEY_PREFIX))
             if (place == null || place !in visiblePlaces) return false
             preference.title = place.title
+            // Its own glyph, the catalog's (Droidtop/tracker#705), not the settings cog every place shared.
+            preference.icon = androidx.core.content.ContextCompat.getDrawable(preference.context, place.icon.drawableRes())
             preference.intent = Place.openIntent(preference.context, place)
             return true
         }
