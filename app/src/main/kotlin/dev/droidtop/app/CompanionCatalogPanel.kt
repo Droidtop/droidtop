@@ -44,7 +44,11 @@ import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.NoticeItem
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.SliderItem
+import dev.droidtop.library.settings.DocumentPickItem
+import dev.droidtop.library.settings.FolderPickItem
+import dev.droidtop.library.settings.SubScreenItem
 import dev.droidtop.library.settings.TextBlockItem
+import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.settings.confirmText
 import dev.droidtop.shell.gamepad.QuickSection
@@ -108,10 +112,58 @@ internal fun CompanionCatalogItems(
     asks: (CatalogItem) -> Boolean = { it.confirmText != null },
 ) {
     var nested by remember { mutableStateOf<CatalogScreen?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // The rows the host used to leave out (Droidtop/tracker#786 S2a2): a text field opens the shared editor, a folder
+    // or document the system's picker as Gaming's Settings opens it (CatalogPickers), each line kept by row id.
+    val statusById = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
+    // A picker needs an activity to answer it: the companion's own activity has one, a Presentation on the second
+    // screen does not, and registering one there would crash the whole companion. There the row says where to pick.
+    val pickers = if (androidx.activity.compose.LocalActivityResultRegistryOwner.current != null) {
+        dev.droidtop.shell.gamepad.rememberCatalogPickers(
+            onStatus = { id, line -> if (line != null) statusById[id] = line else statusById.remove(id) },
+            onDone = onChanged,
+        )
+    } else {
+        null
+    }
+    val pickHere: (String, () -> Unit) -> Unit = { id, pick ->
+        if (pickers != null) pick() else statusById[id] = PICK_ON_MAIN_SCREEN
+    }
+    var editing by remember { mutableStateOf<TextInputItem?>(null) }
+    var askingPick by remember { mutableStateOf<DocumentPickItem?>(null) }
     val open = nested
     if (open != null) {
         CompanionNestedScreen(open, onBack = { nested = null }, onChanged = onChanged, asks = asks)
         return
+    }
+    // The field opens in place of the list, as a nested screen does: a dialog window cannot open over a Presentation.
+    val field = editing
+    if (field != null) {
+        dev.droidtop.shell.gamepad.TextEditPanel(
+            title = field.title,
+            subtitle = field.subtitle,
+            initial = field.value,
+            multiline = field.multiline,
+            secret = field.secret,
+            search = field.search,
+            onCommit = { text ->
+                editing = null
+                // The write first, then the re-read, so the row shows what was saved.
+                scope.launch {
+                    field.onChange(context, text)
+                    onChanged()
+                }
+            },
+            onDismiss = { editing = null },
+        )
+        return
+    }
+    askingPick?.let { pick ->
+        CompanionAsk(pick.confirmTitle ?: "${pick.title}?", "Cancel", pick.title, onSafe = { askingPick = null }, onAction = {
+            askingPick = null
+            pickHere(pick.id) { pickers?.pickDocument(pick) }
+        })
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         items.forEach { item ->
@@ -125,6 +177,17 @@ internal fun CompanionCatalogItems(
                 // A page's header and bar (docs/SPEC.md 7k, "Page anatomy"): the shared pieces, touch only.
                 is dev.droidtop.library.settings.PageHeaderItem -> dev.droidtop.ui.shared.PageHeaderView(item.header)
                 is dev.droidtop.library.settings.ButtonBarItem -> CompanionButtonBar(item, onChanged)
+                is TextInputItem -> CatalogRow(
+                    item.title,
+                    item.subtitle,
+                    if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifEmpty { null },
+                ) { editing = item }
+                is FolderPickItem -> CatalogRow(item.title, item.subtitle, statusById[item.id]) { pickHere(item.id) { pickers?.pickFolder(item) } }
+                is DocumentPickItem -> CatalogRow(item.title, item.subtitle, statusById[item.id]) {
+                    if (item.confirmTitle != null) askingPick = item else pickHere(item.id) { pickers?.pickDocument(item) }
+                }
+                // A screen of Android's or another app's: it opens there, as from Gaming's Settings.
+                is SubScreenItem -> CatalogRow(item.title, item.subtitle, null) { context.startActivity(item.launchIntent(context)) }
                 is TextBlockItem -> Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                     if (item.title.isNotBlank()) Text(item.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                     Text(item.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -448,3 +511,6 @@ private fun CompanionButtonBar(bar: dev.droidtop.library.settings.ButtonBarItem,
         })
     }
 }
+
+/** A folder or document row on a companion that cannot open the system's picker (a Presentation on the second screen). */
+private const val PICK_ON_MAIN_SCREEN = "Choose it from droidtop's Settings on the main screen"

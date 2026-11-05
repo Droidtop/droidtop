@@ -5458,7 +5458,15 @@ droidtop 0.2.0-dev.1931).
   they cannot differ. Below it, folded: Display and Sound (the Quick Menu's Display and Audio sections), Power
   (performance mode), Storage (free and total) and Privacy (Android's privacy dashboard,
   `REVIEW_PERMISSION_USAGE`, else its Privacy settings). Connections and Accessibility join when their slices
-  land. **The one slider row** (`CompanionSliderRow`, Droidtop/tracker#786 S2a, decided 2026-10-30): the name and
+  land. **Every row kind (Droidtop/tracker#786 S2a2).** The host draws every catalog item, no longer
+  leaving out the ones it had no touch form for: a text field (`TextInputItem`) opens the shared editor
+  (`TextEditPanel`, the body of Gaming's `TextEditDialog`) in place of the list, since a dialog window cannot open
+  over a Presentation; a folder or document (`FolderPickItem`, `DocumentPickItem`) opens the system's picker
+  through the one `rememberCatalogPickers` Gaming's Settings uses too, its line on the row while it works, and a
+  document that asks first asks with the companion's ask card; a screen of Android's or another app's
+  (`SubScreenItem`) opens there. A picker needs an activity to answer it: where the companion is a Presentation on
+  the second screen there is none, and the row says to choose it from droidtop's Settings on the main screen.
+  Group titles and a screen's live updates are the next slice. **The one slider row** (`CompanionSliderRow`, Droidtop/tracker#786 S2a, decided 2026-10-30): the name and
   the value on one line, then a drawn track with a step button at each end (a catalog slider's step is the Quick
   Menu's, `QuickTiles.sliderStep`). A finger drags or taps the track; the value moves at once and the write goes
   through `LatestWrites` (tested), one background queue where only the newest write per control waits, so a drag asks
