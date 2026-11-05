@@ -55,7 +55,7 @@ object KeyboardAppearance {
     @JvmStatic
     fun current(context: Context): Int = resolve(storedTheme(context), isLight(context))
 
-    /** Material dark, for a keyboard with no host colours (the standalone app). */
+    /** HKR's own dark (#903 H2), for a keyboard with no host colours, and in the input method. */
     val DARK = KeyboardColors(
         ground = Color.rgb(32, 33, 36),
         panel = Color.rgb(41, 42, 45),
@@ -66,12 +66,12 @@ object KeyboardAppearance {
         accent = Color.rgb(26, 115, 232),
     )
 
-    /** Material light, for a keyboard with no host colours. */
+    /** HKR's own light: white keys on a light grey ground (#903 H2), for a keyboard with no host colours. */
     val LIGHT = KeyboardColors(
-        ground = Color.rgb(241, 243, 244),
+        ground = Color.rgb(232, 234, 237),
         panel = Color.WHITE,
-        key = Color.rgb(218, 220, 224),
-        keyFocused = Color.rgb(189, 193, 198),
+        key = Color.WHITE,
+        keyFocused = Color.rgb(200, 204, 209),
         text = Color.rgb(32, 33, 36),
         muted = Color.rgb(95, 99, 104),
         accent = Color.rgb(26, 115, 232),
@@ -81,11 +81,28 @@ object KeyboardAppearance {
     @JvmStatic
     fun lightPanels(drawn: Int): Boolean = drawn == MATERIAL_LIGHT
 
-    /** The keyboard's colours now: the host's for this light or dark, else [LIGHT] or [DARK]. */
+    /**
+     * The keyboard's colours now, for what is drawn in [context] (Droidtop/tracker#903 H2, the theme seam). Inside the
+     * input method, Hacker Keyboard Reborn's own [LIGHT] or [DARK]: HKR has a look of its own wherever it types. In a
+     * keyboard the host embeds (droidtop's in-window, companion and overlay keyboards), the host's colours for this
+     * light or dark, so it matches the screen around it; else the same built-in ones.
+     */
     @JvmStatic
     fun colors(context: Context): KeyboardColors {
         val light = lightPanels(current(context))
-        return host?.let { logged("host colours not read") { it.colors(context, light) }.getOrNull() } ?: if (light) LIGHT else DARK
+        val hosted = if (drawnByInputMethod(context)) null else host
+        return hosted?.let { logged("host colours not read") { it.colors(context, light) }.getOrNull() } ?: if (light) LIGHT else DARK
+    }
+
+    /** Whether [context] is the input method's (its service, or a wrapper around it), not a host's own window. */
+    @JvmStatic
+    fun drawnByInputMethod(context: Context): Boolean {
+        var c: Context? = context
+        while (c != null) {
+            if (c is android.inputmethodservice.InputMethodService) return true
+            c = (c as? android.content.ContextWrapper)?.baseContext
+        }
+        return false
     }
 }
 

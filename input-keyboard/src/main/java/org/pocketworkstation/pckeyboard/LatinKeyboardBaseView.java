@@ -196,6 +196,10 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
     private int mShadowColor;
     private float mShadowRadius;
     private Drawable mKeyBackground;
+    /** droidtop patch (Droidtop/tracker#903 H2): the colours keys are drawn as plates in, or null for the theme's drawing. */
+    private KeyboardColors mPlates;
+    private final Paint mPlatePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final android.graphics.RectF mPlateRect = new android.graphics.RectF();
     private int mBackgroundAlpha;
     private float mBackgroundDimAmount;
     private float mKeyHysteresisDistance;
@@ -678,6 +682,9 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
             tracker.setKeyboard(mKeys, mKeyHysteresisDistance);
         }
         mLabelScale = LatinIME.sKeyboardSettings.labelScalePref;
+        // droidtop patch (Droidtop/tracker#903 H2): HKR's modern plates, or the theme's drawing (KeyPlates.colorsFor).
+        mPlates = KeyPlates.colorsFor(getContext());
+        if (mPlates != null) setBackgroundColor(mPlates.getGround());
         //if (keyboard.mLayoutRows >= 4) mLabelScale *= 5.0f / keyboard.mLayoutRows;
         requestLayout();
         // Hint to reallocate the buffer if the size changed
@@ -999,6 +1006,21 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         }
     }
 
+    /**
+     * droidtop patch (Droidtop/tracker#903 H2): one key as a flat rounded plate, in the canvas already moved to the
+     * key's corner. The colour is {@link KeyPlates#plateColor}: function keys a shade apart, a latched modifier lit, a
+     * pressed key in the focused shade.
+     */
+    private void drawPlate(Canvas canvas, Key key) {
+        final float density = getResources().getDisplayMetrics().density;
+        final float inset = KeyPlates.INSET_DP * density;
+        final float radius = KeyPlates.RADIUS_DP * density;
+        final boolean functional = KeyPlates.functional(key.codes, key.label, key.icon != null, key.modifier, key.sticky);
+        mPlatePaint.setColor(KeyPlates.plateColor(mPlates, functional, key.pressed, key.on));
+        mPlateRect.set(inset, inset, key.width - inset, key.height - inset);
+        canvas.drawRoundRect(mPlateRect, radius, radius, mPlatePaint);
+    }
+
     private void onBufferDraw(Canvas canvas) {
         //Log.i(TAG, "onBufferDraw called");
         if (/*mBuffer == null ||*/ mKeyboardChanged) {
@@ -1023,7 +1045,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
 
         final Paint paint = mPaint;
         final Paint paintHint = mPaintHint;
-        paintHint.setColor(mKeyHintColor);
+        paintHint.setColor(mPlates != null ? mPlates.getMuted() : mKeyHintColor);
         final Drawable keyBackground = mKeyBackground;
         final Rect clipRegion = mClipRegion;
         final Rect padding = mPadding;
@@ -1034,7 +1056,10 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
 
         ColorFilter iconColorFilter = null;
         ColorFilter shadowColorFilter = null;
-        if (mInvertSymbols) {
+        if (mPlates != null) {
+            // Plates: icons in the label colour, no shadow (HKR's flat look, #903 H2).
+            iconColorFilter = new PorterDuffColorFilter(mPlates.getText(), PorterDuff.Mode.SRC_ATOP);
+        } else if (mInvertSymbols) {
             iconColorFilter = mInvertingColorFilter;
         } else if (mRecolorSymbols) {
             // TODO: cache these?
@@ -1088,7 +1113,7 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
                 continue;
             }
             keysDrawn++;
-            paint.setColor(key.isCursor ? mKeyCursorColor : mKeyTextColor);
+            paint.setColor(key.isCursor ? mKeyCursorColor : (mPlates != null ? mPlates.getText() : mKeyTextColor));
 
             int[] drawableState = key.getCurrentDrawableState();
             keyBackground.setState(drawableState);
@@ -1108,15 +1133,19 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
                 }
             }
             canvas.translate(key.x + kbdPaddingLeft, key.y + kbdPaddingTop);
-            if (yscale != 1.0f) {
-                canvas.save();
-                canvas.scale(1.0f, yscale);
+            if (mPlates != null) {
+                drawPlate(canvas, key);
+            } else {
+                if (yscale != 1.0f) {
+                    canvas.save();
+                    canvas.scale(1.0f, yscale);
+                }
+                if (mBackgroundAlpha != 255) {
+                    keyBackground.setAlpha(mBackgroundAlpha);
+                }
+                keyBackground.draw(canvas);
+                if (yscale != 1.0f)  canvas.restore();
             }
-            if (mBackgroundAlpha != 255) {
-                keyBackground.setAlpha(mBackgroundAlpha);
-            }
-            keyBackground.draw(canvas);
-            if (yscale != 1.0f)  canvas.restore();
 
             boolean shouldDrawIcon = true;
             if (label != null) {
@@ -1135,8 +1164,8 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
 
                 final int labelHeight = getLabelHeight(paint, labelSize);
 
-                // Draw a drop shadow for the text
-                paint.setShadowLayer(mShadowRadius, 0, 0, mShadowColor);
+                // Draw a drop shadow for the text (none on HKR's flat plates, #903 H2)
+                paint.setShadowLayer(mPlates != null ? 0 : mShadowRadius, 0, 0, mShadowColor);
 
                 // Draw hint label (if present) behind the main key
                 String hint = key.getHintLabel(showHints7Bit(), showHintsAll());
