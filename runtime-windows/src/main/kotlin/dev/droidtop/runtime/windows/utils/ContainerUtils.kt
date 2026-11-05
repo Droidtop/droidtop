@@ -45,6 +45,15 @@ object ContainerUtils {
     const val WRAPPER_ADRENO_8ELITE = "Turnip Gen8 V30"
     const val WRAPPER_ADRENO_A12 = "Turnip v26.1.0 A12 Fix"
 
+    /**
+     * The Wine new containers get: droidtop's own builds (Droidtop/proton-wine-tux, catalog source "droidtop"),
+     * whose patches let a game load from shared storage and SD cards. Owner, relayed 2026-11-04
+     * (Droidtop/tracker#857): proton-wine-tux 11.0-2 is the default for new containers, after a console check of
+     * a game on internal storage and one on an SD card. Existing containers keep the Wine they have.
+     */
+    const val DEFAULT_WINE_ARM64EC = "proton-11.0-2-arm64ec-1"
+    const val DEFAULT_WINE_X86_64 = "proton-11.0-2-x86_64-1"
+
     val wrapperDriverDefaults: List<String> =
         listOf(WRAPPER_TURNIP_CAPABLE, WRAPPER_ADRENO_8ELITE_GEN5, WRAPPER_ADRENO_8ELITE, WRAPPER_ADRENO_A12)
 
@@ -53,7 +62,7 @@ object ContainerUtils {
         // arm64ec build is ARM code and cannot run there, and none of the Adreno
         // or Wrapper drivers below exist for x86. Software Vulkan is the one
         // Vulkan driver every x86_64 device can load (X86_64Graphics).
-        // The Wine is Proton 10 (upstream's arm64 default is Proton 10 too):
+        // The Wine is Proton 10 or later, here proton-wine-tux 11.0-2:
         // GameNative's x86_64 Android builds fix Wine's address space at 39
         // bits for box64 (proton-wine android/patches/x86_64/
         // dlls_ntdll_unix_virtual_c.patch), and Proton 9's ntdll then sizes its
@@ -62,7 +71,7 @@ object ContainerUtils {
         // sizes it from the host's real limit (get_host_addr_space_limit).
         if (X86_64GuestLibs.isX86_64Host()) {
             DefaultVersion.VARIANT = Container.BIONIC
-            DefaultVersion.WINE_VERSION = "proton-10.0-4-x86_64-1"
+            DefaultVersion.WINE_VERSION = DEFAULT_WINE_X86_64
             DefaultVersion.DEFAULT_GRAPHICS_DRIVER = X86_64Graphics.LAVAPIPE
             DefaultVersion.DXVK = "2.6.1-gplasync"
             DefaultVersion.VKD3D = "2.14.1"
@@ -74,7 +83,7 @@ object ContainerUtils {
         // Override default driver and DXVK version based on Turnip capability
         if (GPUInformation.isTurnipCapable(context)) {
             DefaultVersion.VARIANT = Container.BIONIC
-            DefaultVersion.WINE_VERSION = "proton-10.0-arm64ec-2"
+            DefaultVersion.WINE_VERSION = DEFAULT_WINE_ARM64EC
             DefaultVersion.DEFAULT_GRAPHICS_DRIVER = "Wrapper"
             DefaultVersion.DXVK = if (GPUInformation.isAdreno6xx(context)) "1.11.1-sarek" else "2.4.1-gplasync"
             DefaultVersion.VKD3D = "2.14.1"
@@ -83,7 +92,7 @@ object ContainerUtils {
             DefaultVersion.ASYNC_CACHE = "1"
         } else if (GPUInformation.isAdrenoA12(context)) {
             DefaultVersion.VARIANT = Container.BIONIC
-            DefaultVersion.WINE_VERSION = "proton-10.0-arm64ec-2"
+            DefaultVersion.WINE_VERSION = DEFAULT_WINE_ARM64EC
             DefaultVersion.DEFAULT_GRAPHICS_DRIVER = "Wrapper"
             DefaultVersion.DXVK = "2.4.1-gplasync"
             DefaultVersion.VKD3D = "2.14.1"
@@ -92,7 +101,7 @@ object ContainerUtils {
             DefaultVersion.ASYNC_CACHE = "1"
         } else if (GPUInformation.isAdreno8EliteGen5(context)) {
             DefaultVersion.VARIANT = Container.BIONIC
-            DefaultVersion.WINE_VERSION = "proton-10.0-arm64ec-2"
+            DefaultVersion.WINE_VERSION = DEFAULT_WINE_ARM64EC
             DefaultVersion.DEFAULT_GRAPHICS_DRIVER = "Wrapper"
             DefaultVersion.DXVK = "2.4.1-gplasync"
             DefaultVersion.VKD3D = "2.14.1"
@@ -101,7 +110,7 @@ object ContainerUtils {
             DefaultVersion.ASYNC_CACHE = "1"
         } else if (GPUInformation.isAdreno8Elite(context)) {
             DefaultVersion.VARIANT = Container.BIONIC
-            DefaultVersion.WINE_VERSION = "proton-10.0-arm64ec-2"
+            DefaultVersion.WINE_VERSION = DEFAULT_WINE_ARM64EC
             DefaultVersion.DEFAULT_GRAPHICS_DRIVER = "Wrapper"
             DefaultVersion.DXVK = "2.4.1-gplasync"
             DefaultVersion.VKD3D = "2.14.1"
@@ -110,7 +119,7 @@ object ContainerUtils {
             DefaultVersion.ASYNC_CACHE = "1"
         } else {
             DefaultVersion.VARIANT = Container.BIONIC
-            DefaultVersion.WINE_VERSION = "proton-10.0-arm64ec-2"
+            DefaultVersion.WINE_VERSION = DEFAULT_WINE_ARM64EC
             DefaultVersion.DEFAULT_GRAPHICS_DRIVER =
                 if (GPUInformation.isAdrenoGPU(context)) "Wrapper" else "Wrapper-gamenative"
             DefaultVersion.DXVK = "async-1.10.3"
