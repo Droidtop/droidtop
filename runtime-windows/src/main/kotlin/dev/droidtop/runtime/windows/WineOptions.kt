@@ -140,13 +140,17 @@ object WineOptions {
      */
     private val gameRoots = java.util.concurrent.ConcurrentHashMap<String, String>()
 
+    /** The "Prefix" row (docs/SPEC.md 5a "Per-game prefixes", piece 1; Droidtop/tracker#584): which managed prefix a game runs in. */
+    const val PREFIX = "wine_prefix"
+    private const val PREFIX_NEW = "droidtop:new-prefix"
+
     /** The container field the game's gestures are laid over at launch (`Container.LAUNCH_OVERRIDE_KEYS`). */
     const val GESTURE_OVERRIDE = "gestureConfig"
     private const val STEAMWORKS_ON = "on"
     private const val STEAMWORKS_OFF = "off"
 
     /** A game's choices that are not prefix settings: kept when its Wine choices change or are dropped. */
-    private val OWN_KEYS = setOf(LSFG_KEY, STEAMWORKS_KEY, STEAMWORKS_APPID_KEY, CACHE_KEY, PREPARED_KEY)
+    private val OWN_KEYS = setOf(LSFG_KEY, STEAMWORKS_KEY, STEAMWORKS_APPID_KEY, CACHE_KEY, PREPARED_KEY, PcContainers.PREFIX_KEY)
 
     /**
      * Where the choices made before Set up Windows games are kept (in [WineGameOptionsPrefs], under a name no
@@ -213,7 +217,8 @@ object WineOptions {
      * generation and Steamworks. Disk work.
      */
     private suspend fun gameRows(context: Context, entryId: String?, gameRoot: String?): List<WineOptionRow> =
-        listOf(translationCacheRow(context, entryId)) +
+        listOfNotNull(entryId?.let { prefixRow(context, it) }) +
+            listOf(translationCacheRow(context, entryId)) +
             (if (entryId != null && gameRoot != null) listOf(prepareRow(context, entryId, gameRoot)) else emptyList()) +
             if (entryId == null) emptyList() else listOf(lsfgRow(context, entryId)) + steamworksRows(context, entryId, gameRoot?.let(::File))
 
@@ -265,6 +270,36 @@ object WineOptions {
     internal fun recordPrepared(context: Context, entryId: String, bytes: Long, executable: File) {
         val stored = WineGameOptionsPrefs.get(context, entryId) - PREPARED_KEY
         WineGameOptionsPrefs.set(context, entryId, stored + (PREPARED_KEY to "$bytes|${System.currentTimeMillis()}|${stampOf(executable)}"))
+    }
+
+    /**
+     * Which managed prefix [entryId] runs in: every prefix on the device ("Shared" for the shared one) and, while the
+     * game has none of its own, "New prefix for this game". Picking another entry is the way back from a prefix of
+     * its own; that prefix stays on the device (nothing is deleted by a choice, SPEC 5a piece 2). Null before setup.
+     */
+    private fun prefixRow(context: Context, entryId: String): WineOptionRow? {
+        val containers = runCatching { ContainerManager(context).containers }.getOrNull().orEmpty()
+        val current = PcContainers.forGame(context, entryId)?.id ?: return null
+        if (containers.isEmpty()) return null
+        val own = PcContainers.ownIdOf(entryId)
+        val choices = containers.map { c -> WineOptionChoice(c.id, prefixLabel(c, own)) } +
+            if (containers.none { it.id == own }) listOf(WineOptionChoice(PREFIX_NEW, "New prefix for this game")) else emptyList()
+        return WineOptionRow(
+            PREFIX, "Prefix",
+            "The Windows installation this game runs in, with its own Wine build, settings and saves. Another one runs the " +
+                "game on that one's Wine build; its saves so far stay where they are.",
+            current, choices,
+            ownChoice = PcContainers.chosenId(context, entryId) != null,
+        )
+    }
+
+    private fun prefixLabel(container: Container, ownId: String): String {
+        val name = container.name?.takeIf { it.isNotBlank() } ?: container.id
+        return when (container.id) {
+            DroidtopPcGameRuntime.CONTAINER_ID -> "Shared"
+            ownId -> "$name (this game's own)"
+            else -> name
+        } + " · " + container.wineVersion.orEmpty()
     }
 
     /** Whether [entryId]'s own choice leaves its translation cache on (the setting for every game is [TranslationCache.enabled]). */
@@ -369,6 +404,20 @@ object WineOptions {
                     val root = gameRoots[entryId]
                     if (value != PREPARE_IDLE && root != null) {
                         PrepareFirstLaunchJob.start(app, entryId, title ?: entryId, root, onBattery = value == PREPARE_ON_BATTERY)
+                    }
+                    return@runCatching
+                }
+                if (rowId == PREFIX && entryId != null) {
+                    if (value == PREFIX_NEW) {
+                        // A new prefix for the game, made from the settings it runs with now; its choices over the
+                        // old prefix become the new one's own settings.
+                        val container = PcContainers.forGame(app, entryId) ?: return@runCatching
+                        val data = ContainerUtils.toContainerData(container)
+                        val settings = WineOptionPlan.merge(read(data), gameChoices(app, entryId))
+                        PcContainers.createOwn(app, entryId, title ?: entryId, write(data, settings))
+                        setWineChoices(app, entryId, emptyMap())
+                    } else {
+                        PcContainers.choose(app, entryId, value)
                     }
                     return@runCatching
                 }

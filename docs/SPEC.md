@@ -7569,8 +7569,22 @@ source (now `:runtime-windows`, §9):
 
 ### Per-game prefixes, the way back, and what a game can reach (decided 2026-10-22, Droidtop/tracker#584)
 
-Design only; nothing in this subsection is built. Built state stays as the
-bullets above describe it until each part lands. The mechanism is 5b
+Design, built in slices. **Built (2026-11-05, Droidtop/tracker#584,
+`ci/managed-prefixes`): the per-game choice of piece 1.** A game's Wine
+settings have a "Prefix" row: every prefix on the device ("Shared" for the
+shared one, others by name, each with its Wine build) and, while the game has
+none of its own, "New prefix for this game". The choice is the game's stored
+prefix id (`PcContainers.PREFIX_KEY` in `WineGameOptionsPrefs`, kept across
+Wine changes). `PcContainers.forGame` reads it first, when that prefix still
+exists, then falls back to the rule below (own, else the first). So a game
+with no choice runs exactly as before. Picking "Shared" is the way back from
+a prefix of its own. The own prefix stays on the device, since nothing is
+deleted by a choice. A new prefix (the row, or a different Wine build) is
+made from the settings the game runs with now (`PcContainers.createOwn`) and
+recorded as the choice. Not built yet: the confirmation's "Copy this game's
+saves", the Prefixes list with "Not used" and Remove, copy-on-write and layer
+prefixes, and pieces 3 to 7. Built state of the rest stays as the bullets
+above describe it until each part lands. The mechanism is 5b
 "Containment and copy-on-write layers for Wine"; the library side is the
 sandbox library's `docs/design.md`, "Layers, containment, and Wine and proot
 under the broker".

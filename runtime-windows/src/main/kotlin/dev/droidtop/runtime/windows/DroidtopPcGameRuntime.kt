@@ -18,6 +18,7 @@ import dev.droidtop.library.PcPrefixState
 import dev.droidtop.library.GameLanguage
 import dev.droidtop.library.GameLaunchOptions
 import dev.droidtop.library.PcProvisionResult
+import dev.droidtop.library.WineGameOptionsPrefs
 import dev.droidtop.library.WineGameSettingsPrefs
 import dev.droidtop.library.WindowsLaunchResolver
 import dev.droidtop.library.lutris.DllOverrides
@@ -706,6 +707,12 @@ object PcContainers {
         entryId?.takeIf { it.startsWith(BY_CONTAINER) }?.let { token ->
             return runCatching { manager.getContainerById(token.removePrefix(BY_CONTAINER)) }.getOrNull()
         }
+        // The managed prefix the person chose for the game (docs/SPEC.md 5a "Per-game prefixes", piece 1;
+        // Droidtop/tracker#584), when it still exists; otherwise the rule below, as before any choice.
+        val chosen = entryId?.let { chosenId(context, it) }
+        if (chosen != null && runCatching { manager.hasContainer(chosen) }.getOrDefault(false)) {
+            return runCatching { manager.getContainerById(chosen) }.getOrNull()
+        }
         val perGame = entryId?.let { ownId(it) }
         if (perGame != null && runCatching { manager.hasContainer(perGame) }.getOrDefault(false)) {
             return runCatching { manager.getContainerById(perGame) }.getOrNull()
@@ -715,6 +722,20 @@ object PcContainers {
     }
 
     private const val BY_CONTAINER = "container:"
+
+    /** Where a game's chosen prefix is kept, among its own choices ([WineGameOptionsPrefs]; WineOptions keeps it). */
+    internal const val PREFIX_KEY = "prefix"
+
+    /** The prefix id [entryId] runs in by the person's choice, or null when it has made none. Preferences read. */
+    fun chosenId(context: Context, entryId: String): String? = WineGameOptionsPrefs.get(context, entryId)[PREFIX_KEY]
+
+    /** Makes [entryId] run in the prefix [containerId] from its next launch. Preferences write. */
+    fun choose(context: Context, entryId: String, containerId: String) {
+        WineGameOptionsPrefs.set(context, entryId, WineGameOptionsPrefs.get(context, entryId) + (PREFIX_KEY to containerId))
+    }
+
+    /** The id [entryId]'s own prefix has, or would have once made. */
+    fun ownIdOf(entryId: String): String = ownId(entryId)
 
     /** What [forGame] takes in place of an entry id to open the prefix with this container [id]. */
     fun ofContainer(id: String): String = BY_CONTAINER + id
@@ -735,7 +756,8 @@ object PcContainers {
      * never on the main thread.
      */
     suspend fun createOwn(context: Context, entryId: String, title: String, settings: ContainerData): Container =
-        createNamed(context, ownId(entryId), title, settings)
+        // The game then runs in it: recorded as its choice, which forGame reads first.
+        createNamed(context, ownId(entryId), title, settings).also { choose(context, entryId, it.id) }
 
     /**
      * A container with this [id], named [title], made with [settings]: [createOwn] for a game's id, and
