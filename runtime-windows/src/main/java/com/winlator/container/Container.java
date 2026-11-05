@@ -269,7 +269,9 @@ public class Container {
         "gestureConfig",
         // droidtop: a game's own wide storage grants (WineStorageGrants, Droidtop/tracker#584).
         dev.droidtop.runtime.windows.WineStorageGrants.DEVICE_SYSTEM, dev.droidtop.runtime.windows.WineStorageGrants.ALL_STORAGE,
-        dev.droidtop.runtime.windows.WineStorageGrants.GAME_FOLDER);
+        dev.droidtop.runtime.windows.WineStorageGrants.GAME_FOLDER,
+        // droidtop: a game's own allocator (WineAllocator, Droidtop/tracker#894).
+        dev.droidtop.runtime.windows.WineAllocator.KEY);
     private final java.util.Map<String, String> launchOverrides = new java.util.HashMap<>();
 
     public void setLaunchOverrides(java.util.Map<String, String> overrides) {

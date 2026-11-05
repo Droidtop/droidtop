@@ -17,7 +17,12 @@ dynamic symbol is defined by a library its DT_NEEDED closure can reach:
 Several APK libraries can share a SONAME; all of them count, so the check proves "some match defines it", not
 which one wins at run time.
 
+A library whose whole job is to define symbols for another process names them with --exports lib.so:sym,sym. Each ABI's
+copy must be in the APK and export every one of them. The preloaded allocator (libmimalloc.so, Droidtop/tracker#894)
+does nothing if a build hides its malloc and free, and a missing import is not how that would show.
+
 Usage: check-native-links.py <unzipped APK root, holding lib/<abi>/> <NDK sysroot> [--api N] [--other-process lib.so]...
+       [--exports lib.so:sym,sym]...
 Exit 1 with a list of library: symbol pairs when anything is missing.
 """
 import argparse
@@ -80,6 +85,21 @@ def stubs_for(sysroot, abi, api):
     return found
 
 
+def check_exports(root, abi, exports):
+    problems = []
+    for spec in exports:
+        name, _, symbols = spec.partition(":")
+        path = os.path.join(root, "lib", abi, name)
+        if not os.path.isfile(path):
+            problems.append(f"{abi}/{name}: not in the APK")
+            continue
+        defined = Lib(path).defined
+        for sym in symbols.split(","):
+            if sym and sym not in defined:
+                problems.append(f"{abi}/{name}: does not export {sym}")
+    return problems
+
+
 def check_abi(root, abi, sysroot, api, other):
     libdir = os.path.join(root, "lib", abi)
     apk = [Lib(os.path.join(libdir, f)) for f in sorted(os.listdir(libdir)) if f.endswith(".so")]
@@ -126,6 +146,7 @@ def main():
     parser.add_argument("sysroot")
     parser.add_argument("--api", type=int, default=35)
     parser.add_argument("--other-process", action="append", default=[])
+    parser.add_argument("--exports", action="append", default=[])
     args = parser.parse_args()
     abis = [a for a in sorted(os.listdir(os.path.join(args.root, "lib"))) if a in TRIPLES]
     if not abis:
@@ -134,7 +155,7 @@ def main():
     for abi in abis:
         count, p, n = check_abi(args.root, abi, args.sysroot, args.api, set(args.other_process))
         total += count
-        problems += p
+        problems += p + check_exports(args.root, abi, args.exports)
         notes += n
     for line in notes:
         print("note (loaded into another process): " + line)

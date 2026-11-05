@@ -23136,6 +23136,21 @@ console). `WineMediaConverter`, at each launch, sets all six as Proton does: the
 folder, kept in droidtop's assets and unpacked once into `files/mediaconv`). A prefix's or game's own value wins.
 GameNative sets these only behind a per-container switch that is off by default, with paths under its own package.
 
+### The allocator a game's Wine uses (built 2026-11-05, Droidtop/tracker#894, owner approved)
+
+Bionic's allocator, Scudo, gives each small size class a fixed 256 MB region in a process. LLVM compiling DXVK's
+pipelines inside Lavapipe fills the 32 KB and 64 KB classes, and Scudo then fails the allocation ("Scudo OOM: The
+process has exhausted 256M for size class N") however much memory the device has left (seen with Slime Rancher on
+BlueStacks). The owner approved an opt-in, per-game replacement (2026-11-05): a game's Wine settings have a "Memory
+allocator" row, Android's by default, that can choose mimalloc. `WineAllocator` then puts `libmimalloc.so` first on the
+game's Wine processes' LD_PRELOAD, so its `malloc` and `free` come before bionic's. It is built from `vendor/mimalloc`
+(microsoft/mimalloc v2.2.7, MIT) by `runtime-windows/native/CMakeLists.txt` for both ABIs, with native ELF TLS, so it is
+offered from Android 10 (API 29) only; older devices see the row without a choice. The risk is two allocators in one
+process: a pointer one allocated reaching the other's `free` crashes the game. It is per game, so a game it breaks is
+the only one affected. The Lavapipe compiler-thread cap (10b) stays as well. Not yet shown on a device, and the
+BlueStacks repro may be plain RAM exhaustion (8 GB), so the rig check records the process's RSS and the system's
+MemAvailable at the failure.
+
 ### Translation cache, precache and mixed-arch running (decided 2026-11-04, Droidtop/tracker#865, #866)
 
 The owner, relayed by the coordinator on 2026-11-04, approved the cache plan in #865 (mixed-architecture running

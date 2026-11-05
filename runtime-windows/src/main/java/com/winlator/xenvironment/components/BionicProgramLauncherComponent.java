@@ -373,6 +373,10 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         // person's own Lossless Scaling is installed in droidtop's Steam.
         LsfgVkManager.applyLaunchEnv(context, container, envVars);
 
+        // droidtop: mimalloc first on LD_PRELOAD for a game that chose it (Droidtop/tracker#894), after every preload
+        // above, so its malloc comes before bionic's Scudo.
+        dev.droidtop.runtime.windows.WineAllocator.applyLaunchEnv(context, container, envVars);
+
         // droidtop: the game's whole tree under the sandbox broker, learning only and behind a Developer menu
         // switch (Droidtop/tracker#584 piece 0). Last, since it puts libsbx_child.so first on the LD_PRELOAD
         // every hook above has finished.

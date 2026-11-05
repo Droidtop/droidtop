@@ -109,6 +109,10 @@ object WineOptions {
     private const val LSFG_KEY = "lsfg"
     private const val LSFG_OFF = "off"
 
+    /** A game's memory allocator (WineAllocator, Droidtop/tracker#894): Android's unless the game chose mimalloc. */
+    const val ALLOCATOR = "wine_allocator"
+    private const val ALLOCATOR_ANDROID = "android"
+
     /**
      * Whether a game starts through the Steamworks shim in its prefix (docs/SPEC.md 5b), and as which Steam
      * app: a game's own choices. Unchosen, a game Steam owns is on and any other is off; the app id is
@@ -158,7 +162,7 @@ object WineOptions {
     /** A game's choices that are not prefix settings: kept when its Wine choices change or are dropped. */
     private val OWN_KEYS = setOf(
         LSFG_KEY, STEAMWORKS_KEY, STEAMWORKS_APPID_KEY, CACHE_KEY, PREPARED_KEY, PcContainers.PREFIX_KEY,
-        WineStorageGrants.DEVICE_SYSTEM, WineStorageGrants.ALL_STORAGE,
+        WineStorageGrants.DEVICE_SYSTEM, WineStorageGrants.ALL_STORAGE, WineAllocator.KEY,
     )
 
     /**
@@ -230,7 +234,7 @@ object WineOptions {
             listOf(translationCacheRow(context, entryId)) +
             grantRows(context, entryId) +
             (if (entryId != null && gameRoot != null) listOf(prepareRow(context, entryId, gameRoot)) else emptyList()) +
-            if (entryId == null) emptyList() else listOf(lsfgRow(context, entryId)) + steamworksRows(context, entryId, gameRoot?.let(::File))
+            if (entryId == null) emptyList() else listOf(lsfgRow(context, entryId), allocatorRow(context, entryId)) + steamworksRows(context, entryId, gameRoot?.let(::File))
 
     /**
      * "Prepare for first launch": starts the game out of sight once so its first real start is faster. The summary says
@@ -500,6 +504,11 @@ object WineOptions {
                     WineGameOptionsPrefs.set(app, entryId, if (value == LSFG_OFF) stored else stored + (LSFG_KEY to value))
                     return@runCatching
                 }
+                if (rowId == ALLOCATOR && entryId != null) {
+                    val stored = WineGameOptionsPrefs.get(app, entryId) - WineAllocator.KEY
+                    WineGameOptionsPrefs.set(app, entryId, if (value == WineAllocator.MIMALLOC) stored + (WineAllocator.KEY to value) else stored)
+                    return@runCatching
+                }
                 if (rowId.startsWith(WineGestures.ROW_PREFIX) && entryId != null) {
                     val stored = WineGameOptionsPrefs.get(app, entryId) - GESTURES_KEY
                     val next = WineGestures.apply(gestures(app, entryId), rowId, value)
@@ -656,7 +665,33 @@ object WineOptions {
      */
     fun launchOverrides(context: Context, entryId: String?, container: Container): Map<String, String> =
         wineOverrides(context, entryId, container) + lsfgOverrides(context, entryId) + gestureOverrides(context, entryId) +
-            grantOverrides(context, entryId)
+            grantOverrides(context, entryId) + allocatorOverrides(context, entryId)
+
+    /**
+     * The memory allocator row of [entryId] (WineAllocator): Android's unless the game chose mimalloc, and no choice
+     * on a device older than Android 10, where the preload cannot load.
+     */
+    private fun allocatorRow(context: Context, entryId: String): WineOptionRow {
+        val title = "Memory allocator"
+        if (!WineAllocator.supported()) {
+            return WineOptionRow(ALLOCATOR, title, "Android's. mimalloc needs Android 10 or later.", ALLOCATOR_ANDROID, emptyList())
+        }
+        val chosen = WineGameOptionsPrefs.get(context, entryId)[WineAllocator.KEY]
+        return WineOptionRow(
+            ALLOCATOR, title,
+            "mimalloc can help a game that quits with \"Scudo OOM\" in its log. It is new here: if the game crashes " +
+                "with it, set this back to Android's. Only this game is affected.",
+            if (chosen == WineAllocator.MIMALLOC) WineAllocator.MIMALLOC else ALLOCATOR_ANDROID,
+            listOf(WineOptionChoice(ALLOCATOR_ANDROID, "Android's"), WineOptionChoice(WineAllocator.MIMALLOC, "mimalloc")),
+            ownChoice = chosen != null,
+        )
+    }
+
+    /** mimalloc for [entryId]'s launch, when the game chose it. */
+    private fun allocatorOverrides(context: Context, entryId: String?): Map<String, String> {
+        val chosen = entryId?.let { WineGameOptionsPrefs.get(context, it)[WineAllocator.KEY] } ?: return emptyMap()
+        return if (chosen == WineAllocator.MIMALLOC) mapOf(WineAllocator.KEY to chosen) else emptyMap()
+    }
 
     /** The game's own wide grants (WineStorageGrants), when it has allowed one. */
     private fun grantOverrides(context: Context, entryId: String?): Map<String, String> {

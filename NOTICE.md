@@ -123,6 +123,9 @@ This project is distributed under the GNU General Public License v3.0 (see
   `third_party/sdl_controller_list/gen_sdl_controller_families.py` from SDL's `src/joystick/controller_list.h`
   (Copyright (C) Valve Corporation, zlib), and its `PadFamilies.classify` follows
   `SDL_GetJoystickGameControllerTypeFromVIDPID` (`src/joystick/SDL_joystick.c`, zlib).
+- **mimalloc** — `vendor/mimalloc` (v2.2.7), https://github.com/microsoft/mimalloc — MIT,
+  Copyright (c) 2018-2025 Microsoft Corporation, Daan Leijen. Built into `libmimalloc.so` for both ABIs, the allocator
+  a game can choose for its Wine processes (docs/SPEC.md 9, "The allocator a game's Wine uses").
 - **libffi** — `vendor/libffi`, https://github.com/libffi/libffi — MIT.
   Runtime dependency of `libwayland-client`, cross-compiled by
   `build-scripts/build-vendor-deps.sh`.

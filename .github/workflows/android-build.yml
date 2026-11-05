@@ -241,7 +241,8 @@ jobs:
         # NDK's platform libraries (scripts/check-native-links.py). Release
         # 2967 shipped a libwinlator_11.so without the functions
         # libvortekrenderer.so imports, and every vortek game crashed at its
-        # first frame (Droidtop/tracker#857).
+        # first frame (Droidtop/tracker#857). The allocator a game can preload
+        # must export what it replaces (Droidtop/tracker#894).
         if: ${{ !cancelled() }}
         run: |
           apk_dir="$RUNNER_TEMP/apk-libs"
@@ -249,7 +250,8 @@ jobs:
           unzip -q -o app/build/outputs/apk/release/app-universal-release.apk 'lib/*' -d "$apk_dir"
           ndk_bin="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64"
           READELF="$ndk_bin/bin/llvm-readelf" python3 scripts/check-native-links.py \
-            "$apk_dir" "$ndk_bin/sysroot"
+            "$apk_dir" "$ndk_bin/sysroot" \
+            --exports libmimalloc.so:malloc,free,calloc,realloc,posix_memalign,memalign,malloc_usable_size
 
       - name: ABI sets (arm64-v8a libraries without an x86_64 build)
         # The fat APK installs as x86_64 on an Android-x86 device with ARM

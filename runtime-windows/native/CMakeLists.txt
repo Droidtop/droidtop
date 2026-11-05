@@ -187,3 +187,19 @@ target_include_directories(evshim PRIVATE ${SDL2_HEADERS})
 target_compile_options(evshim PRIVATE -fvisibility=hidden -O3 -Wall -Wextra)
 target_link_libraries(evshim log dl)
 page_16k(evshim)
+
+# libmimalloc: vendor/mimalloc (microsoft/mimalloc v2.2.7, MIT), the allocator a game can choose for its Wine processes
+# instead of bionic's Scudo (docs/SPEC.md 9, "The allocator a game's Wine uses"; Droidtop/tracker#894). WineAllocator
+# puts it first on LD_PRELOAD, so it overrides malloc and friends (MI_MALLOC_OVERRIDE). Built as mimalloc's own
+# single-file build (src/static.c) with the defines and flags its CMakeLists gives a shared, overriding release
+# library, and native ELF TLS (-fno-emulated-tls): emulated TLS allocates through malloc, which is this library.
+# Native TLS needs Android 10, so WineAllocator offers it from API 29 only.
+set(MIMALLOC ${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/mimalloc)
+add_library(mimalloc SHARED ${MIMALLOC}/src/static.c)
+set_target_properties(mimalloc PROPERTIES C_STANDARD 11)
+target_include_directories(mimalloc PRIVATE ${MIMALLOC}/include)
+target_compile_definitions(mimalloc PRIVATE MI_SHARED_LIB MI_SHARED_LIB_EXPORT MI_MALLOC_OVERRIDE MI_DEBUG=0 NDEBUG)
+target_compile_options(mimalloc PRIVATE -O3 -fvisibility=hidden -ftls-model=initial-exec -fno-emulated-tls
+        -fno-builtin-malloc -Wno-unknown-pragmas -Wno-static-in-inline)
+target_link_libraries(mimalloc dl)
+page_16k(mimalloc)
