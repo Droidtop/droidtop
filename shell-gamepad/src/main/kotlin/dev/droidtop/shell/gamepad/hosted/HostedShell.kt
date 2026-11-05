@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.hosted
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import androidx.compose.foundation.background
@@ -596,7 +598,7 @@ fun AppInFrontStandalone(
             rows = listOf(
                 dev.droidtop.shell.gamepad.ActionRow("Resume", "Back to the app; it never stopped") { onResume() },
                 dev.droidtop.shell.gamepad.ActionRow(
-                    title = "Close the app",
+                    title = words(R.string.gamepad_close_the_app),
                     detail = said ?: "Ends it the way the task manager does",
                     danger = true,
                 ) { asking = true },

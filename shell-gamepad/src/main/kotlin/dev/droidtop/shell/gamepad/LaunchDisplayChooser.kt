@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 
@@ -74,7 +75,7 @@ internal fun LaunchDisplayChooserDialog(
         MenuPanel(
             modifier = Modifier.width(window.panelWidth(400.dp)),
             focusLabel = "Launch display chooser",
-            title = "Launch on which screen?",
+            title = words(R.string.gamepad_launch_on_which_screen),
             onPad = { press ->
                 when (press.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> selected = menuMove(selected, count, press)

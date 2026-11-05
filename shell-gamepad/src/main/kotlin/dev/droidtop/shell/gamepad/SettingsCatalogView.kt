@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -64,7 +65,7 @@ internal fun SettingsCatalogView(
  */
 internal fun gamingSettingsRoot(placeScreenIds: Set<String> = emptySet()): CatalogScreen = CatalogScreen(
     id = "gaming_settings",
-    title = "Settings",
+    title = words(R.string.gamepad_settings),
     categoryOrder = GamingSettingsCatalog.CATEGORY_ORDER,
     // Merged first, then filtered: the places Global settings links to (Updates) were merged in after the filter ran,
     // so Settings kept a second Updates (Droidtop/tracker#610).

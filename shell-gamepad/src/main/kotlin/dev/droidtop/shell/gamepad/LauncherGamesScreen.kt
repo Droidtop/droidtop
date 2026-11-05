@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.onPad
@@ -228,7 +229,7 @@ private fun GamesGrid(
             },
     ) {
         MenuHeader(
-            title = "Games",
+            title = words(R.string.gamepad_games),
             subtitle = list?.let { queryCountLine(it.size, total, !query.isEmpty, scope) },
         )
         // The one pill the other lists draw while something filters, cleared by one press.

@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import dev.droidtop.library.controller.FaceRole
 import dev.droidtop.library.controller.LayoutSource
 import dev.droidtop.library.settings.ActionItem
@@ -33,7 +34,7 @@ internal object ControllerLayoutTiles {
         return listOf(
             ActionItem(
                 id = ID_SET,
-                title = "Controller buttons",
+                title = words(R.string.gamepad_controller_buttons),
                 value = summary,
                 icon = CatalogIcon.CONTROLLER,
                 run = { ControllerLayouts.requestCapture() },
@@ -42,8 +43,8 @@ internal object ControllerLayoutTiles {
             // right now, whatever decided it; a switch, not the word (show, then say: Droidtop/tracker#738).
             ActionItem(
                 id = ID_SWAP,
-                title = "Swap A and B",
-                subtitle = "For when the buttons are named wrong",
+                title = words(R.string.gamepad_swap_a_and_b),
+                subtitle = words(R.string.gamepad_for_when_the_buttons_are_named),
                 state = layout.swapped,
                 icon = CatalogIcon.CONTROLLER,
                 run = { ControllerLayouts.swapNow(it) },

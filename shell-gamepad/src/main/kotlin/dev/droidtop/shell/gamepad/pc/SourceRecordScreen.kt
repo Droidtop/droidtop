@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import android.content.Context
 import dev.droidtop.library.GameLinks
 import dev.droidtop.library.GameNaming
@@ -51,7 +53,7 @@ object SourceRecordScreen {
     fun forUpdate(library: (Context) -> Library, entryId: String, title: String): CatalogScreen = CatalogScreen(
         id = ID,
         title = title,
-        subtitle = "Its update",
+        subtitle = words(R.string.gamepad_its_update),
         groups = { context -> groups(context, library(context), entryId) },
         indexGroups = { _ -> emptyList() },
     )
@@ -65,8 +67,8 @@ object SourceRecordScreen {
                     items = listOf(
                         ActionItem(
                             id = "update_record_no_page",
-                            title = "No source page for this update",
-                            subtitle = "The source naming the newer version has no page droidtop can show; see the game's sources",
+                            title = words(R.string.gamepad_no_source_page_for_this_update),
+                            subtitle = words(R.string.gamepad_the_source_naming_the_newer_version),
                         ),
                     ),
                 ),
@@ -115,8 +117,8 @@ object SourceRecordScreen {
             val current = dev.droidtop.library.DownloadLines.picked(offered, picked)
             ChoiceItem(
                 id = "update_record_system",
-                title = "System",
-                subtitle = "Which system's links are listed",
+                title = words(R.string.gamepad_system),
+                subtitle = words(R.string.gamepad_which_system_s_links_are_listed),
                 options = offered.map { ChoiceOption(it, dev.droidtop.library.DownloadLines.label(it)) },
                 current = current,
                 onSelect = { ctx, value ->
@@ -194,7 +196,7 @@ object SourceRecordScreen {
                 inline = CatalogScreen(
                     id = "${id}_hosts",
                     title = row.title,
-                    subtitle = "Pick a host, or try them in order",
+                    subtitle = words(R.string.gamepad_pick_a_host_or_try_them),
                     groups = {
                         listOf(
                             CatalogGroup(

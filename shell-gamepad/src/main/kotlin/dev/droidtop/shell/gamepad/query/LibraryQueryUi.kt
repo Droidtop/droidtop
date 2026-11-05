@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.query
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import dev.droidtop.ui.shared.NoticeCard
 import dev.droidtop.library.settings.NoticePlacement
 import dev.droidtop.library.settings.NoticeTone
@@ -212,11 +214,11 @@ internal fun LibraryFilterSheet(
                 if (!query.isEmpty) add(FilterEntry.Row("Clear filters", danger = true, onClick = { onQueryChange(query.cleared) }))
                 when {
                     editingName != null -> add(
-                        FilterEntry.Row("Save \"$editingName\"", subtitle = "These filters and sort, in the same tab", hint = "Save") { onSaveView(editingName) },
+                        FilterEntry.Row("Save \"$editingName\"", subtitle = words(R.string.gamepad_these_filters_and_sort_in_the), hint = "Save") { onSaveView(editingName) },
                     )
                     onSaveOnly != null -> {
-                        add(FilterEntry.Row("Save as a tab", subtitle = "A tab on the strip, after the others", hint = "Save as a tab") { naming = true })
-                        add(FilterEntry.Row("Save only", subtitle = "Listed with your saved views in Collections", hint = "Save only") { naming = false })
+                        add(FilterEntry.Row("Save as a tab", subtitle = words(R.string.gamepad_a_tab_on_the_strip_after), hint = "Save as a tab") { naming = true })
+                        add(FilterEntry.Row("Save only", subtitle = words(R.string.gamepad_listed_with_your_saved_views_in), hint = "Save only") { naming = false })
                     }
                     else -> add(FilterEntry.Row("Save this view", hint = "Save") { naming = true })
                 }
@@ -256,7 +258,7 @@ internal fun LibraryFilterSheet(
     naming?.let { asTab ->
         TextEditDialog(
             title = if (onSaveOnly == null) "Save this view" else if (asTab) "Save as a tab" else "Save only",
-            subtitle = "Current filters and sort",
+            subtitle = words(R.string.gamepad_current_filters_and_sort),
             initial = query.text.takeIf { it.isNotBlank() } ?: "",
             onCommit = { name ->
                 naming = null
@@ -341,7 +343,7 @@ internal fun LibrarySortSheet(
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
             focusLabel = "Sort by",
-            title = "Sort by",
+            title = words(R.string.gamepad_sort_by),
             hints = listOf(HintBinding(GamepadAction.A, "Sort"), HintBinding(GamepadAction.B, "Close")),
             onPad = { press ->
                 when (press.action) {
@@ -799,12 +801,12 @@ internal fun LibrarySearchDialog(
                     )
                 }
                 state.unavailable.filter { !it.waitingForApproval }.forEach { off ->
-                    add(SearchLine.Entry("off:${off.pluginId}", "${off.label} ${off.reason}", subtitle = "Open its page") { openPlugin(off.pluginId) })
+                    add(SearchLine.Entry("off:${off.pluginId}", "${off.label} ${off.reason}", subtitle = words(R.string.gamepad_open_its_page)) { openPlugin(off.pluginId) })
                 }
                 // A source's own search options (docs/plugin-api.md 1.10, search.filter): its page, then the search again.
                 state.sources.forEach { status ->
                     status.source.filterScreen(context)?.let { options ->
-                        add(SearchLine.Entry("filters:${status.source.id}", "${status.source.label}: search options", subtitle = "Searches again after") { activeCatalog = options })
+                        add(SearchLine.Entry("filters:${status.source.id}", "${status.source.label}: search options", subtitle = words(R.string.gamepad_searches_again_after)) { activeCatalog = options })
                     }
                 }
                 // A failed source is one compact row below the results (docs/SPEC.md 12a, "One search", Droidtop/tracker#746):
@@ -892,7 +894,7 @@ internal fun LibrarySearchDialog(
                 // No source could be asked at all: one line that leads to Plugins (docs/SPEC.md 13, "There is no Get games
                 // sheet"). A source waiting or turned off already has its own row above.
                 GetGamesEntry.noSourceLine(state.sources.size, state.unavailable.size, scoped = systemId != null || sourcePlatform != null)?.let { line ->
-                    add(SearchLine.Entry("no_source", line, subtitle = "Open Plugins") { openPlugin(null) })
+                    add(SearchLine.Entry("no_source", line, subtitle = words(R.string.gamepad_open_plugins)) { openPlugin(null) })
                 }
             }
             statusLine?.let { add(SearchLine.Note(it)) }

@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import dev.droidtop.ui.shared.NoticeCard
 import dev.droidtop.library.settings.NoticePlacement
 import dev.droidtop.library.settings.NoticeTone
@@ -125,7 +127,7 @@ internal fun StoreContentSheet(
     BackHandler { onDismiss() }
     asking?.let { branch ->
         TextEditDialog(
-            title = "Password for ${branch.title}",
+            title = words(R.string.gamepad_password_for_x, branch.title),
             subtitle = null,
             initial = "",
             secret = true,

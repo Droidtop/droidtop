@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -134,7 +135,7 @@ internal suspend fun saveRows(context: Context, entry: LibraryEntry, copies: Lis
     }
     return listOf(
         GameInfoRow(
-            title = "Saves",
+            title = words(R.string.gamepad_saves),
             value = SaveLines.value(report.status, now),
             subtitle = SaveLines.subtitle(report, now, volumes),
             screen = savesScreen(entry, report, now, volumes, copying),
@@ -165,8 +166,8 @@ private fun copyGroups(entry: LibraryEntry, copying: SaveCopying, nowMs: Long, v
         listOf(
             ActionItem(
                 id = "saves_copy_none",
-                title = "No saves found for this copy yet",
-                subtitle = "Play it and save once, so droidtop learns where its saves go; then copy saves here",
+                title = words(R.string.gamepad_no_saves_found_for_this_copy),
+                subtitle = words(R.string.gamepad_play_it_and_save_once_so),
             ),
         )
     } else {
@@ -178,7 +179,7 @@ private fun copyGroups(entry: LibraryEntry, copying: SaveCopying, nowMs: Long, v
             val engine = SaveCopies.sameEngine(copy, entry)
             AsyncActionItem(
                 id = "saves_copy_$index",
-                title = "Copy saves from $from",
+                title = words(R.string.gamepad_copy_saves_from_x, from),
                 subtitle = "${saveFiles(side.files.size)}, newest ${SaveLines.ago(side.newestMs, nowMs)}, in ${SaveLines.folder(side.folder.path, volumes, short = true)}",
                 confirmTitle = listOfNotNull(
                     if (replaced > 0) "Replace ${saveFiles(replaced)} of this copy's? They are backed up first" else "Add these saves to this copy? Its own are backed up first",
@@ -190,13 +191,13 @@ private fun copyGroups(entry: LibraryEntry, copying: SaveCopying, nowMs: Long, v
                 },
             )
         }.ifEmpty {
-            listOf(ActionItem(id = "saves_copy_others_none", title = "No other copy has saves yet"))
+            listOf(ActionItem(id = "saves_copy_others_none", title = words(R.string.gamepad_no_other_copy_has_saves_yet)))
         }
     }
     val restore = copying.backups.mapIndexed { index, backup ->
         AsyncActionItem(
             id = "saves_restore_$index",
-            title = "Put back the saves from ${SaveLines.ago(backup.takenMs, nowMs)}",
+            title = words(R.string.gamepad_put_back_the_saves_from_x, SaveLines.ago(backup.takenMs, nowMs)),
             subtitle = "${saveFiles(backup.files)} backed up before saves were copied here",
             confirmTitle = "Put this copy's saves back as they were? Saves copied in since are removed; saves made since are kept",
             run = { _, _ ->
@@ -238,7 +239,7 @@ internal fun savesScreen(
                     if (turnedOff) {
                         AsyncActionItem(
                             id = "saves_again",
-                            title = "Look for this game's saves again",
+                            title = words(R.string.gamepad_look_for_this_game_s_saves),
                             subtitle = "droidtop goes back to working out where they are",
                             run = { ctx, _ ->
                                 SaveDetector.matchAgain(ctx, entry.id)
@@ -248,8 +249,8 @@ internal fun savesScreen(
                     } else {
                         AsyncActionItem(
                             id = "saves_off",
-                            title = "Don't look for this game's saves",
-                            subtitle = "For a game whose rule is wrong. Nothing is deleted",
+                            title = words(R.string.gamepad_don_t_look_for_this_game),
+                            subtitle = words(R.string.gamepad_for_a_game_whose_rule_is),
                             run = { ctx, _ ->
                                 SaveDetector.turnOff(ctx, entry.id)
                                 "droidtop will not look for this game's saves"
@@ -306,7 +307,7 @@ internal fun storeAchievementRowsFor(storeLabel: String, gameId: String, result:
 /** A store game's achievements as a page of rows, laid out as RetroAchievements' are: earned first, then the rest. */
 internal fun storeAchievementsScreen(storeLabel: String, gameId: String, list: dev.droidtop.library.stores.StoreAchievements): CatalogScreen = CatalogScreen(
     id = "store_achievements_${storeLabel.lowercase()}_$gameId",
-    title = "Achievements",
+    title = words(R.string.gamepad_achievements),
     subtitle = "${list.earned} of ${list.total} earned on $storeLabel",
     groups = {
         val (earned, locked) = list.achievements.partition { it.earnedAtMs != null }
@@ -317,7 +318,7 @@ internal fun storeAchievementsScreen(storeLabel: String, gameId: String, list: d
                 CatalogGroup(
                     "store_site",
                     null,
-                    listOf(ActionItem(id = "store_open_site", title = "Open on $storeLabel", run = { context -> dev.droidtop.library.Links.open(context, url) })),
+                    listOf(ActionItem(id = "store_open_site", title = words(R.string.gamepad_open_on_x, storeLabel), run = { context -> dev.droidtop.library.Links.open(context, url) })),
                 )
             },
         )
@@ -411,8 +412,8 @@ internal fun raProposalScreen(entryId: String, game: dev.droidtop.library.achiev
                 listOf(
                     AsyncActionItem(
                         id = "ra_confirm",
-                        title = "Yes, show its achievements",
-                        subtitle = "Your progress in it shows on this game from now on",
+                        title = words(R.string.gamepad_yes_show_its_achievements),
+                        subtitle = words(R.string.gamepad_your_progress_in_it_shows_on),
                         run = { ctx, _ ->
                             dev.droidtop.library.achievements.RaChoices.confirm(ctx, entryId, game.id)
                             // What the person confirmed is who the game is (#318 §2): a claim later devices can use.
@@ -424,7 +425,7 @@ internal fun raProposalScreen(entryId: String, game: dev.droidtop.library.achiev
                     ),
                     AsyncActionItem(
                         id = "ra_not_this",
-                        title = "Not this game",
+                        title = words(R.string.gamepad_not_this_game),
                         subtitle = "droidtop does not ask about it again",
                         run = { ctx, _ ->
                             dev.droidtop.library.achievements.RaChoices.notThis(ctx, entryId, game.id)
@@ -492,7 +493,7 @@ internal fun achievementsScreen(gameId: Int, gameTitle: String, progress: RaProg
                 listOf(
                     ActionItem(
                         id = "ra_open_site",
-                        title = "Open on retroachievements.org",
+                        title = words(R.string.gamepad_open_on_retroachievements_org),
                         run = { context -> dev.droidtop.library.Links.open(context, RetroAchievementsClient.gameUrl(gameId)) },
                     ),
                 ),

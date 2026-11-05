@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -191,7 +193,7 @@ internal fun SourceLinkSheet(
     var editingQuery by remember(source.key) { mutableStateOf(false) }
     if (editingQuery) {
         TextEditDialog(
-            title = "Search ${source.label}",
+            title = words(R.string.gamepad_search_x, source.label),
             subtitle = SEARCH_HELP,
             initial = query,
             search = true,

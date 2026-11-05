@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import dev.droidtop.runtime.FailureText
 import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
@@ -268,7 +269,7 @@ internal fun GamelistOptionsMenu(
                 }
             }
             "Scrape all systems" -> {
-                startScrapeJob(title = "Scrape all systems", systemId = null)
+                startScrapeJob(title = words(R.string.gamepad_scrape_all_systems), systemId = null)
             }
             SCRAPE_ALL_PC -> {
                 startScrapeJob(title = SCRAPE_ALL_PC, systemId = null, pcOnly = true)
@@ -349,9 +350,9 @@ internal fun GamelistOptionsMenu(
             // games on screen. Until now the first arm took both, and the PC tab asked for a console system "pc".
             "Get artwork and details" -> {
                 if (systemId == null || systemId == PC_SYSTEM_ID) {
-                    startScrapeJob(title = "Scrape $groupLabel", systemId = null, pcIds = games.filter { it.isPcOrEngineGame }.map { it.id })
+                    startScrapeJob(title = words(R.string.gamepad_scrape_x, groupLabel), systemId = null, pcIds = games.filter { it.isPcOrEngineGame }.map { it.id })
                 } else {
-                    startScrapeJob(title = "Scrape $groupLabel", systemId = systemId)
+                    startScrapeJob(title = words(R.string.gamepad_scrape_x, groupLabel), systemId = systemId)
                 }
             }
             "Import from ES-DE" -> {

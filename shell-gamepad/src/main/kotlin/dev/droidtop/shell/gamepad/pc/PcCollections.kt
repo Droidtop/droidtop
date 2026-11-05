@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import dev.droidtop.shell.gamepad.padRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -281,7 +283,7 @@ internal fun ImportedCollectionsPrompt(
     onNotNow: () -> Unit,
 ) {
     ActionSheet(
-        title = "Add your $count $storeLabel collections as tabs after Updates?",
+        title = words(R.string.gamepad_add_your_x_x_collections_as, count, storeLabel),
         rows = listOf(
             ActionRow("Choose in Collections", onSelect = onChoose),
             ActionRow("Add all $count", onSelect = onAddAll),

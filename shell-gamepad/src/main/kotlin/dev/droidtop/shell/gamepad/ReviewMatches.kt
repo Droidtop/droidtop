@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -253,8 +254,8 @@ internal fun ReviewMatches(onDismiss: () -> Unit) {
             )
             ReviewTabs(tab, all) { picked -> moveTab(MatchQueue.Tab.entries.indexOf(picked) - MatchQueue.Tab.entries.indexOf(tab)) }
             when {
-                cards == null -> MenuRow(title = "Reading the queue...")
-                card == null -> MenuRow(title = "Nothing waits in ${TAB_NAMES.getValue(tab)}")
+                cards == null -> MenuRow(title = words(R.string.gamepad_reading_the_queue))
+                card == null -> MenuRow(title = words(R.string.gamepad_nothing_waits_in_x, TAB_NAMES.getValue(tab)))
                 else -> {
                     // Previous and Next as taps too: Left and Right step the cards on a pad, and a person with no pad
                     // must reach every card (Droidtop/tracker#839).
@@ -271,7 +272,7 @@ internal fun ReviewMatches(onDismiss: () -> Unit) {
                         LocalSide(card, entries, Modifier.weight(0.4f))
                         Column(Modifier.weight(0.6f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             if (choices.isEmpty()) {
-                                MenuRow(title = "No answer kept", subtitle = "A searches the source again", selected = true)
+                                MenuRow(title = words(R.string.gamepad_no_answer_kept), subtitle = words(R.string.gamepad_a_searches_the_source_again), selected = true)
                             }
                             choices.forEachIndexed { i, choice ->
                                 ChoiceRow(choice, selected = i == choiceIndex, onClick = {

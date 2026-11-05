@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import androidx.compose.ui.res.stringResource
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.util.Log
@@ -442,8 +443,8 @@ internal fun AppsSection(
 
     if (filterOpen) {
         val usageAction = SheetAction(
-            title = "Include apps opened outside droidtop",
-            subtitle = "Needs usage access",
+            title = words(R.string.gamepad_include_apps_opened_outside_droidtop),
+            subtitle = words(R.string.gamepad_needs_usage_access),
             onClick = { runCatching { SettingsLaunch.start(context, AppUsageAccess.settingsIntent()) } },
         )
         LibraryFilterSheet(

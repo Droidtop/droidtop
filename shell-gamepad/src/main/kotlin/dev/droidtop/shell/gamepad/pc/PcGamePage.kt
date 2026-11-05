@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
+import dev.droidtop.shell.gamepad.R
 import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.library.friendlyLocation
 import dev.droidtop.library.runsInEnginehost
@@ -886,8 +888,8 @@ internal fun PcGamePage(
                             items = listOfNotNull(
                                 dev.droidtop.library.settings.ActionItem(
                                     id = "pc_copy_use",
-                                    title = "Use this copy for this game",
-                                    subtitle = "The button plays it whenever it is installed",
+                                    title = words(R.string.gamepad_use_this_copy_for_this_game),
+                                    subtitle = words(R.string.gamepad_the_button_plays_it_whenever_it),
                                     run = { ctx ->
                                         copyOptions = null
                                         scope.launch { withContext(Dispatchers.IO) { dev.droidtop.library.CopyChoices.choose(ctx, cardKey, copy.id) } }
@@ -895,8 +897,8 @@ internal fun PcGamePage(
                                 ),
                                 dev.droidtop.library.settings.ActionItem(
                                     id = "pc_copy_auto",
-                                    title = "Let droidtop choose",
-                                    subtitle = "An installed copy, in the stores' order",
+                                    title = words(R.string.gamepad_let_droidtop_choose),
+                                    subtitle = words(R.string.gamepad_an_installed_copy_in_the_stores),
                                     run = { ctx ->
                                         copyOptions = null
                                         scope.launch { withContext(Dispatchers.IO) { dev.droidtop.library.CopyChoices.choose(ctx, cardKey, null) } }
@@ -913,8 +915,8 @@ internal fun PcGamePage(
     if (editingVersion) {
         // Prefilled with what the folder's name says, or what was set; blank goes back to the folder's name.
         TextEditDialog(
-            title = "Set version",
-            subtitle = "Blank uses the folder's name",
+            title = words(R.string.gamepad_set_version),
+            subtitle = words(R.string.gamepad_blank_uses_the_folder_s_name),
             initial = setVersion ?: dev.droidtop.library.SetVersions.shown(entry, null)?.first.orEmpty(),
             onCommit = { text ->
                 editingVersion = false
@@ -1444,7 +1446,7 @@ internal fun oldVersionRows(
     again: String,
     onRemove: (dev.droidtop.library.integrations.OldVersions.Old) -> Unit,
 ): List<PageFact> {
-    fun words(size: dev.droidtop.library.FolderSizes.Size) =
+    fun sizeWords(size: dev.droidtop.library.FolderSizes.Size) =
         dev.droidtop.library.FolderSizes.words(size, dev.droidtop.library.format.ValueFormat::size)
     val heading = when {
         removing -> PageFact(OLD_VERSIONS_ROW, "Removing\u2026", tab = PageTab.VERSIONS)
@@ -1454,9 +1456,9 @@ internal fun oldVersionRows(
     return listOfNotNull(heading) + olds.map { old ->
         val path = old.folder.absolutePath
         val label = dev.droidtop.library.integrations.OldVersions.label(old.version)
-        val size = sizes[path]?.let(::words)
+        val size = sizes[path]?.let(::sizeWords)
         PageFact(
-            title = "Version $label",
+            title = words(R.string.gamepad_version_x, label),
             value = if (armed == path) "Remove?" else "Remove",
             subtitle = if (armed == path) {
                 "$again to remove it" + (size?.let { " and free $it" } ?: "") + ". Its saves are copied to this version first"
@@ -1527,7 +1529,7 @@ private fun pageRows(
             PageFact(
                 "Not scraped yet",
                 value = scrapeStatus ?: "Scrape",
-                subtitle = "No cover or description yet",
+                subtitle = words(R.string.gamepad_no_cover_or_description_yet),
                 onActivate = onScrape,
                 tab = PageTab.OVERVIEW,
             ),
@@ -1556,7 +1558,7 @@ private fun pageRows(
             ),
         )
     } else if (onSetVersion != null) {
-        add(PageFact("Version", "Set", subtitle = "The folder's name says no version", onActivate = onSetVersion, tab = PageTab.VERSIONS))
+        add(PageFact("Version", "Set", subtitle = words(R.string.gamepad_the_folder_s_name_says_no), onActivate = onSetVersion, tab = PageTab.VERSIONS))
     }
     if (setVersion != null && onClearVersion != null) {
         add(PageFact(CLEAR_VERSION_ROW, "Use folder name", onActivate = onClearVersion, tab = PageTab.VERSIONS))
@@ -1631,7 +1633,7 @@ private fun pageRows(
     // The technical facts, folded away until asked for (docs/SPEC.md 7i).
     val more = buildList {
         entry.pcInfo?.storeId?.takeIf { entry.isStoreRow() }?.let { add(PageFact("Store id", it, tab = PageTab.DETAILS)) }
-        entry.pcInfo?.marker?.let { add(PageFact("Store id", it.key, subtitle = "From the store's files in the game's folder", tab = PageTab.DETAILS)) }
+        entry.pcInfo?.marker?.let { add(PageFact("Store id", it.key, subtitle = words(R.string.gamepad_from_the_store_s_files_in), tab = PageTab.DETAILS)) }
         entry.pcInfo?.installedVersion?.let { add(PageFact("Installed build", it, tab = PageTab.DETAILS)) }
         // Where it lives as a person names it; the whole path is the tooltip.
         folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it, tab = PageTab.DETAILS)) }
@@ -1782,7 +1784,7 @@ internal fun partFacts(siblings: List<LibraryEntry>): List<PageFact> {
         .maxByOrNull { it.segments.size }
         ?: return emptyList()
     return buildList {
-        add(PageFact("Parts", "${game.segments.size} parts", subtitle = "Played in the order the folders name them", tab = PageTab.OVERVIEW))
+        add(PageFact("Parts", "${game.segments.size} parts", subtitle = words(R.string.gamepad_played_in_the_order_the_folders), tab = PageTab.OVERVIEW))
         game.segments.forEach { segment ->
             add(PageFact(segment.label, segment.versions.firstOrNull()?.version?.takeIf { it.isNotBlank() }, tab = PageTab.OVERVIEW))
         }
@@ -1895,7 +1897,7 @@ internal fun elsewhereRows(
     val newer = now != null && (here == null || dev.droidtop.library.computers.ComputerLibrary.newerThan(now.version, here))
     val get = if (computer != null && newer && onGet != null) ({ onGet(computer, now.version) }) else null
     PageFact(
-        title = "On $device",
+        title = words(R.string.gamepad_on_x, device),
         value = (now ?: versions.first()).version.let { if (it.firstOrNull()?.isDigit() == true) "v$it" else it },
         subtitle = listOfNotNull(
             if (now == null) "No longer installed there" else null,
@@ -1907,8 +1909,8 @@ internal fun elsewhereRows(
     )
 } + if (onSend == null) emptyList() else computers.map { computer ->
     PageFact(
-        title = "Send this version to ${computer.name}",
-        subtitle = "Copied to its game folder as a new folder; nothing there is replaced",
+        title = words(R.string.gamepad_send_this_version_to_x, computer.name),
+        subtitle = words(R.string.gamepad_copied_to_its_game_folder_as),
         onActivate = { onSend(computer) },
         tab = PageTab.VERSIONS,
     )

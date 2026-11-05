@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.library.settings.words
 import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.R
 import dev.droidtop.runtime.FailureText
@@ -355,7 +356,7 @@ private fun PcGameMenuSheet(
                 engine = runners.engine,
                 current = null,
                 overridden = false,
-                title = "Run once with",
+                title = words(R.string.gamepad_run_once_with),
                 onPick = { strategy ->
                     pickingOnce = false
                     val option = runners.options.firstOrNull { it.strategy == strategy }
@@ -563,8 +564,8 @@ private fun PcGameMenuSheet(
     }
     if (renaming) {
         TextEditDialog(
-            title = "Title",
-            subtitle = "Blank uses the folder name (${folderNameOf(entry)})",
+            title = words(R.string.gamepad_title),
+            subtitle = words(R.string.gamepad_blank_uses_the_folder_name_x, folderNameOf(entry)),
             initial = entry.gameName.orEmpty(),
             onCommit = { text ->
                 renaming = false
@@ -1007,7 +1008,7 @@ private fun PcGameMenuSheet(
     // Runs with -- WHICH runner, and how to change it: the first row of How it runs.
     val runsWithRow = if (!entry.missing && (!loaded || runners.options.isNotEmpty())) {
         ActionRow(
-            title = "Runs with",
+            title = words(R.string.gamepad_runs_with),
             detail = when {
                 !loaded -> "Working out what can run this…"
                 runner == null -> "Not chosen — ${runners.options.size} to choose from"
@@ -1217,7 +1218,7 @@ private fun PcGameMenuSheet(
         val gogRow = gogId?.let { productId ->
             val state = gogNews
             ActionRow(
-                title = "What's new",
+                title = words(R.string.gamepad_what_s_new),
                 detail = state.detail(),
                 onSelect = if (state !is GogNewsState.Looking) {
                     {

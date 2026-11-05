@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.library.settings.words
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,7 +48,7 @@ internal fun GetNewGamesPage(entries: List<LibraryEntry>, onOpenUpdates: () -> U
         CatalogScreen(
             id = "get_new_games",
             title = GetGamesEntry.NEW_GAMES,
-            subtitle = "From the sources you have, for the games you play",
+            subtitle = words(R.string.gamepad_from_the_sources_you_have_for),
             groups = { _ ->
                 newGamesGroups(loaded.value, onSearch = { text, typing -> search = text to typing }, onOpenUpdates, onRetry = { attempt++ })
             },
@@ -71,8 +72,8 @@ private fun newGamesGroups(
             items = listOf(
                 ActionItem(
                     id = "new_games_search_row",
-                    title = "Search for a game",
-                    subtitle = "Every source you have, and the sites to search on",
+                    title = words(R.string.gamepad_search_for_a_game),
+                    subtitle = words(R.string.gamepad_every_source_you_have_and_the),
                     icon = CatalogIcon.SEARCH,
                     run = { onSearch("", true) },
                 ),
@@ -91,7 +92,7 @@ private fun newGamesGroups(
                 title = null,
                 items = listOf(
                     TextBlockItem(id = "new_games_unreachable_text", text = "Could not reach your sources. Check the connection, then try again."),
-                    ActionItem(id = "new_games_retry", title = "Try again", run = { onRetry() }),
+                    ActionItem(id = "new_games_retry", title = words(R.string.gamepad_try_again), run = { onRetry() }),
                 ),
             ),
         )
@@ -118,7 +119,7 @@ private fun newGamesGroups(
         add(
             CatalogGroup(
                 id = "new_games_updates",
-                title = "New versions of your games",
+                title = words(R.string.gamepad_new_versions_of_your_games),
                 items = loaded.updates.map { entry ->
                     ActionItem(
                         id = "new_games_update_${entry.id}",
@@ -134,7 +135,7 @@ private fun newGamesGroups(
         add(
             CatalogGroup(
                 id = "new_games_more_$index",
-                title = "More from ${shelf.ask.query}, because you played ${shelf.ask.because}",
+                title = words(R.string.gamepad_more_from_x_because_you_played, shelf.ask.query, shelf.ask.because),
                 items = shelf.finds.mapIndexed { at, find ->
                     ActionItem(
                         id = "new_games_find_${index}_$at",
@@ -159,8 +160,8 @@ private fun newGamesGroups(
                     ),
                     NestedScreenItem(
                         id = "new_games_get_source",
-                        title = "Get a game source",
-                        subtitle = "Plugins, where sources are added and approved",
+                        title = words(R.string.gamepad_get_a_game_source),
+                        subtitle = words(R.string.gamepad_plugins_where_sources_are_added_and),
                         registryId = AcquireContentSources.PLUGINS_SCREEN_ID,
                     ),
                 ),
