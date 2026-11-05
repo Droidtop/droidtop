@@ -42,8 +42,9 @@ object StorageSharesCatalog {
     private fun trustLine(trusted: Boolean): String = if (trusted) {
         "Anyone who runs this share can read your saves and backups. You can open them yourself and restore them on any device"
     } else {
-        "droidtop locks what it writes here. The share's owner can't read it, and neither can you outside droidtop. " +
-            "Restoring on a new device needs this device's key: keep a backup of droidtop"
+        // The lock is this device's own key, which never leaves the device (DeviceIdentity), so only this device opens it.
+        "droidtop locks what it writes here. The share's owner can't read it, and only this device can open it: " +
+            "a new or reset device can't restore it"
     }
 
     private fun mark(state: String): StatusMark = when (state) {
