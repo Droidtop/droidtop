@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -67,6 +68,9 @@ fun JobProgress(fraction: Float, look: JobLook, colors: JobProgressColors, modif
     val shake = shakeOf(look == JobLook.FAILED)
     val segments = parts.takeIf { it in 2..JobLook.MAX_PARTS } ?: 1
     val said = JobLook.words(look) + if (look == JobLook.ACTIVE || look == JobLook.LEVEL) ", ${(target * 100).toInt()} percent" else ""
+    // One band brush per colour, spanning whatever it fills and moved with translate: a gradient built with new start
+    // and end every frame was a new native shader each frame for as long as a job checks (Droidtop/tracker#917).
+    val bandBrush = remember(colors.fill) { Brush.horizontalGradient(listOf(Color.Transparent, colors.fill, Color.Transparent)) }
     Canvas(
         modifier
             .height(height)
@@ -95,11 +99,7 @@ fun JobProgress(fraction: Float, look: JobLook, colors: JobProgressColors, modif
             // A band of the fill crossing the track: under way, nothing to count yet.
             val band = size.width * 0.3f
             val x = -band + (size.width + band) * shimmer.value
-            drawRect(
-                Brush.horizontalGradient(listOf(Color.Transparent, colors.fill, Color.Transparent), startX = x, endX = x + band),
-                topLeft = Offset(x, 0f),
-                size = Size(band, size.height),
-            )
+            translate(left = x) { drawRect(bandBrush, size = Size(band, size.height)) }
         }
     }
 }
