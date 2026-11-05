@@ -2458,7 +2458,7 @@ dependencies = [
 [[package]]
 name = "kdeconnect-link"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=a68f8dbe0085cdc362f26df6815954bbf02a1c96#a68f8dbe0085cdc362f26df6815954bbf02a1c96"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=dc7f5559aa26c6819590e55e4ec979347ce35d10#dc7f5559aa26c6819590e55e4ec979347ce35d10"
 dependencies = [
  "kdeconnect-proto",
  "rcgen 0.13.2",
@@ -2472,7 +2472,7 @@ dependencies = [
 [[package]]
 name = "kdeconnect-proto"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=a68f8dbe0085cdc362f26df6815954bbf02a1c96#a68f8dbe0085cdc362f26df6815954bbf02a1c96"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=dc7f5559aa26c6819590e55e4ec979347ce35d10#dc7f5559aa26c6819590e55e4ec979347ce35d10"
 dependencies = [
  "serde",
  "serde_json",
@@ -2484,7 +2484,7 @@ dependencies = [
 [[package]]
 name = "kdeconnect-service"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=a68f8dbe0085cdc362f26df6815954bbf02a1c96#a68f8dbe0085cdc362f26df6815954bbf02a1c96"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=dc7f5559aa26c6819590e55e4ec979347ce35d10#dc7f5559aa26c6819590e55e4ec979347ce35d10"
 dependencies = [
  "base64 0.22.1",
  "kdeconnect-link",
