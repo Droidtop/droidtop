@@ -9,6 +9,8 @@ import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -200,26 +202,37 @@ internal fun BoxScope.Taskbar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TaskbarButton(onClick = onOpenStartMenu) {
-                    Text(stringResource(R.string.desktop_start_menu))
+                    Text(stringResource(R.string.desktop_start_menu), maxLines = 1, softWrap = false)
                 }
                 Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
+                // What only Android can do stays on droidtop's bar (Droidtop/tracker#555 D4): Terminal, Containers
+                // and Settings are Start's System rows, and the clock is the tray's (Droidtop/tracker#691), so the
+                // screen has one. The mode switcher stays, by name: Desktop's only other route to the Android home or
+                // Gaming is a long-press of Back (SPEC 2c).
+                val extras: @Composable () -> Unit = {
+                    TaskbarButton(onClick = { openModes(context) }) {
+                        Text(stringResource(R.string.desktop_modes), maxLines = 1, softWrap = false)
+                    }
+                    KeyboardTaskbarItem()
+                    PluginTaskbarItems()
+                    CompanionTaskbarItem()
+                    ClipboardNotice()
+                }
                 if (oneRow) {
                     TaskbarPinChips(pins, onOpenPin, onUnpin)
                     TaskbarWindowList(hostBridge, toplevels, androidApps, ownScreens, windows, windowIcons, modifier = Modifier.weight(1f))
+                    extras()
                 } else {
-                    Spacer(modifier = Modifier.weight(1f))
+                    // On a narrow bar the buttons between Start and the tray take what is left and scroll, so the tray
+                    // keeps its own width: last in the Row, it was given the remainder and "100%" wrapped one
+                    // character per line on a 411 dp phone with the Clipboard chip showing (Droidtop/tracker#691, rig
+                    // 2026-11-04).
+                    Row(
+                        modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) { extras() }
                 }
-                // What only Android can do stays on droidtop's bar (Droidtop/tracker#555 D4): Terminal, Containers
-                // and Settings are Start's System rows, and the clock is the panel's (Waybar's custom/clock, or
-                // swaybar's status line), so the screen has one. The mode switcher stays, by name: Desktop's only
-                // other route to the Android home or Gaming is a long-press of Back (SPEC 2c).
-                TaskbarButton(onClick = { openModes(context) }) {
-                    Text(stringResource(R.string.desktop_modes))
-                }
-                KeyboardTaskbarItem()
-                PluginTaskbarItems()
-                CompanionTaskbarItem()
-                ClipboardNotice()
                 SystemTray(onClick = onOpenQuickMenu)
             }
             if (atTop) {

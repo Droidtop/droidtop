@@ -134,7 +134,7 @@ fun StatusCluster(showBatteryPercent: Boolean, onClick: () -> Unit, modifier: Mo
             },
     ) {
         if (clock.isNotEmpty()) {
-            Text(clock, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelLarge)
+            Text(clock, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
         }
         if (snapshot != null) {
             NetworkGlyph(snapshot)
@@ -144,7 +144,9 @@ fun StatusCluster(showBatteryPercent: Boolean, onClick: () -> Unit, modifier: Mo
             ) {
                 BatteryGlyph(battery, snapshot.charging)
                 if (showBatteryPercent && battery != null) {
-                    Text("$battery%", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+                    // One line whatever width it is given: "100%" wrapped a character per line in a crowded Desktop bar
+                    // (Droidtop/tracker#691).
+                    Text("$battery%", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false)
                 }
             }
         }
