@@ -161,4 +161,7 @@
     <!-- The desktop's background picture (DesktopBackgroundPicture, Droidtop/tracker#694). -->
     <string name="desktop_background_picture_saved">The desktop\'s background picture is set. It shows when the desktop next starts.</string>
     <string name="desktop_background_picture_failed">Couldn\'t use that picture for the desktop\'s background.</string>
+    <string name="language_title">Language</string>
+    <string name="language_subtitle">The language droidtop\'s own screens use. Games, apps and themes keep their own</string>
+    <string name="language_follow_android">Follow Android</string>
 </resources>

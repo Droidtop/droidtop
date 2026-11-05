@@ -1,6 +1,7 @@
 package dev.droidtop.library.settings
 
 import android.content.Context
+import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 
 /**
@@ -19,7 +20,18 @@ object Words {
 
     fun get(@StringRes id: Int, vararg args: Any): String =
         checkNotNull(context) { "Words.init has not run: a catalog was built before the Application" }.getString(id, *args)
+
+    /**
+     * A count's words, as the language counts (Droidtop/tracker#627: "plurals done right"): a `<plurals>` resource read
+     * for [count], never `if (n == 1) "1 game" else "$n games"` in Kotlin, which is English's rule only. [args] fill its
+     * placeholders, the count usually among them.
+     */
+    fun plural(@PluralsRes id: Int, count: Int, vararg args: Any): String =
+        checkNotNull(context) { "Words.init has not run: a catalog was built before the Application" }.resources.getQuantityString(id, count, *args)
 }
+
+/** [Words.plural]: a count's words, from a `<plurals>` resource. */
+fun plural(@PluralsRes id: Int, count: Int, vararg args: Any): String = Words.plural(id, count, *args)
 
 /** [Words.get]: one catalog string, with its arguments. */
 fun words(@StringRes id: Int, vararg args: Any): String = Words.get(id, *args)

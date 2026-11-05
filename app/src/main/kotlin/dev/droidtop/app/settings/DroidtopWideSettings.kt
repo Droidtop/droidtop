@@ -144,6 +144,8 @@ object DroidtopWideSettings {
                     title = "Accessibility",
                     category = "Appearance",
                     items = listOf(
+                        // droidtop's own language (Droidtop/tracker#627): Follow Android, or a shipped language.
+                        dev.droidtop.app.AppLanguage.item(context),
                         ChoiceItem(
                             id = AccessibilityPrefs.KEY_COLOR_VISION,
                             title = "Colour vision",
