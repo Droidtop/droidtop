@@ -86,6 +86,13 @@ fun LauncherSearchScreen(
             value = LocalSimilarityRecommendations({ playable })
                 .recommend(context, RecommendationScope.Overall, 5)
         }
+        // Android's own Settings pages by title (Droidtop/tracker#704): which resolve on this device, read once off the
+        // main thread; typing only filters them in memory.
+        val androidPages by produceState(emptyList<dev.droidtop.runtime.systemstatus.SystemControls.SettingsLink>()) {
+            value = withContext(Dispatchers.IO) {
+                runCatching { dev.droidtop.runtime.systemstatus.SystemControls.settingsLinks(context) }.getOrDefault(emptyList())
+            }
+        }
         // System names for the Retro badge, read once off the main thread; the rows use a map, never a lookup each.
         val systemNames by produceState(emptyMap<String, String>()) {
             value = withContext(Dispatchers.IO) {
@@ -138,7 +145,16 @@ fun LauncherSearchScreen(
                         dev.droidtop.library.settings.Notices.flash("$value copied", context = context)
                     }
                 }
-                listOfNotNull(sum) + apps + matching + listOfNotNull(web)
+                // An Android Settings page whose title matches, said to be Android's; picking it opens it and closes this.
+                val pages = androidPages.takeIf { text.isNotBlank() }.orEmpty()
+                    .filter { dev.droidtop.library.integrations.SearchRank.score(it.label, text) < dev.droidtop.library.integrations.SearchRank.OTHER }
+                    .map { link ->
+                        LocalSearchRow("android:${link.id}", SearchRowKind.APP, link.label, ANDROID_PAGE_DETAIL) {
+                            dev.droidtop.runtime.systemstatus.SettingsLaunch.start(context, link.intent)
+                            onDismiss()
+                        }
+                    }
+                listOfNotNull(sum) + apps + pages + matching + listOfNotNull(web)
             },
         )
     }
@@ -153,3 +169,4 @@ private const val NOT_INSTALLED = "Not installed"
 private const val MISSING = "Missing"
 private const val WEB_TITLE = "Search the web"
 private const val CALC_DETAIL = "Calculator · press to copy"
+private const val ANDROID_PAGE_DETAIL = "Android's Settings page"
