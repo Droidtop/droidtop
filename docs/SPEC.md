@@ -50,7 +50,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [7m. One game, its versions and its segments (directed 2026-09-16)](#7m-one-game-its-versions-and-its-segments-directed-2026-09-16)
 - [7n. PC game titles, executables and multi-part games (Droidtop/tracker#264)](#7n-pc-game-titles-executables-and-multi-part-games-droidtoptracker264)
 - [7o. Computers: droidtop-agent (decided 2026-10-08, Droidtop/tracker#373)](#7o-computers-droidtop-agent-decided-2026-10-08-droidtoptracker373)
-- [7p. KDE Connect (decided 2026-11-05, Droidtop/tracker#645)](#7p-kde-connect-decided-2026-11-05-droidtoptracker645)
+- [7q. KDE Connect (decided 2026-11-05, Droidtop/tracker#645)](#7q-kde-connect-decided-2026-11-05-droidtoptracker645)
 - [8. Licensing](#8-licensing)
 - [9. Module map](#9-module-map)
 - [10. Build order](#10-build-order)
@@ -22736,7 +22736,7 @@ downloads, maintenance, build scripts), and the check is recorded in its commit.
   - A backup locked by another device says so and is not opened.
 - a share in the system file picker and as a games root, through a documents provider;
 - root mounts only through the enhanced privileges provider, as an enhancement.
-## 7p. KDE Connect (decided 2026-11-05, Droidtop/tracker#645)
+## 7q. KDE Connect (decided 2026-11-05, Droidtop/tracker#645)
 
 The owner, 2026-11-05: "We want to get kde connect and tailscale integrated more closely. File transfer, keyboard
 input, and etc are good first things" and "Remember we wanted to implement the kde connect protocol and stuff

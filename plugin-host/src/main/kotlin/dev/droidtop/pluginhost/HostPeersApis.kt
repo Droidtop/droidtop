@@ -6,7 +6,7 @@ import org.json.JSONObject
  * D22 (docs/plugin-api.md 3, `peers`, Droidtop/tracker#645, #373): a VPN plugin tells droidtop where the person's other
  * devices can be reached on its network, and droidtop reaches them there too. The Tailscale plugin passes its tailnet's
  * online devices (owner, 2026-11-05: "We control tailscale like any other VPN ... Tailcale plugin, not full tailscale
- * client"). Today KDE Connect announces this device to each address (docs/SPEC.md 7p); droidtop's own peer links take
+ * client"). Today KDE Connect announces this device to each address (docs/SPEC.md 7q); droidtop's own peer links take
  * them next. Each call replaces what the same plugin said before; an empty list withdraws it. Only IP addresses, never
  * names, so a plugin cannot make droidtop resolve anything, and at most [MAX] of them.
  */

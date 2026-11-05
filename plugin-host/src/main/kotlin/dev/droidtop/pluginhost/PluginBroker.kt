@@ -688,6 +688,7 @@ object HostApis {
     val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostSettingsApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPowerApis.ops + HostSourcesApis.ops + HostMediaApis.ops + HostSteamApis.ops }
     val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostSettingsApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPowerApis.ops + HostSourcesApis.ops }
     val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPeersApis.ops + HostPowerApis.ops + HostSourcesApis.ops }
+    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostSettingsApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPeersApis.ops + HostPowerApis.ops + HostSourcesApis.ops }
 
     const val MAX_ENGINES = 50
     const val MAX_PATH = 4096
