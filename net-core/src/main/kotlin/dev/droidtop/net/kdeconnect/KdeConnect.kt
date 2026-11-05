@@ -21,7 +21,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * droidtop as a KDE Connect device (docs/SPEC.md "KDE Connect", Droidtop/tracker#645): the official KDE Connect apps
+ * droidtop as a KDE Connect device (docs/SPEC.md 7q "KDE Connect", Droidtop/tracker#645): the official KDE Connect apps
  * on a phone or PC, and Pythia, find it, pair with it and talk to it. The device itself is lib-kdeconnect's, inside
  * droidtop's native library; this is its switch and its event loop, through `AgentNative.call("kdeconnect_<op>")`.
  *

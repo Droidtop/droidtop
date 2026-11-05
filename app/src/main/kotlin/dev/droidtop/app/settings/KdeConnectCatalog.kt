@@ -18,7 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Settings > Accounts and sources > KDE Connect (docs/SPEC.md "KDE Connect", Droidtop/tracker#645): droidtop as a
+ * Settings > Accounts and sources > KDE Connect (docs/SPEC.md 7q "KDE Connect", Droidtop/tracker#645): droidtop as a
  * KDE Connect device. The switch, the name the others see, devices added by address, and the devices: a request
  * to pair with its code, Accept and Refuse; the paired ones with Ping and Unpair; the others with Pair. A catalog
  * screen, so both Settings surfaces draw it, and live: it is built again when a device comes, goes or asks.
@@ -120,7 +120,7 @@ object KdeConnectCatalog {
     @Volatile
     private var pluginNames: Map<String, String> = emptyMap()
 
-    /** "Phone, 192.168.1.9", or with a VPN plugin's address "Phone, over Tailscale" (docs/SPEC.md 7p, Tailscale). */
+    /** "Phone, 192.168.1.9", or with a VPN plugin's address "Phone, over Tailscale" (docs/SPEC.md 7q, Tailscale). */
     private fun place(d: KdcDevice): String {
         val via = KdeConnect.viaPlugin(d.address)?.let { id -> "over " + (pluginNames[id] ?: "your VPN") }
         return listOfNotNull(d.type.replaceFirstChar { it.uppercase() }, via ?: d.address).joinToString(", ")

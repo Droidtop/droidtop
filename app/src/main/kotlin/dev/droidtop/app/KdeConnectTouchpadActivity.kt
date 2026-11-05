@@ -24,7 +24,7 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * droidtop as the controller of a paired device's pointer (docs/SPEC.md 7p, remote input; Droidtop/tracker#645, "droidtop
+ * droidtop as the controller of a paired device's pointer (docs/SPEC.md 7q, remote input; Droidtop/tracker#645, "droidtop
  * as both the controlled device and the controller"), the touchpad of the official apps' Remote input:
  * - the screen: one finger moves the pointer, a tap clicks, two fingers scroll, a two-finger tap right-clicks;
  * - a controller: the left stick moves the pointer, the right stick scrolls, A clicks, X right-clicks, Y middle-clicks,

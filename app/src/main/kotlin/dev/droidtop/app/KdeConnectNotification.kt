@@ -25,7 +25,7 @@ import java.io.File
 import java.io.IOException
 
 /**
- * KDE Connect's notices and what arrives from paired devices (docs/SPEC.md 7p "KDE Connect"):
+ * KDE Connect's notices and what arrives from paired devices (docs/SPEC.md 7q "KDE Connect"):
  * - a device asking to pair, with the code to compare; a ping;
  * - a shared link (tap opens it), a shared text (shown whole);
  * - a shared file: the library stores it whole in droidtop's cache, and it is moved here into the folder the person
@@ -58,7 +58,7 @@ object KdeConnectNotification {
     }
 
     /**
-     * The library also finds devices by mDNS (docs/SPEC.md 7p), which Wi-Fi drops on Android unless an app holds a
+     * The library also finds devices by mDNS (docs/SPEC.md 7q), which Wi-Fi drops on Android unless an app holds a
      * multicast lock: held while KDE Connect is on, released when it goes off (the permission is already droidtop's,
      * for pairing a computer).
      */
@@ -70,7 +70,7 @@ object KdeConnectNotification {
         }
     }
 
-    /** This device's battery to paired devices (docs/SPEC.md 7p, battery), from Android's battery broadcast. */
+    /** This device's battery to paired devices (docs/SPEC.md 7q, battery), from Android's battery broadcast. */
     private fun followBattery(context: Context) {
         val receiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(c: Context, intent: Intent) {
@@ -134,7 +134,7 @@ object KdeConnectNotification {
     }
 
     /**
-     * This device's clipboard to paired devices (docs/SPEC.md 7p, clipboard): Android tells droidtop of a change only
+     * This device's clipboard to paired devices (docs/SPEC.md 7q, clipboard): Android tells droidtop of a change only
      * while it is in front or its input method is the active one, and only then lets it read the clip, so that is when
      * it is sent. The rules are the shared clipboard's ([ClipRules]): a clip marked sensitive never leaves, only plain
      * text, at most 64 KB. A clip that just arrived from a paired device is not sent back (the library holds it).
@@ -208,7 +208,7 @@ object KdeConnectNotification {
             is KdcEvent.Input -> typeHere(context, e)
             is KdcEvent.Ring -> ring(context, nameOf(e.id))
             is KdcEvent.Battery -> if (e.low) post(context, PING_ID, "${nameOf(e.id)}'s battery is low", "${e.charge}%", screen(context, PING_ID))
-            // Another device's notifications, shown as its own (docs/SPEC.md 7p, notifications): one notice each,
+            // Another device's notifications, shown as its own (docs/SPEC.md 7q, notifications): one notice each,
             // updated in place and taken away when it goes there.
             is KdcEvent.Notification -> post(
                 context,
@@ -226,7 +226,7 @@ object KdeConnectNotification {
     }
 
     /**
-     * Typing from a paired device (docs/SPEC.md 7p, remote input) through "Type from another device"'s one router: into
+     * Typing from a paired device (docs/SPEC.md 7q, remote input) through "Type from another device"'s one router: into
      * droidtop's own focused field, else through droidtop's input method into any app's field. Text, Backspace and
      * Enter are typed; a key it cannot type and a pointer move are not (the pointer needs an accessibility service,
      * not built). When there is no field, the router's notice is shown once a minute at most.

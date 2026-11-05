@@ -1124,7 +1124,7 @@ dependencies = [
  "dirs",
  "droidtop-agent-stream",
  "games-scan",
- "if-addrs",
+ "if-addrs 0.13.4",
  "plist",
  "plugins-contexts",
  "roxmltree",
@@ -1157,6 +1157,7 @@ version = "0.1.0"
 dependencies = [
  "droidtop-agent-service",
  "jni",
+ "kdeconnect-service",
  "net-remote",
  "serde",
  "serde_json",
@@ -1346,6 +1347,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 
 [[package]]
+name = "fastrand"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
+
+[[package]]
 name = "ff"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1410,6 +1417,15 @@ dependencies = [
  "libz-sys",
  "miniz_oxide",
  "zlib-rs",
+]
+
+[[package]]
+name = "flume"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e139bc46ca777eb5efaf62df0ab8cc5fd400866427e56c68b22e414e53bd3be"
+dependencies = [
+ "spin",
 ]
 
 [[package]]
@@ -2026,6 +2042,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "if-addrs"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0a05c691e1fae256cf7013d99dad472dc52d5543322761f83ec8d47eab40d2b"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2462,6 +2488,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "kdeconnect-link"
+version = "0.1.0"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?tag=v0.1.0#284fc626aaefc38c50c082b8a5610f960792f3af"
+dependencies = [
+ "kdeconnect-proto",
+ "mdns-sd",
+ "rcgen 0.13.2",
+ "rustls",
+ "serde_json",
+ "thiserror 1.0.69",
+ "time",
+ "x509-parser 0.16.0",
+]
+
+[[package]]
+name = "kdeconnect-proto"
+version = "0.1.0"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?tag=v0.1.0#284fc626aaefc38c50c082b8a5610f960792f3af"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "kdeconnect-service"
+version = "0.1.0"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?tag=v0.1.0#284fc626aaefc38c50c082b8a5610f960792f3af"
+dependencies = [
+ "base64 0.22.1",
+ "kdeconnect-link",
+ "kdeconnect-proto",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "keccak"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2631,6 +2697,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "mdns-sd"
+version = "0.21.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6743ed743ff2bada2b8651ef298d3f98addb0b74844f19cdd57137d8bd0219e"
+dependencies = [
+ "fastrand",
+ "flume",
+ "if-addrs 0.15.0",
+ "mio",
+ "socket-pktinfo",
+ "socket2",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2668,6 +2748,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1788edb87fdc09c7e26304471e2f5be8cdefb1b6930d6e3985fc02ff53bf86ee"
 dependencies = [
  "libc",
+ "log",
  "wasi",
  "windows-sys 0.61.2",
 ]
@@ -4635,6 +4716,17 @@ dependencies = [
  "defmt 0.3.101",
  "heapless 0.8.0",
  "managed",
+]
+
+[[package]]
+name = "socket-pktinfo"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "612942246d0cc239cfd83af1dfd39be47f649208a3524e5e9da651910128e0ac"
+dependencies = [
+ "libc",
+ "socket2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

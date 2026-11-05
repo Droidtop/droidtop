@@ -78,7 +78,7 @@ pub fn call(op: &str, args: &str) -> String {
         "remote_list" => remote_list(&args),
         "remote_put" => remote_put(&args),
         "remote_get" => remote_get(&args),
-        // KDE Connect (Droidtop/tracker#645, docs/SPEC.md "KDE Connect"): kdeconnect_<op> is
+        // KDE Connect (Droidtop/tracker#645, docs/SPEC.md 7q "KDE Connect"): kdeconnect_<op> is
         // lib-kdeconnect's operation <op>, passed through as it is.
         op if op.starts_with("kdeconnect_") => return kdeconnect_service::ops::call(&op["kdeconnect_".len()..], &args).to_string(),
         other => Err(Failure::Error(format!("unknown operation {other}"))),
