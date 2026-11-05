@@ -972,6 +972,46 @@ object AppSettingsCatalogs {
         },
     )
 
+    /** "Prefixes": every managed prefix, and Remove (asked first) beside one no game runs in. Disk and library reads. */
+    private suspend fun prefixesGroup(context: Context): CatalogGroup = withContext(Dispatchers.IO) {
+        val containers = runCatching { com.winlator.container.ContainerManager(context).containers }.getOrNull().orEmpty()
+        val usage = runCatching { dev.droidtop.runtime.windows.PcContainers.usage(context) }.getOrDefault(emptyMap())
+        CatalogGroup(
+            id = "windows_prefixes",
+            title = "Prefixes",
+            items = containers.flatMap { container ->
+                val shared = dev.droidtop.runtime.windows.PcContainers.isShared(container.id)
+                val name = if (shared) "Shared" else container.name?.takeIf { it.isNotBlank() } ?: container.id
+                val users = usage[container.id].orEmpty()
+                val size = dev.droidtop.library.format.ValueFormat.size(dev.droidtop.runtime.windows.PcContainers.sizeOf(container))
+                val who = when {
+                    users.isNotEmpty() -> "Used by ${users.joinToString(", ")}"
+                    shared -> "Games with no prefix of their own run here"
+                    else -> "Not used"
+                }
+                listOfNotNull(
+                    ActionItem(
+                        id = "windows_prefix_${container.id}",
+                        title = name,
+                        subtitle = "${container.wineVersion.orEmpty()} · $size · $who",
+                    ),
+                    if (!shared && users.isEmpty()) {
+                        AsyncActionItem(
+                            id = "windows_prefix_remove_${container.id}",
+                            title = "Remove $name",
+                            subtitle = "No game runs in it. Its Windows installation, settings and any saves in it are deleted",
+                            confirmTitle = "Remove the prefix $name and everything in it, saves included?",
+                            confirmKeep = "Keep it",
+                            run = { ctx, _ -> dev.droidtop.runtime.windows.PcContainers.remove(ctx, container.id) },
+                        )
+                    } else {
+                        null
+                    },
+                )
+            },
+        )
+    }
+
     private fun windowsGamesScreen() = CatalogScreen(
         id = SCREEN_WINDOWS_GAMES,
         title = "Windows games",
@@ -1032,6 +1072,11 @@ object AppSettingsCatalogs {
             // the device's defaults, and the choices are setup's
             // (Droidtop/tracker#372).
             if (wineOptions && runtime != null) WineOptionsCatalog.groups(context, entryId = null, title = null) else emptyList()
+        ) + (
+            // The managed prefixes (docs/SPEC.md 5a "Per-game prefixes", piece 1 and 2; Droidtop/tracker#584): each
+            // with its Wine build, size and the games in it, and Remove beside one no game uses. Reads the library and
+            // walks each prefix, so it is left out of search indexing.
+            if (wineOptions && provisioned) listOf(prefixesGroup(context)) else emptyList()
         ) + listOf(
             CatalogGroup(
                 id = "windows_drives",

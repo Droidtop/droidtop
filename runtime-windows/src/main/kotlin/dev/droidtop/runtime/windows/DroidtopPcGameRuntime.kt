@@ -665,18 +665,72 @@ object PcContainers {
         entryId?.takeIf { it.startsWith(BY_CONTAINER) }?.let { token ->
             return runCatching { manager.getContainerById(token.removePrefix(BY_CONTAINER)) }.getOrNull()
         }
-        // The managed prefix the person chose for the game (docs/SPEC.md 5a "Per-game prefixes", piece 1;
-        // Droidtop/tracker#584), when it still exists; otherwise the rule below, as before any choice.
-        val chosen = entryId?.let { chosenId(context, it) }
-        if (chosen != null && runCatching { manager.hasContainer(chosen) }.getOrDefault(false)) {
-            return runCatching { manager.getContainerById(chosen) }.getOrNull()
-        }
-        val perGame = entryId?.let { ownId(it) }
-        if (perGame != null && runCatching { manager.hasContainer(perGame) }.getOrDefault(false)) {
-            return runCatching { manager.getContainerById(perGame) }.getOrNull()
-        }
         val containers = runCatching { manager.containers }.getOrNull().orEmpty()
-        return containers.firstOrNull { it.id == DroidtopPcGameRuntime.CONTAINER_ID } ?: containers.firstOrNull()
+        val id = resolveId(
+            chosen = entryId?.let { chosenId(context, it) },
+            ownId = entryId?.let { ownId(it) },
+            existing = containers.map { it.id },
+        ) ?: return null
+        return containers.firstOrNull { it.id == id }
+    }
+
+    /**
+     * The one rule a game's prefix is resolved by, from the ids of the prefixes on the device ([existing], in their
+     * order): the managed prefix the person chose (docs/SPEC.md 5a "Per-game prefixes", piece 1; Droidtop/tracker#584)
+     * when it still exists, else the game's own, else the shared one, else the first. [forGame] and [usage] both read
+     * it, so the Prefixes list counts exactly the games that launch in each. Pure.
+     */
+    internal fun resolveId(chosen: String?, ownId: String?, existing: List<String>): String? = when {
+        chosen != null && chosen in existing -> chosen
+        ownId != null && ownId in existing -> ownId
+        DroidtopPcGameRuntime.CONTAINER_ID in existing -> DroidtopPcGameRuntime.CONTAINER_ID
+        else -> existing.firstOrNull()
+    }
+
+    /**
+     * Which library games run in each prefix, by container id (a prefix no game runs in is absent): the Prefixes list's
+     * "Used by" and its "Not used". The containers are read once and each game resolved by [resolveId]. Disk and the
+     * library's store reads: never on the main thread.
+     */
+    suspend fun usage(context: Context): Map<String, List<String>> = withContext(Dispatchers.IO) {
+        val ids = runCatching { ContainerManager(context).containers }.getOrNull().orEmpty().map { it.id }
+        PcLibrary.allGames(context)
+            .mapNotNull { game -> resolveId(chosenId(context, game.id), ownId(game.id), ids)?.let { it to game.title } }
+            .groupBy({ it.first }, { it.second })
+    }
+
+    /**
+     * Removes the prefix [containerId] (docs/SPEC.md 5a piece 2: "A prefix no game or app uses any more is listed as
+     * 'Not used' with Remove beside it; nothing removes it by itself"). Refuses the shared prefix and one any game runs
+     * in. Deleted by [SafeDelete.clearWithin] fenced to the prefix home, which never follows a link: a prefix holds
+     * dosdevices links to drives and to the device's storage (the 2026-09-02 incident). Returns the sentence to show.
+     */
+    suspend fun remove(context: Context, containerId: String): String = withContext(Dispatchers.IO) {
+        if (containerId == DroidtopPcGameRuntime.CONTAINER_ID) return@withContext "The shared prefix is never removed."
+        val container = runCatching { ContainerManager(context).getContainerById(containerId) }.getOrNull()
+            ?: return@withContext "That prefix is already gone."
+        val users = usage(context)[containerId].orEmpty()
+        if (users.isNotEmpty()) return@withContext "Not removed: ${users.joinToString(", ")} still run in it."
+        val name = container.name?.takeIf { it.isNotBlank() } ?: containerId
+        val home = container.rootDir.parentFile ?: return@withContext "Not removed: the prefix has no home folder."
+        SafeDelete.clearWithin(home, container.rootDir)?.let { why -> return@withContext "$name was not fully removed: $why" }
+        "Removed $name."
+    }
+
+    /** The bytes [container] takes on disk, counted without following its links (dosdevices points at whole drives). Disk. */
+    fun sizeOf(container: Container): Long {
+        var total = 0L
+        runCatching {
+            java.nio.file.Files.walkFileTree(container.rootDir.toPath(), object : java.nio.file.SimpleFileVisitor<java.nio.file.Path>() {
+                override fun visitFile(file: java.nio.file.Path, attrs: java.nio.file.attribute.BasicFileAttributes): java.nio.file.FileVisitResult {
+                    if (attrs.isRegularFile) total += attrs.size()
+                    return java.nio.file.FileVisitResult.CONTINUE
+                }
+                override fun visitFileFailed(file: java.nio.file.Path, exc: java.io.IOException): java.nio.file.FileVisitResult =
+                    java.nio.file.FileVisitResult.CONTINUE
+            })
+        }
+        return total
     }
 
     private const val BY_CONTAINER = "container:"
@@ -691,6 +745,9 @@ object PcContainers {
     fun choose(context: Context, entryId: String, containerId: String) {
         WineGameOptionsPrefs.set(context, entryId, WineGameOptionsPrefs.get(context, entryId) + (PREFIX_KEY to containerId))
     }
+
+    /** Whether [containerId] is the shared prefix every game without a choice or a prefix of its own runs in. */
+    fun isShared(containerId: String): Boolean = containerId == DroidtopPcGameRuntime.CONTAINER_ID
 
     /** The id [entryId]'s own prefix has, or would have once made. */
     fun ownIdOf(entryId: String): String = ownId(entryId)

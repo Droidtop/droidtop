@@ -7513,8 +7513,16 @@ with no choice runs exactly as before. Picking "Shared" is the way back from
 a prefix of its own. The own prefix stays on the device, since nothing is
 deleted by a choice. A new prefix (the row, or a different Wine build) is
 made from the settings the game runs with now (`PcContainers.createOwn`) and
-recorded as the choice. Not built yet: the confirmation's "Copy this game's
-saves", the Prefixes list with "Not used" and Remove, copy-on-write and layer
+recorded as the choice. **Built (2026-11-05, `ci/managed-prefixes-2`): the
+Prefixes list of piece 2.** Settings > Library > Windows games > "Prefixes"
+lists every prefix with its Wine build, its size (counted without following
+links) and the games that run in it, or "Not used". Beside a prefix no game
+runs in (never the shared one) is "Remove", asked first ("Keep it" is the safe
+answer). `PcContainers.remove` deletes by `SafeDelete.clearWithin` fenced to
+the prefix home, and refuses a prefix any game still resolves to. The games
+are counted with the same rule a launch uses (`PcContainers.resolveId`, one
+rule for `forGame` and `usage`), with the containers read once. Not built yet:
+the confirmation's "Copy this game's saves", copy-on-write and layer
 prefixes, and pieces 3 to 7. Built state of the rest stays as the bullets
 above describe it until each part lands. The mechanism is 5b
 "Containment and copy-on-write layers for Wine"; the library side is the
