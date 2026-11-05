@@ -1231,6 +1231,8 @@ object AppSettingsCatalogs {
                     guidedKeyRow(context, ScraperKeyService.GOFILE, "GoFile"),
                 ),
             ),
+            // The person's own network shares and cloud storage (docs/SPEC.md "Network and cloud storage", Droidtop/tracker#573).
+            StorageSharesCatalog.group(context),
             // droidtop's own sign-ins for download sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648).
             CatalogGroup(
                 id = "accounts_download_sites",

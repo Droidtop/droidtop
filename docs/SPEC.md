@@ -22536,6 +22536,59 @@ The design's order (droidtop-agent docs/DESIGN.md section 10) holds:
 No relay carries data. Syncthing's discovery and STUN servers carry
 addresses only (the owner's decision above), and Tailscale is never required.
 
+## 7p. Network and cloud storage (decided 2026-11-05, Droidtop/tracker#573)
+
+The person's own network shares and cloud storage, which droidtop reaches itself. The design is on #573 (its first
+comment by the Cloud storage lane, 2026-11-04), with the owner's two decisions:
+- **Where the client lives** (owner, 2026-11-05): "Share client? That's be in lib-net. lib-sync controls
+  synchronization. A share can be a backend for a sync, but it's really just a network resource we can use for lots
+  of stuff".
+  - The client is lib-net's `net-remote` crate: one interface, `Remote`, and every backend. droidtop links it into
+    its native library (`native/`, operation `remote_test` so far).
+  - lib-sync names only what store and forward needs from a share (`sync_core::share::Share`); a lib-net share is
+    one implementation of it.
+- **Plain or locked** (owner, 2026-11-05): "That depends on their contents, I suppose, and if the user trusts the
+  share. Encryption should probably be toggleable".
+  - Each share has a trust choice, "What droidtop writes":
+    - **Locked** (the default): what droidtop writes there is sealed with the agent's sealing (XChaCha20-Poly1305
+      under this device's key), not a new scheme.
+    - **Trusted:** plain files the person can open themselves.
+  - The words on the choice say what each means: who can read the files, and that restoring a locked set on a new
+    device needs this device's key. Built to the lane's recommendation, owner to confirm: Locked is the default.
+  - Store-and-forward letters are sealed on every share, whatever the choice.
+
+**Backends**, in the order they are built: WebDAV (built: Nextcloud, ownCloud, most NAS), SFTP, SMB 2/3,
+S3-compatible, then cloud drives (Dropbox, OneDrive, Google Drive, through OAuth with PKCE and droidtop's client ids
+only) and NFS. Each crate a backend needs is checked first (name, owner, repository, downloads, maintenance, build
+scripts), and the check is recorded in its commit.
+
+**Settings > Accounts and sources > "Network and cloud storage"** (`StorageSharesCatalog`, `StorageShares`):
+- One row per share, with its state drawn and said: Not tested, Connected, Can't reach it, Sign-in refused,
+  Not encrypted, Address not valid, Refused. Opening the row gives:
+  - Test;
+  - the address and sign-in fields (the password is never shown back);
+  - Allow unencrypted;
+  - the trust choice;
+  - Remove, which forgets the password and deletes nothing on the share.
+- Add share takes a WebDAV address, the person's own user name and password, a name, Allow unencrypted and the
+  trust choice, then adds the share and tests it.
+- Rules for an address (`StorageShares.addressProblem`, and the same rules in `net-remote`):
+  - https only, unless the person allowed unencrypted for this share;
+  - no user, password, query or fragment in it (a sign-in goes in its own fields);
+  - redirects are not followed, so the sign-in never goes anywhere but the address typed.
+- The password is kept in the credential vault (`CredentialStore`, key `droidtop_share_<id>_password`). It is not
+  in the vault's backup set, so a droidtop backup never carries it.
+- Changing the address, the user name, the password or Allow unencrypted sets the share back to Not tested.
+- Nothing reads from or writes to a share until the person presses Test, or turns on something that uses it.
+
+**Uses, slice by slice** (each recorded here when built):
+- the computer's Cloud folder as a share (store and forward with no mirrored folder; it waits for droidtop's
+  sync-core pin to move to lib-sync 0.1.3 with droidtop-agent's);
+- saves to a share, as a save sync engine using lib-sync's save rule, plain or locked;
+- Back up droidtop to a share;
+- a share in the system file picker and as a games root, through a documents provider;
+- root mounts only through the enhanced privileges provider, as an enhancement.
+
 ## 8. Licensing
 
 GameNative's code lifted into `:runtime-windows` and `:stores` (by way of
