@@ -8092,6 +8092,15 @@ launcher's own, so an earlier LD_PRELOAD would be replaced), starts one listener
 `SBX_OWN_OPENS`, and keeps the newest five learn logs under droidtop's files, `wine-sandbox`. The row and the log say
 there is no protection while it is on. Winetricks and the other shell commands the runtime runs are not under it.
 
+**The pin moves to Fibrewall v0.2.0 (2026-11-05).** `vendor/sandbox` is at bi0shacker001/fibrewall 6cb3fdd, which
+adds network filtering (its `docs/design.md`, "Network filtering"). Per process, a host declares the destinations it may
+reach (`sbx_policy_net_rule`); the broker decides every connect, accept and addressed send
+(`SBX_LOCK_NET_FILTER`, with `SBX_LOCK_NET_BROKERED`), and resolves names itself. Nothing in droidtop uses it yet:
+this change only moves the pin (coordinator, 2026-11-05: "push a droidtop ci/ branch that moves the vendor/sandbox
+pin to it"). The `net.sockets` flags and rules are unchanged (`plugin_filter.c`, `plugin_broker.c`). Passing the flag on
+the isolated `net.sockets` shape, and declaring each plugin's rules, is the next change (Droidtop/tracker#553 lists
+Syncthing's rules).
+
 **Kernel drivers: the read-only half, built ahead of the layer (Droidtop/tracker#607, coordinator 2026-10-29).** The
 list, the approvals and the reporting do not depend on the layer, so they are built first; nothing in this half
 changes a prefix (the owner: no code that edits the prefix's registry before the layer can do it safely).
