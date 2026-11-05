@@ -102,7 +102,7 @@ object RemoteInputs {
         session = null
     }
 
-    private fun router() = RemoteInputRouter(
+    internal fun router() = RemoteInputRouter(
         ownField = { InWindowKeyboard.focusedOwnField() },
         ime = {
             SecondScreenKeyboard.androidTarget?.let {

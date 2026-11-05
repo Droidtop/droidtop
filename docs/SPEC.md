@@ -22249,7 +22249,19 @@ client." The plan and its slices are on #645.
     with the time it changed, and the newer one wins (kdeconnect-android's rule). A clip that just arrived is not
     sent back. Built to the recommendation, owner to confirm: the clipboard is shared with every paired device by
     default, as in the official apps.
-  - Remote input follows in #645's slice 4. Each plugin will have its own switch.
+  - **remote input (slice 4)**, both directions:
+    - *Controlled.* Typing from a paired device goes through "Type from another device"'s one router
+      (`RemoteInputRouter`): droidtop's own focused field, else droidtop's input method into any app's field, else
+      the router's notice (once a minute at most). Text, Backspace and Enter are typed; other special keys are not yet.
+      droidtop tells paired devices it takes typing (`keyboardstate` true) while KDE Connect is on, because the router
+      always answers. **Not built:** moving droidtop's pointer from a paired device. That needs an accessibility
+      service (`dispatchGesture`) or droidtop's own cursor, both the person's to switch on. Recommendation: droidtop's
+      own cursor overlay in Desktop mode first, with the accessibility service as an opt-in for other apps.
+    - *Controller.* A paired, reachable device's rows add **Type on ...**: typed into the field in focus there, then
+      Enter. A touchpad page (pointer, clicks, scroll) is next; the library already sends all of it (`input_send`).
+    - Built to the recommendation, owner to confirm: paired devices may type into droidtop by default, as in the
+      official apps; the switch is the library's `input` plugin.
+  - Each plugin will have its own switch on the screen.
 - **Tailscale** is a VPN plugin, not a client of droidtop's own (owner, above). It feeds its tailnet's online devices
   to the same address list (`kdeconnect_addresses`), slice 5 of #645.
 

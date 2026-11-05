@@ -127,6 +127,9 @@ object KdeConnect {
             return@withLock
         }
         call("addresses", JSONObject().put("addresses", JSONArray(addresses(context))))
+        // Typing from a paired device goes wherever "Type from another device" types (droidtop's own field, or any
+        // app's field through droidtop's input method), and says so when there is no field: so it always takes it.
+        call("keyboard_ready", JSONObject().put("ready", true))
         _running.value = true
         _changes.tryEmit(System.nanoTime())
         loop = scope.launch {
@@ -163,6 +166,20 @@ object KdeConnect {
 
     suspend fun ping(id: String): String? = withContext(Dispatchers.IO) {
         AgentNative.failure(call("ping", JSONObject().put("id", id).put("message", "Ping from droidtop")))
+    }
+
+    /** Types [text] on the paired device [id] (droidtop as the controller). */
+    suspend fun type(id: String, text: String, enter: Boolean = false): String? = withContext(Dispatchers.IO) {
+        var failure = if (text.isEmpty()) null else AgentNative.failure(call("input_send", JSONObject().put("id", id).put("input", JSONObject().put("key", text))))
+        if (failure == null && enter) {
+            failure = AgentNative.failure(call("input_send", JSONObject().put("id", id).put("input", JSONObject().put("special_key", "enter"))))
+        }
+        failure
+    }
+
+    /** Moves the pointer of, scrolls or clicks on [id]: [input] in lib-kdeconnect's InputEvent form. */
+    suspend fun pointer(id: String, input: JSONObject): String? = withContext(Dispatchers.IO) {
+        AgentNative.failure(call("input_send", JSONObject().put("id", id).put("input", input)))
     }
 
     /** This device's clipboard is now [text] (already checked against droidtop's clipboard rules): sent to paired devices. */
@@ -250,6 +267,8 @@ sealed class KdcEvent {
     /** Whole, at [path] in droidtop's cache; moved to the person's folder by :app. */
     data class FileReceived(val id: String, val name: String, val path: String, val size: Long, val open: Boolean) : KdcEvent()
     data class FileFailed(val id: String, val name: String, val why: String) : KdcEvent()
+    /** A paired device types ([key] text, or [specialKey] such as "backspace" or "enter") or moves the pointer. */
+    data class Input(val id: String, val key: String?, val specialKey: String?, val pointer: Boolean) : KdcEvent()
     /** The other device's clipboard: put on this one's. */
     data class Clipboard(val id: String, val text: String) : KdcEvent()
     data class FileSent(val id: String, val name: String, val size: Long) : KdcEvent()
@@ -269,6 +288,15 @@ sealed class KdcEvent {
                 when (p?.optString("plugin")) {
                     "ping" -> Ping(o.optString("id"), p.optString("message").takeIf { it.isNotEmpty() && !p.isNull("message") })
                     "clipboard" -> Clipboard(o.optString("id"), p.optString("text"))
+                    "input" -> {
+                        val i = p.optJSONObject("input") ?: JSONObject()
+                        Input(
+                            o.optString("id"),
+                            i.optString("key").takeIf { it.isNotEmpty() && !i.isNull("key") },
+                            i.optString("special_key").takeIf { it.isNotEmpty() && !i.isNull("special_key") },
+                            pointer = i.has("dx") || i.has("dy") || i.has("x") || i.has("click") || i.has("scroll"),
+                        )
+                    }
                     "share_text" -> ShareText(o.optString("id"), p.optString("text"))
                     "share_url" -> ShareUrl(o.optString("id"), p.optString("url"))
                     "file_receiving" -> FileReceiving(
