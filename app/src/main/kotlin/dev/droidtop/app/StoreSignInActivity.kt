@@ -364,26 +364,32 @@ private fun Choices(label: String, failure: String?, session: StoreAccountSignIn
     // The primary action is selected on open, so a pad starts there.
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
     failure?.let { NoticeCard(Notice(NoticeTone.Caution, "Not signed in", body = it.take(Notice.BODY_MAX), details = it), NoticePlacement.Row) }
-    Text(stringResource(R.string.store_sign_in_with_a_qr_code), style = MaterialTheme.typography.titleMedium)
-    Text(
-        "Scan it with the $label app on your phone and approve. Nothing is typed here.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Button(onClick = { session.showQrCode() }, modifier = Modifier.focusRequester(first)) { Text(stringResource(R.string.store_sign_in_show_a_qr_code)) }
-    HorizontalDivider()
+    if (session.offersQrCode) {
+        Text(stringResource(R.string.store_sign_in_with_a_qr_code), style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Scan it with the $label app on your phone and approve. Nothing is typed here.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Button(onClick = { session.showQrCode() }, modifier = Modifier.focusRequester(first)) { Text(stringResource(R.string.store_sign_in_show_a_qr_code)) }
+        HorizontalDivider()
+    }
     Text(stringResource(R.string.store_sign_in_with_your_account_name_and), style = MaterialTheme.typography.titleMedium)
     Text(
-        "They go to $label to sign in and are not kept on this device. $label may then ask for a code from its phone app or your e-mail.",
+        if (session.keepsPassword) {
+            "$label asks for them with every request, so this device keeps them, sealed in droidtop's encrypted vault, until you sign out."
+        } else {
+            "They go to $label to sign in and are not kept on this device. $label may then ask for a code from its phone app or your e-mail."
+        },
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     OutlinedTextField(
         value = accountName,
         onValueChange = { accountName = it },
-        label = { Text(stringResource(R.string.store_sign_in_account_name)) },
+        label = { Text(session.accountLabel ?: stringResource(R.string.store_sign_in_account_name)) },
         singleLine = true,
-        modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
+        modifier = if (session.offersQrCode) Modifier.widthIn(max = 480.dp).fillMaxWidth() else Modifier.widthIn(max = 480.dp).fillMaxWidth().focusRequester(first),
     )
     OutlinedTextField(
         value = password,

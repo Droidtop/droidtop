@@ -9,6 +9,7 @@ import dev.droidtop.stores.gog.GOGStore
 import dev.droidtop.stores.humble.HumbleStore
 import dev.droidtop.stores.indiegala.IndiegalaStore
 import dev.droidtop.stores.itch.ItchStore
+import dev.droidtop.stores.legacy.LegacyStore
 import dev.droidtop.stores.steam.SteamStore
 import dev.droidtop.stores.ubisoft.UbisoftStore
 import dev.droidtop.stores.xbox.XboxStore
@@ -31,6 +32,7 @@ object BuiltInStores {
         StoreLibraries.register(EAStore())
         StoreLibraries.register(UbisoftStore())
         StoreLibraries.register(XboxStore())
+        StoreLibraries.register(LegacyStore())
     }
 
     /**

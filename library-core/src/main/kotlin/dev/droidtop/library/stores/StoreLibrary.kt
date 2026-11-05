@@ -212,6 +212,18 @@ interface StoreAccountSignIn {
 
     /** The screen is closing: stops whatever is under way. */
     fun close()
+
+    /** Whether the store signs in by a QR code its phone app approves (Steam); without one the screen offers none. */
+    val offersQrCode: Boolean get() = true
+
+    /**
+     * Whether the store needs the password with every request, so droidtop keeps it, sealed in its encrypted vault
+     * (Legacy Games, the owner's choice, Droidtop/tracker#913); the screen then says so instead of "not kept".
+     */
+    val keepsPassword: Boolean get() = false
+
+    /** What the account field is called ("E-mail"); null for "Account name". */
+    val accountLabel: String? get() = null
 }
 
 /**

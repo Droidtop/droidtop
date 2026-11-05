@@ -15678,6 +15678,16 @@ follows:
   games (a package family name, type Game, PC among its devices, Playnite's
   filter), with Microsoft's platform words dropped from their names. They run only
   on Windows or an Xbox: Install says so.
+- **Legacy Games** (`LegacyStore`, `LegacyApi`; Droidtop/tracker#335; the owner, 2026-11-05: "include Legacy
+  Games, with the password in the encrypted vault"): the account's purchases (`users/downloads` against
+  `products/catalog`) and giveaways (`users/getgiveawaycatalogbyemail`), as the launcher's own API gives them and as
+  borgx/legacygames-backup and gpuccio87/legacy-games-buyout (MIT) read them. Its API asks for the e-mail and
+  password with every request, so the sign-in is droidtop's own screen (`StoreSignIn.Account`, with no QR code and
+  saying that the password is kept: `StoreAccountSignIn.offersQrCode`, `keepsPassword`, `accountLabel`), the pair is
+  checked with `users/login` and then kept sealed in a vault of the store's own (`CredentialStore.vaultFor`, the same
+  Keystore sealing as droidtop's other keys, never in a settings backup) until Sign out, which removes it; Keys and
+  accounts lists it. An install asks for a fresh installer link (`products/download`, or `giveawaydownload` for a
+  giveaway) and runs `SingleFileInstall`: Legacy's games are Windows installers, kept in the game's folder.
 - **Amazon Games** (`AmazonStore`): sign-in is Amazon's own page with a
   fresh PKCE session per sign-in (nile's device registration, through
   GameNative's `AmazonAuthManager`); the code comes back on the address
