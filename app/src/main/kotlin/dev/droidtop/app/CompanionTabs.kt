@@ -95,18 +95,42 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
 
         val HOME = of(ControlPanel.HOME, "Home", QuickGlyph.HOME)
         val GAME = of(ControlPanel.GAME, "Game", QuickGlyph.GAMEPAD)
-        val SYSTEM = of(ControlPanel.SYSTEM, "System", QuickGlyph.SETTINGS)
-        val APPS = of(ControlPanel.APPS, "Apps", QuickGlyph.APPS)
+
+        /**
+         * The two management tabs (Droidtop/tracker#786 S3, plan 4.2): each a list of its pages, and any page can be a
+         * tab of its own ([CompanionPrefs.pageId]). System, Network and Apps, tabs until S3, are Device's pages.
+         */
+        val DEVICE = of(ControlPanel.DEVICE, "Device", QuickGlyph.SETTINGS)
+        val DROIDTOP = of(ControlPanel.DROIDTOP, "droidtop", QuickGlyph.DISPLAY)
+        val SYSTEM = CompanionTab(CompanionPrefs.DEVICE_SYSTEM, "System", QuickGlyph.POWER)
+        val APPS = CompanionTab(CompanionPrefs.DEVICE_APPS, "Apps", QuickGlyph.APPS)
+        /** Android's own pages, folded under one row until each has its own page (plan 4.1 rule 1). */
+        val ANDROID_PAGES = CompanionTab(CompanionPrefs.DEVICE_ANDROID, "Android's pages", QuickGlyph.ANDROID)
+        val COMPANION_SETTINGS = CompanionTab(CompanionPrefs.DROIDTOP_COMPANION, "Companion", QuickGlyph.SECOND_SCREEN)
         val PERFORMANCE = of(ControlPanel.PERFORMANCE, "Performance", QuickGlyph.GAUGE)
         val INPUT = of(ControlPanel.INPUT, "Input", QuickGlyph.KEYBOARD)
         val SOCIAL = of(ControlPanel.SOCIAL, "Social", QuickGlyph.PEOPLE)
         val PLUGINS = of(ControlPanel.PLUGINS, "Plugins", QuickGlyph.GENERIC)
 
-        /** Every network in context, with Manage (Droidtop/tracker#583); the Quick Menu's Connections panel. */
-        val NETWORK = of(ControlPanel.CONNECTIONS, "Network", QuickGlyph.NETWORK)
+        /** Every network in context, with Manage (Droidtop/tracker#583); a page of Device since S3. */
+        val NETWORK = CompanionTab(CompanionPrefs.DEVICE_NETWORK, "Network", QuickGlyph.NETWORK)
 
         /** The tabs a person can choose, in the order More lists them. Game is not one: it comes while a game runs. */
-        val CHOOSABLE = listOf(HOME, SYSTEM, APPS, PERFORMANCE, INPUT, SOCIAL, NETWORK)
+        val CHOOSABLE = listOf(HOME, DEVICE, DROIDTOP, PERFORMANCE, INPUT, SOCIAL)
+
+        /** Device's pages and droidtop's, in the order their tab lists them. */
+        val DEVICE_PAGES = listOf(SYSTEM, NETWORK, APPS, ANDROID_PAGES)
+        val DROIDTOP_PAGES = listOf(COMPANION_SETTINGS)
+
+        /** Pages a person can choose as a tab of its own; they are never listed under More, their tab lists them. */
+        val PAGE_TABS = DEVICE_PAGES + DROIDTOP_PAGES
+
+        /** The pages of [parent]'s tab, or empty for a tab that has none. */
+        fun pagesOf(parent: String): List<CompanionTab> = when (parent) {
+            DEVICE.id -> DEVICE_PAGES
+            DROIDTOP.id -> DROIDTOP_PAGES
+            else -> emptyList()
+        }
 
         fun plugin(pluginId: String, label: String) = CompanionTab(CompanionPrefs.PLUGIN_PREFIX + pluginId, label, QuickGlyph.GENERIC)
 
@@ -159,7 +183,8 @@ internal fun slots(
     val offered = CompanionTab.CHOOSABLE.filter { it.panel in allowed } +
         (if (pluginTabs.isNotEmpty()) listOf(CompanionTab.PLUGINS) else emptyList())
     val canChoose = ControlAccess.shows(mode, "", ControlAccess.GROUP_COMPANION)
-    val choices = offered + pluginTabs
+    // A page chosen as its own tab is drawn on the bar; it is never under More, which its parent's tab already lists.
+    val choices = offered + pluginTabs + CompanionTab.PAGE_TABS.filter { it.panel in allowed }
     val bar = (if (canChoose) chosen.map(CompanionPrefs::currentId) else offered.map { it.id })
         .mapNotNull { id -> choices.firstOrNull { it.id == id } }
         .distinct()
@@ -247,6 +272,8 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
     val badges = mapOf(CompanionTab.SOCIAL.id to if (social) unread else 0)
 
     var selectedId by remember(mode) { mutableStateOf<String?>(null) }
+    // The page open on Device's and droidtop's tabs, by the tab's id; none shows the tab's list of pages.
+    var openPages by remember(mode) { mutableStateOf<Map<String, String>>(emptyMap()) }
     var moreOpen by remember { mutableStateOf(false) }
     // The tab "When a game starts" turned to, so quitting the game goes back to Home only from there.
     var autoTab by remember { mutableStateOf<String?>(null) }
@@ -379,9 +406,22 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             moreOpen = false
             autoTab = null
             selectedId = id
+            // A tap on Device or droidtop shows its list again.
+            openPages = openPages - id
+        }
+        // A page that is not a tab of its own opens on its parent's tab (Droidtop/tracker#786 S3): "All controls" on Home
+        // opens Device > System wherever System is.
+        fun showTab(tab: CompanionTab) {
+            val parent = CompanionPrefs.parentOf(tab.id)?.let(CompanionPrefs::id)
+            if (bar.all.none { it.id == tab.id } && parent != null && bar.all.any { it.id == parent }) {
+                select(parent)
+                openPages = openPages + (parent to tab.id)
+            } else {
+                select(tab.id)
+            }
         }
         val nav = CompanionNav(
-            openTab = { tab -> select(tab.id) },
+            openTab = { tab -> showTab(tab) },
             openConversation = { conversation -> select(CompanionTab.SOCIAL.id); socialStart = conversation },
         )
         // Remembered for "The last one used", off the main thread.
@@ -447,9 +487,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                         CompanionPill("Hide keyboard", selected = true) { KeyboardTargets.hideCompanion() }
                     }
                     if (immersive) {
-                        StatusCluster(showBatteryPercent = true, onClick = {
-                            if (bar.all.any { it.id == CompanionTab.SYSTEM.id }) select(CompanionTab.SYSTEM.id)
-                        })
+                        StatusCluster(showBatteryPercent = true, onClick = { showTab(CompanionTab.SYSTEM) })
                     }
                 }
             }
@@ -462,13 +500,19 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                             CompanionTab.HOME.id -> home()
                             CompanionTab.GAME.id -> CompanionGameTab()
                             CompanionTab.SOCIAL.id -> CompanionSocialTab(socialStart)
-                            CompanionTab.APPS.id -> CompanionTasksTab()
                             CompanionTab.PERFORMANCE.id -> CompanionPerformanceTab()
-                            CompanionTab.SYSTEM.id -> CompanionSystemTab()
                             CompanionTab.INPUT.id -> SecondScreenInputSurface(mode)
                             CompanionTab.PLUGINS.id -> CompanionPluginsTab(null)
-                            CompanionTab.NETWORK.id -> CompanionNetworkTab()
-                            else -> if (shown.startsWith(CompanionPrefs.PLUGIN_PREFIX)) CompanionPluginsTab(shown)
+                            CompanionTab.DEVICE.id, CompanionTab.DROIDTOP.id -> CompanionAreaTab(
+                                pages = CompanionTab.pagesOf(shown),
+                                open = openPages[shown],
+                                onOpen = { page -> openPages = openPages + (shown to page) },
+                                onBack = { openPages = openPages - shown },
+                            )
+                            else -> when {
+                                shown.startsWith(CompanionPrefs.PLUGIN_PREFIX) -> CompanionPluginsTab(shown)
+                                shown.startsWith(CompanionPrefs.PAGE_PREFIX) -> CompanionPage(shown)
+                            }
                         }
                     }
                 }
@@ -562,36 +606,21 @@ private val RAIL_WIDTH = 88.dp
 
 /** More: the tabs that are not on the bar, as large rows with their counts. A tap opens one. */
 @Composable
-private fun CompanionMoreList(tabs: List<CompanionTab>, shown: String, badges: Map<String, Int>, onSelect: (CompanionTab) -> Unit) {
+private fun CompanionMoreList(
+    tabs: List<CompanionTab>,
+    shown: String,
+    badges: Map<String, Int>,
+    title: String = CompanionTab.MORE_LABEL,
+    onSelect: (CompanionTab) -> Unit,
+) {
     val colors = MaterialTheme.colorScheme
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    // The companion's own settings, on the companion (Droidtop/tracker#786 S2b): the screen Settings shows under
-    // "Companion screen", opened here in place; until S3's droidtop tab, More's last row. Null where the mode hides it.
-    var settingsScreen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
-    val offersSettings by androidx.compose.runtime.produceState(false) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            dev.droidtop.library.settings.ControlAccess.shows(
-                dev.droidtop.library.settings.UiModePrefs.get(context),
-                dev.droidtop.library.settings.GamingSettingsCatalog.ID_DISPLAY_COMPANION,
-                dev.droidtop.library.settings.ControlAccess.GROUP_COMPANION,
-            )
-        }
-    }
-    val openSettings = settingsScreen
-    if (openSettings != null) {
-        Column(modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp)) {
-            CompanionNestedScreen(openSettings, onBack = { settingsScreen = null }, onChanged = {})
-        }
-        return
-    }
     val onOpen = onSelect
     Column(
         modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            CompanionTab.MORE_LABEL,
+            title,
             style = MaterialTheme.typography.titleMedium,
             color = colors.onBackground,
             modifier = Modifier.semantics { heading() },
@@ -623,32 +652,111 @@ private fun CompanionMoreList(tabs: List<CompanionTab>, shown: String, badges: M
                 }
             }
         }
-        if (offersSettings) {
-            CompanionTile(
-                onClick = {
-                    scope.launch {
-                        settingsScreen = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            dev.droidtop.library.settings.GamingSettingsCatalog.companionScreen(context)
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().semantics { role = Role.Button },
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).background(colors.surface).padding(horizontal = 16.dp),
-                ) {
-                    QuickGlyphIcon(QuickGlyph.SETTINGS, tint = colors.onSurface, modifier = Modifier.size(24.dp))
-                    Text(COMPANION_SETTINGS, style = MaterialTheme.typography.titleSmall, color = colors.onSurface, modifier = Modifier.weight(1f))
-                }
-            }
+    }
+}
+
+/**
+ * Device's or droidtop's tab (Droidtop/tracker#786 S3, plan 4.1 rule 7): the tab is level 0, its list of [pages]; a page
+ * is level 1, opened in place with a Back row above it. [open] is the page shown, null for the list.
+ */
+@Composable
+private fun CompanionAreaTab(pages: List<CompanionTab>, open: String?, onOpen: (String) -> Unit, onBack: () -> Unit) {
+    val page = pages.firstOrNull { it.id == open }
+    if (page == null) {
+        CompanionMoreList(pages, shown = "", badges = emptyMap(), title = areaTitle(pages), onSelect = { onOpen(it.id) })
+        return
+    }
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CompanionPill("Back") { onBack() }
+            Text(
+                page.label,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.semantics { heading() },
+            )
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) { CompanionPage(page.id) }
+    }
+}
+
+/** The heading over an area tab's list of pages: the tab's own name. */
+private fun areaTitle(pages: List<CompanionTab>): String =
+    if (pages == CompanionTab.DROIDTOP_PAGES) CompanionTab.DROIDTOP.label else CompanionTab.DEVICE.label
+
+/** One page of Device or droidtop, drawn the same on its parent's tab and as a tab of its own. */
+@Composable
+private fun CompanionPage(id: String) {
+    when (id) {
+        CompanionTab.SYSTEM.id -> CompanionSystemTab()
+        CompanionTab.NETWORK.id -> CompanionNetworkTab()
+        CompanionTab.APPS.id -> CompanionTasksTab()
+        CompanionTab.ANDROID_PAGES.id -> CompanionCatalogPage { context -> androidPagesScreen(context) }
+        CompanionTab.COMPANION_SETTINGS.id -> CompanionCatalogPage { context ->
+            dev.droidtop.library.settings.GamingSettingsCatalog.companionScreen(context)
         }
     }
 }
 
-/** More's last row: the companion's own settings. */
-private const val COMPANION_SETTINGS = "Companion settings"
+/** A page that is a catalog screen, built off the main thread by [build] and drawn by the companion's catalog host. */
+@Composable
+private fun CompanionCatalogPage(build: (android.content.Context) -> dev.droidtop.library.settings.CatalogScreen?) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val screen by androidx.compose.runtime.produceState<dev.droidtop.library.settings.CatalogScreen?>(null) {
+        value = withContext(Dispatchers.IO) { build(context) }
+    }
+    Column(modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp)) {
+        screen?.let { CompanionNestedScreen(it, onBack = null, onChanged = {}) } ?: CompanionNote("Reading…")
+    }
+}
+
+/**
+ * "Android's pages" (Droidtop/tracker#786 S3, plan 4.1 rules 1 and 2): Android's own Settings pages droidtop has no page
+ * for yet, folded under one row of Device, each labelled as the exit it is ("Android's Display") and saying where it
+ * opens. NFC and Printing are left out where the device lacks them, since a resolving page does not prove the
+ * hardware. Each later slice moves its area onto a page of droidtop's and its link leaves this list.
+ */
+internal fun androidPagesScreen(context: android.content.Context): dev.droidtop.library.settings.CatalogScreen {
+    val pm = context.packageManager
+    val links = dev.droidtop.runtime.systemstatus.SystemControls.settingsLinks(context).filter { link ->
+        when (link.id) {
+            "nfc" -> pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_NFC)
+            "print" -> pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PRINTING)
+            else -> true
+        }
+    }
+    return dev.droidtop.library.settings.CatalogScreen(
+        id = "companion_android_pages",
+        title = CompanionTab.ANDROID_PAGES.label,
+        groups = { _ ->
+            listOf(
+                dev.droidtop.library.settings.CatalogGroup(
+                    id = "companion_android_pages_links",
+                    title = null,
+                    items = links.map { link ->
+                        dev.droidtop.library.settings.ActionItem(
+                            id = "companion_android_${link.id}",
+                            title = exitLabel(link.label),
+                            subtitle = EXIT_SUBTITLE,
+                            icon = dev.droidtop.library.settings.CatalogIcon.ANDROID_SETTINGS,
+                            run = { ctx -> dev.droidtop.runtime.systemstatus.SettingsLaunch.start(ctx, link.intent) },
+                        )
+                    },
+                ),
+            )
+        },
+    )
+}
+
+/** An exit row's label (plan 4.1 rule 2): it names the page as Android's. */
+internal fun exitLabel(page: String): String = "Android's $page"
+
+/** What an exit row says it does (plan 4.1 rule 2). */
+internal const val EXIT_SUBTITLE = "Opens Android's Settings on this screen. Back returns here"
 
 /** A first-run tip: what something is, until the person dismisses it. Read by TalkBack like any text. */
 @Composable

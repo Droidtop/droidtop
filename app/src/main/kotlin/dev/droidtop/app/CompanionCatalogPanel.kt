@@ -86,7 +86,14 @@ internal fun companionSystemCards(
     privacy: CatalogItem?,
     accessibility: List<CatalogItem> = emptyList(),
 ): List<SystemCard> = listOf(
-    SystemCard("system", "System", section(QuickSection.SYSTEM), folded = false),
+    // Without the Android settings row: on the companion its links are Device's "Android's pages", labelled as exits,
+    // and an exit is on one page only (Droidtop/tracker#786 S3, plan 4.1 rule 2).
+    SystemCard(
+        "system",
+        "System",
+        section(QuickSection.SYSTEM).filter { it.id != dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS },
+        folded = false,
+    ),
     SystemCard("display", "Display", section(QuickSection.DISPLAY), folded = true),
     SystemCard("sound", "Sound", section(QuickSection.AUDIO), folded = true),
     // Network detail and Bluetooth devices, drawn by the card itself (slice C19).

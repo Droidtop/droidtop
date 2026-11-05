@@ -1203,15 +1203,20 @@ object GamingSettingsCatalog {
     )
 
     /** The tabs a person can put on the companion's bar or open it on, with their names. Game comes by itself. */
+    // The tabs and the pages that can be tabs of their own (Droidtop/tracker#786 S3): System, Network and Apps are
+    // Device's pages since S3, and a saved bar's old ids are read as these (CompanionPrefs.currentId).
     private val COMPANION_TAB_CHOICES = listOf(
-        ControlPanel.HOME to "Home",
-        ControlPanel.SYSTEM to "System",
-        ControlPanel.APPS to "Apps",
-        ControlPanel.PERFORMANCE to "Performance",
-        ControlPanel.INPUT to "Input",
-        ControlPanel.SOCIAL to "Social",
-        ControlPanel.PLUGINS to "Plugins",
-        ControlPanel.CONNECTIONS to "Network",
+        CompanionPrefs.id(ControlPanel.HOME) to "Home",
+        CompanionPrefs.id(ControlPanel.DEVICE) to "Device",
+        CompanionPrefs.id(ControlPanel.DROIDTOP) to "droidtop",
+        CompanionPrefs.id(ControlPanel.PERFORMANCE) to "Performance",
+        CompanionPrefs.id(ControlPanel.INPUT) to "Input",
+        CompanionPrefs.id(ControlPanel.SOCIAL) to "Social",
+        CompanionPrefs.id(ControlPanel.PLUGINS) to "Plugins",
+        CompanionPrefs.DEVICE_SYSTEM to "Device: System",
+        CompanionPrefs.DEVICE_NETWORK to "Device: Network",
+        CompanionPrefs.DEVICE_APPS to "Device: Apps",
+        CompanionPrefs.DROIDTOP_COMPANION to "droidtop: Companion",
     )
 
     /** The names of plugin panels last offered as tab choices, so a bar's summary can name them without reading manifests. */
@@ -1226,9 +1231,9 @@ object GamingSettingsCatalog {
      */
     private fun companionTabsGroup(context: Context): CatalogGroup {
         val settings = CompanionPrefs.settings.value
-        val tabOptions = COMPANION_TAB_CHOICES.map { (panel, label) -> ChoiceOption(CompanionPrefs.id(panel), label) }
+        val tabOptions = COMPANION_TAB_CHOICES.map { (id, label) -> ChoiceOption(id, label) }
         fun names(ids: List<String>) = ids.mapNotNull { id ->
-            COMPANION_TAB_CHOICES.firstOrNull { CompanionPrefs.id(it.first) == id }?.second ?: companionPluginTabNames[id]
+            COMPANION_TAB_CHOICES.firstOrNull { it.first == id }?.second ?: companionPluginTabNames[id]
         }.joinToString(", ")
         val perMode = CompanionPrefs.MODES.map { mode ->
             val name = COMPANION_MODE_NAMES.getValue(mode)

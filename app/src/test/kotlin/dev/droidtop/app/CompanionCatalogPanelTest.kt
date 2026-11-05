@@ -35,7 +35,11 @@ class CompanionCatalogPanelTest {
     @Test fun cardsCarryTheQuickMenusItemsInTheSameOrder() {
         val cards = companionSystemCards(::quick, performance, privacy)
         assertEquals(listOf("system", "display", "sound", "connections", "power", "storage", "privacy"), cards.map { it.id })
-        assertEquals(quick(QuickSection.SYSTEM).map { it.id }, cards.first { it.id == "system" }.items.map { it.id })
+        // The Android settings row is Device's "Android's pages" on the companion (Droidtop/tracker#786 S3).
+        assertEquals(
+            quick(QuickSection.SYSTEM).map { it.id } - GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS,
+            cards.first { it.id == "system" }.items.map { it.id },
+        )
         assertEquals(quick(QuickSection.DISPLAY).map { it.id }, cards.first { it.id == "display" }.items.map { it.id })
         assertEquals(quick(QuickSection.AUDIO).map { it.id }, cards.first { it.id == "sound" }.items.map { it.id })
         // Every Quick Menu item is on the companion exactly once.

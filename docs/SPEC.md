@@ -5335,12 +5335,21 @@ droidtop 0.2.0-dev.1931).
   `ControlPanel.DROIDTOP`, owner decision of 2026-10-30) are the companion's own panels: the Quick Menu never lists
   them (`ControlAccess.COMPANION_ONLY`), and only Full allows them, default-deny for every other mode. Any of
   their pages can be a tab of its own, stored as `page:<parent>/<page>` (`CompanionPrefs.pageId`), whose panel is
-  its parent's, so a mode that denies the panel denies the page. Their tabs and pages are drawn from S3. **The companion's own settings on the
-  companion** (Droidtop/tracker#786 S2b): More's last row, "Companion settings", opens the screen Settings shows
-  under "Companion screen" (`GamingSettingsCatalog.companionScreen`), in place, as a nested screen; where the mode
-  hides the Companion group (Kid, Kiosk, Guest) there is no such row. S3 moves it under the droidtop tab. Where the mode hides the Companion
-  group (Kid, Kiosk) nobody can choose, so the bar is the mode's whole tab set. Defaults: Home, System, Apps,
-  Social in Gaming and Mobile; Input, Home, System, Apps in Desktop. A tab under More passes its badge to
+  its parent's, so a mode that denies the panel denies the page. **Since S3** (Droidtop/tracker#786) each is a tab
+  whose content is its list of pages (level 0), and a page opens in place under a Back row (level 1;
+  `CompanionAreaTab`). Device's pages: System, Network and Apps (the tabs they were, drawn as before) and
+  **Android's pages**, Android's own Settings pages droidtop has no page for yet, folded under one row, each labelled
+  as the exit it is ("Android's Display", "Opens Android's Settings on this screen. Back returns here"; NFC and
+  Printing only where the device has them); the System page's "Android settings" row is left out on the companion,
+  so an exit is on one page. Later slices move each area onto a page of its own and its link leaves the fold.
+  droidtop's first page is **Companion**, the companion's own settings: the screen Settings shows under "Companion
+  screen" (`GamingSettingsCatalog.companionScreen`, S2b), drawn by the companion's catalog host; it was More's last
+  row until S3. A page chosen as a tab is on the bar and never under More, which lists tabs only; anything that
+  opens a page that is not on the bar (Home's "All controls", the status line, the System page's Network) opens it
+  on its parent's tab. A saved bar keeps its reach (`CompanionPrefs.currentId`): System is read as Device, Network
+  and Apps as Device's pages. Where the mode hides the Companion
+  group (Kid, Kiosk) nobody can choose, so the bar is the mode's whole tab set. Defaults: Home, Device, droidtop,
+  Social in Gaming and Mobile; Input, Home, Device, droidtop in Desktop. A tab under More passes its badge to
   More (the Social unread count, spoken with it). Every entry has the tab role, its selected state and a spoken
   name. A first-run tip says what the bar is and that Game appears while a game runs, until dismissed.
 - **Opening tab and game start.** The companion opens on the mode's opening tab: Home in Gaming and Mobile,

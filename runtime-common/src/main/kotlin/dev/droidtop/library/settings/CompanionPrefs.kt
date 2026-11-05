@@ -145,6 +145,19 @@ object CompanionPrefs {
     /** The tab id of [page] under [parent]. */
     fun pageId(parent: ControlPanel, page: String): String = PAGE_PREFIX + id(parent) + "/" + page
 
+    /**
+     * The pages S3 gives Device and droidtop (Droidtop/tracker#786): the tabs System, Network and Apps became Device's
+     * pages, Android's own pages fold under one row of Device, and the companion's settings are droidtop's first page.
+     */
+    val DEVICE_SYSTEM: String = pageId(ControlPanel.DEVICE, "system")
+    val DEVICE_NETWORK: String = pageId(ControlPanel.DEVICE, "network")
+    val DEVICE_APPS: String = pageId(ControlPanel.DEVICE, "apps")
+    val DEVICE_ANDROID: String = pageId(ControlPanel.DEVICE, "android")
+    val DROIDTOP_COMPANION: String = pageId(ControlPanel.DROIDTOP, "companion")
+
+    /** The panel a page tab belongs to (Device or droidtop); null for a tab that is not a page. */
+    fun parentOf(id: String): ControlPanel? = if (id.startsWith(PAGE_PREFIX)) panelOf(id) else null
+
     val MODES = listOf("GAMING", "STANDARD", "DESKTOP")
 
     /** The id of a built-in tab. */
@@ -160,22 +173,28 @@ object CompanionPrefs {
         else -> ControlPanel.entries.firstOrNull { id(it) == id }
     }
 
-    /** Defaults (docs/SPEC.md "The companion's tabs"): Desktop leads with Input, the others with Home. */
+    /**
+     * Defaults (docs/SPEC.md "The companion's tabs", Droidtop/tracker#786 plan 4.2): Home, Device, droidtop and Social
+     * in Gaming and Mobile; Input, Home, Device and droidtop in Desktop.
+     */
     fun defaultChosen(mode: String): List<String> = if (mode == "DESKTOP") {
-        listOf(ControlPanel.INPUT, ControlPanel.HOME, ControlPanel.SYSTEM, ControlPanel.APPS).map(::id)
+        listOf(ControlPanel.INPUT, ControlPanel.HOME, ControlPanel.DEVICE, ControlPanel.DROIDTOP).map(::id)
     } else {
-        listOf(ControlPanel.HOME, ControlPanel.SYSTEM, ControlPanel.APPS, ControlPanel.SOCIAL).map(::id)
+        listOf(ControlPanel.HOME, ControlPanel.DEVICE, ControlPanel.DROIDTOP, ControlPanel.SOCIAL).map(::id)
     }
 
     /** The tab [OPEN_DEFAULT] means: Input in Desktop (SPEC 6c), Home elsewhere. */
     fun defaultOpening(mode: String): String = id(if (mode == "DESKTOP") ControlPanel.INPUT else ControlPanel.HOME)
 
     /**
-     * A stored tab id as today's: the Tasks tab became Apps. Anything else unknown is dropped by the caller, so a
-     * value from another version never names a tab that is not there.
+     * A stored tab id as today's, so a saved bar keeps its reach: the Tasks tab became Apps, and since S3
+     * (Droidtop/tracker#786 plan 4.2) System is Device, and Network and Apps are Device's pages. Anything else unknown
+     * is dropped by the caller, so a value from another version never names a tab that is not there.
      */
     fun currentId(stored: String): String = when (stored) {
-        "tasks" -> id(ControlPanel.APPS)
+        "system" -> id(ControlPanel.DEVICE)
+        "connections" -> DEVICE_NETWORK
+        "tasks", "apps" -> DEVICE_APPS
         else -> stored
     }
 

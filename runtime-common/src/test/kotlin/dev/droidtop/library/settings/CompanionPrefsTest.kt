@@ -24,13 +24,13 @@ class CompanionPrefsTest {
 
     @Test
     fun `stored ids are read as today's, unknown ones dropped, at most four`() {
-        assertEquals(listOf("home", "apps", "social", "system"), CompanionPrefs.decodeList("home,tasks,nonsense,social,home,system,input"))
+        assertEquals(listOf("home", CompanionPrefs.DEVICE_APPS, "social", "device"), CompanionPrefs.decodeList("home,tasks,nonsense,social,home,system,input"))
         val read = CompanionPrefs.read(
             mapOf("chosen_GAMING" to "tasks,home", "opening_STANDARD" to "tasks", "game_start" to "none", "bar_tip_seen" to true),
         )
-        assertEquals(listOf("apps", "home"), read.chosen("GAMING"))
+        assertEquals(listOf(CompanionPrefs.DEVICE_APPS, "home"), read.chosen("GAMING"))
         assertEquals(CompanionPrefs.defaultChosen("DESKTOP"), read.chosen("DESKTOP"))
-        assertEquals("apps", read.opening("STANDARD"))
+        assertEquals(CompanionPrefs.DEVICE_APPS, read.opening("STANDARD"))
         assertEquals(CompanionPrefs.OPEN_DEFAULT, read.opening("GAMING"))
         assertEquals(CompanionPrefs.GAME_START_NONE, read.onGameStart)
         assertTrue(read.barTipSeen)
@@ -61,5 +61,23 @@ class CompanionPrefsTest {
         // Only Device's and droidtop's pages can be tabs; a page with no name, or under another panel, is nothing.
         assertEquals(null, CompanionPrefs.panelOf("page:device/"))
         assertEquals(null, CompanionPrefs.panelOf("page:home/pins"))
+    }
+
+    // Droidtop/tracker#786 S3: a saved bar keeps its reach when System, Network and Apps move under Device.
+    @Test
+    fun `the old System, Network and Apps tabs become Device and its pages`() {
+        assertEquals(
+            listOf("home", "device", CompanionPrefs.DEVICE_NETWORK, CompanionPrefs.DEVICE_APPS),
+            CompanionPrefs.decodeList("home,system,connections,apps"),
+        )
+        assertEquals(ControlPanel.DEVICE, CompanionPrefs.parentOf(CompanionPrefs.DEVICE_NETWORK))
+        assertEquals(ControlPanel.DROIDTOP, CompanionPrefs.parentOf(CompanionPrefs.DROIDTOP_COMPANION))
+        assertEquals(null, CompanionPrefs.parentOf("home"))
+    }
+
+    @Test
+    fun `the default bars lead with Device and droidtop`() {
+        assertEquals(listOf("home", "device", "droidtop", "social"), CompanionPrefs.defaultChosen("GAMING"))
+        assertEquals(listOf("input", "home", "device", "droidtop"), CompanionPrefs.defaultChosen("DESKTOP"))
     }
 }
