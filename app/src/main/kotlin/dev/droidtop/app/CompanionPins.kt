@@ -54,6 +54,10 @@ import dev.droidtop.library.settings.StatusIndicators
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.settings.UiModeRefresh
 import dev.droidtop.pluginhost.TileState
+import dev.droidtop.runtime.systemstatus.NetworkKind
+import dev.droidtop.runtime.systemstatus.SystemControls
+import dev.droidtop.runtime.systemstatus.SystemStatus
+import dev.droidtop.runtime.systemstatus.SystemStatusSnapshot
 import dev.droidtop.runtime.tasks.BackendState
 import dev.droidtop.runtime.tasks.TaskManager
 import dev.droidtop.shell.gamepad.QuickPress
@@ -61,6 +65,7 @@ import dev.droidtop.shell.gamepad.QuickSection
 import dev.droidtop.shell.gamepad.QuickTiles
 import dev.droidtop.shell.gamepad.quickSectionGroups
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -142,6 +147,7 @@ internal fun CompanionPinsSection() {
                             val item = byId[id]
                             val tile = tileById[id]
                             when {
+                                item != null && id == GamingSettingsCatalog.ID_SYSTEM_NETWORK -> NetworkPinTile(Modifier.weight(1f))
                                 item != null -> PinTile(item, Modifier.weight(1f)) { version++ }
                                 tile != null -> PluginTilePin(tile, tileStates[tile.key] ?: PluginTiles.cached(tile), Modifier.weight(1f)) { tileVersion++ }
                                 appLabels[id] != null -> AppPinTile(id, appLabels.getValue(id), Modifier.weight(1f))
@@ -257,6 +263,92 @@ private fun PinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit
             Text(value, style = MaterialTheme.typography.bodySmall, color = if (lit) colors.onPrimaryContainer else colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
+}
+
+/**
+ * The Network pin (Droidtop/tracker#786 addendum 2, item 3: "Network: Wi-Fi, signal 4/4" was a dead tile with no
+ * network name). It draws the status line's signal glyph and the network's name ([wifiName]: with the helper app, or
+ * with location granted), so it never shows only text. With the helper a tap switches Wi-Fi in place, the Wi-Fi row's
+ * own switch ([SystemControls.switchRadio], saying so while it works); otherwise it opens the Network tab, or Android's
+ * internet panel where the bar has no Network tab. Status follows [SystemStatus.flow] while the pin is on screen; the
+ * name is read off the main thread when the connection changes.
+ */
+@Composable
+private fun NetworkPinTile(modifier: Modifier) {
+    val context = LocalContext.current
+    val app = context.applicationContext
+    val nav = LocalCompanionNav.current
+    val scope = rememberCoroutineScope()
+    val colors = MaterialTheme.colorScheme
+    val controls = SystemControls
+    val status by produceState<SystemStatusSnapshot?>(null, app) {
+        SystemStatus.flow(app).flowOn(Dispatchers.IO).collect { value = it }
+    }
+    var working by remember { mutableStateOf<String?>(null) }
+    val networkLabel = stringResource(R.string.companion_pin_network)
+    val turningOn = stringResource(R.string.companion_pin_wifi_turning_on)
+    val turningOff = stringResource(R.string.companion_pin_wifi_turning_off)
+    val now = status
+    // What the pin can do and what to call the network: asked again only when the connection itself changes.
+    val facts by produceState<Pair<Boolean, String?>?>(null, now?.network, now?.validated, working) {
+        value = withContext(Dispatchers.IO) {
+            val helper = runCatching { TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
+            val wifiOn = controls.radioOn(app, SystemControls.Radio.WIFI)
+            val name = if (now?.network == NetworkKind.WIFI) wifiName(app, helper) else null
+            helper to (name ?: if (wifiOn == false) "Wi-Fi off" else null)
+        }
+    }
+    val helper = facts?.first == true
+    val kind = now?.network
+    val line = working ?: networkPinLine(kind, now?.validated == true, facts?.second)
+    val onWifi = kind == NetworkKind.WIFI
+    Column(
+        modifier = modifier
+            .heightIn(min = 72.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (helper && onWifi) colors.primaryContainer else colors.surface)
+            .clickable(enabled = working == null, role = if (helper) Role.Switch else Role.Button) {
+                when {
+                    helper -> scope.launch {
+                        val on = withContext(Dispatchers.IO) { controls.radioOn(app, SystemControls.Radio.WIFI) } != true
+                        working = if (on) turningOn else turningOff
+                        val switched = withContext(Dispatchers.IO) { controls.switchRadio(app, TaskManager.shell, SystemControls.Radio.WIFI, on) }
+                        working = null
+                        if (!switched) dev.droidtop.runtime.systemstatus.SettingsLaunch.start(context, controls.radioSettingsIntent(SystemControls.Radio.WIFI))
+                    }
+                    nav != null && nav.shows(CompanionTab.NETWORK) -> nav.openTab(CompanionTab.NETWORK)
+                    else -> dev.droidtop.runtime.systemstatus.SettingsLaunch.start(context, controls.internetPanelIntent())
+                }
+            }
+            .semantics {
+                contentDescription = networkLabel
+                stateDescription = line
+            }
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            now?.let { dev.droidtop.shell.gamepad.NetworkGlyph(it, normal = colors.onSurface, height = 18.dp) }
+            Text(networkLabel, style = MaterialTheme.typography.labelLarge, color = if (helper && onWifi) colors.onPrimaryContainer else colors.onSurface, maxLines = 1)
+        }
+        Text(line, style = MaterialTheme.typography.bodySmall, color = if (helper && onWifi) colors.onPrimaryContainer else colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/**
+ * The Network pin's line under its glyph: the Wi-Fi's name where it is known, else what the connection is, with
+ * "no internet" when it is up and nothing gets through. Pure.
+ */
+internal fun networkPinLine(kind: NetworkKind?, validated: Boolean, name: String?): String {
+    val base = when (kind) {
+        null -> "Reading…"
+        NetworkKind.WIFI -> name ?: "Wi-Fi"
+        NetworkKind.ETHERNET -> "Ethernet"
+        NetworkKind.CELLULAR -> "Mobile data"
+        NetworkKind.NONE -> name ?: "Offline"
+    }
+    val up = kind != null && kind != NetworkKind.NONE
+    return if (up && !validated) "$base, no internet" else base
 }
 
 /**

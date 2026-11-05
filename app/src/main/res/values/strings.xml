@@ -142,6 +142,9 @@
     <string name="onboarding_folder_path">Folder path</string>
     <string name="onboarding_a_full_path_starting_with">A full path, starting with /</string>
     <string name="companion_home_update_available">Update available: %1$s</string>
+    <string name="companion_pin_network">Network</string>
+    <string name="companion_pin_wifi_turning_on">Turning Wi-Fi on…</string>
+    <string name="companion_pin_wifi_turning_off">Turning Wi-Fi off…</string>
     <string name="shelf_configure_shelf">Shelf</string>
     <string name="shelf_configure_shows">Shows</string>
     <string name="shelf_configure_reading_your_library">Reading your library</string>

@@ -173,7 +173,7 @@ private fun statusDescription(clock: String, status: SystemStatusSnapshot?): Str
  * element without icons of its own draws this too, in its colour and at its height (Droidtop/tracker#659).
  */
 @Composable
-internal fun NetworkGlyph(status: SystemStatusSnapshot, normal: Color = MenuTokens.OnSurfaceMuted, height: Dp = 14.dp) {
+fun NetworkGlyph(status: SystemStatusSnapshot, normal: Color = MenuTokens.OnSurfaceMuted, height: Dp = 14.dp) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val stroke = remember(density) { Stroke(width = with(density) { 1.6.dp.toPx() }, cap = StrokeCap.Round) }
     val attention = MenuTokens.NoticeDanger

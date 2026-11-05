@@ -215,8 +215,7 @@ private fun readNetworks(context: Context): NetworkState {
         val kind = kindOf(caps::hasTransport)
         val wifi = if (kind == NetKind.WIFI) context.getSystemService(WifiManager::class.java)?.connectionInfo else null
         val name = when (kind) {
-            // The network's name: Android shows it to apps only with location; the helper app reads `cmd wifi status`.
-            NetKind.WIFI -> if (helper) shellLine(listOf("cmd", "wifi", "status"))?.let { Regex("SSID: \"([^\"]+)\"").find(it)?.groupValues?.get(1) } else null
+            NetKind.WIFI -> wifiName(context, helper)
             // Which app provides the VPN, where Android says: the always-on VPN setting, read with the helper app.
             NetKind.VPN -> if (helper) shellLine(listOf("settings", "get", "secure", "always_on_vpn_app"))?.trim()
                 ?.takeIf { it.isNotBlank() && it != "null" }?.let { pkg -> appLabel(context, pkg) ?: pkg } else null
@@ -246,6 +245,15 @@ private fun readNetworks(context: Context): NetworkState {
     val adbWifi = if (helper) shellLine(listOf("settings", "get", "global", "adb_wifi_enabled"))?.trim()?.let { it == "1" } else null
     return NetworkState(networks, interfaces, helper, adbWifi)
 }
+
+/**
+ * The Wi-Fi network's name, the one read the Network page and Home's Network pin share: the helper app reads
+ * `cmd wifi status`; without it Android tells apps the name only with location granted ([MeteredGrants.wifiName]).
+ * Null when neither can say. Blocks: off the main thread.
+ */
+internal fun wifiName(context: Context, helper: Boolean): String? =
+    (if (helper) shellLine(listOf("cmd", "wifi", "status"))?.let { Regex("SSID: \"([^\"]+)\"").find(it)?.groupValues?.get(1) } else null)
+        ?: dev.droidtop.net.MeteredGrants.wifiName(context)
 
 private fun shellLine(argv: List<String>): String? = runCatching { TaskManager.shell.exec(argv)?.stdout }.getOrNull()
 

@@ -377,6 +377,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         val nav = CompanionNav(
             openTab = { tab -> select(tab.id) },
             openConversation = { conversation -> select(CompanionTab.SOCIAL.id); socialStart = conversation },
+            shows = { tab -> bar.all.any { it.id == tab.id } },
         )
         // Remembered for "The last one used", off the main thread.
         LaunchedEffect(selected) {

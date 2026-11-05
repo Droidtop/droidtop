@@ -5163,7 +5163,13 @@ droidtop 0.2.0-dev.1931).
   and the game's own battery mode) and the last launch or quit error, then the **pins** (slice C5, Droidtop/tracker#414):
   catalog items by id (`PinnedControls`, default volume, brightness, Wi-Fi (the network row), Do Not Disturb
   and Mute microphone), drawn with the Quick Menu's own tile model (`QuickTiles.tile`, pressed by
-  `QuickTiles.pressKind`); a slider pin has a step button each side. "Edit pins" lists every System, Display and
+  `QuickTiles.pressKind`); a slider pin has a step button each side. The **Network pin** is drawn by itself
+  (`NetworkPinTile`, Droidtop/tracker#786 addendum 2, item 3: "Network: Wi-Fi, signal 4/4" was "a dead tile. It has
+  no network name and does nothing when tapped"; "A pin never shows only text"): the status line's signal glyph and
+  the network's name (`wifiName`, the helper's `cmd wifi status` or, without it, Android's name with location
+  granted, the Network tab's same read), else the kind, with "no internet" when nothing gets through. A tap switches
+  Wi-Fi in place where droidtop can (the helper; "Turning Wi-Fi off…" while it works, Android's Wi-Fi screen if it
+  did not switch), else opens the Network tab, else, with no Network tab on the bar, Android's internet panel. "Edit pins" lists every System, Display and
   Sound item with Pin or Unpin (no long-press needed), plugin tiles (slice C9, see Plugins), plus live stat tiles (slice C7): battery temperature and
   draw in watts (from the battery broadcast) and the fastest core's clock (from `PerformanceMonitor`, which runs
   only while that tile is on a Home that is on screen); a stat tile is not a live region. A pin for a control that needs the helper app is not

@@ -103,9 +103,12 @@ object MeteredGrants {
         }
     }
 
-    /** The Wi-Fi network's name, or null without the location permission (Android then hides it). */
+    /**
+     * The Wi-Fi network's name, or null without the location permission (Android then hides it). The companion's
+     * Network pin and page read it here too, when the helper app cannot say.
+     */
     @Suppress("DEPRECATION")
-    private fun wifiName(context: Context): String? {
+    fun wifiName(context: Context): String? {
         if (!canNameWifi(context)) return null
         val ssid = runCatching { context.applicationContext.getSystemService(WifiManager::class.java)?.connectionInfo?.ssid }.getOrNull()
         return ssid?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != WifiManager.UNKNOWN_SSID }

@@ -75,8 +75,15 @@ import dev.droidtop.ui.shared.tabularFigures
  * puts them in order on one scrolling page.
  */
 
-/** Lets a Home section open another companion tab: Social at a conversation, System for the device controls. */
-internal class CompanionNav(val openTab: (CompanionTab) -> Unit, val openConversation: (OpenConversation) -> Unit)
+/**
+ * Lets a Home section open another companion tab: Social at a conversation, System for the device controls. [shows]
+ * says whether a tab is on this bar (or in its More), so a section opens only a tab that is there.
+ */
+internal class CompanionNav(
+    val openTab: (CompanionTab) -> Unit,
+    val openConversation: (OpenConversation) -> Unit,
+    val shows: (CompanionTab) -> Boolean = { true },
+)
 
 internal val LocalCompanionNav = staticCompositionLocalOf<CompanionNav?> { null }
 
