@@ -196,7 +196,7 @@ class WineGameActivity : Activity() {
             "Graphics driver" to listOf(prefix.graphicsDriver, prefix.graphicsDriverVersion).filterNot { it.isNullOrBlank() }.joinToString(" "),
             // What actually runs: an x86_64 device runs Wine's code itself, whatever the prefix names (Droidtop/tracker#896:
             // the record said Box64 where the game's page said None).
-            "Emulator" to if (X86_64GuestLibs.isX86_64Host()) "None" else prefix.emulator.orEmpty(),
+            "Emulator" to if (dev.droidtop.runtime.windows.utils.X86_64GuestLibs.isX86_64Host()) "None" else prefix.emulator.orEmpty(),
         ).filter { it.second.isNotBlank() }
 
         val xServer = XServer(ScreenInfo(prefix.screenSize), false)
