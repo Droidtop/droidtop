@@ -23239,6 +23239,22 @@ gamenative's code actually calls:
   in `pulseaudio-gamenative-x86_64.tzst`, the x86_64 counterpart of the
   arm64 asset (both droidtop's builds since Droidtop/tracker#857).
 
+**A real GPU on x86_64: Venus (Droidtop/tracker#608; plan of 2026-11-05, built to the recommendation, owner to
+confirm).** The owner: "gpu is always first. We want to do the most performant to the least performant in order of
+priority". So the x86_64 drivers become, in order: Venus (Mesa's virtio Vulkan driver in Wine, replayed by a
+virglrenderer vtest server on Android's own Vulkan, which is the host GPU on an emulator), OpenGL on the host GPU if
+Venus cannot run, then Lavapipe. The rig data of 2026-10-30: the AVD exposes the host GPU through Vulkan 1.3;
+BlueStacks has a `vulkan.default.so` but no `gpu` service, so its level is unknown. Venus is the default only where the
+device's Vulkan qualifies (1.1+, external memory fd, timeline semaphores), read at run time. Pieces, from Termux's
+recipes built in droidtop's CI (the `mesa-xlib-gl` precedent), because Termux's binaries fix the vtest socket under
+Termux's prefix:
+- **Built (slice 1):** `build-scripts/x86_64-venus/mesa-venus`, Mesa 26.2.4 with `-Dvulkan-drivers=virtio` and X11
+  WSI only, Termux's patches except 0005, which droidtop's `0005-vtest-socket-from-env.patch` replaces: the socket is
+  `VTEST_SOCKET_NAME`, else `/tmp/.virgl_test`. `.github/workflows/x86_64-venus.yml` builds it and keeps the package as
+  an artifact; nothing ships yet.
+- **Next:** the vtest server (`virglrenderer-android` 1.3.0 with Venus, as `libvirgl_vtest.so` in the APK, started per
+  session), then a `venus` driver in `X86_64Graphics`.
+
 **Inside the guest on x86_64 (decided 2026-10-02, Droidtop/tracker#242).**
 The list above is the app's own natives; the guest process needs its own
 x86_64 userland too, because the base system droidtop installs

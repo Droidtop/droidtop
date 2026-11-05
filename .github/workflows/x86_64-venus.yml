@@ -1,0 +1,70 @@
+name: x86_64 Venus driver
+
+# Builds Mesa's Venus Vulkan driver (libvulkan_virtio.so) for droidtop's x86_64 Wine guest from Termux's Mesa recipe
+# and patches, with droidtop's socket patch (build-scripts/x86_64-venus/mesa-venus), and keeps the package as a run
+# artifact. Slice 1 of Droidtop/tracker#608 (a real GPU on x86_64): nothing ships yet. The vtest server that replays
+# Venus on Android's Vulkan, and the driver choice in X86_64Graphics, are the next slices.
+
+on:
+  push:
+    paths:
+      - 'build-scripts/x86_64-venus/**'
+      - '.github/workflows/x86_64-venus.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # The same termux-packages commit the xlib OpenGL build starts from (x86_64-lavapipe.yml), so both Mesa builds
+  # share Termux's patches and dependencies.
+  TERMUX_PACKAGES_COMMIT: 2e8fa6379b106caa4829407611410025a0973e02
+
+jobs:
+  mesa-venus:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: termux-packages
+        run: |
+          git init -q "$RUNNER_TEMP/termux-packages"
+          cd "$RUNNER_TEMP/termux-packages"
+          git remote add origin https://github.com/termux/termux-packages
+          git fetch -q --depth 1 origin "$TERMUX_PACKAGES_COMMIT"
+          git checkout -q FETCH_HEAD
+
+      - name: Recipe
+        run: bash build-scripts/x86_64-venus/mesa-venus/prepare.sh "$RUNNER_TEMP/termux-packages"
+
+      - name: Build
+        # Termux's own package builder image, as termux-packages' CI runs it; -I takes every dependency from
+        # Termux's x86_64 repository.
+        run: |
+          cd "$RUNNER_TEMP/termux-packages"
+          ./scripts/run-docker.sh ./build-package.sh -I -a x86_64 mesa-venus
+          ls -la output
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp output/mesa-venus_*_x86_64.deb "$GITHUB_WORKSPACE/out/"
+
+      - name: Check
+        # The driver, its ICD manifest, and the socket read from the environment (droidtop's 0005).
+        run: |
+          deb=$(ls out/mesa-venus_*_x86_64.deb)
+          mkdir -p "$RUNNER_TEMP/deb" && dpkg-deb -x "$deb" "$RUNNER_TEMP/deb"
+          lib=$(find "$RUNNER_TEMP/deb" -name libvulkan_virtio.so | head -1)
+          json=$(find "$RUNNER_TEMP/deb" -name 'virtio_icd.x86_64.json' | head -1)
+          test -n "$lib" && test -n "$json"
+          cat "$json"
+          readelf -d "$lib" | grep NEEDED
+          strings "$lib" | grep -x VTEST_SOCKET_NAME
+
+      - name: Upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: x86_64-mesa-venus
+          path: out/*.deb
+          retention-days: 30

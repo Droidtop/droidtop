@@ -1,0 +1,14 @@
+--- a/src/virtio/vtest/vtest_protocol.h
++++ b/src/virtio/vtest/vtest_protocol.h
+@@ -25,7 +25,10 @@
+ #ifndef VTEST_PROTOCOL
+ #define VTEST_PROTOCOL
+ 
+-#define VTEST_DEFAULT_SOCKET_NAME "/tmp/.virgl_test"
++#include <stdlib.h>
++/* droidtop (Droidtop/tracker#608): the socket of the app's vtest server, one per session, in the environment;
++ * Termux's 0005 fixes it under Termux's own prefix, which another app cannot create. */
++#define VTEST_DEFAULT_SOCKET_NAME (getenv("VTEST_SOCKET_NAME") ? getenv("VTEST_SOCKET_NAME") : "/tmp/.virgl_test")
+ 
+ #ifdef VIRGL_RENDERER_UNSTABLE_APIS
+ #define VTEST_PROTOCOL_VERSION 3
