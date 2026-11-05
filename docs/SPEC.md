@@ -524,9 +524,12 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   there is one control panel, not two.
 - **The bar says which buttons.** With a pad attached (`ShellWindow.padPresent`) a strip beside the bar
   (`PadLegend`, not tappable) names Start, R2, L1 and R1; it is a strip of its own so the bar keeps its
-  width for the window list on a 768 dp console. The bar's buttons stay for touch and a mouse, so they are a
-  finger's size whatever drives the rest (`ShellWindow.touchOnlyTarget`, Droidtop/tracker#690): sized as the pad's
-  48dp of the canvas they were 65 px on the console, about 29dp of its own (release 2967). The Start
+  width for the window list on a 768 dp console. The bar's size follows the input mode (owner, 2026-11-05,
+  Droidtop/tracker#690 and #913; `ShellWindow.barTarget`): a finger's size after a touch, the pad's denser 48dp of the
+  canvas while the pad drives (`PadModality`), the window buttons' "⋯" included. A change waits until the new mode has
+  held for a second (`BarInputMode`), because each one resizes the bar and with it the Linux desktop's output (#682).
+  Sized as the pad's always, the bar was 65 px on the console, about 29dp of its own, under a finger (release 2967);
+  sized as a finger's always (2026-11-05 morning), the pad lost the dense bar. The Start
   button only opens now: the menu is modal, so the "Close" label it wore while the menu floated over the
   bar is gone.
 - **Desktop is immersive, one layout** (Droidtop/tracker#555 D4, 2026-10-15). Android's status and
@@ -19740,8 +19743,8 @@ it where touch comes first: `touchTargetDp` makes them 0.3 inch on the panel fro
 canvas. Where the pad drives, a press target
 is the shell's 48dp of the canvas (`Measure.padTarget`), as through 2026-10-28. `ShellWindow.pressTarget` is the one
 place that choice is made, and `check-ui-rules.sh` (press-target) fails a screen that reads the finger size directly.
-What the pad never presses (Desktop's bar) takes `ShellWindow.touchOnlyTarget`, a finger's size with or without the
-pad (Droidtop/tracker#690).
+Desktop's bar follows the input mode instead (`ShellWindow.barTarget`, Droidtop/tracker#690): a finger's size after a
+touch, `Measure.padTarget` while the pad drives.
 **The Quick Menu stays dense** (owner, 2026-10-30, Droidtop/tracker#740: "the QAM redesign made it significantly less
 dense, which is a terrible decision"; "something REALLY wants it to be heavily padded or scaled"). Two things
 together made it sparse. Since 2026-10-29 a finger is 0.3 inch of the panel: about 80dp of the console's canvas, and

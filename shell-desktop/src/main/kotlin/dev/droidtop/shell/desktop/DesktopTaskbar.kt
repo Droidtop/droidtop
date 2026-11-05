@@ -128,6 +128,15 @@ import dev.droidtop.shell.gamepad.pc.rememberPcLaunch
 // Desktop mode's taskbar (Droidtop/tracker#764, split out of DesktopShell.kt): its buttons, window list, pins,
 // Android tasks, tray and plugin items, and the system screens its buttons open.
 
+/**
+ * The input mode the bar is sized for (Droidtop/tracker#690): [PadModality][dev.droidtop.shell.gamepad.input.PadModality]
+ * once it has held for [SETTLE_MS]. One value for every bar item, set by [Taskbar].
+ */
+internal object BarInputMode {
+    const val SETTLE_MS = 1000L
+    var padDriving by mutableStateOf(false)
+}
+
 @Composable
 internal fun BoxScope.Taskbar(
     atTop: Boolean,
@@ -144,6 +153,15 @@ internal fun BoxScope.Taskbar(
     onOpenQuickMenu: () -> Unit,
 ) {
     val context = LocalContext.current
+    // The bar's size follows the input mode (Droidtop/tracker#690), settled for a second first: each change resizes the
+    // bar and with it the Linux desktop's output (#682), so a touch between pad presses doesn't make the desktop jump.
+    val padDriving = dev.droidtop.shell.gamepad.input.PadModality.showsFocus
+    LaunchedEffect(padDriving) {
+        if (padDriving != BarInputMode.padDriving) {
+            kotlinx.coroutines.delay(BarInputMode.SETTLE_MS)
+            BarInputMode.padDriving = padDriving
+        }
+    }
     // With a pad in hand the bar names the four buttons that reach droidtop's chrome (the activity
     // answers them, see DesktopPadRoutes), on a strip of its own so the bar keeps its width for the
     // window list on a 768 dp console.
@@ -195,7 +213,7 @@ internal fun BoxScope.Taskbar(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = currentShellWindow().touchOnlyTarget)
+                        .heightIn(min = currentShellWindow().barTarget(BarInputMode.padDriving))
                         .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -216,7 +234,7 @@ internal fun BoxScope.Taskbar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = currentShellWindow().touchOnlyTarget)
+                    .heightIn(min = currentShellWindow().barTarget(BarInputMode.padDriving))
                     .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -287,10 +305,9 @@ internal fun TaskbarButton(onClick: () -> Unit, modifier: Modifier = Modifier, c
     // A flat chip in the Gaming palette, not Material's filled pill (Droidtop/tracker#555 D4).
     androidx.compose.material3.Surface(
         onClick = onClick,
-        // A finger's size whatever drives the rest (ShellWindow.touchOnlyTarget): the pad never presses the bar (SPEC 2b),
-        // so the pad's 48dp of the canvas, 65 px on the console, about 29dp of its own, was under a finger
-        // (Droidtop/tracker#690). Not a literal 48.dp: the shell lays out at the canvas density.
-        modifier = modifier.padding(horizontal = 3.dp).heightIn(min = currentShellWindow().touchOnlyTarget),
+        // The bar follows the input mode (ShellWindow.barTarget, Droidtop/tracker#690): a finger's size after a touch,
+        // the pad's denser size while the pad drives. Not a literal 48.dp: the shell lays out at the canvas density.
+        modifier = modifier.padding(horizontal = 3.dp).heightIn(min = currentShellWindow().barTarget(BarInputMode.padDriving)),
         shape = dev.droidtop.shell.gamepad.MenuTokens.RowShape,
         color = dev.droidtop.shell.gamepad.MenuTokens.Card,
         contentColor = dev.droidtop.shell.gamepad.MenuTokens.OnSurface,
@@ -413,7 +430,7 @@ internal fun TaskbarOwnScreenRow(screen: OwnScreen, onOpen: () -> Unit, onClose:
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .widthIn(max = 180.dp)
-                .heightIn(min = currentShellWindow().touchOnlyTarget)
+                .heightIn(min = currentShellWindow().barTarget(BarInputMode.padDriving))
                 .anchorFor(anchor)
                 .onSecondaryClick { menuOpen = true }
                 .combinedClickable(onClick = onOpen, onLongClick = { menuOpen = true })
@@ -466,7 +483,7 @@ internal fun TaskbarWindowRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .widthIn(max = 180.dp)
-                .heightIn(min = currentShellWindow().touchOnlyTarget)
+                .heightIn(min = currentShellWindow().barTarget(BarInputMode.padDriving))
                 .anchorFor(anchor)
                 .onSecondaryClick { menuOpen = true }
                 .combinedClickable(onClick = onTap, onLongClick = { menuOpen = true })
@@ -498,7 +515,7 @@ internal fun TaskbarWindowRow(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .heightIn(min = currentShellWindow().pressTarget)
+                    .heightIn(min = currentShellWindow().barTarget(BarInputMode.padDriving))
                     .widthIn(min = 32.dp)
                     .clickable(onClickLabel = menuLabel) { menuOpen = true }
                     .semantics { contentDescription = menuLabel },
@@ -574,7 +591,7 @@ internal fun TaskbarPinChips(pins: List<TaskbarPin>, onOpen: (TaskbarPin) -> Uni
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier
                         .widthIn(max = 140.dp)
-                        .heightIn(min = currentShellWindow().touchOnlyTarget)
+                        .heightIn(min = currentShellWindow().barTarget(BarInputMode.padDriving))
                         .anchorFor(anchor)
                         .onSecondaryClick { menuOpen = true }
                         .combinedClickable(onClick = { onOpen(pin) }, onLongClick = { menuOpen = true })
@@ -613,7 +630,7 @@ internal fun TaskbarAppRow(app: RunningApp, onOpen: () -> Unit, onClose: () -> U
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .widthIn(max = 180.dp)
-                .heightIn(min = currentShellWindow().touchOnlyTarget)
+                .heightIn(min = currentShellWindow().barTarget(BarInputMode.padDriving))
                 .anchorFor(anchor)
                 .onSecondaryClick { menuOpen = true }
                 .combinedClickable(onClick = onOpen, onLongClick = { menuOpen = true })

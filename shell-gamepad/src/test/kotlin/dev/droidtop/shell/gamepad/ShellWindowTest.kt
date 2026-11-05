@@ -86,14 +86,13 @@ class ShellWindowTest {
         assertEquals(72f, touchTargetDp(xdpi = 300f, systemDensity = 2.25f, layoutDensity = 1.5f), 0.1f)
     }
 
-    @Test
-    fun `what only touch presses is a finger's even with the pad`() {
-        // Desktop's bar on the console (Droidtop/tracker#690): the pad never presses it, so the pad's 48dp of the canvas,
-        // 65 px on release 2967, about 29dp of the panel's own, was under a finger.
+    @Test fun `the Desktop bar follows the input mode`() {
+        // Droidtop/tracker#690, owner 2026-11-05: a finger's size after a touch, the pad's dense size while it drives.
         val console = ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true, minTouchTarget = consoleFinger)
-        assertEquals(consoleFinger, console.touchOnlyTarget)
-        assertTrue(console.touchOnlyTarget.value * 1.5f >= 48f * 2.25f)
-        // The pad-driven press target is unchanged (#740).
+        assertEquals(consoleFinger, console.barTarget(padDriving = false))
+        assertTrue(console.barTarget(padDriving = false).value * 1.5f >= 48f * 2.25f)
+        assertEquals(Measure.padTarget, console.barTarget(padDriving = true))
+        // The pad-driven press target elsewhere is unchanged (#740).
         assertEquals(Measure.padTarget, console.pressTarget)
     }
 

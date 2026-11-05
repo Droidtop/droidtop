@@ -71,12 +71,12 @@ data class ShellWindow(
     val pressTarget: Dp get() = if (touchFirst) minTouchTarget else Measure.padTarget
 
     /**
-     * The least size of something only touch or a mouse presses, never the pad: a finger's ([minTouchTarget]) whatever
-     * drives the rest of the window. Desktop's bar is one (docs/SPEC.md 2b, "The bar's buttons stay for touch and a
-     * mouse"): sized by [pressTarget], a console with its pad got the pad's 48dp of the canvas, 65 px on the Retroid
-     * Pocket 5's panel, about 29dp of its own, under a finger (Droidtop/tracker#690, release 2967).
+     * Desktop's bar: the size follows the input mode (owner, 2026-11-05, Droidtop/tracker#690 and #913): a finger's
+     * ([minTouchTarget]) after a touch, the pad's denser [Measure.padTarget] while the pad drives ([PadModality]).
+     * Sized by [pressTarget] alone, a console with its pad got the pad's size even under a finger, 65 px on the
+     * Retroid Pocket 5, about 29dp of its own (release 2967); sized as a finger's always, the pad lost the dense bar.
      */
-    val touchOnlyTarget: Dp get() = minTouchTarget
+    fun barTarget(padDriving: Boolean): Dp = if (padDriving) Measure.padTarget else minTouchTarget
 
     /**
      * A pane of a larger window ([pane]): the Quick Menu's catalog tabs. Its rows and section labels are compact
