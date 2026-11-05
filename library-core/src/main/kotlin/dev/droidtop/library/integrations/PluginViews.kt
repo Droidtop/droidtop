@@ -111,7 +111,12 @@ object PluginViews {
     internal fun declared(record: PluginRecord): Set<String> = record.manifest.v2.permissions.map { it.id }.toSet()
 
     /** The fallback title of a failed action's notice. */
-    internal const val FAILED_TITLE = "Couldn't finish"
+    /**
+     * A failed call's notice title in droidtop's words, by its code, naming the feature (Droidtop/tracker#883 §3.7):
+     * "F95zone wants you to sign in", "F95zone stopped". It replaced one "Couldn't finish" for every failure.
+     */
+    internal fun failedTitle(record: PluginRecord, code: PluginErrorCode?): String =
+        dev.droidtop.pluginhost.PluginFailureWords.of(code, record.manifest.label).title
 
     /** The title of droidtop's notice for a job that finished and sent no notice of its own (Droidtop/tracker#521 item 9). */
     internal const val FINISHED_TITLE = "Finished"
@@ -164,7 +169,7 @@ object PluginViews {
                 when {
                     !reply.ok -> ActionOutcome(
                         "${record.manifest.label}: ${SourceFailures.forCode(reply.code, reply.message)}", null, refetch = false,
-                        notice = PluginViewCall.errorNotice(reply, declared(record), FAILED_TITLE, messages),
+                        notice = PluginViewCall.errorNotice(reply, declared(record), failedTitle(record, reply.code), messages),
                     )
                     value.isBlank() -> ActionOutcome("${record.manifest.label} gave nothing to show", null, refetch = false)
                     !dev.droidtop.pluginhost.PluginSecrets.show(record.manifest.label, label, value) -> ActionOutcome("It cannot be shown right now", null, refetch = false)
@@ -182,7 +187,7 @@ object PluginViews {
                 if (!reply.ok) {
                     ActionOutcome(
                         "${record.manifest.label}: ${SourceFailures.forCode(reply.code, reply.message)}", null, refetch = false,
-                        notice = PluginViewCall.errorNotice(reply, declared(record), FAILED_TITLE, messages),
+                        notice = PluginViewCall.errorNotice(reply, declared(record), failedTitle(record, reply.code), messages),
                     )
                 } else {
                     val view = PluginViewCall.replyView(reply.data, messages)
@@ -209,7 +214,7 @@ object PluginViews {
                     result.values["notice"]?.let { text -> runCatching { PluginViewCall.replyNotice(JSONObject().put("notice", JSONObject(text)), messages) }.getOrNull() }
                         ?: finishedNotice(said)
                 } else {
-                    PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.FAILED, result.error ?: "failed"), emptySet(), FAILED_TITLE, messages)
+                    PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.FAILED, result.error ?: "failed"), emptySet(), failedTitle(record, PluginErrorCode.FAILED), messages)
                 }
                 ActionOutcome(message, replaced, refetch = replaced == null, notice = notice)
             }
@@ -417,7 +422,10 @@ private class PluginPage(
                 ?: PluginView.parse(reply.data, messages)
             PluginMessages.record(context, record.manifest.id, "$point/$op", messages)
             if (parsed == null) {
-                error = "${record.manifest.label} sent a page droidtop cannot draw"
+                // A page droidtop cannot draw is skipped and logged for the developer (Droidtop/tracker#883 §3.7): the
+                // person sees an empty page, never "<plugin> sent a page droidtop cannot draw".
+                runCatching { android.util.Log.w("droidtop.plugin", "${record.manifest.id}: $point/$op returned a page droidtop cannot draw: ${messages.joinToString("; ")}") }
+                show(PluginView(title = null, subtitle = null, sections = emptyList()))
             } else {
                 show(parsed)
             }

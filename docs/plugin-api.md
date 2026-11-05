@@ -275,7 +275,8 @@ the same envelope in both directions:
 Error codes are a closed set: `INVALID_ARGS`, `UNSUPPORTED`,
 `NOT_FOUND`, `PERMISSION_DENIED`, `RATE_LIMITED`, `TIMEOUT`,
 `PROVIDER_UNAVAILABLE`, `PROVIDER_CRASHED`, `CANCELLED`, `FAILED`,
-`SIGN_IN_REQUIRED`, `BROWSER_CHECK_REQUIRED`. A plugin's own ordinary failure ("no network",
+`SIGN_IN_REQUIRED`, `BROWSER_CHECK_REQUIRED`, `OFFLINE`, `SITE_DOWN`, `NEEDS_UPDATE`
+(the last three 2026-11-05, Droidtop/tracker#883 §3.7). A plugin's own ordinary failure ("no network",
 "nothing found") is an error reply, not a crash. This keeps today's
 distinction in `PluginCrashPolicy`.
 
@@ -1535,6 +1536,28 @@ The owner: "Any store OR SOURCE plugin can provide that information. There has t
 - **How much.** One `store` facet per plugin per item, refreshed by its TTL (7 days by default) like any bundle.
 - **The person's say.** Each plugin's store information is its own switch under the plugin's "Where it appears", and
   a store or source the person hides is hidden on every game.
+
+#### Failures in droidtop's words (Droidtop/tracker#852 part 2 slice 2, from #883 §3.7, approved 2026-11-05)
+
+A plugin's failure carries a code from the fixed list (§1.3), and droidtop words it with its one fix
+(`PluginFailureWords`). The subject is the feature's own name, the one it has in Game sources, never "the plugin".
+
+| Code | Title | Fix |
+| --- | --- | --- |
+| `SIGN_IN_REQUIRED` | <Name> wants you to sign in | Sign in |
+| `BROWSER_CHECK_REQUIRED` | <Name> checks your browser first | Open the site |
+| `OFFLINE`, `SITE_DOWN` (new) | <Name> can't be reached | Try again |
+| `RATE_LIMITED` | <Name> asked droidtop to wait | Waiting |
+| `PERMISSION_DENIED` | <Name> can't do this yet | Allow |
+| `TIMEOUT` | <Name> didn't answer in time | Try again |
+| `NEEDS_UPDATE` (new: contract or runtime too old) | <Name> needs its update | Update |
+| anything else, or a crash | <Name> stopped | Try again |
+
+- **Gone:** the generic phrases "It could not do that", "Couldn't finish", "<label> ran into a problem it didn't
+  explain" and "<label> couldn't finish this".
+- **A page droidtop cannot draw** is skipped and logged for the developer; the person sees an empty page.
+- **What the plugin said, and its `detail`, is in Info (Technical details) always**, not only with the Developer
+  menu on: "no status shown without its reason" (DESIGN-LANGUAGE).
 
 #### Targets: where a facet can appear
 

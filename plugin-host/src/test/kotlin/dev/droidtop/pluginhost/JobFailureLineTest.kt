@@ -27,14 +27,14 @@ class JobFailureLineTest {
     fun `an exception or a stack trace is never the line`() {
         val trace = "java.lang.IllegalStateException: bad state\n\tat dev.example.Plugin.run(Plugin.kt:12)"
         val line = JobFailureLine.of("Example", trace)
-        assertEquals("Example ran into a problem it didn't explain", line.sentence)
+        assertEquals("Example stopped", line.sentence)
         assertEquals(trace, line.detail)
         assertTrue(JobFailureLine.of("Example", "x".repeat(JobFailureLine.MAX_PLAIN + 1)).detail != null)
     }
 
     @Test
     fun `no message at all says the job did not finish`() {
-        assertEquals("Example couldn't finish this", JobFailureLine.of("Example", null).sentence)
-        assertEquals("Example couldn't finish this", JobFailureLine.of("Example", "  ").sentence)
+        assertEquals("Example stopped", JobFailureLine.of("Example", null).sentence)
+        assertEquals("Example stopped", JobFailureLine.of("Example", "  ").sentence)
     }
 }

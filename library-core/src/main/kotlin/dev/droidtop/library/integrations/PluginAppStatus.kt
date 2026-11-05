@@ -126,7 +126,8 @@ object PluginAppStatus {
                             }
                             // Undocumented values never reach the page as "Key: value" (Droidtop/tracker#544 item 5).
                             // A Developer menu row (docs/SPEC.md 7, "Developer menu").
-                            if (technical.isNotEmpty() && dev.droidtop.library.settings.DeveloperMenu.on(context)) {
+                            // Always, not only with the Developer menu (Droidtop/tracker#883 §3.7: Info always).
+                            if (technical.isNotEmpty()) {
                                 add(
                                     dev.droidtop.library.settings.NestedScreenItem(
                                         id = "plugin_app_status_${m.id}_technical",

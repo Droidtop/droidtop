@@ -30,7 +30,10 @@ object SourceFailures {
     const val GONE = "It is no longer on the site"
 
     /** A message that carries a link: droidtop never shows a plugin's link as its sentence (Droidtop/tracker#784). */
-    const val SEE_DETAILS = "It could not do that. What it said is under Technical details"
+    const val SEE_DETAILS = "It stopped. What it said is in Info"
+
+    /** A plugin that needs its update to run on this droidtop (NEEDS_UPDATE, Droidtop/tracker#883 §3.7). */
+    const val NEEDS_UPDATE = "It needs its update"
 
     /**
      * The one sentence for a failed answer, by its code first (docs/plugin-api.md 1.3 and 1.11 point 4, Droidtop/tracker#784
@@ -42,6 +45,9 @@ object SourceFailures {
         PluginErrorCode.BROWSER_CHECK_REQUIRED -> NEEDS_BROWSER_CHECK
         PluginErrorCode.RATE_LIMITED -> SLOW_DOWN
         PluginErrorCode.NOT_FOUND -> GONE
+        PluginErrorCode.OFFLINE, PluginErrorCode.SITE_DOWN -> OFFLINE
+        PluginErrorCode.TIMEOUT -> TIMED_OUT
+        PluginErrorCode.NEEDS_UPDATE -> NEEDS_UPDATE
         PluginErrorCode.PERMISSION_DENIED -> permissionOff(message, code) ?: PERMISSION_OFF
         else -> plain(message)
     }

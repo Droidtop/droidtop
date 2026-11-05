@@ -17,7 +17,7 @@ object PluginLoadErrorMessage {
             "The plugin's version isn't compatible with the installed runtime."
         raw.contains("_channel.invokeMethod('ready')", ignoreCase = true) ||
             raw.contains("never signaled ready", ignoreCase = true) ->
-            "The plugin didn't signal ready; it needs an update from its developer."
+            "It needs its update."
         raw.contains("timed out", ignoreCase = true) ->
             "The plugin timed out."
         raw.contains("load failed:", ignoreCase = true) ||

@@ -765,7 +765,8 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         // for its developer or a bug report (docs/SPEC.md 12a, Droidtop/tracker#167), in the Developer menu's
         // rows (docs/SPEC.md 7, "Developer menu").
         val detail = record.disabledDetail
-        if (record.disabledReason != null && detail != null && DeveloperMenu.on(context)) {
+        // Always, not only with the Developer menu: "no status shown without its reason" (Droidtop/tracker#883 §3.7).
+        if (record.disabledReason != null && detail != null) {
             add(
                 NestedScreenItem(
                     id = "plugin_${m.id}_detail",

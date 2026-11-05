@@ -28,6 +28,18 @@ enum class PluginErrorCode {
 
     /** The site shows a browser check (a "checking your browser" page) first: droidtop offers "Open the site" in the plugin's session. */
     BROWSER_CHECK_REQUIRED,
+
+    /** This device has no connection to the site (Droidtop/tracker#883 §3.7): droidtop offers Try again. */
+    OFFLINE,
+
+    /** The site itself is down or answered with a server error (Droidtop/tracker#883 §3.7): droidtop offers Try again. */
+    SITE_DOWN,
+
+    /**
+     * The plugin cannot run on this droidtop until it is updated: its contract or runtime is too old (Droidtop/tracker#883
+     * §3.7). droidtop offers its Updates row.
+     */
+    NEEDS_UPDATE,
     ;
 
     companion object {

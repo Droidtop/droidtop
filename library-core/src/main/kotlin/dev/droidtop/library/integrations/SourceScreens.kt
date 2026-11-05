@@ -107,10 +107,10 @@ object SourceScreens {
             onFailure = { error -> listOf(CatalogGroup("source_error_${source.id}", null, buildList {
                 // A plain sentence first; what the source actually reported (a platform exception text, a
                 // stack line) is for its developer and sits one step behind "Technical details".
-                add(ActionItem("source_failure_${source.id}", "Couldn't search ${source.label}", subtitle = "It did not answer. Try again in a moment."))
+                add(ActionItem("source_failure_${source.id}", dev.droidtop.pluginhost.PluginFailureWords.of(null, source.label).title, subtitle = "It did not answer. Try again in a moment."))
                 val technical = error.message?.trim().orEmpty().ifBlank { error::class.java.simpleName }
-                // A Developer menu row (docs/SPEC.md 7, "Developer menu").
-                if (dev.droidtop.library.settings.DeveloperMenu.on(context)) add(
+                // Always shown, not only with the Developer menu (Droidtop/tracker#883 §3.7: Info always).
+                add(
                     NestedScreenItem(
                         "source_failure_detail_${source.id}", "Technical details", subtitle = "What the source reported, for its developer",
                         inline = CatalogScreen("source_failure_detail_screen_${source.id}", "Technical details", groups = {
