@@ -442,7 +442,9 @@ internal fun playTimeRows(context: Context, entry: LibraryEntry): List<GameInfoR
     val title = entry.gameName ?: GameNaming.displayName(entry.title)
     return when (val result = HowLongToBeat.lookup(context, title)) {
         HltbResult.Off, HltbResult.NotFound -> emptyList()
-        is HltbResult.Failed -> if (offline(result.message)) emptyList() else listOf(GameInfoRow("How long to beat", "Not loaded", result.message))
+        // The person reads one plain line; the site's own answer ("api/search/site/init answered HTTP 200 but gave no
+        // token") is in the log, where HowLongToBeat writes it (Droidtop/tracker#678, rig 2936).
+        is HltbResult.Failed -> if (offline(result.message)) emptyList() else listOf(GameInfoRow("How long to beat", "Not loaded", HLTB_FAILED_LINE))
         is HltbResult.Found -> {
             val summary = HowLongToBeat.summary(result.game)
             if (summary.isEmpty()) {
@@ -462,6 +464,9 @@ internal fun playTimeRows(context: Context, entry: LibraryEntry): List<GameInfoR
         }
     }
 }
+
+/** What the How long to beat row says when HowLongToBeat would not answer: what happened and what happens next. */
+internal const val HLTB_FAILED_LINE = "HowLongToBeat did not answer. droidtop tries again later."
 
 internal fun compatibilityRows(context: Context, entry: LibraryEntry): List<GameInfoRow> =
     when (val result = EmulatorCompat.lookup(context, entry)) {
