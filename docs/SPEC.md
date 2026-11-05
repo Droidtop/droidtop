@@ -24142,7 +24142,13 @@ one runner per kind:
     only `prefix/lib/**` (dropping the unused C headers under
     `prefix/include`) into `filesDir/python-runtime/<version>/<abi>/`,
     laid out exactly like the archive's own `prefix/` so it can be handed
-    straight to the bridge as `PYTHONHOME`. The download is a separate,
+    straight to the bridge as `PYTHONHOME`. An entry is written only when its name
+    has no `..` or `.` part, is not absolute, and its real path is strictly
+    inside that folder, the root followed by a separator
+    (`RuntimeArtifactInstaller.entryTarget`, 2026-11-05, Droidtop/tracker#874:
+    a plain prefix check let `lib/../../python-evil/x` reach a sibling folder;
+    droidtop-shared's `BundleTar.validatePath` already refused `..`). The
+    digest is checked before anything is extracted. The download is a separate,
     explicit, progress-shown Settings action (an `AsyncActionItem` in the
     Plugins screen, the same "long action with live status text" shape
     droidtop's settings catalog already uses elsewhere) — never triggered

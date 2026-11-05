@@ -208,10 +208,10 @@ object PythonRuntimeManager {
             while (entry != null) {
                 val name = entry.name.removePrefix("./")
                 if (!entry.isDirectory && name.startsWith("prefix/lib/") && !name.startsWith("prefix/lib/pkgconfig/")) {
-                    val relative = name.removePrefix("prefix/")
-                    val target = File(installDir, relative)
-                    // Same zip-slip guard PluginBundleInstaller applies to plugin bundles.
-                    if (!target.canonicalPath.startsWith(installDir.canonicalPath)) {
+                    // No `..`, and strictly inside the install folder (Droidtop/tracker#874).
+                    val target = RuntimeArtifactInstaller.entryTarget(installDir, name.removePrefix("prefix/"))
+                    if (target == null) {
+                        android.util.Log.w("droidtop.plugin", "the Python runtime archive's entry $name points outside its folder; skipped")
                         entry = tar.nextTarEntry
                         continue
                     }

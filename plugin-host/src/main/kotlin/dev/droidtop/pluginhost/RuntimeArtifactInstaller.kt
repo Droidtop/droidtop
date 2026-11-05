@@ -18,6 +18,22 @@ sealed interface RuntimeArtifactProgress {
 object RuntimeArtifactInstaller {
     const val MARKER_FILE = ".verified"
 
+    /**
+     * Where an archive entry named [relative] goes under [installDir], or null when it must not be written: a name with
+     * a `..` or `.` part, an absolute name, or one whose real path is not strictly inside [installDir] (a symlink in the
+     * way). A plain prefix check let `lib/../../python-evil/x` reach a sibling folder sharing the install folder's name
+     * as its prefix (Droidtop/tracker#874); this refuses `..` outright as droidtop-shared's `BundleTar.validatePath`
+     * does, then compares real paths with the separator after the root. Pure but for the paths it resolves.
+     */
+    fun entryTarget(installDir: File, relative: String): File? {
+        if (relative.isEmpty() || relative.startsWith("/") || relative.contains('\\')) return null
+        val parts = relative.split('/')
+        if (parts.any { it == ".." || it == "." }) return null
+        val root = installDir.canonicalFile
+        val target = File(root, relative).canonicalFile
+        return target.takeIf { it.path.startsWith(root.path.trimEnd(File.separatorChar) + File.separator) }
+    }
+
     /** Installs [archive] into [installDir]. The caller has already downloaded it; its digest is checked here too. */
     fun install(
         archive: File,

@@ -72,4 +72,19 @@ class RuntimeArtifactInstallerTest {
         assertTrue(partialDownload.length() > 0)
         assertFalse(RuntimeArtifactInstaller.isInstalled(dir))
     }
+
+    @Test fun anEntryReachesOnlyInsideTheInstallFolderNeverASiblingSharingItsPrefix() {
+        // Droidtop/tracker#874: `python` and `python-evil` share a prefix; a plain startsWith let the second through.
+        val dir = temp.newFolder("python")
+        temp.newFolder("python-evil")
+        assertEquals(File(dir, "lib/libpython3.so").canonicalFile, RuntimeArtifactInstaller.entryTarget(dir, "lib/libpython3.so"))
+        assertNull(RuntimeArtifactInstaller.entryTarget(dir, "lib/../../python-evil/x"))
+        assertNull(RuntimeArtifactInstaller.entryTarget(dir, "../python-evil/x"))
+        assertNull(RuntimeArtifactInstaller.entryTarget(dir, "lib/./x"))
+        assertNull(RuntimeArtifactInstaller.entryTarget(dir, "/etc/passwd"))
+        assertNull(RuntimeArtifactInstaller.entryTarget(dir, ""))
+        // A symlink in the way that leads out is refused too.
+        java.nio.file.Files.createSymbolicLink(File(dir, "out").toPath(), temp.root.toPath())
+        assertNull(RuntimeArtifactInstaller.entryTarget(dir, "out/python-evil/x"))
+    }
 }
