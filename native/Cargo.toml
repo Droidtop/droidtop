@@ -22,6 +22,9 @@ crate-type = ["cdylib", "rlib"]
 droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.2" }
 # The person's own shares (Droidtop/tracker#573): Droidtop/lib-net's share client, WebDAV and the backends to come.
 net-remote = { git = "https://github.com/Droidtop/lib-net", tag = "v0.2.1" }
+# KDE Connect, both ways (Droidtop/tracker#645, SPEC 7q): kdeconnect_<op> is passed to
+# lib-kdeconnect's operation table.
+kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", tag = "v0.1.0" }
 jni = { version = "0.21", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
