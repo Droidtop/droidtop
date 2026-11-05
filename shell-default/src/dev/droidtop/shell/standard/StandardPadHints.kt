@@ -16,13 +16,6 @@ import dev.droidtop.ui.shared.HintViews
  * its press does something: the page buttons with more than one home page, the item menu while an item has the focus.
  */
 object StandardPadHints {
-    /**
-     * Whether Start reaches the mode switcher on the rig. The code path is there ([StandardPad]), but on 2936 the rig
-     * saw no reaction to Start (adb keyevents, AVD), so the row does not promise it until a rig check confirms it
-     * (coordinator, 2026-11-05). Turn on in the commit that confirms it.
-     */
-    const val START_CONFIRMED = false
-
     /** Bumped on every pad press, after the launcher has acted on it: the row reads the page and the focus again. */
     private val revision = androidx.compose.runtime.mutableIntStateOf(0)
 
@@ -31,12 +24,13 @@ object StandardPadHints {
         val home = { launcher.isInState(LauncherState.NORMAL) }
         val pages = { home() && launcher.workspace.pageCount > 1 }
         HintViews.padRow(launcher, revision) {
-            listOfNotNull(
+            listOf(
                 HintBinding(GamepadAction.L, "Previous page") { pages() && launcher.workspace.nextPage > 0 },
                 HintBinding(GamepadAction.R, "Next page") { pages() && launcher.workspace.nextPage < launcher.workspace.pageCount - 1 },
                 HintBinding(GamepadAction.X, "Menu") { launcher.currentFocus != null },
                 HintBinding(GamepadAction.Y, "Search"),
-                HintBinding(GamepadAction.START, "Modes").takeIf { START_CONFIRMED },
+                // Start reaches the mode switcher (rig, RP5 3057: ActivityTaskManager started ModeSwitcherActivity).
+                HintBinding(GamepadAction.START, "Modes"),
             )
         }
     }

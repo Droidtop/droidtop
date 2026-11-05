@@ -1873,9 +1873,8 @@ menu). **The pad's hint row** (`StandardPadHints`, Droidtop/tracker#699): the sh
 last input (`PadModality`: the launcher reports pad keys and touches) and gone
 at the first touch, its pills on their own plates over the wallpaper and each
 a tap on its button. A pill shows only while its press does something: L1/R1
-with a page to turn to, X while an item has the focus, Y always. Start's
-"Modes" pill waits for a rig check that Start reaches the mode switcher
-(`START_CONFIRMED`; on 2936 the rig saw no reaction). It waits while the
+with a page to turn to, X while an item has the focus, Y and Start ("Modes",
+the mode switcher, confirmed on the RP5 on 3057) always. It waits while the
 in-place "Press and hold Home" hint is up, which sits in the same place.
 Not yet: the face-button swap, which lives in the Gaming shell's
 `ControllerLayouts`. Root stays
