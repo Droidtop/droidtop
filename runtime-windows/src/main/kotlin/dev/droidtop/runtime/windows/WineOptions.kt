@@ -222,7 +222,8 @@ object WineOptions {
         return WineOptionRow(
             PREFIX, "Prefix",
             "The Windows installation this game runs in, with its own Wine build, settings and saves. Another one runs the " +
-                "game on that one's Wine build; its saves so far stay where they are.",
+                "game on that one's Wine build, and copies its saves there (Documents, AppData, Saved Games; nothing already there " +
+                "is replaced). Settings stored in the registry stay behind.",
             current, choices,
             ownChoice = PcContainers.chosenId(context, entryId) != null,
         )
@@ -336,6 +337,8 @@ object WineOptions {
             runCatching {
                 WindowsBackbone.awaitReady(app)
                 if (rowId == PREFIX && entryId != null) {
+                    // The prefix the game ran in until now: its saves follow it to the new one (SPEC 5a piece 2).
+                    val before = PcContainers.forGame(app, entryId)
                     if (value == PREFIX_NEW) {
                         // A new prefix for the game, made from the settings it runs with now; its choices over the
                         // old prefix become the new one's own settings.
@@ -346,6 +349,11 @@ object WineOptions {
                         setWineChoices(app, entryId, emptyMap())
                     } else {
                         PcContainers.choose(app, entryId, value)
+                    }
+                    val after = PcContainers.forGame(app, entryId)
+                    if (before != null && after != null && before.id != after.id) {
+                        val copied = WinePrefixSaves.copy(before.rootDir, after.rootDir)
+                        android.util.Log.i(TAG, "Moved $entryId from prefix ${before.id} to ${after.id}; copied $copied save files")
                     }
                     return@runCatching
                 }

@@ -7521,9 +7521,16 @@ runs in (never the shared one) is "Remove", asked first ("Keep it" is the safe
 answer). `PcContainers.remove` deletes by `SafeDelete.clearWithin` fenced to
 the prefix home, and refuses a prefix any game still resolves to. The games
 are counted with the same rule a launch uses (`PcContainers.resolveId`, one
-rule for `forGame` and `usage`), with the containers read once. Not built yet:
-the confirmation's "Copy this game's saves", copy-on-write and layer
-prefixes, and pieces 3 to 7. Built state of the rest stays as the bullets
+rule for `forGame` and `usage`), with the containers read once. **Built
+(2026-11-05, `ci/managed-prefixes-3`): the saves move with the game.**
+Changing the Prefix row copies the game's saves from the prefix it ran in to
+the one it runs in now (`WinePrefixSaves.copy`: every user's `Documents`,
+`AppData` and `Saved Games`, never overwriting a name already there, never
+following or copying a link). Registry values are not carried, and the row's
+summary says so. Built to the SPEC's default ("on by default"); the
+confirmation that would let the person turn it off is not built, since a
+choice row has no confirmation step. Owner to confirm. Not built yet:
+copy-on-write and layer prefixes, and pieces 3 to 7. Built state of the rest stays as the bullets
 above describe it until each part lands. The mechanism is 5b
 "Containment and copy-on-write layers for Wine"; the library side is the
 sandbox library's `docs/design.md`, "Layers, containment, and Wine and proot
