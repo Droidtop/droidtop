@@ -3959,6 +3959,34 @@ the `ContainerRuntime` interface that already exists (§3):
   reload would then silently spread that output's touches over the whole
   layout. Nothing calls the named form until D3; until then a desktop
   with a second output still takes the unnamed call.
+- **The session adds and removes a second output (2026-11-05,
+  Droidtop/tracker#908, step D2).** `DesktopSessionState.Connected` carries
+  `outputs`, one `DesktopOutput` (an Android `DisplayOutput` and the
+  compositor's name for its output) per output, the primary's first;
+  `primaryOutput` still names the primary's display. Under sway,
+  `DesktopSessionService.extendTo(display)` asks sway over its IPC socket
+  for a new headless output (`create_output`), takes its name from the one
+  `HostBridge.outputNames()` did not list before (`DesktopOutputs.newOutputName`),
+  sizes it to the display's pixels through `setOutputSize(name, ...)` at the
+  scale the primary would have there (Desktop scale and render resolution,
+  `DesktopScale`, with the display's own `densityDpi`, now on
+  `DisplayOutput`), and once the compositor reports that size puts it right
+  of the other outputs, top edges level (`output <name> pos <x> 0`, x from
+  each output's box as in D1b, `DesktopOutputs.positionX`).
+  `retract(displayId)` stops presenting it and sends
+  `output <name> unplug`; the session retracts on its own when Android
+  removes the display. Both run on the session's IO scope, one at a time,
+  and are idempotent: a display that has an output is sized and placed
+  again rather than given another, the primary's own display is never
+  given one, and retracting a display with none does nothing. sway is
+  driven over IPC (`SwayIpc`, the socket host-bridge already reaches),
+  not `swaymsg` in the container, so no process is started for it. Under
+  labwc nothing is added. Nothing calls `extendTo` yet: D3 shows the
+  output on the display, D5 decides whether to (asked once per display,
+  remembered). The position is set when the output is added; a later
+  change of the primary's size (a rotation, another Desktop scale) does
+  not move it until `extendTo` is called again, which D3 is to do when
+  either resizes.
 - **Per-window placement is not built (corrected 2026-10-29,
   Droidtop/tracker#695).** This section used to promise that any window could
   be reassigned to a different `DisplayOutput` at runtime, sway moving a
@@ -3989,9 +4017,10 @@ the `ContainerRuntime` interface that already exists (§3):
   (§4d), **Virtual controller** (§4), **Extended desktop output** (Desktop
   only: a second headless output in the compositor, sized to the display;
   `:host-bridge` tracks and captures every output and can place pointer
-  input on any of them since #908's D1a and D1b, but the session's second
-  output (D2) and a surface showing it (D3) are needed before this role or
-  a taskbar "move to" action can exist), or **Mirror** (Android's
+  input on any of them since #908's D1a and D1b, and the session can add
+  and remove that output since D2, but a surface showing it (D3) is
+  needed before this role or a taskbar "move to" action can exist), or
+  **Mirror** (Android's
   own mirroring, chosen rather than fallen into). The per-mode
   second-screen role rows are these same rows filtered to the mode. A
   display in a fallback mode the add-on is known to come up in (480x640

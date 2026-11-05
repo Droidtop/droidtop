@@ -44,6 +44,11 @@ data class DisplayOutput(
     /** The panel's pixels per inch as it reports them (`DisplayMetrics.xdpi`, `ydpi`); 0 when it reports none. */
     val xdpi: Float = 0f,
     val ydpi: Float = 0f,
+    /**
+     * Android's density for the display (`DisplayMetrics.densityDpi`, what Android's own UI is scaled by there); 0
+     * when unknown. The desktop's scale on an output for this display follows it ([DesktopScale.resolve]).
+     */
+    val densityDpi: Int = 0,
 ) {
     /** See [DisplayModes.isFallback]. */
     val isInFallbackMode: Boolean

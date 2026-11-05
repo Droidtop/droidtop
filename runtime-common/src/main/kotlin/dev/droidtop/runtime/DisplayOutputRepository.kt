@@ -115,6 +115,7 @@ class DisplayOutputRepository(private val context: Context) {
                 nativeHeightPx = native?.physicalHeight ?: point.y,
                 xdpi = metrics.xdpi,
                 ydpi = metrics.ydpi,
+                densityDpi = metrics.densityDpi,
             )
         }
     }

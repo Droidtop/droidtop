@@ -7,8 +7,11 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import dev.droidtop.hostbridge.DesktopOutput
+import dev.droidtop.hostbridge.DesktopOutputs
 import dev.droidtop.hostbridge.DesktopWindows
 import dev.droidtop.hostbridge.HostBridge
+import dev.droidtop.hostbridge.SwayOutputs
 import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.CompositorProvisioning
 import dev.droidtop.runtime.Container
@@ -17,6 +20,7 @@ import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.CraneImageCatalogResolver
 import dev.droidtop.runtime.DisplayOutput
 import dev.droidtop.runtime.DisplayOutputKind
+import dev.droidtop.runtime.DesktopScale
 import dev.droidtop.runtime.KnownImageRepository
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.resolveCurrent
@@ -24,10 +28,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 sealed interface DesktopSessionState {
     data object Idle : DesktopSessionState
@@ -40,7 +48,11 @@ sealed interface DesktopSessionState {
     data class Connecting(val detail: String? = null, val firstStart: Boolean = false) : DesktopSessionState
     data class Connected(
         val hostBridge: HostBridge,
-        val primaryOutput: DisplayOutput,
+        /**
+         * The compositor outputs the desktop has, each with the Android display it is for: the primary's first, then
+         * any [DesktopSessionService.extendTo] added for another display (Droidtop/tracker#908, step D2).
+         */
+        val outputs: List<DesktopOutput>,
         /**
          * The taskbar's window actions for the compositor the session started
          * ([PrimaryProvisioning.compositorCommand], "sway" or "labwc" today): the Wayland
@@ -51,7 +63,10 @@ sealed interface DesktopSessionState {
         /** The running primary container + the runtime that created it — what a native Linux game needs to run as a Wayland client sharing this same desktop (Windows games go through `:runtime-windows`'s own `WineEngine` and need neither). */
         val runtime: ContainerRuntime,
         val container: Container,
-    ) : DesktopSessionState
+    ) : DesktopSessionState {
+        /** The display the desktop's primary output is drawn for. */
+        val primaryOutput: DisplayOutput get() = outputs.first().display
+    }
     /** [stopped]: the desktop was running and its compositor went away, rather than failing to start. */
     data class Failed(val message: String, val stopped: Boolean = false) : DesktopSessionState
 }
@@ -119,6 +134,7 @@ class DesktopSessionService : Service() {
         super.onCreate()
         startForeground(NOTIFICATION_ID, buildNotification())
         sessionScope = scope
+        appContext = applicationContext
         _stateHolder.value = DesktopSessionState.Connecting()
         scope.launch { connect() }
     }
@@ -136,6 +152,9 @@ class DesktopSessionService : Service() {
         // wait alone would leave its compositor coming up with nobody to
         // stop it.
         DesktopKeyboardLayout.stopWatching(applicationContext)
+        displayListener?.let { getSystemService(android.hardware.display.DisplayManager::class.java)?.unregisterDisplayListener(it) }
+        displayListener = null
+        swayOutputs = null
         libraryEntries?.stop()
         libraryEntries = null
         EngineApiServer.stop(applicationContext)
@@ -259,12 +278,17 @@ class DesktopSessionService : Service() {
 
         _stateHolder.value = DesktopSessionState.Connected(
             hostBridge,
-            primaryDisplayOutput(),
+            listOf(DesktopOutput(primaryDisplayOutput(), hostBridge.outputNames().firstOrNull().orEmpty())),
             DesktopWindows(hostBridge, provisioning.compositorCommand, runtime.hostSocketDir()),
             runtime,
             primary,
         )
         scope.launch { watchCompositor(hostBridge) }
+        // Outputs for other displays (Droidtop/tracker#908, step D2): sway alone can make a headless output on demand.
+        if (provisioning.compositorCommand.substringBefore(' ') == "sway") {
+            swayOutputs = SwayOutputs(hostBridge, runtime.hostSocketDir())
+            watchDisplayRemovals()
+        }
         libraryEntries = DesktopLibraryEntries(applicationContext, LibraryCore.library(applicationContext)).also { it.start(scope) }
         // The Docker Engine API on docker.sock and the libpod API on podman.sock, for clients that talk to a daemon
         // (docs/SPEC.md 3d, D14, D15).
@@ -298,6 +322,34 @@ class DesktopSessionService : Service() {
         endedBecause = "It closed unexpectedly, and the windows that were open on it closed with it."
         stopSelf()
     }
+
+    /**
+     * Retracts the desktop's output for a display Android removes (Droidtop/tracker#908, step D2). The callback runs on
+     * the main thread and only queues the retract, which talks to sway, on the session's IO scope; a display with no
+     * output of the desktop's makes it a no-op.
+     */
+    private fun watchDisplayRemovals() {
+        val displays = getSystemService(android.hardware.display.DisplayManager::class.java) ?: return
+        val listener = object : android.hardware.display.DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) = Unit
+            override fun onDisplayChanged(displayId: Int) = Unit
+            override fun onDisplayRemoved(displayId: Int) {
+                scope.launch { retractNow(displayId) }
+            }
+        }
+        displays.registerDisplayListener(listener, android.os.Handler(android.os.Looper.getMainLooper()))
+        displayListener = listener
+        // The session ended while this was registering: onDestroy has already run, so undo it here.
+        if (!scope.isActive) {
+            displays.unregisterDisplayListener(listener)
+            displayListener = null
+            swayOutputs = null
+        }
+    }
+
+    /** The listener [watchDisplayRemovals] registered, unregistered with the session. */
+    @Volatile
+    private var displayListener: android.hardware.display.DisplayManager.DisplayListener? = null
 
     /**
      * The existing PRIMARY when it was made from the image the user still
@@ -394,6 +446,7 @@ class DesktopSessionService : Service() {
             kind = DisplayOutputKind.PRIMARY_SCREEN,
             widthPx = metrics.widthPixels,
             heightPx = metrics.heightPixels,
+            densityDpi = metrics.densityDpi,
         )
     }
 
@@ -487,6 +540,81 @@ class DesktopSessionService : Service() {
 
         @Volatile
         private var sessionScope: CoroutineScope? = null
+
+        /** The application, for the Desktop settings [extendTo] sizes an output by. */
+        @Volatile
+        private var appContext: android.content.Context? = null
+
+        /** What adds and removes the session's outputs; null without a session, or under a compositor other than sway. */
+        @Volatile
+        private var swayOutputs: SwayOutputs? = null
+
+        /** One output change at a time: each reads the session's outputs, talks to sway, then records the result. */
+        private val outputsLock = Mutex()
+
+        /**
+         * Gives the Android display [display] its own output in the desktop (Droidtop/tracker#908, step D2): a new
+         * sway headless output, sized to the display's pixels at the scale the primary's output would have on it
+         * (the Desktop scale and resolution settings with the display's own density, [DesktopScale]), placed right
+         * of the outputs already there. Nothing shows it yet (D3), and nothing decides to call this yet (D5).
+         *
+         * Idempotent: a display that already has an output keeps it, sized and placed again. The primary's own
+         * display is never given a second one. Runs on the session's IO scope; returns false when no session is up.
+         */
+        fun extendTo(display: DisplayOutput): Boolean {
+            if (_stateHolder.value !is DesktopSessionState.Connected) return false
+            val scope = sessionScope ?: return false
+            scope.launch { extendNow(display) }
+            return true
+        }
+
+        /**
+         * Removes the output [extendTo] gave the Android display [displayId] (sway's `output <name> unplug`) and
+         * forgets it; a no-op when it has none. The session calls it itself when Android removes the display. Runs
+         * on the session's IO scope; returns false when no session is up.
+         */
+        fun retract(displayId: Int): Boolean {
+            if (_stateHolder.value !is DesktopSessionState.Connected) return false
+            val scope = sessionScope ?: return false
+            scope.launch { retractNow(displayId) }
+            return true
+        }
+
+        private suspend fun extendNow(display: DisplayOutput) = outputsLock.withLock {
+            val session = _stateHolder.value as? DesktopSessionState.Connected ?: return@withLock
+            if (display.androidDisplayId == session.primaryOutput.androidDisplayId) return@withLock
+            val sway = swayOutputs ?: run {
+                android.util.Log.i(TAG, "Not adding an output for display ${display.androidDisplayId}: the compositor is not sway")
+                return@withLock
+            }
+            val context = appContext ?: return@withLock
+            val name = DesktopOutputs.outputFor(session.outputs, display.androidDisplayId)?.outputName
+                ?: sway.create()
+                ?: return@withLock
+            // Recorded before it is placed, so a retract finds it even when placing fails.
+            recordOutputs(session.hostBridge) { DesktopOutputs.extended(it, display, name) }
+            val prefs = dev.droidtop.library.settings.DesktopPrefs.read(context)
+            val factor = DesktopScale.resolutionFactor(prefs.resolution)
+            val (width, height) = DesktopScale.outputSize(display.widthPx, display.heightPx, factor)
+            val scale = DesktopScale.outputScale(DesktopScale.resolve(prefs.scale, display.densityDpi), factor)
+            if (!sway.place(name, width, height, scale)) {
+                android.util.Log.w(TAG, "Output $name for display ${display.androidDisplayId} could not be placed")
+            }
+        }
+
+        private suspend fun retractNow(displayId: Int) = outputsLock.withLock {
+            val session = _stateHolder.value as? DesktopSessionState.Connected ?: return@withLock
+            val output = DesktopOutputs.outputFor(session.outputs, displayId) ?: return@withLock
+            swayOutputs?.unplug(output.outputName)
+            recordOutputs(session.hostBridge) { DesktopOutputs.retracted(it, displayId) }
+        }
+
+        /** Changes the outputs of the session on [hostBridge], if it is still the one up. */
+        private fun recordOutputs(hostBridge: HostBridge, change: (List<DesktopOutput>) -> List<DesktopOutput>) {
+            _stateHolder.update { state ->
+                if (state is DesktopSessionState.Connected && state.hostBridge === hostBridge) state.copy(outputs = change(state.outputs)) else state
+            }
+        }
 
         private val _launchFailure = MutableStateFlow<String?>(null)
 
