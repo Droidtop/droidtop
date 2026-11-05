@@ -229,6 +229,8 @@ fun CatalogNavigator(
     var confirmArmedId by remember { mutableStateOf<String?>(null) }
     var editingText by remember { mutableStateOf<TextInputItem?>(null) }
     var pickingChoice by remember { mutableStateOf<ChoiceItem?>(null) }
+    // A short choice tapped: its options in a small pop-up over the page (Droidtop/tracker#673).
+    var poppingChoice by remember { mutableStateOf<ChoiceItem?>(null) }
     // A row that asks first (its confirmTitle), waiting in the one confirmation, Cancel first (Droidtop/tracker#835): it
     // replaced the second A on the row, where only pressing again or leaving the page ended the question.
     var confirming by remember { mutableStateOf<CatalogItem?>(null) }
@@ -584,11 +586,15 @@ fun CatalogNavigator(
         }
         when (item) {
             is ToggleItem -> adjust(item, +1)
-            // A and a tap open the choices, never change the value by
-            // themselves (rig, build 1649: a tap on a selector cycled it, so
-            // looking at a setting changed it). Left/Right, and the arrows a
-            // touch screen draws on a short choice, still step it in place.
-            is ChoiceItem -> if (item.options.isNotEmpty()) pickingChoice = item
+            // A tap never changes a value by itself (rig, build 1649: a tap on a selector cycled it, so looking at a
+            // setting changed it): it opens the choices, a short one as a small pop-up over the row, a long one as the
+            // picker (owner, 2026-11-05, Droidtop/tracker#673, option 1). A on a pad steps a short choice in place
+            // before it gets here (onPanePad); Left/Right step either way.
+            is ChoiceItem -> when {
+                item.options.isEmpty() -> {}
+                item.stepsInPlace() -> poppingChoice = item
+                else -> pickingChoice = item
+            }
             is SliderItem -> {}
             is TextInputItem -> editingText = item
             is FolderPickItem -> {
@@ -739,6 +745,17 @@ fun CatalogNavigator(
                 }
             },
             onDismiss = { editingText = null },
+        )
+    }
+    poppingChoice?.let { popped ->
+        CatalogChoicePopup(
+            item = popped,
+            onPick = { value ->
+                popped.onSelect(context, value)
+                poppingChoice = null
+                refresh()
+            },
+            onDismiss = { poppingChoice = null },
         )
     }
     val choiceItem = pickingChoice
@@ -931,9 +948,16 @@ fun CatalogNavigator(
                 row != null && (!categoryMode || row.item.stepsInPlace()) -> adjust(row.item, +1)
             }
             GamepadAction.A -> row?.let {
+                val item = it.item
+                // A on a short choice steps it to its next option in place: pressing A is deliberate (owner,
+                // 2026-11-05, Droidtop/tracker#673, option 1). A long choice still opens its picker.
+                if (item is ChoiceItem && item.stepsInPlace()) {
+                    adjust(item, +1)
+                    return@let
+                }
                 // A toggle and a stepped choice make their own cue (adjust); everything else confirms.
-                if (it.item !is ToggleItem) EsDeNavigationSounds.play(UiSound.CONFIRM)
-                activate(it.item)
+                if (item !is ToggleItem) EsDeNavigationSounds.play(UiSound.CONFIRM)
+                activate(item)
             }
             else -> return false
         }
@@ -979,7 +1003,8 @@ fun CatalogNavigator(
     val rowHints = remember(selectedRowItem) {
         selectedRowItem?.let { item ->
             listOfNotNull(
-                HintBinding(GamepadAction.A, "Select").takeIf { !item.isInert },
+                // A short choice steps on A (Droidtop/tracker#673): the hint says so.
+                HintBinding(GamepadAction.A, if (item is ChoiceItem && item.stepsInPlace()) "Next" else "Select").takeIf { !item.isInert },
                 // A row that steps in place says so: "◄ ► Change" (Droidtop/tracker#519). Left's label is empty so
                 // the pair reads as one hint, keycaps then the word.
                 HintBinding(GamepadAction.LEFT, "").takeIf { item.stepsInPlace() },
@@ -1588,6 +1613,37 @@ private fun CatalogRowView(
         return
     }
     val placeholder = status == null && value == null && item is TextInputItem
+    // A text size under the cursor shows itself: a sample line under its row, at the size in force (A steps it,
+    // Droidtop/tracker#673).
+    val sample = (item as? ChoiceItem)?.sampleScale?.takeIf { isSelected }
+    if (sample != null) {
+        Column(Modifier.fillMaxWidth()) {
+            CatalogMenuRow(item, value, status, locked, placeholder, chevron, isSelected, confirmArmed, infoUnderRow, oneLineSummary, toggle, slider, onClick, onLongClick, onAdjust)
+            Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) { ChoiceSample(1f, TypeRole.body) }
+        }
+        return
+    }
+    CatalogMenuRow(item, value, status, locked, placeholder, chevron, isSelected, confirmArmed, infoUnderRow, oneLineSummary, toggle, slider, onClick, onLongClick, onAdjust)
+}
+
+@Composable
+private fun CatalogMenuRow(
+    item: CatalogItem,
+    value: String?,
+    status: String?,
+    locked: Boolean,
+    placeholder: Boolean,
+    chevron: Boolean,
+    isSelected: Boolean,
+    confirmArmed: Boolean,
+    infoUnderRow: Boolean,
+    oneLineSummary: Boolean,
+    toggle: ToggleItem?,
+    slider: SliderItem?,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    onAdjust: ((Int) -> Unit)?,
+) {
     MenuRow(
         title = if (confirmArmed) "${item.title}: ${PressWords.again} to confirm" else item.title,
         value = if (locked) "Read it first" else status ?: value ?: if (placeholder) "Type here" else null,

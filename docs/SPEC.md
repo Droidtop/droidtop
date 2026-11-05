@@ -20678,9 +20678,14 @@ Settings tab, the left menu's places, Console systems and Containers.
 - **Rows.** A row is its name and, right-aligned in the screen's one value
   column, what it is set to: a switch for a toggle, an inline track and the
   number for a slider, `‹ value ›` for a short choice, a chevron for a row
-  that opens something. A or a tap on a choice opens its list
-  (`CatalogChoicePicker`) and never changes the value by itself (rig, build
-  1649: a tap cycled it); Left/Right and a touch screen's arrows step it in place. No explanation is drawn on a row: it is shown while the pad rests on the
+  that opens something. **A short choice (six or fewer options) steps on A, opens on a tap** (owner, 2026-11-05,
+  Droidtop/tracker#673, option 1): on a pad, A steps it to its next option in place, as Left and Right do (pressing
+  A is deliberate; the hint reads "Next"); a tap opens its options as a small pop-up over the page
+  (`CatalogChoicePopup`, the dialogs' one list), never a full page, and a tap never changes the value by itself (rig,
+  build 1649: a tap cycled it). A long choice keeps its list (`CatalogChoicePicker`) on A and on a tap. Text size
+  (`ChoiceItem.sampleScale`) shows a live sample line: under its row while the cursor is on it, and in the pop-up
+  at the option under the cursor. The launcher's Settings already draw a choice as Android's own small list dialog,
+  and the companion's panel opens its options in place under the row. No explanation is drawn on a row: it is shown while the pad rests on the
   row (after the one tooltip delay) in a fixed-height strip under the list, three lines of the summary
   type (`CatalogTipStrip`, reserved only on a page whose rows have explanations), and in the Y Info
   sheet (a long press on touch). It was a bubble under the row (Droidtop/tracker#366 fixed its

@@ -157,6 +157,11 @@ class ChoiceItem(
     val current: String?,
     val onSelect: (Context, String) -> Unit,
     override val chip: RowTag? = null,
+    /**
+     * A choice whose options are text sizes: the scale an option's value stands for, so renderers draw a live sample
+     * line at it (Text size, Droidtop/tracker#673). Null for every other choice.
+     */
+    val sampleScale: ((String) -> Float?)? = null,
 ) : CatalogItem {
     fun currentLabel(): String? = options.firstOrNull { it.value == current }?.label ?: current
 

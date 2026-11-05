@@ -176,6 +176,8 @@ object DroidtopWideSettings {
                             onSelect = { ctx, value ->
                                 CatalogPrefs.prefs(ctx).edit().putString(AccessibilityPrefs.KEY_TEXT_SCALE, value).apply()
                             },
+                            // Each size shows itself on a sample line (Droidtop/tracker#673).
+                            sampleScale = { it.toFloatOrNull() },
                         ),
                         dev.droidtop.library.settings.ReadingPrefs.infoTextItem(context),
                         dev.droidtop.library.settings.ReadingPrefs.highContrastItem(context),
