@@ -9,14 +9,14 @@ import org.junit.Test
 class PcGamePageHintsTest {
     @Test
     fun `on the first action A names the verb, so X does not name it again`() {
-        assertEquals("Play", pageActionLabel(0, "Play"))
-        assertFalse(xNamesPlay(PageZone.ACTIONS, 0))
+        assertEquals("Play", pageActionLabel(PageButton.PRIMARY, "Play"))
+        assertFalse(xNamesPlay(PageZone.ACTIONS, PageButton.PRIMARY))
     }
 
     @Test
     fun `everywhere else X names the verb`() {
-        assertTrue(xNamesPlay(PageZone.ACTIONS, 1))
-        assertTrue(xNamesPlay(PageZone.TABS, 0))
-        assertTrue(xNamesPlay(PageZone.CONTENT, 0))
+        assertTrue(xNamesPlay(PageZone.ACTIONS, PageButton.OPTIONS))
+        assertTrue(xNamesPlay(PageZone.TABS, PageButton.PRIMARY))
+        assertTrue(xNamesPlay(PageZone.CONTENT, PageButton.PRIMARY))
     }
 }

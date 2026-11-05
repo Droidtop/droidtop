@@ -250,7 +250,7 @@ internal fun GamePageFrame(
                     PageZone.CONTENT -> current.getOrNull(row)?.onActivate != null
                 }
             },
-            HintBinding(GamepadAction.X, verb) { play.pressable || play.chooseEngine },
+            HintBinding(GamepadAction.X, verb) { (play.pressable || play.chooseEngine) && xNamesPlay(zone, selectedButton) },
             HintBinding(GamepadAction.Y, "Favourite"),
             HintBinding(GamepadAction.L2, kind.optionsHint),
             HintBinding(GamepadAction.SELECT, "Copy options") { zone == PageZone.CONTENT && current.getOrNull(row)?.onOptions != null },
@@ -509,7 +509,7 @@ internal fun GamePageFrame(
 }
 
 /** Where the page's one cursor is: the action band's buttons, the tab strip, or the tab's rows. */
-private enum class PageZone { ACTIONS, TABS, CONTENT }
+internal enum class PageZone { ACTIONS, TABS, CONTENT }
 
 /** The page's one list: the hero, the action band, the sticky tab strip, then the tab's rows. */
 internal const val PAGE_ITEM_HERO = 0
@@ -675,6 +675,13 @@ internal object PageOptionRows {
 }
 
 /** The A hint on the action band: what the button under the cursor does. */
+/**
+ * Whether the X hint names the primary verb: not while the cursor is on the primary action, where A already says it
+ * (Droidtop/tracker#660: "A Play" and "X Play" side by side, one action named twice in a bar that runs short in
+ * portrait). X still plays from there; the bar just names it once. Pure.
+ */
+internal fun xNamesPlay(zone: PageZone, button: PageButton): Boolean = !(zone == PageZone.ACTIONS && button == PageButton.PRIMARY)
+
 internal fun pageActionLabel(button: PageButton, primaryVerb: String): String = when (button) {
     PageButton.PRIMARY -> primaryVerb
     PageButton.EDIT_METADATA -> EDIT_METADATA
