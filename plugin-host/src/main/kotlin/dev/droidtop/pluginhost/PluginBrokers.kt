@@ -358,6 +358,10 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         Thread({ runCatching { dev.droidtop.net.peer.PairedDevices.announce(appContext, pluginId, value) } }, "devices-announce").start()
     }
 
+    override fun setPeerAddresses(pluginId: String, addresses: List<String>) {
+        dev.droidtop.net.kdeconnect.KdeConnect.setPluginAddresses(pluginId, addresses)
+    }
+
     override fun netLinks(): List<NetLinks.Link> {
         val cm = appContext.getSystemService(android.net.ConnectivityManager::class.java) ?: return emptyList()
         val active = cm.activeNetwork

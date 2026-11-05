@@ -22718,7 +22718,10 @@ client." The plan and its slices are on #645.
       official apps; the switch is the library's `input` plugin.
   - Each plugin will have its own switch on the screen.
 - **Tailscale** is a VPN plugin, not a client of droidtop's own (owner, above). It feeds its tailnet's online devices
-  to the same address list (`kdeconnect_addresses`), slice 5 of #645.
+  to the same address list through the host API `peers.set_addresses` (docs/plugin-api.md D22, `peers.addresses`,
+  dangerous): KDE Connect announces this device to the person's addresses and every VPN plugin's, once each
+  (`KdeConnect.allAddresses`). A plugin's list lives for the process (plugins send it again when they start); the
+  person's own list is kept. Slice 5 of #645; the plugin itself is `droidtop-plugin-tailscale`.
 
 ## 8. Licensing
 

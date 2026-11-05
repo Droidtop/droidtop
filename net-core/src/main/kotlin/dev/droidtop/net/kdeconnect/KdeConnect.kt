@@ -102,10 +102,31 @@ object KdeConnect {
         val list = parseAddresses(text)
         prefs(context).edit().putString(KEY_ADDRESSES, list.joinToString(", ")).apply()
         if (_running.value) {
-            call("addresses", JSONObject().put("addresses", JSONArray(list)))
+            call("addresses", JSONObject().put("addresses", JSONArray(allAddresses(context))))
             call("announce")
         }
     }
+
+    /** Addresses VPN plugins gave (`peers.set_addresses`), by plugin id; kept for the process's life, as plugins re-send. */
+    private val pluginAddresses = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
+
+    @Volatile
+    private var appContext: Context? = null
+
+    /** A VPN plugin's devices (docs/plugin-api.md D22): replaces what [pluginId] gave before; empty withdraws it. */
+    fun setPluginAddresses(pluginId: String, addresses: List<String>) {
+        if (addresses.isEmpty()) pluginAddresses.remove(pluginId) else pluginAddresses[pluginId] = addresses
+        val context = appContext ?: return
+        scope.launch {
+            if (_running.value) {
+                call("addresses", JSONObject().put("addresses", JSONArray(allAddresses(context))))
+                call("announce")
+            }
+        }
+    }
+
+    /** The person's addresses and every VPN plugin's, once each. */
+    fun allAddresses(context: Context): List<String> = (addresses(context) + pluginAddresses.values.flatten()).distinct()
 
     private fun call(op: String, args: JSONObject = JSONObject()): JSONObject = AgentNative.call("kdeconnect_$op", args)
 
@@ -126,7 +147,8 @@ object KdeConnect {
             _changes.tryEmit(System.nanoTime())
             return@withLock
         }
-        call("addresses", JSONObject().put("addresses", JSONArray(addresses(context))))
+        appContext = context.applicationContext
+        call("addresses", JSONObject().put("addresses", JSONArray(allAddresses(context))))
         // Typing from a paired device goes wherever "Type from another device" types (droidtop's own field, or any
         // app's field through droidtop's input method), and says so when there is no field: so it always takes it.
         call("keyboard_ready", JSONObject().put("ready", true))

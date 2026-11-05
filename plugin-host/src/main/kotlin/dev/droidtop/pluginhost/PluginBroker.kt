@@ -173,6 +173,10 @@ interface BrokerEnvironment {
     fun announceToDevices(pluginId: String, value: JSONObject?): Unit =
         throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop announces nothing to paired devices")
 
+    /** D22 (`peers.set_addresses`): where [pluginId]'s network reaches the person's other devices; empty withdraws it. */
+    fun setPeerAddresses(pluginId: String, addresses: List<String>): Unit =
+        throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop reaches no peers by address")
+
     /** D7 (`power.state`): the battery now. */
     fun powerState(): PowerState = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop reports no battery state")
 
@@ -676,6 +680,7 @@ object HostApis {
 
     /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
     val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostSettingsApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPowerApis.ops + HostSourcesApis.ops }
+    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPeersApis.ops + HostPowerApis.ops + HostSourcesApis.ops }
 
     const val MAX_ENGINES = 50
     const val MAX_PATH = 4096
