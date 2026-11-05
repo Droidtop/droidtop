@@ -151,7 +151,17 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
             return
         }
         val chooser = Intent.createChooser(intent, "Open with").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { context.startActivity(chooser) }.onFailure { Log.w(TAG, "Could not open it on Android", it) }
+        // Started by the showing Desktop shell from its activity, on the main thread, as Start starts an Android app
+        // (which the 2026-11-04 rig run saw come to the front). Started from here, a file watcher's thread with the
+        // application's context, the link reached Chrome's dispatcher but Chrome never came to the front
+        // (Droidtop/tracker#388). With no Desktop shell showing, from here as before.
+        if (DesktopLaunchRequests.offerView(chooser)) {
+            Log.i(TAG, "Open on Android: handed to the Desktop shell (${intent.data?.scheme})")
+            return
+        }
+        runCatching { context.startActivity(chooser) }
+            .onSuccess { Log.i(TAG, "Open on Android: started with no Desktop shell showing (${intent.data?.scheme})") }
+            .onFailure { Log.w(TAG, "Could not open it on Android", it) }
     }
 
     private fun sharedFileIntent(target: ContainerLauncher.ViewTarget.SharedFile): Intent? {

@@ -297,4 +297,15 @@ object DesktopLaunchRequests {
 
     /** Asks the showing Desktop shell for its Start menu; false when none is collecting. */
     fun offerStartMenu(): Boolean = startFlow.subscriptionCount.value > 0 && startFlow.tryEmit(Unit)
+
+    private val viewFlow = MutableSharedFlow<android.content.Intent>(extraBufferCapacity = 4)
+
+    /**
+     * Open on Android's checked intents ([ContainerLauncher.parseViewRequest], Droidtop/tracker#388): the showing
+     * Desktop shell starts each from its own activity, the way Start starts an Android app.
+     */
+    val viewRequests: SharedFlow<android.content.Intent> = viewFlow.asSharedFlow()
+
+    /** Hands [intent] to the showing Desktop shell to start; false when none is collecting. */
+    fun offerView(intent: android.content.Intent): Boolean = viewFlow.subscriptionCount.value > 0 && viewFlow.tryEmit(intent)
 }

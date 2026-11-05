@@ -308,7 +308,13 @@ host, or a shared-storage path with no `.` or `..` segment; the file is
 then resolved on its Android volume, must stay inside it after symlinks are
 followed and must be a file, and is handed over as a FileProvider content
 URI with read access. Both go through Android's own chooser, so the person
-picks the app. Nothing else crosses: no other scheme, no app-private path,
+picks the app. The chooser is started by the showing Desktop shell from its
+own activity on the main thread (`DesktopLaunchRequests.viewRequests`), the
+way Start starts an Android app, and from the file watcher's thread with the
+application's context only when no Desktop shell shows (rig 2026-11-04, build
+2852: started from the watcher, `xdg-open https://example.com` reached
+Chrome's IntentDispatcher but Chrome never came to the front, while an
+Android app started from Start did). Nothing else crosses: no other scheme, no app-private path,
 no intent extras. The helper is registered as a hidden "Open on Android"
 desktop entry for links and everyday document and media types, and a
 `mimeapps.list` beside the library's entries makes it the http(s) default

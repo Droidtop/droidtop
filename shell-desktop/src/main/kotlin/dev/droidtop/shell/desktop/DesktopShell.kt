@@ -273,6 +273,22 @@ fun DesktopShell(
             if (entry != null) currentPlay(entry) else launchById(id)
         }
     }
+    // Open on Android (Droidtop/tracker#388): a link or shared-storage file the desktop asked to open, started from this
+    // activity as Start starts an Android app, so the app it opens in comes to the front.
+    LaunchedEffect(Unit) {
+        DesktopLaunchRequests.viewRequests.collect { intent ->
+            runCatching { context.startActivity(intent) }
+                .onSuccess { android.util.Log.i("droidtop.DesktopLibrary", "Open on Android: started from the Desktop shell") }
+                .onFailure {
+                    android.util.Log.w("droidtop.DesktopLibrary", "Could not open it on Android", it)
+                    dev.droidtop.library.settings.Notices.flash(
+                        context.getString(R.string.desktop_open_on_android_failed),
+                        tone = dev.droidtop.library.settings.NoticeTone.Caution,
+                        context = context,
+                    )
+                }
+        }
+    }
     // The desktop's launcher key (Super+D in sway) opens this Start menu, the desktop's one launcher (#683).
     LaunchedEffect(Unit) {
         DesktopLaunchRequests.startMenuRequests.collect { startMenuOpen = true }
