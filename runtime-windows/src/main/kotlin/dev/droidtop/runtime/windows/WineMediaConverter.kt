@@ -27,9 +27,11 @@ import java.io.File
  *   takes asfdemux out of autoplugging, so the converter gets ASF as it does under Proton and plays the blank video.
  * - The blank video itself: Proton's blank.mkv is AV1, which this Wine's winegstreamer has no mapping for
  *   ("wg_format_from_caps: Unhandled caps video/x-av1") and the image no decoder, so Media Foundation's source reader
- *   never produced a sample and Unity asked for one forever (main 3061). droidtop's blank.mkv is the same 4 s with
- *   Proton's Opus audio, but its video is uncompressed I420 (64x48, 5 fps, V_UNCOMPRESSED), which matroskademux
- *   hands over as video/x-raw and winegstreamer maps today.
+ *   never produced a sample and Unity asked for one forever (main 3061). droidtop's blank.mkv is the same 4 s, but
+ *   uncompressed throughout: I420 video (64x48, 5 fps, V_UNCOMPRESSED) and 16-bit PCM silence (8 kHz mono,
+ *   A_PCM/INT/LIT), which matroskademux hands over as video/x-raw and audio/x-raw with no decoder at all. Its first
+ *   uncompressed copy kept Proton's Opus audio, and decodebin then reported a missing plug-in (the rawblank build
+ *   on the console): the base system has no Opus decoder to take that stream.
  */
 internal object WineMediaConverter {
     private val BLANKS = listOf("blank.mkv", "blank.mka", "blank.ptna")
