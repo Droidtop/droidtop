@@ -125,6 +125,10 @@ object KdeConnect {
         }
     }
 
+    /** The VPN plugin that gave [address] (`peers.set_addresses`), or null: a device reached there is "over" it. */
+    fun viaPlugin(address: String?): String? =
+        address?.let { a -> pluginAddresses.entries.firstOrNull { a in it.value }?.key }
+
     /** The person's addresses and every VPN plugin's, once each. */
     fun allAddresses(context: Context): List<String> = (addresses(context) + pluginAddresses.values.flatten()).distinct()
 
