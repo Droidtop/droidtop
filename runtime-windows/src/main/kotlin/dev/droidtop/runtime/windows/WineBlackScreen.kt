@@ -84,11 +84,11 @@ internal class WineBlackScreen(
         }
         runCatching {
             PixelCopy.request(view, frame, { result ->
-                val dark = result == PixelCopy.SUCCESS && run {
-                    frame.getPixels(pixels, 0, frame.width, 0, 0, frame.width, frame.height)
-                    FrameDarkness.isFlatDark(pixels)
-                }
-                if (watch.sample(SystemClock.elapsedRealtime(), windowShown(), dark)) {
+                val copied = result == PixelCopy.SUCCESS
+                if (copied) frame.getPixels(pixels, 0, frame.width, 0, 0, frame.width, frame.height)
+                val dark = copied && FrameDarkness.isFlatDark(pixels)
+                val picture = copied && FrameDarkness.hasPicture(pixels)
+                if (watch.sample(SystemClock.elapsedRealtime(), windowShown(), dark, picture)) {
                     val shot = frame.copy(Bitmap.Config.ARGB_8888, false)
                     showing = true
                     activity.runOnUiThread { show(shot) }
@@ -156,11 +156,17 @@ internal class WineBlackScreen(
     }
 
     /**
-     * The pad while the notice is up: Left and Right move between its two buttons, A or Enter presses one, B or Back
-     * keeps waiting. Every key is the notice's while it is up; false when it is not.
+     * The pad while the notice is up: Left and Right move between its two buttons, A or Enter presses one, B keeps
+     * waiting. Back closes the notice and goes on to do what it does on the game screen, open the running game's sheet,
+     * as the hint row says (Droidtop/tracker#896: it was eaten here). Every other key is the notice's while it is up;
+     * false when it is not.
      */
     fun onKey(event: KeyEvent): Boolean {
         if (notice == null) return false
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_UP) keepWaiting()
+            return false
+        }
         if (event.action != KeyEvent.ACTION_UP) return true
         val focused = buttons.indexOfFirst { it.isFocused }.coerceAtLeast(0)
         when (event.keyCode) {
@@ -168,7 +174,7 @@ internal class WineBlackScreen(
                 buttons.getOrNull(if (focused == 0) 1 else 0)?.requestFocus()
             KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_CENTER ->
                 buttons.getOrNull(focused)?.takeIf { it.isEnabled }?.performClick()
-            KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BACK -> keepWaiting()
+            KeyEvent.KEYCODE_BUTTON_B -> keepWaiting()
         }
         return true
     }

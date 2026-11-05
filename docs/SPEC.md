@@ -11580,7 +11580,7 @@ read alike and what is judged is what the person sees. Once the game has shown i
 (`BlackScreenWatch.HOLD_MS`) puts a notice over the game: "The game is showing a black screen", with **Report a
 problem** and **Keep waiting**. One bright frame starts the count again, so a fade or a short black loading screen
 says nothing; the notice never ends the game, and Keep waiting starts a new count. While it is up it takes the pad
-(Left and Right, A, B for Keep waiting). Report a problem writes the run's record as it stands, while the game still
+(Left and Right, A, B for Keep waiting; Back passes on, below). Report a problem writes the run's record as it stands, while the game still
 runs (Wine's output so far from the run's `RunLogCollector`, the run's setup, the game's own logs), as
 `wine-report-last.log` and a `wine-report-run-<game>-<time>.log` beside the frame that was shown as a PNG, then opens
 Share diagnostics (`DiagnosticsArchive.share`, the same step as Settings' row), so the person chooses where it goes;
@@ -11591,6 +11591,17 @@ for a running Wine game (owner, 2026-10-28, asked whether it should be: "Yes"): 
 from the Quick Menu", with no frame, the row saying "Saving the report..." and then what happened. **A report never
 links to the tracker** (owner: "no. The tracker is private. We need, like, a bugzilla"); a public bug tracker is
 Droidtop/tracker#655, and until it exists a report shows no link at all.
+
+**A copy that shows nothing is not a black screen** (Droidtop/tracker#896, BlueStacks: Kingdom Two Crowns drew its
+animated menu while `PixelCopy` answered SUCCESS with 48 by 27 pixels of colour 0, and the notice came after 45 s). A
+dark frame counts only once this run's copies have shown some picture (`FrameDarkness.hasPicture`: a pixel whose colour
+is not exactly 0; the pointer on black, or a near-black loading frame, is one). A copy that is all zero every time says
+nothing about the game, so it says nothing. Built to the issue's recommendation, owner to confirm: a game black from its
+first frame with no pointer, on a device whose copies work, is no longer said; reading the frame from droidtop's own
+renderer instead would cover that and is not built. **Back on the notice** closes it and opens the running game's sheet,
+as the hint row says (it was eaten); B still means Keep waiting. **A clean end clears the running game** too, not only a
+failure (`nothingRunning`), so the shell does not offer Quit, Restart and Kill for a game that is gone. The run's record
+names the emulator that runs: "None" on an x86_64 device, as the game's Wine page says.
 
 **Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
 first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures

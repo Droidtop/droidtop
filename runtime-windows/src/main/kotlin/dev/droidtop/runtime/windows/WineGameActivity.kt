@@ -194,7 +194,9 @@ class WineGameActivity : Activity() {
             "Wine" to prefix.wineVersion.orEmpty(),
             "Direct3D" to prefix.dxWrapper.orEmpty(),
             "Graphics driver" to listOf(prefix.graphicsDriver, prefix.graphicsDriverVersion).filterNot { it.isNullOrBlank() }.joinToString(" "),
-            "Emulator" to prefix.emulator.orEmpty(),
+            // What actually runs: an x86_64 device runs Wine's code itself, whatever the prefix names (Droidtop/tracker#896:
+            // the record said Box64 where the game's page said None).
+            "Emulator" to if (X86_64GuestLibs.isX86_64Host()) "None" else prefix.emulator.orEmpty(),
         ).filter { it.second.isNotBlank() }
 
         val xServer = XServer(ScreenInfo(prefix.screenSize), false)
@@ -385,8 +387,23 @@ class WineGameActivity : Activity() {
             // The person left the game (Back): stopping the session killed
             // Wine (code 137), which is the quit itself, not a failure to report.
             if (isFinishing || isDestroyed) return@runOnUiThread
-            if (report != null) showFailure(report.detail, title = report.title) else finish()
+            if (report != null) {
+                showFailure(report.detail, title = report.title)
+            } else {
+                // A clean end is an end too: the shell must not open the running game's sheet for it
+                // (Droidtop/tracker#896: Quit, Restart and Kill were offered for a game that was gone).
+                nothingRunning()
+                finish()
+            }
         }
+    }
+
+    /**
+     * Nothing is running any more: the Quick Menu must not offer Resume, Quit, Restart or Kill for this launch
+     * (Droidtop/tracker#171, rig 2026-10-01 r18; #896, after a game that ended with code 0).
+     */
+    private fun nothingRunning() {
+        if (dev.droidtop.library.LaunchDisplay.runningPackageName == packageName) dev.droidtop.library.LaunchDisplay.clearRunning()
     }
 
     /**
@@ -530,9 +547,7 @@ class WineGameActivity : Activity() {
         }
         session?.stop()
         session = null
-        // Nothing is running any more: the Quick Menu must not offer Resume or Quit for this launch
-        // (Droidtop/tracker#171, rig 2026-10-01 r18).
-        if (dev.droidtop.library.LaunchDisplay.runningPackageName == packageName) dev.droidtop.library.LaunchDisplay.clearRunning()
+        nothingRunning()
         setContentView(
             TextView(this).apply {
                 // A tap dismisses it too, for a person holding the console without a pad in reach.

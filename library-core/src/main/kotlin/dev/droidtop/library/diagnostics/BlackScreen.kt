@@ -12,6 +12,13 @@ object FrameDarkness {
     /** How much of the frame may be something else and still be a black screen: the pointer, a stray pixel. */
     const val NOT_DARK_ALLOWANCE = 0.02
 
+    /**
+     * Whether [argb] holds anything at all: some pixel whose colour is not exactly zero. A dark frame with a pointer or
+     * a near-black loading screen has; a copy that read nothing does not (Droidtop/tracker#896: on BlueStacks PixelCopy
+     * answers SUCCESS with every pixel 0 for the Wine surface while the game draws its menu).
+     */
+    fun hasPicture(argb: IntArray): Boolean = argb.any { it and 0xFFFFFF != 0 }
+
     /** Whether [argb] (packed ARGB pixels of one frame) is a black screen. An empty frame is not. */
     fun isFlatDark(argb: IntArray): Boolean {
         if (argb.isEmpty()) return false
@@ -33,14 +40,22 @@ object FrameDarkness {
  * after the game showed its window, every sampled frame flat dark for [holdMs]. One bright frame starts the count again,
  * so a game that fades through black or loads on a black screen for a while is left alone. It says so once; Keep
  * waiting ([keepWaiting]) starts a new count. Pure: the caller samples and gives the time.
+ *
+ * A dark frame counts only once the copies have shown some picture in this run ([FrameDarkness.hasPicture]): a copy that
+ * is exactly zero every time says nothing about the game (Droidtop/tracker#896, BlueStacks: Kingdom Two Crowns drew its
+ * menu and the notice came anyway). A real black screen still counts once anything (the pointer, a near-black frame)
+ * has shown. Built to the issue's recommendation, owner to confirm: a game black from its very first frame with no
+ * pointer, on a device whose copies work, is no longer said.
  */
 class BlackScreenWatch(private val holdMs: Long = HOLD_MS) {
     private var darkSince: Long? = null
     private var said = false
+    private var sawPicture = false
 
-    /** One sampled frame at [nowMs]; true exactly when the black screen should be said now. */
-    fun sample(nowMs: Long, windowShown: Boolean, flatDark: Boolean): Boolean {
-        if (!windowShown || !flatDark) {
+    /** One sampled frame at [nowMs]; true exactly when the black screen should be said now. [picture]: [FrameDarkness.hasPicture]. */
+    fun sample(nowMs: Long, windowShown: Boolean, flatDark: Boolean, picture: Boolean = true): Boolean {
+        if (picture) sawPicture = true
+        if (!windowShown || !flatDark || !sawPicture) {
             darkSince = null
             return false
         }

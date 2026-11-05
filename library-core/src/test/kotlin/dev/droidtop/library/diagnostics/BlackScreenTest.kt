@@ -58,4 +58,30 @@ class BlackScreenTest {
         assertFalse(watch.sample(20_000, true, true))
         assertTrue(watch.sample(22_000, true, true))
     }
+
+    @Test
+    fun `a copy that reads all zero is not a picture, and a pointer on black is`() {
+        // Droidtop/tracker#896: BlueStacks' PixelCopy gave 48x27 pixels of RGB 0, alpha 255, over a drawn menu.
+        assertFalse(FrameDarkness.hasPicture(IntArray(48 * 27) { 0xFF000000.toInt() }))
+        assertTrue(FrameDarkness.hasPicture(IntArray(48 * 27) { if (it == 600) 0xFFFFFFFF.toInt() else 0xFF000000.toInt() }))
+        assertTrue(FrameDarkness.hasPicture(IntArray(4) { 0xFF0A0A0A.toInt() }))
+    }
+
+    @Test
+    fun `copies that never showed anything never say black screen`() {
+        val watch = BlackScreenWatch(holdMs = 10_000)
+        val said = (0L..120_000L step 2_000L).filter { watch.sample(it, windowShown = true, flatDark = true, picture = false) }
+        assertTrue(said.isEmpty())
+    }
+
+    @Test
+    fun `once a picture has shown, a black screen after it is said as before`() {
+        val watch = BlackScreenWatch(holdMs = 10_000)
+        assertFalse(watch.sample(0, true, flatDark = true, picture = false))
+        // The pointer on black: a picture, and dark.
+        assertFalse(watch.sample(2_000, true, flatDark = true, picture = true))
+        // Later copies read all zero again; the run has shown a picture, so they count.
+        assertFalse(watch.sample(8_000, true, flatDark = true, picture = false))
+        assertTrue(watch.sample(12_000, true, flatDark = true, picture = false))
+    }
 }
