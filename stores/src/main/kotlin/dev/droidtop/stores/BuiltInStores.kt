@@ -3,6 +3,7 @@ package dev.droidtop.stores
 import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.stores.amazon.AmazonStore
 import dev.droidtop.stores.battlenet.BattleNetStore
+import dev.droidtop.stores.ea.EAStore
 import dev.droidtop.stores.epic.EpicStore
 import dev.droidtop.stores.gog.GOGStore
 import dev.droidtop.stores.humble.HumbleStore
@@ -25,5 +26,6 @@ object BuiltInStores {
         StoreLibraries.register(HumbleStore())
         StoreLibraries.register(IndiegalaStore())
         StoreLibraries.register(BattleNetStore())
+        StoreLibraries.register(EAStore())
     }
 }

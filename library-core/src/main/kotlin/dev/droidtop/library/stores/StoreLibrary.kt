@@ -113,6 +113,11 @@ sealed interface StoreSignIn {
         val codeInUrl: (String) -> String?,
         val codeInBody: String? = null,
         val codeInCookie: String? = null,
+        /**
+         * Whose cookies [codeInCookie] reads: the return page's by default, or this address's, for a store whose
+         * session lives on another host than its sign-in returns to (EA: `accounts.ea.com`).
+         */
+        val cookieUrl: String? = null,
     ) : StoreSignIn {
         companion object {
             /**

@@ -15520,6 +15520,20 @@ follows:
   next Battle.net step on Droidtop/tracker#335. A game the app installed keeps
   Battle.net's folder marker (`battle.net:<product code>`), a folder entry that
   one-game grouping joins with this row by title.
+- **EA app** (`EAStore`; Droidtop/tracker#335, built to the recommendation of its
+  design comment, owner to confirm): after Lutris's EA app service (GPL-3.0). The
+  person signs in on EA's page; once it returns to ea.com, the cookies of
+  `accounts.ea.com` are kept (`StoreSignIn.WebPage.cookieUrl`: whose cookies a
+  web sign-in keeps, when the session lives on another host than the return
+  page). Each sync trades them for an access token (`connect/auth`, implicit
+  grant with EA's own public `ORIGIN_JS_SDK` client id) and reads EA's GraphQL
+  service: `ownedGameProducts` (PC, base games, 100 a page) and then
+  `gameProducts` and `legacyOffers` for each one's title, box art and content id
+  (the EA app's own id, the row's id). A GraphQL error fails the sync with EA's
+  message rather than emptying the library. EA serves games only through its EA
+  app, so this store lists them and its Install says so; running the EA app in a
+  Wine prefix (`origin2://game/launch?offerIds=<content id>`, Lutris's way) is
+  the next EA step on Droidtop/tracker#335.
 - **Amazon Games** (`AmazonStore`): sign-in is Amazon's own page with a
   fresh PKCE session per sign-in (nile's device registration, through
   GameNative's `AmazonAuthManager`); the code comes back on the address

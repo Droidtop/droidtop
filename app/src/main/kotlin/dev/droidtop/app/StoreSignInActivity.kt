@@ -212,7 +212,7 @@ class StoreSignInActivity : AppCompatActivity() {
                     signIn.codeInCookie?.let { name ->
                         // The store's session itself is the sign-in (Humble): its cookie, once the return page is reached.
                         if (signIn.isReturnPage(url)) {
-                            StoreSignIn.WebPage.cookieValue(CookieManager.getInstance().getCookie(url), name)?.let { finishWith(store, it) }
+                            StoreSignIn.WebPage.cookieValue(CookieManager.getInstance().getCookie(signIn.cookieUrl ?: url), name)?.let { finishWith(store, it) }
                         }
                         return
                     }
