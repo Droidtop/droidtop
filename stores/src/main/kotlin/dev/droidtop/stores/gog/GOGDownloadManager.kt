@@ -109,6 +109,163 @@ internal class GOGDownloadManager(
          * (one game's, or the dependencies'), so discarding one install deletes its own partial chunks and no other's. Pure.
          */
         fun areaPrefix(chunkCacheDir: File): String = "gog_" + Integer.toHexString(chunkCacheDir.absolutePath.hashCode()) + "_"
+        /**
+         * Decompress a GOG chunk directly to file using zlib, streaming to avoid large memory allocations.
+         * Calculates MD5 while decompressing and writes directly to the target file at the specified offset.
+         *
+         * @param chunkFile Compressed chunk file
+         * @param chunk Chunk metadata
+         * @param outputFile Target file to write decompressed data
+         * @param writeOffset Offset in the output file to write at
+         * @return Result indicating success or failure
+         */
+        internal fun decompressChunkToFile(
+            chunkFile: File,
+            chunk: FileChunk,
+            outputFile: File,
+            writeOffset: Long,
+        ): Result<Unit> {
+            return try {
+                val md5Digest = MessageDigest.getInstance("MD5")
+                var totalBytesWritten = 0L
+
+                FileChannel.open(
+                    outputFile.toPath(),
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.CREATE
+                ).use { channel ->
+                    channel.position(writeOffset)
+
+                    // If no compressed size specified, data is already uncompressed
+                    if (chunk.compressedSize == null) {
+                        chunkFile.inputStream().use { input ->
+                            val buffer = ByteArray(8192)
+                            val byteBuffer = ByteBuffer.wrap(buffer)
+                            var bytesRead: Int
+
+                            while (input.read(buffer).also { bytesRead = it } != -1) {
+                                md5Digest.update(buffer, 0, bytesRead)
+                                byteBuffer.clear()
+                                byteBuffer.limit(bytesRead)
+                                while (byteBuffer.hasRemaining()) {
+                                    channel.write(byteBuffer)
+                                }
+                                totalBytesWritten += bytesRead
+                            }
+                        }
+                    } else {
+                        // Decompress using zlib and stream directly to file
+                        val inflater = Inflater()
+                        try {
+                            chunkFile.inputStream().buffered().use { input ->
+                                val inputBuffer = ByteArray(8192)
+                                val outputBuffer = ByteArray(8192)
+                                val byteBuffer = ByteBuffer.wrap(outputBuffer)
+                                var inputBytesRead: Int
+
+                                while (input.read(inputBuffer).also { inputBytesRead = it } != -1) {
+                                    inflater.setInput(inputBuffer, 0, inputBytesRead)
+
+                                    while (!inflater.needsInput() && !inflater.finished()) {
+                                        val count = inflater.inflate(outputBuffer)
+                                        if (count > 0) {
+                                            md5Digest.update(outputBuffer, 0, count)
+                                            byteBuffer.clear()
+                                            byteBuffer.limit(count)
+                                            while (byteBuffer.hasRemaining()) {
+                                                channel.write(byteBuffer)
+                                            }
+                                            totalBytesWritten += count
+                                        } else {
+                                            if (inflater.needsDictionary()) {
+                                                throw java.io.IOException(
+                                                    "Zlib data requires a preset dictionary which is not supported"
+                                                )
+                                            }
+                                            break
+                                        }
+                                    }
+                                }
+
+                                // Finish any remaining data
+                                while (!inflater.finished()) {
+                                    val count = inflater.inflate(outputBuffer)
+                                    if (count > 0) {
+                                        md5Digest.update(outputBuffer, 0, count)
+                                        byteBuffer.clear()
+                                        byteBuffer.limit(count)
+                                        while (byteBuffer.hasRemaining()) {
+                                            channel.write(byteBuffer)
+                                        }
+                                        totalBytesWritten += count
+                                    } else {
+                                        if (inflater.needsInput()) {
+                                            throw java.io.IOException(
+                                                "Incomplete zlib data: decompression requires more input but none available"
+                                            )
+                                        }
+                                        break
+                                    }
+                                }
+                            }
+                        } finally {
+                            inflater.end()
+                        }
+                    }
+                }
+
+                // Verify size matches expected
+                if (totalBytesWritten != chunk.size) {
+                    return Result.failure(
+                        Exception("Decompressed size mismatch: expected ${chunk.size}, got $totalBytesWritten"),
+                    )
+                }
+
+                // Verify decompressed MD5
+                val actualMd5 = md5Digest.digest().joinToString("") { "%02x".format(it) }
+                if (actualMd5 != chunk.md5) {
+                    return Result.failure(
+                        Exception("Decompressed MD5 mismatch for chunk: expected ${chunk.md5}, got $actualMd5"),
+                    )
+                }
+
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Timber.tag("GOG").e(e, "Failed to decompress chunk ${chunk.compressedMd5}")
+                Result.failure(e)
+            }
+        }
+
+        /**
+         * Check if file exists and has the expected size. When [expectedMd5] is non-null/non-blank,
+         * also verifies content MD5 to reject corrupted files; short-circuits on size mismatch before hashing.
+         * When [expectedMd5] is null/blank, returns false to avoid treating pre-allocated files as complete.
+         */
+        internal fun fileExistsWithCorrectSize(
+            outputFile: File,
+            expectedSize: Long,
+            expectedMd5: String? = null,
+        ): Boolean {
+            if (!outputFile.exists()) return false
+            if (outputFile.length() != expectedSize) return false
+            if (expectedMd5.isNullOrBlank()) return false
+            return calculateMd5File(outputFile).equals(expectedMd5, ignoreCase = true)
+        }
+        /**
+         * Calculate MD5 hash of file
+         */
+        internal fun calculateMd5File(file: File): String {
+            val digest = MessageDigest.getInstance("MD5")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    digest.update(buffer, 0, bytesRead)
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
+
     }
 
     /**
@@ -1529,133 +1686,6 @@ internal class GOGDownloadManager(
     }
 
     /**
-     * Decompress a GOG chunk directly to file using zlib, streaming to avoid large memory allocations.
-     * Calculates MD5 while decompressing and writes directly to the target file at the specified offset.
-     *
-     * @param chunkFile Compressed chunk file
-     * @param chunk Chunk metadata
-     * @param outputFile Target file to write decompressed data
-     * @param writeOffset Offset in the output file to write at
-     * @return Result indicating success or failure
-     */
-    internal fun decompressChunkToFile(
-        chunkFile: File,
-        chunk: FileChunk,
-        outputFile: File,
-        writeOffset: Long,
-    ): Result<Unit> {
-        return try {
-            val md5Digest = MessageDigest.getInstance("MD5")
-            var totalBytesWritten = 0L
-
-            FileChannel.open(
-                outputFile.toPath(),
-                StandardOpenOption.WRITE,
-                StandardOpenOption.CREATE
-            ).use { channel ->
-                channel.position(writeOffset)
-
-                // If no compressed size specified, data is already uncompressed
-                if (chunk.compressedSize == null) {
-                    chunkFile.inputStream().use { input ->
-                        val buffer = ByteArray(8192)
-                        val byteBuffer = ByteBuffer.wrap(buffer)
-                        var bytesRead: Int
-
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            md5Digest.update(buffer, 0, bytesRead)
-                            byteBuffer.clear()
-                            byteBuffer.limit(bytesRead)
-                            while (byteBuffer.hasRemaining()) {
-                                channel.write(byteBuffer)
-                            }
-                            totalBytesWritten += bytesRead
-                        }
-                    }
-                } else {
-                    // Decompress using zlib and stream directly to file
-                    val inflater = Inflater()
-                    try {
-                        chunkFile.inputStream().buffered().use { input ->
-                            val inputBuffer = ByteArray(8192)
-                            val outputBuffer = ByteArray(8192)
-                            val byteBuffer = ByteBuffer.wrap(outputBuffer)
-                            var inputBytesRead: Int
-
-                            while (input.read(inputBuffer).also { inputBytesRead = it } != -1) {
-                                inflater.setInput(inputBuffer, 0, inputBytesRead)
-
-                                while (!inflater.needsInput() && !inflater.finished()) {
-                                    val count = inflater.inflate(outputBuffer)
-                                    if (count > 0) {
-                                        md5Digest.update(outputBuffer, 0, count)
-                                        byteBuffer.clear()
-                                        byteBuffer.limit(count)
-                                        while (byteBuffer.hasRemaining()) {
-                                            channel.write(byteBuffer)
-                                        }
-                                        totalBytesWritten += count
-                                    } else {
-                                        if (inflater.needsDictionary()) {
-                                            throw java.io.IOException(
-                                                "Zlib data requires a preset dictionary which is not supported"
-                                            )
-                                        }
-                                        break
-                                    }
-                                }
-                            }
-
-                            // Finish any remaining data
-                            while (!inflater.finished()) {
-                                val count = inflater.inflate(outputBuffer)
-                                if (count > 0) {
-                                    md5Digest.update(outputBuffer, 0, count)
-                                    byteBuffer.clear()
-                                    byteBuffer.limit(count)
-                                    while (byteBuffer.hasRemaining()) {
-                                        channel.write(byteBuffer)
-                                    }
-                                    totalBytesWritten += count
-                                } else {
-                                    if (inflater.needsInput()) {
-                                        throw java.io.IOException(
-                                            "Incomplete zlib data: decompression requires more input but none available"
-                                        )
-                                    }
-                                    break
-                                }
-                            }
-                        }
-                    } finally {
-                        inflater.end()
-                    }
-                }
-            }
-
-            // Verify size matches expected
-            if (totalBytesWritten != chunk.size) {
-                return Result.failure(
-                    Exception("Decompressed size mismatch: expected ${chunk.size}, got $totalBytesWritten"),
-                )
-            }
-
-            // Verify decompressed MD5
-            val actualMd5 = md5Digest.digest().joinToString("") { "%02x".format(it) }
-            if (actualMd5 != chunk.md5) {
-                return Result.failure(
-                    Exception("Decompressed MD5 mismatch for chunk: expected ${chunk.md5}, got $actualMd5"),
-                )
-            }
-
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Timber.tag("GOG").e(e, "Failed to decompress chunk ${chunk.compressedMd5}")
-            Result.failure(e)
-        }
-    }
-
-    /**
      * Calculate MD5 hash of byte array
      */
     private fun calculateMd5(data: ByteArray): String {
@@ -1702,36 +1732,6 @@ internal class GOGDownloadManager(
                 Timber.tag("GOG").w(e, "Failed to create symlink ${link.path} -> ${link.target}")
             }
         }
-    }
-
-    /**
-     * Check if file exists and has the expected size. When [expectedMd5] is non-null/non-blank,
-     * also verifies content MD5 to reject corrupted files; short-circuits on size mismatch before hashing.
-     * When [expectedMd5] is null/blank, returns false to avoid treating pre-allocated files as complete.
-     */
-    private fun fileExistsWithCorrectSize(
-        outputFile: File,
-        expectedSize: Long,
-        expectedMd5: String? = null,
-    ): Boolean {
-        if (!outputFile.exists()) return false
-        if (outputFile.length() != expectedSize) return false
-        if (expectedMd5.isNullOrBlank()) return false
-        return calculateMd5File(outputFile).equals(expectedMd5, ignoreCase = true)
-    }
-    /**
-     * Calculate MD5 hash of file
-     */
-    private fun calculateMd5File(file: File): String {
-        val digest = MessageDigest.getInstance("MD5")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(8192)
-            var bytesRead: Int
-            while (input.read(buffer).also { bytesRead = it } != -1) {
-                digest.update(buffer, 0, bytesRead)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     /**

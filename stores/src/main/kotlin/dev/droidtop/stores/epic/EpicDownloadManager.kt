@@ -87,6 +87,227 @@ internal class EpicDownloadManager(
         private const val MAX_CHUNK_RETRIES = 3 // Maximum retries per chunk
         private const val RETRY_DELAY_MS = 1000L // Initial retry delay in milliseconds
         private const val STREAM_PROGRESS_TIME_INTERVAL_MS = 200L
+
+        /**
+         * Whether a chunk's HTTP failure is answered by asking Epic for fresh CDN links and trying the chunk again
+         * (Droidtop/tracker#732, which resolved the old "check error status" TODO): an expired or refused link (401,
+         * 403, 404, 410), being told to slow down (429), or the CDN failing (any 5xx, where only 500 was retried before,
+         * so a 502 or 503 failed the chunk for good). Any other 4xx is the request's own fault and fails it. Pure.
+         */
+        fun refreshesLinks(status: Int): Boolean = status in setOf(401, 403, 404, 410, 429) || status in 500..599
+        /**
+         * Decompress an Epic chunk file directly to output file with streaming hash verification
+         * This avoids allocating huge ByteArrays (1.5GB) in memory
+         */
+        internal fun decompressStreamingChunkToFile(
+            inputStream: InputStream,
+            outputFile: File,
+            expectedSize: Long,
+            expectedHash: ByteArray,
+            downloadInfo: DownloadInfo,
+        ) {
+            val digest = MessageDigest.getInstance("SHA-1")
+            var totalBytesWritten = 0L
+            var lastProgressEmitAt = System.currentTimeMillis()
+
+            inputStream.buffered().use { input ->
+                // Read the entire header - determine size dynamically
+                val headerStart = ByteArray(12)
+                if (input.read(headerStart) != 12) {
+                    throw Exception("Failed to read chunk header start")
+                }
+
+                val startBuffer = ByteBuffer.wrap(headerStart).order(ByteOrder.LITTLE_ENDIAN)
+                val magic = startBuffer.int
+                if (magic != 0xB1FE3AA2.toInt()) {
+                    throw Exception("Invalid chunk magic: 0x${magic.toString(16)}")
+                }
+
+                val headerVersion = startBuffer.int
+                val headerSize = startBuffer.int
+
+                // Epic chunks can have different header sizes (62 or 66 bytes)
+                // Minimum viable header is 62 bytes
+                if (headerSize < 62 || headerSize > 66) {
+                    throw Exception("Invalid header size: $headerSize (expected 62-66 bytes)")
+                }
+
+                // Read the remaining header bytes
+                val remainingSize = headerSize - 12
+                val remainingBytes = ByteArray(remainingSize)
+                if (input.read(remainingBytes) != remainingSize) {
+                    throw Exception("Failed to read remaining header: expected $remainingSize bytes")
+                }
+
+                // Parse the header fields from the remaining bytes sequentially
+                // This matches the format in legendary/models/chunk.py
+                val buffer = ByteBuffer.wrap(remainingBytes).order(ByteOrder.LITTLE_ENDIAN)
+
+                // Chunk header format (after magic/version/headerSize):
+                // compressedSize: 4 bytes (file offset 12-15)
+                // GUID: 16 bytes (file offset 16-31)
+                // hash: 8 bytes (file offset 32-39)
+                // storedAs: 1 byte (file offset 40)
+                // SHA hash: 20 bytes (file offset 41-60)
+                // For 66-byte headers:
+                //   hash type: 1 byte (file offset 61)
+                //   uncompressedSize: 4 bytes (file offset 62-65)
+                // For 62-byte headers (older format):
+                //   uncompressedSize: 4 bytes (file offset 58-61) - replaces hash type + padding
+
+                // Ensure we have minimum required fields (up to SHA hash)
+                if (buffer.remaining() < 50) {
+                    throw Exception("Buffer underflow: only ${buffer.remaining()} bytes available, need at least 50")
+                }
+
+                val compressedSize = buffer.int  // Read compressed size
+                buffer.position(buffer.position() + 16)  // Skip GUID (16 bytes)
+                buffer.position(buffer.position() + 8)   // Skip hash (8 bytes)
+                val storedAs = buffer.get().toInt() and 0xFF  // Read storedAs flag
+                val isCompressed = (storedAs and 0x1) == 0x1
+
+                // Version Check to understand header spacing
+                // Header version 2: includes sha_hash (20 bytes) + hash_type (1 byte) = 62 total bytes
+                // Header version 3: adds uncompressed_size (4 bytes) = 66 total bytes
+                if (headerVersion >= 2) {
+                    buffer.position(buffer.position() + 20)  // Skip SHA hash (20 bytes)
+                    if (buffer.remaining() >= 1) {
+                        buffer.position(buffer.position() + 1)   // Skip hash type (1 byte)
+                    }
+                }
+
+                val uncompressedSize = if (headerVersion >= 3 && buffer.remaining() >= 4) {
+                    // Version 3+: uncompressedSize field is present (4 bytes)
+                    buffer.int
+                } else {
+                    // Version 2 or no uncompressedSize field: use expectedSize parameter
+                    Timber.tag("Epic").d("Header version $headerVersion doesn't include uncompressedSize field, using expectedSize=$expectedSize")
+                    expectedSize.toInt()
+                }
+
+                Timber.tag("Epic").d("Chunk header: magic=0x${magic.toString(16)}, headerVersion=$headerVersion, headerSize=$headerSize, compressedSize=$compressedSize, uncompressedSize=$uncompressedSize, storedAs=0x${storedAs.toString(16)}, isCompressed=$isCompressed, expectedSize=$expectedSize")
+
+                outputFile.outputStream().buffered().use { output ->
+                    if (isCompressed) {
+                        // Streaming decompression
+                        val inflater = Inflater()
+                        try {
+                            val inputBuffer = ByteArray(65536) // 64KB compressed read buffer
+                            val outputBuffer = ByteArray(65536) // 64KB decompressed write buffer
+                            var endOfStream = false
+                            var firstRead = true
+
+                            while (totalBytesWritten < uncompressedSize && !endOfStream) {
+                                // Feed more input if needed
+                                if (inflater.needsInput() && !endOfStream) {
+                                    val bytesRead = input.read(inputBuffer)
+                                    if (bytesRead == -1) {
+                                        endOfStream = true
+                                        Timber.tag("Epic").d("Unexpected end of stream: read=$totalBytesWritten, expected=$uncompressedSize")
+                                    } else {
+                                        downloadInfo.updateBytesDownloaded(bytesRead.toLong())
+                                        val now = System.currentTimeMillis()
+                                        if (now - lastProgressEmitAt >= STREAM_PROGRESS_TIME_INTERVAL_MS) {
+                                            downloadInfo.emitProgressChange()
+                                            lastProgressEmitAt = now
+                                        }
+                                        if (firstRead) {
+                                            Log.d("Epic", "First compressed data bytes: ${inputBuffer.take(16).joinToString(" ") { "%02x".format(it) }}")
+                                            firstRead = false
+                                        }
+                                        inflater.setInput(inputBuffer, 0, bytesRead)
+                                    }
+                                }
+
+                                // Try to decompress
+                                try {
+                                    val decompressed = inflater.inflate(outputBuffer)
+                                    if (decompressed > 0) {
+                                        output.write(outputBuffer, 0, decompressed)
+                                        digest.update(outputBuffer, 0, decompressed)
+                                        totalBytesWritten += decompressed
+                                    } else if (inflater.finished() || endOfStream) {
+                                        // No more data available
+                                        break
+                                    }
+                                } catch (e: java.util.zip.DataFormatException) {
+                                    Timber.tag("Epic").d("DataFormatException during inflate: ${e.message}")
+                                    Timber.tag("Epic").d("  totalBytesWritten=$totalBytesWritten, expectedSize=$uncompressedSize")
+                                    Timber.tag("Epic").d("  inflater: finished=${inflater.finished()}, needsInput=${inflater.needsInput()}")
+                                    throw Exception("Failed to decompress chunk: ${e.message}", e)
+                                }
+                            }
+                        } finally {
+                            inflater.end()
+                        }
+                    } else {
+                        // Already uncompressed - stream directly
+                        val buffer = ByteArray(65536)
+                        var remaining = compressedSize
+                        while (remaining > 0) {
+                            val toRead = minOf(remaining, buffer.size)
+                            val bytesRead = input.read(buffer, 0, toRead)
+                            if (bytesRead == -1) break
+                            downloadInfo.updateBytesDownloaded(bytesRead.toLong())
+                            val now = System.currentTimeMillis()
+                            if (now - lastProgressEmitAt >= STREAM_PROGRESS_TIME_INTERVAL_MS) {
+                                downloadInfo.emitProgressChange()
+                                lastProgressEmitAt = now
+                            }
+                            output.write(buffer, 0, bytesRead)
+                            digest.update(buffer, 0, bytesRead)
+                            totalBytesWritten += bytesRead
+                            remaining -= bytesRead
+                        }
+                    }
+                }
+            }
+
+            // Verify size
+            if (totalBytesWritten != expectedSize) {
+                Timber.tag("Epic").d("Size mismatch: expected=$expectedSize, actual=$totalBytesWritten, diff=${expectedSize - totalBytesWritten}")
+                outputFile.delete()
+                throw Exception("Decompressed size mismatch: expected $expectedSize, got $totalBytesWritten")
+            }
+
+            // Verify hash
+            val actualHash = digest.digest()
+            if (!actualHash.contentEquals(expectedHash)) {
+                val expectedHex = expectedHash.joinToString("") { "%02x".format(it) }
+                val actualHex = actualHash.joinToString("") { "%02x".format(it) }
+                outputFile.delete()
+                throw Exception("Chunk hash verification failed: expected $expectedHex, got $actualHex")
+            }
+
+            // Ensure UI receives a final progress update after this chunk's bytes.
+            downloadInfo.emitProgressChange()
+        }
+
+        /**
+         * True when the file on disk matches the manifest's size and full-file SHA-1,
+         * so it can be skipped on resume. An all-zero manifest hash is treated as
+         * unverifiable and the file is re-downloaded.
+         */
+        internal fun fileExistsWithCorrectHash(outputFile: File, expectedSize: Long, expectedHash: ByteArray): Boolean {
+            if (!outputFile.exists()) return false
+            if (outputFile.length() != expectedSize) return false
+            if (expectedHash.all { it == 0.toByte() }) return false
+            return try {
+                val digest = MessageDigest.getInstance("SHA-1")
+                outputFile.inputStream().use { input ->
+                    val buffer = ByteArray(64 * 1024)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        digest.update(buffer, 0, bytesRead)
+                    }
+                }
+                digest.digest().contentEquals(expectedHash)
+            } catch (e: Exception) {
+                Timber.tag("Epic").w(e, "Could not verify existing file ${outputFile.path}, re-downloading")
+                false
+            }
+        }
+
     }
 
     /**
@@ -584,194 +805,6 @@ internal class EpicDownloadManager(
     }
 
     /**
-     * Decompress an Epic chunk file directly to output file with streaming hash verification
-     * This avoids allocating huge ByteArrays (1.5GB) in memory
-     */
-    private fun decompressStreamingChunkToFile(
-        inputStream: InputStream,
-        outputFile: File,
-        expectedSize: Long,
-        expectedHash: ByteArray,
-        downloadInfo: DownloadInfo,
-    ) {
-        val digest = MessageDigest.getInstance("SHA-1")
-        var totalBytesWritten = 0L
-        var lastProgressEmitAt = System.currentTimeMillis()
-
-        inputStream.buffered().use { input ->
-            // Read the entire header - determine size dynamically
-            val headerStart = ByteArray(12)
-            if (input.read(headerStart) != 12) {
-                throw Exception("Failed to read chunk header start")
-            }
-
-            val startBuffer = ByteBuffer.wrap(headerStart).order(ByteOrder.LITTLE_ENDIAN)
-            val magic = startBuffer.int
-            if (magic != 0xB1FE3AA2.toInt()) {
-                throw Exception("Invalid chunk magic: 0x${magic.toString(16)}")
-            }
-
-            val headerVersion = startBuffer.int
-            val headerSize = startBuffer.int
-
-            // Epic chunks can have different header sizes (62 or 66 bytes)
-            // Minimum viable header is 62 bytes
-            if (headerSize < 62 || headerSize > 66) {
-                throw Exception("Invalid header size: $headerSize (expected 62-66 bytes)")
-            }
-
-            // Read the remaining header bytes
-            val remainingSize = headerSize - 12
-            val remainingBytes = ByteArray(remainingSize)
-            if (input.read(remainingBytes) != remainingSize) {
-                throw Exception("Failed to read remaining header: expected $remainingSize bytes")
-            }
-
-            // Parse the header fields from the remaining bytes sequentially
-            // This matches the format in legendary/models/chunk.py
-            val buffer = ByteBuffer.wrap(remainingBytes).order(ByteOrder.LITTLE_ENDIAN)
-
-            // Chunk header format (after magic/version/headerSize):
-            // compressedSize: 4 bytes (file offset 12-15)
-            // GUID: 16 bytes (file offset 16-31)
-            // hash: 8 bytes (file offset 32-39)
-            // storedAs: 1 byte (file offset 40)
-            // SHA hash: 20 bytes (file offset 41-60)
-            // For 66-byte headers:
-            //   hash type: 1 byte (file offset 61)
-            //   uncompressedSize: 4 bytes (file offset 62-65)
-            // For 62-byte headers (older format):
-            //   uncompressedSize: 4 bytes (file offset 58-61) - replaces hash type + padding
-
-            // Ensure we have minimum required fields (up to SHA hash)
-            if (buffer.remaining() < 50) {
-                throw Exception("Buffer underflow: only ${buffer.remaining()} bytes available, need at least 50")
-            }
-
-            val compressedSize = buffer.int  // Read compressed size
-            buffer.position(buffer.position() + 16)  // Skip GUID (16 bytes)
-            buffer.position(buffer.position() + 8)   // Skip hash (8 bytes)
-            val storedAs = buffer.get().toInt() and 0xFF  // Read storedAs flag
-            val isCompressed = (storedAs and 0x1) == 0x1
-
-            // Version Check to understand header spacing
-            // Header version 2: includes sha_hash (20 bytes) + hash_type (1 byte) = 62 total bytes
-            // Header version 3: adds uncompressed_size (4 bytes) = 66 total bytes
-            if (headerVersion >= 2) {
-                buffer.position(buffer.position() + 20)  // Skip SHA hash (20 bytes)
-                if (buffer.remaining() >= 1) {
-                    buffer.position(buffer.position() + 1)   // Skip hash type (1 byte)
-                }
-            }
-
-            val uncompressedSize = if (headerVersion >= 3 && buffer.remaining() >= 4) {
-                // Version 3+: uncompressedSize field is present (4 bytes)
-                buffer.int
-            } else {
-                // Version 2 or no uncompressedSize field: use expectedSize parameter
-                Timber.tag("Epic").d("Header version $headerVersion doesn't include uncompressedSize field, using expectedSize=$expectedSize")
-                expectedSize.toInt()
-            }
-
-            Timber.tag("Epic").d("Chunk header: magic=0x${magic.toString(16)}, headerVersion=$headerVersion, headerSize=$headerSize, compressedSize=$compressedSize, uncompressedSize=$uncompressedSize, storedAs=0x${storedAs.toString(16)}, isCompressed=$isCompressed, expectedSize=$expectedSize")
-
-            outputFile.outputStream().buffered().use { output ->
-                if (isCompressed) {
-                    // Streaming decompression
-                    val inflater = Inflater()
-                    try {
-                        val inputBuffer = ByteArray(65536) // 64KB compressed read buffer
-                        val outputBuffer = ByteArray(65536) // 64KB decompressed write buffer
-                        var endOfStream = false
-                        var firstRead = true
-
-                        while (totalBytesWritten < uncompressedSize && !endOfStream) {
-                            // Feed more input if needed
-                            if (inflater.needsInput() && !endOfStream) {
-                                val bytesRead = input.read(inputBuffer)
-                                if (bytesRead == -1) {
-                                    endOfStream = true
-                                    Timber.tag("Epic").d("Unexpected end of stream: read=$totalBytesWritten, expected=$uncompressedSize")
-                                } else {
-                                    downloadInfo.updateBytesDownloaded(bytesRead.toLong())
-                                    val now = System.currentTimeMillis()
-                                    if (now - lastProgressEmitAt >= STREAM_PROGRESS_TIME_INTERVAL_MS) {
-                                        downloadInfo.emitProgressChange()
-                                        lastProgressEmitAt = now
-                                    }
-                                    if (firstRead) {
-                                        Log.d("Epic", "First compressed data bytes: ${inputBuffer.take(16).joinToString(" ") { "%02x".format(it) }}")
-                                        firstRead = false
-                                    }
-                                    inflater.setInput(inputBuffer, 0, bytesRead)
-                                }
-                            }
-
-                            // Try to decompress
-                            try {
-                                val decompressed = inflater.inflate(outputBuffer)
-                                if (decompressed > 0) {
-                                    output.write(outputBuffer, 0, decompressed)
-                                    digest.update(outputBuffer, 0, decompressed)
-                                    totalBytesWritten += decompressed
-                                } else if (inflater.finished() || endOfStream) {
-                                    // No more data available
-                                    break
-                                }
-                            } catch (e: java.util.zip.DataFormatException) {
-                                Timber.tag("Epic").d("DataFormatException during inflate: ${e.message}")
-                                Timber.tag("Epic").d("  totalBytesWritten=$totalBytesWritten, expectedSize=$uncompressedSize")
-                                Timber.tag("Epic").d("  inflater: finished=${inflater.finished()}, needsInput=${inflater.needsInput()}")
-                                throw Exception("Failed to decompress chunk: ${e.message}", e)
-                            }
-                        }
-                    } finally {
-                        inflater.end()
-                    }
-                } else {
-                    // Already uncompressed - stream directly
-                    val buffer = ByteArray(65536)
-                    var remaining = compressedSize
-                    while (remaining > 0) {
-                        val toRead = minOf(remaining, buffer.size)
-                        val bytesRead = input.read(buffer, 0, toRead)
-                        if (bytesRead == -1) break
-                        downloadInfo.updateBytesDownloaded(bytesRead.toLong())
-                        val now = System.currentTimeMillis()
-                        if (now - lastProgressEmitAt >= STREAM_PROGRESS_TIME_INTERVAL_MS) {
-                            downloadInfo.emitProgressChange()
-                            lastProgressEmitAt = now
-                        }
-                        output.write(buffer, 0, bytesRead)
-                        digest.update(buffer, 0, bytesRead)
-                        totalBytesWritten += bytesRead
-                        remaining -= bytesRead
-                    }
-                }
-            }
-        }
-
-        // Verify size
-        if (totalBytesWritten != expectedSize) {
-            Timber.tag("Epic").d("Size mismatch: expected=$expectedSize, actual=$totalBytesWritten, diff=${expectedSize - totalBytesWritten}")
-            outputFile.delete()
-            throw Exception("Decompressed size mismatch: expected $expectedSize, got $totalBytesWritten")
-        }
-
-        // Verify hash
-        val actualHash = digest.digest()
-        if (!actualHash.contentEquals(expectedHash)) {
-            val expectedHex = expectedHash.joinToString("") { "%02x".format(it) }
-            val actualHex = actualHash.joinToString("") { "%02x".format(it) }
-            outputFile.delete()
-            throw Exception("Chunk hash verification failed: expected $expectedHex, got $actualHex")
-        }
-
-        // Ensure UI receives a final progress update after this chunk's bytes.
-        downloadInfo.emitProgressChange()
-    }
-
-    /**
      * Verify chunk SHA-1 hash from byte array
      */
     private fun verifyChunkHashBytes(data: ByteArray, expectedHash: ByteArray): Boolean {
@@ -790,31 +823,6 @@ internal class EpicDownloadManager(
             matches
         } catch (e: Exception) {
             Timber.tag("Epic").e(e, "Hash verification failed")
-            false
-        }
-    }
-
-    /**
-     * True when the file on disk matches the manifest's size and full-file SHA-1,
-     * so it can be skipped on resume. An all-zero manifest hash is treated as
-     * unverifiable and the file is re-downloaded.
-     */
-    internal fun fileExistsWithCorrectHash(outputFile: File, expectedSize: Long, expectedHash: ByteArray): Boolean {
-        if (!outputFile.exists()) return false
-        if (outputFile.length() != expectedSize) return false
-        if (expectedHash.all { it == 0.toByte() }) return false
-        return try {
-            val digest = MessageDigest.getInstance("SHA-1")
-            outputFile.inputStream().use { input ->
-                val buffer = ByteArray(64 * 1024)
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    digest.update(buffer, 0, bytesRead)
-                }
-            }
-            digest.digest().contentEquals(expectedHash)
-        } catch (e: Exception) {
-            Timber.tag("Epic").w(e, "Could not verify existing file ${outputFile.path}, re-downloading")
             false
         }
     }
@@ -987,8 +995,7 @@ internal class EpicDownloadManager(
                                 if (exception is HttpStatusException) {
                                     Timber.tag("EPIC")
                                         .d("Chunk ${chunk.guidStr} download failed: HttpError ${exception.statusCode}, ${exception.message}")
-                                    // TODO: Check error status
-                                    if (exception.statusCode in listOf(401, 403, 404, 500)) {
+                                    if (refreshesLinks(exception.statusCode)) {
                                         Timber.tag("EPIC").w("Chunk ${chunk.guidStr} urls expired, refreshing")
                                         networkChunkFlow.tryEmit(chunk)
                                         return@flow
