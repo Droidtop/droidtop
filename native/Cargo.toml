@@ -1,0 +1,37 @@
+# droidtop's native library, libdroidtop_agent.so (docs/SPEC.md 7o): droidtop's own scaffold over the shared
+# libraries (Droidtop/tracker#867, owner 2026-11-04: "each program to have its own scaffold, that can use as
+# many shared libraries and stuff as possible"). It was droidtop-agent's crates/android, built and released by
+# that repository; it moved here as it was, and build-scripts/build-agent-lib.sh builds it for both ABIs.
+[package]
+name = "droidtop-native"
+description = "droidtop's side of the agent protocol: the shared core behind one JNI call, built as libdroidtop_agent.so for arm64-v8a and x86_64"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-only"
+repository = "https://github.com/Droidtop/droidtop"
+rust-version = "1.89"
+publish = false
+
+[lib]
+# The name droidtop loads (net-core AgentNative: System.loadLibrary("droidtop_agent")), unchanged.
+name = "droidtop_agent"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Identity, pairing, the channel, the protocol and the sync rules: Droidtop/lib-sync.
+droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.1" }
+jni = { version = "0.21", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+# The mesh test runs the real agent as one of its computers: droidtop-agent's service, at a release.
+droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", tag = "build-150" }
+droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.1" }
+
+[profile.release]
+# As droidtop-agent built it.
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

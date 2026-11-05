@@ -21,9 +21,8 @@ android {
     kotlinOptions { jvmTarget = "17" }
     sourceSets {
         getByName("main") {
-            // droidtop-agent's core for both ABIs (docs/SPEC.md 7o), built and
-            // released by Droidtop/droidtop-agent and fetched against
-            // agent-lib.pin (build-scripts/fetch-agent-lib.sh).
+            // droidtop's native library for both ABIs (docs/SPEC.md 7o): native/, over the shared
+            // libraries, built by build-scripts/build-agent-lib.sh.
             jniLibs.srcDir("agent/jniLibs")
             // How a browser check is recognised and what passing one earns, shared with Enginehost (vendor/droidtop-shared,
             // docs/SPEC.md 12a, Droidtop/tracker#751): here and not in :runtime-common, which depends on this module.

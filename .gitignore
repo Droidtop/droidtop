@@ -35,6 +35,7 @@ runtime-windows/components/
 runtime-windows/lsfg/
 # droidtop-agent's Android library (build-scripts/fetch-agent-lib.sh).
 net-core/agent/
+native/target/
 # The aria2 download engine's AAR as a local Maven repository (build-scripts/fetch-aria2-engine.sh).
 net-core/aria2-engine/
 # windowcast's Android library as a local Maven repository (build-scripts/fetch-windowcast-lib.sh).

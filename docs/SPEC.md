@@ -21585,15 +21585,20 @@ streamed by windowcast's host, which the agent embeds (Stream from
 ### What droidtop carries, and where
 
 - **One core, two ends.** The agent's Rust core is also droidtop's library,
-  `libdroidtop_agent.so` (arm64-v8a and x86_64). The agent repository builds
-  it and publishes it with each release. droidtop fetches it against
-  `net-core/agent-lib.pin` (tag and SHA-256,
-  `build-scripts/fetch-agent-lib.sh`), the way it fetches the lsfg-vk layer.
-  The pin is build-130 (2026-11-04, Droidtop/tracker#794): the first release
-  with `sync_context_copy`, so a plugin's published context syncs as a copy;
-  under build-121 it only said droidtop needed updating.
-  So droidtop's CI needs no Rust toolchain, and pairing, the session channel,
-  the save rule and the merges are one implementation. `AgentNative` in
+  `libdroidtop_agent.so` (arm64-v8a and x86_64), so pairing, the session
+  channel, the save rule and the merges are one implementation. The shared
+  part is Droidtop/lib-sync's `sync-core`, a library that belongs to neither
+  program (Droidtop/tracker#867, owner 2026-11-04: "each program to have its
+  own scaffold, that can use as many shared libraries and stuff as
+  possible"). droidtop's scaffold over it is `native/`: the JNI surface that
+  was droidtop-agent's `crates/android`, moved here as it was.
+  `build-scripts/build-agent-lib.sh` builds it for both ABIs against API 26
+  (the `android-setup` action runs it before Gradle, cached by its sources),
+  so droidtop's CI has a Rust toolchain; `native/Cargo.lock` holds the exact
+  library versions. It replaced fetching droidtop-agent's prebuilt release
+  against `net-core/agent-lib.pin` (last build-130). Its tests, including the
+  mesh test that runs droidtop-agent's real service (a dev-dependency at a
+  droidtop-agent release tag), run in `android-checks.yml`. `AgentNative` in
   `:net-core` is the one JNI entry point: an operation and its arguments as
   JSON, a JSON reply, blocking, called on `Dispatchers.IO` only.
 - **The device key** (`DeviceIdentity`, `:net-core`) is an Ed25519 key made on
