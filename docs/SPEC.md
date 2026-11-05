@@ -1378,6 +1378,14 @@ disabled row is `isEnabled = false`, not only unfocusable); an icon beside a lab
 already read, and the controller hint row ("A Select, B Cancel"), are hidden from the
 screen reader. The D-pad behaviour is untouched, so nothing here can reopen that bug.
 Only the code path is changed: TalkBack itself has not been run on either dialog.
+**The mode switcher is the shell's sheet now (rig 2026-11-04, AVD droidtop-rig4-dual, build 2852).** Long-press Back
+opens `ModeSwitcherSheet` (`:shell-gamepad`, through `ModeSwitcherActivity`), not `BackButtonMenu`'s views, so the
+helper above no longer reached it: the rig's node dump showed plain `View` rows, the current mode's "Current" only as
+text, and TalkBack's first stop on the hint row. The sheet now says the same things in Compose's terms: each row is a
+button (`Role.Button`), the mode in use is selected with "Current mode" as its state, the hint row is hidden from the
+screen reader (`clearAndSetSemantics`), and every sheet's title (`MenuPanelTitle`, one for all of `MenuPanel`'s sheets)
+is a heading and the pane title, first in the reading order. `RadioListDialog` keeps `DialogAccessibility`. The pad
+path is untouched. TalkBack's spoken output still needs a device: the emulator speaks nothing.
 
 ### Recents in Mobile (Droidtop/tracker#90)
 

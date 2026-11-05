@@ -1,5 +1,9 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.heading
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.verticalScroll
@@ -156,7 +160,12 @@ private const val PANEL_OPEN_SCALE = 0.96f
 /** How tall the fade at the foot of a long sheet is, in dp. */
 internal const val MoreFadeDp = 36
 
-/** A sheet's own name at its top: one heading style for every sheet. */
+/**
+ * A sheet's own name at its top: one heading style for every sheet, and a heading and the window's pane title to a
+ * screen reader, so TalkBack names the sheet as it opens and its first stop is the name, not the hint row under the
+ * rows (Droidtop/tracker#91, rig 2026-11-04: TalkBack's first focus on the mode switcher was "Controls: A Select,
+ * B Cancel").
+ */
 @Composable
 internal fun MenuPanelTitle(text: String) {
     Text(
@@ -164,6 +173,11 @@ internal fun MenuPanelTitle(text: String) {
         style = MaterialTheme.typography.titleLarge,
         color = MenuTokens.OnSurface,
         fontWeight = FontWeight.SemiBold,
+        modifier = androidx.compose.ui.Modifier.semantics {
+            heading()
+            paneTitle = text
+            traversalIndex = -1f
+        },
     )
 }
 

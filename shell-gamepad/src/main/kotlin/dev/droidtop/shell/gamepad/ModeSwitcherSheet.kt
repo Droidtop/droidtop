@@ -13,6 +13,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
@@ -99,15 +105,27 @@ fun ModeSwitcherSheet(
                         value = if (choice.current) "Current" else null,
                         icon = choice.icon,
                         selected = index == focus,
+                        // To a screen reader each row is a button, and the mode in use says so as its state
+                        // (docs/SPEC.md "Accessibility of the custom dialogs", Droidtop/tracker#91).
+                        modifier = Modifier.semantics {
+                            role = Role.Button
+                            if (choice.current) {
+                                selected = true
+                                stateDescription = "Current mode"
+                            }
+                        },
                         onClick = {
                             focus = index
                             choose(index)
                         },
                     )
                 }
+                // The pad's legend and its touch route; a screen reader has the rows and its own back, so it skips it,
+                // as the view-based switcher's hint row was hidden from it (DialogAccessibility.hide).
                 HintRow(
                     bindings = listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, "Cancel")),
                     background = androidx.compose.ui.graphics.Color.Transparent,
+                    modifier = Modifier.clearAndSetSemantics { },
                 )
             }
         }
