@@ -45,6 +45,13 @@ object LaunchStrategyOverridePrefs {
     /** The runner a launch of [entryId] uses: a "Run once with…" choice (taken, so it applies once), else the saved one. */
     fun forLaunch(context: Context, entryId: String): String? = once.remove(entryId) ?: get(context, entryId)
 
+    /**
+     * What [forLaunch] will answer for [entryId], without taking a "Run once with…" choice: for the step before the
+     * launch that decides whether it can start at all (PcRunnerOptions.resolveAndPlay), so it weighs the runner the
+     * launch will use (Droidtop/tracker#752: "Run once with… > Wine" ran Enginehost's setup instead).
+     */
+    fun peekForLaunch(context: Context, entryId: String): String? = once[entryId] ?: get(context, entryId)
+
     /** Whether [forLaunch]'s answer for [entryId] is a one-time choice, so a launch that cannot honour it says so. */
     fun isOnce(entryId: String): Boolean = once.containsKey(entryId)
 

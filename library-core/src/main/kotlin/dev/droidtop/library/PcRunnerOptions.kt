@@ -191,7 +191,8 @@ object PcRunnerOptions {
         }
         val (runners, runner) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val measured = forEntry(context, entry)
-            measured to resolvedFor(context, entry, measured)
+            // The runner this launch will use: a pending "Run once with…" choice, else the saved one (Droidtop/tracker#752).
+            measured to resolvedFor(context, entry, measured, LaunchStrategyOverridePrefs.peekForLaunch(context, entry.id))
         }
         val setupAction = runner?.option?.action
         when {

@@ -31,4 +31,16 @@ class RunOnceTest {
     fun `without a run-once choice a launch takes the saved one, or none`() {
         assertEquals(null, LaunchStrategyOverridePrefs.forLaunch(context, "folder:NEVER_CHOSEN"))
     }
+
+    @Test
+    fun `the step before the launch sees the run-once choice without taking it`() {
+        // Droidtop/tracker#752: resolveAndPlay weighed the saved Enginehost and ran its setup instead of Wine.
+        LaunchStrategyOverridePrefs.set(context, "folder:BGI", GameLaunchStrategy.ENGINEHOST)
+        LaunchStrategyOverridePrefs.runOnce("folder:BGI", GameLaunchStrategy.WINE_PREFIX)
+
+        assertEquals("WINE_PREFIX", LaunchStrategyOverridePrefs.peekForLaunch(context, "folder:BGI"))
+        assertTrue(LaunchStrategyOverridePrefs.isOnce("folder:BGI"))
+        assertEquals("WINE_PREFIX", LaunchStrategyOverridePrefs.forLaunch(context, "folder:BGI"))
+        assertEquals("ENGINEHOST", LaunchStrategyOverridePrefs.peekForLaunch(context, "folder:BGI"))
+    }
 }
