@@ -22924,6 +22924,15 @@ in Proton. Container setup copies those folders into a new prefix (`ContainerMan
   game's own variables (Game properties, 7i) or the prefix's override it; a person can also set it for one game
   there when ICU itself misbehaves.
 
+### The Visual C++ runtime's record in a prefix (built 2026-11-05, Droidtop/tracker#899)
+
+Wine ships its own `vcruntime140` and `msvcp140`, but not the record the Microsoft redistributable writes
+(`HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\<arch>`). Unreal's bootstrap and many installers read
+that record, so an Unreal game stops at "Microsoft Visual C++ 2015-2022 Redistributable (x64) required".
+`WineVcRuntimes`, run from `WinePrefixPreparation` at each launch, writes the record where the prefix has the DLLs and no
+record: the values a 2022 redistributable writes (14.40.33810), for each architecture whose DLL is there, in both
+registry views. A record from a real install is kept.
+
 ### Translation cache, precache and mixed-arch running (decided 2026-11-04, Droidtop/tracker#865, #866)
 
 The owner, relayed by the coordinator on 2026-11-04, approved the cache plan in #865 (mixed-architecture running
