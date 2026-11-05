@@ -5,6 +5,13 @@ back here rather than restating it. Sections keep their numbers, because code
 comments cite them ("SPEC §7g"): a new section takes the next free number in
 its group, is placed in numeric order, and gets a line in the contents below.
 
+**Reuse before building (owner, 2026-11-05, relayed by the coordinator).** "Let's see if we can reuse and repurpose
+existing code whenever possible. No need to reinvent wheels". A change first reuses or repurposes what exists: droidtop's
+own code and the shared repos (droidtop-shared, droidtop-components), the vendored trees under `vendor/` (hooked or
+extended, never rewritten), then a vetted upstream library. New code is written only with its reason stated, in the
+commit and, for a design choice, in the section it belongs to here. This holds for Enginehost and every core
+(§7d "What droidtop requires of Enginehost").
+
 ## Contents
 
 - [1. Product vision](#1-product-vision)
