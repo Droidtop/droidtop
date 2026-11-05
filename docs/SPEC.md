@@ -4513,7 +4513,9 @@ the `ContainerRuntime` interface that already exists (§3):
   curve. The section's name is in the heading role (22/28 bold) between its shoulder glyphs. The
   rail's current section wears Steam's chosen-tab look: a quiet plate and the glyph in full ink (no
   longer the accent: the accent is "you are here" on the left menu, and the cursor is in the
-  section), the others muted. Opening either side menu closes the other from every route (the
+  section), the others muted. The glyphs carry no labels (eleven sections do not fit a 64 dp rail):
+  while a finger is held on one, the header names its section in place, and lifting selects it, as a
+  tap does (`TabRail(onPreview)`, owner-confirmed 2026-11-05, Droidtop/tracker#674); no tooltip. Opening either side menu closes the other from every route (the
   shell's root, either panel's Start or R2, the game page's footer pills). **One switch and one
   slider:** the System, Audio and Display tiles show the same switch Settings' rows do
   (`ShellSwitch`, 52 by 30, the affirmative fill, the knob gliding in the layer phase) instead of an

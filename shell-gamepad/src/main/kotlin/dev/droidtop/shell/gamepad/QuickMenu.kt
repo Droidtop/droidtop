@@ -173,6 +173,8 @@ internal fun QuickMenu(
             QuickTiles.visibleSections(hasPlugins, hasSocial, uiMode, order)
         }
         var section by remember { mutableStateOf(startSection?.takeIf { it in sections } ?: QuickTiles.initialSection) }
+        // The section a finger is held on in the rail, named in the header until it lifts (Droidtop/tracker#674).
+        var preview by remember { mutableStateOf<QuickSection?>(null) }
         val sectionStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
         LaunchedEffect(sections, section) {
             if (section !in sections) section = QuickTiles.initialSection
@@ -221,7 +223,7 @@ internal fun QuickMenu(
             }
         }
         val rail: @Composable () -> Unit = {
-            QuickRail(sections, section, dots, vertical = !window.portrait) { section = it }
+            QuickRail(sections, section, dots, vertical = !window.portrait, onPreview = { preview = it }) { section = it }
         }
         // The pane's width: the sheet less the rail beside it in landscape, the whole sheet under the rail in portrait.
         val paneWidthDp = sheetWidth.value.toInt() - if (window.portrait) 0 else RailWidthDp
@@ -240,7 +242,8 @@ internal fun QuickMenu(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
                         ShoulderGlyph("L1", modifier = Modifier.padding(end = 8.dp))
                         Text(
-                            section.label,
+                            // A finger held on a rail glyph names its section here first (Droidtop/tracker#674).
+                            (preview ?: section).label,
                             style = TypeRole.screenTitle,
                             color = MenuTokens.OnSurface,
                             maxLines = 1,
@@ -325,6 +328,7 @@ private fun QuickRail(
     selected: QuickSection,
     dots: Set<QuickSection>,
     vertical: Boolean,
+    onPreview: (QuickSection?) -> Unit,
     onSelect: (QuickSection) -> Unit,
 ) {
     val window = currentShellWindow()
@@ -343,6 +347,7 @@ private fun QuickRail(
         onSelect = { onSelect(it.key as QuickSection) },
         modifier = if (vertical) Modifier.width(RailWidthDp.dp) else Modifier,
         target = window.pressTarget,
+        onPreview = { onPreview(it?.key as? QuickSection) },
     )
 }
 

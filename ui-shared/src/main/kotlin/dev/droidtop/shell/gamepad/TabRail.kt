@@ -26,6 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -66,7 +70,8 @@ data class RailColors(val selected: Color, val ink: Color, val muted: Color, val
  *   caller decides what fits (the measured label sizes feed the companion's `slots`, see [labelExtent]), so nothing
  *   scrolls and no label is cut off.
  * Every entry has the tab role, its selected state and a spoken name with its count. It is never a focus target:
- * a tap selects.
+ * a tap selects. [onPreview], given, hears which entry a finger is down on (null once it lifts or slides off), so an
+ * unlabelled rail's caller can name it in its own header before the tap lands (Droidtop/tracker#674): no tooltip.
  */
 @Composable
 fun TabRail(
@@ -78,6 +83,7 @@ fun TabRail(
     onSelect: (RailTab) -> Unit,
     modifier: Modifier = Modifier,
     target: Dp = 48.dp,
+    onPreview: ((RailTab?) -> Unit)? = null,
 ) {
     val entry: @Composable (RailTab, Modifier) -> Unit = { tab, itemModifier ->
         val current = tab.key == selected
@@ -90,6 +96,21 @@ fun TabRail(
                 .sizeIn(minWidth = target, minHeight = target)
                 .clip(Corners.Crisp)
                 .background(if (current) colors.selected else Color.Transparent)
+                // Watches the press without taking it: the tap below still selects.
+                .then(
+                    if (onPreview == null) {
+                        Modifier
+                    } else {
+                        Modifier.pointerInput(tab.key) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                onPreview(tab)
+                                waitForUpOrCancellation()
+                                onPreview(null)
+                            }
+                        }
+                    },
+                )
                 // Ahead of the clickable: a plain clickable is still a focus target, and the pad never drives this.
                 .padRow { onSelect(tab) }
                 // One spoken element per entry: its name and count, the tab role, its state, and the tap.
