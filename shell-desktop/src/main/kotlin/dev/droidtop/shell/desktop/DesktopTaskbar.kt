@@ -345,10 +345,11 @@ internal fun TaskbarButton(onClick: () -> Unit, modifier: Modifier = Modifier, c
  * section) is NOT built here: wlr-foreign-toplevel-management-unstable-v1
  * has no such request (only activate/set_minimized/unset_minimized/close/
  * set_fullscreen/set_rectangle -- checked against the protocol XML), and
- * host-bridge's own output handling is still single-output-only (see
- * wayland_client.cpp's WaylandGlobals comment). Real "move to output" needs
- * real multi-output support first; SPEC.md is corrected alongside this
- * change to stop claiming it as already built.
+ * while host-bridge now tracks and can capture every output
+ * (HostBridge.outputNames, Droidtop/tracker#908), nothing shows a second
+ * output on a screen yet. Real "move to output" is a later step of that
+ * issue; SPEC.md is corrected alongside this change to stop claiming it as
+ * already built.
  */
 @Composable
 internal fun TaskbarWindowList(

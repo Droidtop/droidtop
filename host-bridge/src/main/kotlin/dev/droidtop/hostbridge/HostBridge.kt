@@ -40,7 +40,8 @@ data class Toplevel(
  *
  *  1. Connects to the primary container's Wayland socket as a client.
  *  2. Pulls frames from its headless output(s) via wlr-screencopy and
- *     presents them on an Android [Surface] — one per [DisplayOutput].
+ *     presents them on Android [Surface]s, one capture per compositor
+ *     output ([outputNames], Droidtop/tracker#908).
  *  3. Forwards normalized input from :input-seat in as virtual
  *     pointer/keyboard events.
  *  4. Bridges the seat's clipboard selection both ways over
@@ -94,19 +95,39 @@ class HostBridge : HostBridgeInput {
     fun connectionLost(): Boolean = connected && nativeConnectionLost()
 
     /**
-     * Starts a continuous frame-capture loop targeting [surface]. [output]
-     * is accepted but currently ignored on the native side — the native
-     * capture loop is single-output only for now (always the primary
-     * screen), matching the merged-desktop MVP; see host-bridge/README.md
-     * for what real multi-output support needs. Passing a non-primary
-     * [DisplayOutput] here won't do what its name implies yet.
+     * The compositor's outputs by name ("HEADLESS-1" under sway), the primary first, in the order the compositor
+     * advertised them (Droidtop/tracker#908). The primary is the first output it advertised: the one the calls without
+     * a name ([presentOutput] with a [DisplayOutput], [stopPresenting], [setOutputSize]) mean. An output is listed
+     * only once the compositor has named it (wl_output version 4); one that offers less is still reachable as the
+     * primary. Empty when not connected. Safe from any thread.
+     */
+    fun outputNames(): List<String> = if (connected) nativeOutputNames().toList() else emptyList()
+
+    /**
+     * Starts a continuous frame-capture loop of the primary output into [surface]. [output] is accepted but not
+     * read: which Android screen shows which compositor output is not decided here (the named [presentOutput] is the
+     * call for another output).
      */
     fun presentOutput(output: DisplayOutput, surface: Surface): Boolean {
         return nativePresentOutput(surface)
     }
 
+    /**
+     * Starts a continuous frame-capture loop of the compositor output named [outputName] (one of [outputNames]) into
+     * [surface]. Each output has one capture: presenting it again moves it to the new surface. False when there is no
+     * output of that name.
+     */
+    fun presentOutput(outputName: String, surface: Surface): Boolean =
+        outputName.isNotEmpty() && nativePresentNamedOutput(outputName, surface)
+
+    /** Stops the primary output's capture. */
     fun stopPresenting() {
         nativeStopPresenting()
+    }
+
+    /** Stops the capture of the output named [outputName], if it has one. */
+    fun stopPresenting(outputName: String) {
+        if (outputName.isNotEmpty()) nativeStopPresentingOutput(outputName)
     }
 
     /**
@@ -125,6 +146,13 @@ class HostBridge : HostBridgeInput {
      */
     fun setOutputSize(width: Int, height: Int, scale: Double = 0.0): Boolean =
         width > 0 && height > 0 && nativeSetOutputSize(width, height, scale)
+
+    /**
+     * [setOutputSize] for the output named [outputName] (one of [outputNames]): applied to the output-management head
+     * of that name once the compositor has announced it.
+     */
+    fun setOutputSize(outputName: String, width: Int, height: Int, scale: Double = 0.0): Boolean =
+        outputName.isNotEmpty() && width > 0 && height > 0 && nativeSetNamedOutputSize(outputName, width, height, scale)
 
     // ---- Input injection, called from :input-seat's InputSeat ----
 
@@ -283,9 +311,13 @@ class HostBridge : HostBridgeInput {
     private external fun nativeDisconnect()
     private external fun nativeConnectionLost(): Boolean
     private external fun nativeSetInputMethodTaken(taken: Boolean)
+    private external fun nativeOutputNames(): Array<String>
     private external fun nativePresentOutput(surface: Surface): Boolean
+    private external fun nativePresentNamedOutput(outputName: String, surface: Surface): Boolean
     private external fun nativeStopPresenting()
+    private external fun nativeStopPresentingOutput(outputName: String)
     private external fun nativeSetOutputSize(width: Int, height: Int, scale: Double): Boolean
+    private external fun nativeSetNamedOutputSize(outputName: String, width: Int, height: Int, scale: Double): Boolean
     private external fun nativeInjectPointerMotion(dx: Double, dy: Double)
     private external fun nativeInjectPointerMotionAbsolute(x: Double, y: Double, extentWidth: Int, extentHeight: Int)
     private external fun nativeInjectPointerButton(linuxButtonCode: Int, pressed: Boolean)

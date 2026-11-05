@@ -181,18 +181,19 @@ Instead, mirror Qubes OS's dom0/AppVM split:
   management, no compositing, no protocol server logic.
   host-bridge's Wayland client must not assume it is the sole screencopy or
   virtual-input consumer; windowcast attaches as a second client of the same
-  compositor, not through droidtop code. Its one capture session
-  (host-bridge/native/src/wayland_client.cpp:1456) and one virtual pointer
-  and keyboard per connection (wayland_client.cpp:1316-1319) are
+  compositor, not through droidtop code. Its capture sessions, at most one
+  per compositor output (`TrackedOutput::capture`,
+  host-bridge/native/src/wayland_client.cpp:1763), and one virtual pointer
+  and keyboard per connection (wayland_client.cpp:1622-1627) are
   per-connection state, so a second compositor client leaves them untouched,
   and the JNI layer keys every connection by its `HostBridge` object rather
-  than holding a singleton (host-bridge/native/src/hostbridge_jni.cpp:84-95).
+  than holding a singleton (host-bridge/native/src/hostbridge_jni.cpp:117).
   Audited 2026-10-08 (Droidtop/tracker#100): nothing in host-bridge takes an
   exclusive grab, a keyboard-shortcuts inhibitor or a pointer constraint.
   Two things it does are compositor-wide by the protocols' own design, and a
   second client has to leave them to host-bridge rather than fight over them:
   the output's mode, which `applyOutputSize` sets to the Android surface's
-  size through wlr-output-management (wayland_client.cpp:385-396), so a
+  size through wlr-output-management (wayland_client.cpp:521), so a
   second consumer that wants another size captures its own output (sway's
   `create_output` on the headless backend) instead of reconfiguring this
   one; and the clipboard, which the data-control bridge sets for the whole
@@ -3914,9 +3915,24 @@ the `ContainerRuntime` interface that already exists (§3):
 - Each `DisplayOutput` maps to one headless output inside the primary
   container's compositor (whichever the user's configured — see §2).
 - **Every window is on the primary screen's output**: one shared desktop,
-  nothing hidden away. host-bridge presents one output, the primary
-  (`wayland_client.cpp`'s capture is single-output), and the taskbar has no
-  "Move to another screen".
+  nothing hidden away. host-bridge presents one output, the primary, and
+  the taskbar has no "Move to another screen".
+- **host-bridge tracks every compositor output (2026-11-05,
+  Droidtop/tracker#908, step D1a).** The plan on #908: D1 many outputs in
+  host-bridge, D2 the session creating a second sway headless output, D3
+  an Android surface on another display, D4 moving windows, D5 asking once
+  per display. D1a, built: the native client binds every `wl_output` (at
+  version 4 when offered, so each carries its sway name, "HEADLESS-1"),
+  drops one the compositor removes, and gives each output its own
+  screencopy capture into its own `Surface`. `HostBridge.outputNames()`
+  lists them, primary first; `presentOutput(name, surface)`,
+  `stopPresenting(name)` and `setOutputSize(name, w, h, scale)` act on one
+  by name (its size goes to the wlr-output-management head of the same
+  name). The **primary** is the first output bound, the one host-bridge
+  presented before: the calls without a name still mean it, and its size
+  goes to the head of its name, or the first head when it has none, as
+  before (`output_match.h`). Not yet: pointer input is still mapped onto
+  the primary alone (D1b), and nothing calls the named calls until D2/D3.
 - **Per-window placement is not built (corrected 2026-10-29,
   Droidtop/tracker#695).** This section used to promise that any window could
   be reassigned to a different `DisplayOutput` at runtime, sway moving a
@@ -3946,9 +3962,10 @@ the `ContainerRuntime` interface that already exists (§3):
   display's row is a choice of role: **Input surface** (§6c), **Companion**
   (§4d), **Virtual controller** (§4), **Extended desktop output** (Desktop
   only: a second headless output in the compositor, sized to the display;
-  real multi-output support in `:host-bridge` — today single-output-only,
-  see §2a's taskbar paragraph — is needed before this role or a taskbar
-  "move to" action can exist), or **Mirror** (Android's
+  `:host-bridge` tracks and captures every output since #908's D1a, but
+  pointer input on a second output (D1b) and the session's second output
+  (D2) are needed before this role or a taskbar "move to" action can
+  exist), or **Mirror** (Android's
   own mirroring, chosen rather than fallen into). The per-mode
   second-screen role rows are these same rows filtered to the mode. A
   display in a fallback mode the add-on is known to come up in (480x640
@@ -9151,7 +9168,7 @@ the viewport to sway.
 
 The fit stays `STRETCH`, because that is still what the present path does
 until the new mode is applied (and permanently, for a compositor without
-output management) — `presentPrimaryOutput` sets the buffer geometry to the
+output management) — the capture (`WaylandClient::presentOutput`) sets the buffer geometry to the
 output size and SurfaceFlinger scales that buffer to fill the view's
 bounds, per axis, with no letterboxing anywhere. Under `STRETCH` only the
 ratio x/x_extent reaches the compositor, so a mismatch between the size
@@ -10105,10 +10122,9 @@ app-drawer icon or a floating switcher button:
   container today, so nothing distinguishes this yet), moving a toplevel to
   another output (the protocol itself has no such request — only
   activate/set_minimized/unset_minimized/close/set_fullscreen/
-  set_rectangle — and host-bridge's own capture/output handling is still
-  single-output-only besides, see `WaylandGlobals`'s comment in
-  `wayland_client.cpp`; real "move to output" needs real multi-output
-  support in host-bridge first), and folding Android tasks droidtop itself
+  set_rectangle — and host-bridge, though it tracks and captures every
+  output since Droidtop/tracker#908's D1a, does not yet take pointer input
+  on a second output or have one shown; "move to output" is #908's D4), and folding Android tasks droidtop itself
   launched onto the desktop's display (a game, a Wine activity) into the
   same bar via `LaunchDisplay`'s record — all three are backlog, not
   shipped, corrected here after an earlier draft of this section described

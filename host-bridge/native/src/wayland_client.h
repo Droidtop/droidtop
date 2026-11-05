@@ -103,24 +103,47 @@ public:
     // set it, so a connection droidtop closed itself never reads as lost.
     bool connectionLost() const { return connectionLost_; }
 
-    // Starts (or restarts, if already presenting) a continuous screencopy
-    // capture loop targeting the primary output — MVP is single-output only,
-    // matching the current DisplayOutput model's merged-desktop default; see
-    // README for what multi-output would need. `window` must stay valid
-    // until stopPresenting() or disconnect(); the caller (HostBridge.kt) owns
-    // its lifetime via ANativeWindow_acquire/release around the JNI call.
-    bool presentPrimaryOutput(ANativeWindow* window);
-    void stopPresenting();
+    // ---- Outputs (Droidtop/tracker#908) ----
+    //
+    // Every wl_output the compositor advertises is tracked, in bind order.
+    // [outputName] picks one by the name its wl_output v4 `name` event gave
+    // ("HEADLESS-1" under sway); "" means the primary, the first bound,
+    // which is the one output host-bridge knew before it tracked several
+    // (output_match.h holds the rule).
 
-    // Asks the compositor, over wlr-output-management, to give its output
+    // The names of the outputs that have one, primary first. Any thread.
+    std::vector<std::string> outputNames();
+
+    // Starts (or restarts, if already presenting) a continuous screencopy
+    // capture loop of that output into `window`. Each output has at most
+    // one capture; presenting an output again replaces its old one.
+    // `window` must stay valid until that capture stops (stopPresenting,
+    // a later presentOutput of the same output, the output going away, or
+    // disconnect()); the caller (hostbridge_jni.cpp) owns its lifetime via
+    // ANativeWindow_fromSurface/release around the JNI call. Returns the
+    // output's id (its registry name, never 0) or 0 when nothing was
+    // started, so the caller can key the window by the output it really
+    // went to.
+    uint32_t presentOutput(const std::string& outputName, ANativeWindow* window);
+
+    // Stops that output's capture. Returns the id presentOutput gave for it,
+    // or 0 when it had none; after it returns its window is no longer drawn
+    // into and may be released.
+    uint32_t stopPresenting(const std::string& outputName);
+
+    // Stops every output's capture (disconnect()).
+    void stopAllPresenting();
+
+    // Asks the compositor, over wlr-output-management, to give that output
     // this exact size (a custom mode: a headless output accepts any). The
     // Android view showing the desktop calls this with its own size, so a
     // captured frame maps 1:1 onto the view instead of being stretched.
-    // Applied as soon as the compositor has announced its output; returns
-    // false only when it offers no output management at all. [scale] is the
-    // output's scale (logical pixel to physical pixels); 0 leaves the
-    // compositor's own.
-    bool setOutputSize(int32_t width, int32_t height, double scale);
+    // Kept and applied as soon as the compositor has announced the output's
+    // head (the head of the same name; the primary falls back to the first
+    // head); returns false only when it offers no output management at all.
+    // [scale] is the output's scale (logical pixel to physical pixels); 0
+    // leaves the compositor's own.
+    bool setOutputSize(const std::string& outputName, int32_t width, int32_t height, double scale);
 
     // Input injection — safe to call from a thread other than the one that
     // called connect()/runs the dispatch loop. libwayland-client's requests
@@ -222,7 +245,6 @@ private:
     struct wl_display* display_ = nullptr;
     struct wl_registry* registry_ = nullptr;
     WaylandGlobals* globals_ = nullptr;
-    OutputCapture* capture_ = nullptr;
     ClipboardState* clipboard_ = nullptr;
     struct ToplevelState* toplevels_ = nullptr;
     struct TextFieldState* textField_ = nullptr;
@@ -245,9 +267,6 @@ private:
     void runOnDispatchThread(void (*task)(WaylandClient*, void*), void* arg);
     void runPendingTasks();
     void wake();
-
-    void stopPresentingOnDispatchThread();
-    void applyOutputSizeOnDispatchThread();
 };
 
 } // namespace hostbridge

@@ -1,5 +1,6 @@
 #include "wayland_client.h"
 #include "default_keymap.h"
+#include "output_match.h"
 
 #include <android/api-level.h>
 #include <android/log.h>
@@ -14,6 +15,7 @@
 #include <cstring>
 #include <deque>
 #include <fcntl.h>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <poll.h>
@@ -45,12 +47,56 @@
 
 namespace hostbridge {
 
+struct WaylandGlobals;
+
+// One wlr-output-management head: the compositor's configuration view of one
+// output. Touched on the dispatch thread only. `applied_*` is the size last
+// requested for it, so a `done` that changes nothing sends nothing.
+struct OutputHead {
+    WaylandGlobals* globals = nullptr;
+    zwlr_output_head_v1* head = nullptr;
+    std::string name;
+    // The output's place in the compositor's layout, in logical pixels.
+    int32_t x = 0;
+    int32_t y = 0;
+    bool enabled = false;
+    int32_t applied_width = 0;
+    int32_t applied_height = 0;
+    double applied_scale = 0;
+};
+
+// The size asked for one output (setOutputSize), held until its head and a
+// serial are known. 0 scale leaves the compositor's own.
+struct WantedOutputSize {
+    int32_t width = 0;
+    int32_t height = 0;
+    double scale = 0;
+};
+
+// One wl_output the compositor advertises (Droidtop/tracker#908: every one,
+// no longer only the first). Touched on the dispatch thread only, apart from
+// the registry round trips in connect() before that thread starts.
+struct TrackedOutput {
+    uint32_t globalName = 0; // the registry's name for it: never 0, and the id a capture is known by
+    uint32_t version = 0;
+    wl_output* output = nullptr;
+    // From the `name` event (wl_output v4, "HEADLESS-1" under sway); "" on
+    // a compositor that offers v2 or v3 only.
+    std::string name;
+    // The current mode, in pixels, and the integer scale (wl_output events).
+    int32_t width = 0;
+    int32_t height = 0;
+    int32_t scale = 1;
+    // The capture drawing this output into an Android surface, or null.
+    OutputCapture* capture = nullptr;
+};
+
 // Globals bound off the primary container compositor's registry. compositor/
 // seat/screencopy/virtual-pointer/virtual-keyboard are required — if the
 // compositor doesn't advertise all of them, connect() fails. output/shm are
 // tracked too (needed for screencopy) but their absence isn't fatal at
 // connect() time since a headless compositor might advertise its first
-// output slightly later; presentPrimaryOutput() checks for them itself.
+// output slightly later; presentOutput() checks for them itself.
 struct WaylandGlobals {
     wl_compositor* compositor = nullptr;
     wl_seat* seat = nullptr;
@@ -62,21 +108,16 @@ struct WaylandGlobals {
 
     // Output sizing (wlr-output-management). Optional: without it the
     // desktop still works, the frame is just stretched to the view. All of
-    // it is touched on the dispatch thread only. `head` is the first head
-    // announced, the one headless output this compositor has; `serial` is
-    // the latest `done` serial, which every configuration must quote.
+    // it is touched on the dispatch thread only. `heads` are in the order the
+    // compositor announced them; `serial` is the latest `done` serial, which
+    // every configuration must quote. `wanted` is keyed by the output name
+    // setOutputSize was given, "" for the primary (output_match.h).
     zwlr_output_manager_v1* output_manager = nullptr;
     uint32_t output_manager_version = 0;
-    zwlr_output_head_v1* head = nullptr;
+    std::vector<std::unique_ptr<OutputHead>> heads;
     uint32_t output_serial = 0;
     bool output_serial_known = false;
-    int32_t wanted_width = 0;
-    int32_t wanted_height = 0;
-    int32_t applied_width = 0;
-    int32_t applied_height = 0;
-    // The output's scale, sent with its size (0: leave the compositor's own).
-    double wanted_scale = 0;
-    double applied_scale = 0;
+    std::map<std::string, WantedOutputSize> wanted;
 
     // Clipboard. NOT required at connect() time, unlike the five above: a
     // compositor without it still gives a usable desktop, just one whose
@@ -96,12 +137,12 @@ struct WaylandGlobals {
     // time (see there).
     struct ToplevelState* toplevel_state = nullptr;
 
-    // MVP: track only the first wl_output seen — matches the current
-    // single-merged-desktop default (DisplayOutput.kt / SPEC.md §4). A real
-    // multi-output implementation needs a list here plus a way for the
-    // Kotlin side to pick which one presentPrimaryOutput() targets; that's
-    // genuine future work, not an oversight.
-    wl_output* output = nullptr;
+    // Every wl_output, in bind order (Droidtop/tracker#908). The first is the
+    // primary: the output host-bridge presented and sized when it tracked
+    // one only, and what an unnamed request (presentOutput(surface),
+    // setOutputSize(w, h, scale)) still means. When it goes, the next one
+    // in line is the primary.
+    std::vector<std::unique_ptr<TrackedOutput>> outputs;
 
     zwlr_virtual_pointer_v1* virtual_pointer = nullptr;
     // Two keyboards on the one seat (docs/SPEC.md 6b "Keyboard layout"): keys of a physical keyboard go through
@@ -347,29 +388,40 @@ constexpr zwlr_output_mode_v1_listener kModeListener = {
     .finished = mode_finished,
 };
 
-void head_name(void*, zwlr_output_head_v1*, const char* name) {
+void head_name(void* data, zwlr_output_head_v1*, const char* name) {
+    static_cast<OutputHead*>(data)->name = name;
     LOGI("compositor output head: %s", name);
 }
 void head_description(void*, zwlr_output_head_v1*, const char*) {}
 void head_physical_size(void*, zwlr_output_head_v1*, int32_t, int32_t) {}
 void head_mode(void* data, zwlr_output_head_v1*, zwlr_output_mode_v1* mode) {
-    auto* globals = static_cast<WaylandGlobals*>(data);
+    auto* globals = static_cast<OutputHead*>(data)->globals;
     zwlr_output_mode_v1_add_listener(mode, &kModeListener,
         reinterpret_cast<void*>(static_cast<uintptr_t>(globals->output_manager_version)));
 }
-void head_enabled(void*, zwlr_output_head_v1*, int32_t) {}
+void head_enabled(void* data, zwlr_output_head_v1*, int32_t enabled) {
+    static_cast<OutputHead*>(data)->enabled = enabled != 0;
+}
 void head_current_mode(void*, zwlr_output_head_v1*, zwlr_output_mode_v1*) {}
-void head_position(void*, zwlr_output_head_v1*, int32_t, int32_t) {}
+void head_position(void* data, zwlr_output_head_v1*, int32_t x, int32_t y) {
+    auto* record = static_cast<OutputHead*>(data);
+    record->x = x;
+    record->y = y;
+}
 void head_transform(void*, zwlr_output_head_v1*, int32_t) {}
 void head_scale(void*, zwlr_output_head_v1*, wl_fixed_t) {}
 void head_finished(void* data, zwlr_output_head_v1* head) {
-    auto* globals = static_cast<WaylandGlobals*>(data);
-    if (globals->head == head) {
-        globals->head = nullptr;
-        globals->applied_width = globals->applied_height = 0;
-        globals->applied_scale = 0;
+    auto* record = static_cast<OutputHead*>(data);
+    auto* globals = record->globals;
+    uint32_t version = globals->output_manager_version;
+    // Erasing the record frees it: nothing below may read `record`.
+    for (auto it = globals->heads.begin(); it != globals->heads.end(); ++it) {
+        if (it->get() == record) {
+            globals->heads.erase(it);
+            break;
+        }
     }
-    if (globals->output_manager_version >= 3) zwlr_output_head_v1_release(head); else zwlr_output_head_v1_destroy(head);
+    if (version >= 3) zwlr_output_head_v1_release(head); else zwlr_output_head_v1_destroy(head);
 }
 void head_make(void*, zwlr_output_head_v1*, const char*) {}
 void head_model(void*, zwlr_output_head_v1*, const char*) {}
@@ -394,20 +446,29 @@ constexpr zwlr_output_head_v1_listener kHeadListener = {
 
 void manager_head(void* data, zwlr_output_manager_v1*, zwlr_output_head_v1* head) {
     auto* globals = static_cast<WaylandGlobals*>(data);
-    zwlr_output_head_v1_add_listener(head, &kHeadListener, globals);
-    if (!globals->head) globals->head = head; // single headless output: the first head is it
+    auto record = std::make_unique<OutputHead>();
+    record->globals = globals;
+    record->head = head;
+    zwlr_output_head_v1_add_listener(head, &kHeadListener, record.get());
+    globals->heads.push_back(std::move(record));
 }
 void manager_done(void* data, zwlr_output_manager_v1*, uint32_t serial) {
     auto* globals = static_cast<WaylandGlobals*>(data);
     globals->output_serial = serial;
     globals->output_serial_known = true;
+    for (auto& head : globals->heads) {
+        LOGI("compositor output head %s: %s at %d,%d", head->name.c_str(),
+             head->enabled ? "enabled" : "disabled", head->x, head->y);
+    }
     applyOutputSize(globals);
 }
 void manager_finished(void* data, zwlr_output_manager_v1* manager) {
     auto* globals = static_cast<WaylandGlobals*>(data);
     zwlr_output_manager_v1_destroy(manager);
     globals->output_manager = nullptr;
-    globals->head = nullptr;
+    // The head records stay until disconnect(): their proxies may still see
+    // an event, and the listener data must outlive it. Without a manager,
+    // applyOutputSize sends nothing.
 }
 constexpr zwlr_output_manager_v1_listener kOutputManagerListener = {
     .head = manager_head,
@@ -415,23 +476,31 @@ constexpr zwlr_output_manager_v1_listener kOutputManagerListener = {
     .finished = manager_finished,
 };
 
+// A configuration that did not apply leaves every head's size unknown, so
+// the next `done` (fresh serial) asks again for each wanted size. Requests
+// that already landed are asked again unchanged, which costs nothing.
+void forgetAppliedSizes(WaylandGlobals* globals) {
+    for (auto& head : globals->heads) {
+        head->applied_width = head->applied_height = 0;
+        head->applied_scale = 0;
+    }
+}
+
 void configuration_succeeded(void*, zwlr_output_configuration_v1* config) {
     LOGI("output size applied");
     zwlr_output_configuration_v1_destroy(config);
 }
 void configuration_failed(void* data, zwlr_output_configuration_v1* config) {
     auto* globals = static_cast<WaylandGlobals*>(data);
-    LOGW("compositor refused output size %dx%d scale %.2f", globals->wanted_width, globals->wanted_height, globals->wanted_scale);
-    globals->applied_width = globals->applied_height = 0;
-    globals->applied_scale = 0;
+    LOGW("compositor refused the output size configuration");
+    forgetAppliedSizes(globals);
     zwlr_output_configuration_v1_destroy(config);
 }
 void configuration_cancelled(void* data, zwlr_output_configuration_v1* config) {
     // The output changed under the request (its serial went stale). The
     // next `done` carries a fresh serial and re-applies the wanted size.
     auto* globals = static_cast<WaylandGlobals*>(data);
-    globals->applied_width = globals->applied_height = 0;
-    globals->applied_scale = 0;
+    forgetAppliedSizes(globals);
     zwlr_output_configuration_v1_destroy(config);
 }
 constexpr zwlr_output_configuration_v1_listener kConfigurationListener = {
@@ -440,26 +509,63 @@ constexpr zwlr_output_configuration_v1_listener kConfigurationListener = {
     .cancelled = configuration_cancelled,
 };
 
+std::string primaryOutputName(WaylandGlobals* globals) {
+    return globals->outputs.empty() ? std::string() : globals->outputs.front()->name;
+}
+
+// Sends one configuration holding every head whose wanted size it does not
+// have yet. One, not one per head: a configuration quotes the serial, and
+// the first to apply makes the compositor send a new one, so a second sent
+// beside it would only be cancelled. A head the configuration leaves out
+// keeps its state (wlroots fills the rest in from the current one).
 void applyOutputSize(WaylandGlobals* globals) {
-    if (!globals->output_manager || !globals->head || !globals->output_serial_known) return;
-    if (globals->wanted_width <= 0 || globals->wanted_height <= 0) return;
-    if (globals->wanted_width == globals->applied_width && globals->wanted_height == globals->applied_height &&
-        globals->wanted_scale == globals->applied_scale) return;
+    if (!globals->output_manager || !globals->output_serial_known || globals->heads.empty()) return;
+
+    std::vector<std::string> headNames;
+    headNames.reserve(globals->heads.size());
+    for (auto& head : globals->heads) headNames.push_back(head->name);
+    std::string primaryName = primaryOutputName(globals);
+
+    // Resolved per head first: the protocol allows each head once per
+    // configuration (already_configured_head), and "" and the primary's own
+    // name are the same head. std::map orders "" first, so a size asked by
+    // name wins over one asked for the primary.
+    std::map<OutputHead*, WantedOutputSize> changes;
+    for (const auto& [name, size] : globals->wanted) {
+        if (size.width <= 0 || size.height <= 0) continue;
+        int index = findHeadIndex(name, primaryName, headNames);
+        if (index < 0) continue;
+        changes[globals->heads[static_cast<size_t>(index)].get()] = size;
+    }
+    for (auto it = changes.begin(); it != changes.end();) {
+        OutputHead* head = it->first;
+        const WantedOutputSize& size = it->second;
+        if (size.width == head->applied_width && size.height == head->applied_height &&
+            size.scale == head->applied_scale) {
+            it = changes.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    if (changes.empty()) return;
+
     auto* config = zwlr_output_manager_v1_create_configuration(globals->output_manager, globals->output_serial);
     zwlr_output_configuration_v1_add_listener(config, &kConfigurationListener, globals);
-    auto* configHead = zwlr_output_configuration_v1_enable_head(config, globals->head);
-    zwlr_output_configuration_head_v1_set_custom_mode(configHead, globals->wanted_width, globals->wanted_height, 0);
-    // The size stays the surface's pixels (screencopy still captures every
-    // one of them); the scale only sets how many of them a logical pixel is,
-    // which is what makes text and controls readable on a dense screen.
-    if (globals->wanted_scale > 0) {
-        zwlr_output_configuration_head_v1_set_scale(configHead, wl_fixed_from_double(globals->wanted_scale));
+    for (auto& [head, size] : changes) {
+        auto* configHead = zwlr_output_configuration_v1_enable_head(config, head->head);
+        zwlr_output_configuration_head_v1_set_custom_mode(configHead, size.width, size.height, 0);
+        // The size stays the surface's pixels (screencopy still captures every
+        // one of them); the scale only sets how many of them a logical pixel is,
+        // which is what makes text and controls readable on a dense screen.
+        if (size.scale > 0) {
+            zwlr_output_configuration_head_v1_set_scale(configHead, wl_fixed_from_double(size.scale));
+        }
+        head->applied_width = size.width;
+        head->applied_height = size.height;
+        head->applied_scale = size.scale;
+        LOGI("requested output %s size %dx%d scale %.2f", head->name.c_str(), size.width, size.height, size.scale);
     }
     zwlr_output_configuration_v1_apply(config);
-    globals->applied_width = globals->wanted_width;
-    globals->applied_height = globals->wanted_height;
-    globals->applied_scale = globals->wanted_scale;
-    LOGI("requested output size %dx%d scale %.2f", globals->wanted_width, globals->wanted_height, globals->wanted_scale);
 }
 
 // ---- windows (wlr-foreign-toplevel-management-unstable-v1) ----
@@ -501,11 +607,10 @@ void toplevel_handle_app_id(void* data, zwlr_foreign_toplevel_handle_v1* handle,
 }
 
 void toplevel_handle_output_enter(void*, zwlr_foreign_toplevel_handle_v1*, wl_output*) {
-    // Not tracked: droidtop presents a single merged desktop output today
-    // (see WaylandGlobals's own "MVP: track only the first wl_output"
-    // comment above) — real per-output "move to output" needs this, and is
-    // future work alongside real multi-output support, not something
-    // silently dropped here.
+    // Not tracked yet. host-bridge tracks and can capture every output
+    // (WaylandGlobals::outputs, Droidtop/tracker#908), but which output a
+    // window is on matters only once a window can be moved to another
+    // screen, a later step of that issue.
 }
 
 void toplevel_handle_output_leave(void*, zwlr_foreign_toplevel_handle_v1*, wl_output*) {}
@@ -614,6 +719,40 @@ constexpr zwlr_foreign_toplevel_manager_v1_listener kToplevelManagerListener = {
     .finished = toplevel_manager_finished,
 };
 
+// ---- outputs (wl_output) ----
+
+void destroyCapture(OutputCapture* cap); // fwd decl: an output that goes takes its capture with it
+
+void output_geometry(void*, wl_output*, int32_t, int32_t, int32_t, int32_t, int32_t,
+                     const char*, const char*, int32_t) {}
+void output_mode(void* data, wl_output*, uint32_t flags, int32_t width, int32_t height, int32_t) {
+    if (!(flags & WL_OUTPUT_MODE_CURRENT)) return;
+    auto* tracked = static_cast<TrackedOutput*>(data);
+    tracked->width = width;
+    tracked->height = height;
+}
+void output_done(void* data, wl_output*) {
+    auto* tracked = static_cast<TrackedOutput*>(data);
+    LOGI("compositor output %s (wl_output v%u): %dx%d scale %d",
+         tracked->name.empty() ? "(unnamed)" : tracked->name.c_str(), tracked->version,
+         tracked->width, tracked->height, tracked->scale);
+}
+void output_scale(void* data, wl_output*, int32_t factor) {
+    static_cast<TrackedOutput*>(data)->scale = factor;
+}
+void output_name(void* data, wl_output*, const char* name) {
+    static_cast<TrackedOutput*>(data)->name = name;
+}
+void output_description(void*, wl_output*, const char*) {}
+constexpr wl_output_listener kOutputListener = {
+    .geometry = output_geometry,
+    .mode = output_mode,
+    .done = output_done,
+    .scale = output_scale,
+    .name = output_name,
+    .description = output_description,
+};
+
 // ---- registry ----
 
 void registry_global(void* data, wl_registry* registry, uint32_t name,
@@ -630,10 +769,19 @@ void registry_global(void* data, wl_registry* registry, uint32_t name,
         globals->shm = static_cast<wl_shm*>(
             wl_registry_bind(registry, name, &wl_shm_interface, 1));
     } else if (std::strcmp(interface, wl_output_interface.name) == 0) {
-        if (!globals->output) { // first one only — see OutputCapture's comment
-            globals->output = static_cast<wl_output*>(
-                wl_registry_bind(registry, name, &wl_output_interface, 2));
-        }
+        // Every output (Droidtop/tracker#908). Version 4 when offered, for
+        // its `name` event (the name sway's IPC and wlr-output-management
+        // also use); 2 is what this client bound before, and what it still
+        // takes from a compositor offering less than 4: those outputs are
+        // tracked without a name and reachable only as the primary.
+        uint32_t bound = version >= 4 ? 4 : (version < 2 ? version : 2);
+        auto tracked = std::make_unique<TrackedOutput>();
+        tracked->globalName = name;
+        tracked->version = bound;
+        tracked->output = static_cast<wl_output*>(
+            wl_registry_bind(registry, name, &wl_output_interface, bound));
+        wl_output_add_listener(tracked->output, &kOutputListener, tracked.get());
+        globals->outputs.push_back(std::move(tracked));
     } else if (std::strcmp(interface, zwlr_screencopy_manager_v1_interface.name) == 0) {
         globals->screencopy_manager = static_cast<zwlr_screencopy_manager_v1*>(
             wl_registry_bind(registry, name, &zwlr_screencopy_manager_v1_interface, version));
@@ -730,9 +878,24 @@ constexpr zwp_input_method_v2_listener kInputMethodListener = {
     .unavailable = imUnavailable,
 };
 
-void registry_global_remove(void* /* data */, wl_registry* /* registry */, uint32_t /* name */) {
-    // TODO: handle the primary container's compositor restarting mid-session
-    // (a global disappearing) — currently unhandled, connection just goes stale.
+void registry_global_remove(void* data, wl_registry* /* registry */, uint32_t name) {
+    // An output that goes (sway's `output X unplug`, a headless output
+    // destroyed) stops its capture and leaves the list; if it was the
+    // primary, the next output is. Its Android surface keeps the last frame
+    // until the caller presents something else there. Other globals going
+    // is still not handled: the compositor itself exiting is noticed by the
+    // dispatch loop instead (connectionLost).
+    auto* globals = static_cast<WaylandGlobals*>(data);
+    for (auto it = globals->outputs.begin(); it != globals->outputs.end(); ++it) {
+        TrackedOutput* tracked = it->get();
+        if (tracked->globalName != name) continue;
+        LOGI("compositor output %s went away", tracked->name.empty() ? "(unnamed)" : tracked->name.c_str());
+        destroyCapture(tracked->capture);
+        tracked->capture = nullptr;
+        if (tracked->version >= 3) wl_output_release(tracked->output); else wl_output_destroy(tracked->output);
+        globals->outputs.erase(it);
+        return;
+    }
 }
 
 constexpr wl_registry_listener kRegistryListener = {
@@ -935,6 +1098,28 @@ void startNextCapture(OutputCapture* cap) {
     cap->haveBufferInfo = false;
     cap->frame = zwlr_screencopy_manager_v1_capture_output(cap->manager, /*overlay_cursor=*/1, cap->output);
     zwlr_screencopy_frame_v1_add_listener(cap->frame, &kFrameListener, cap);
+}
+
+// Ends a capture and frees it. Dispatch thread only, like everything a
+// capture's frame callbacks touch. Null is a no-op.
+void destroyCapture(OutputCapture* cap) {
+    if (!cap) return;
+    cap->running = false;
+    if (cap->frame) zwlr_screencopy_frame_v1_destroy(cap->frame);
+    if (cap->buffer) wl_buffer_destroy(cap->buffer);
+    if (cap->pool) wl_shm_pool_destroy(cap->pool);
+    if (cap->shmData) munmap(cap->shmData, cap->shmSize);
+    if (cap->shmFd >= 0) close(cap->shmFd);
+    delete cap;
+}
+
+// The output [wanted] means ("" the primary; output_match.h), or null.
+TrackedOutput* findOutput(WaylandGlobals* globals, const std::string& wanted) {
+    std::vector<std::string> names;
+    names.reserve(globals->outputs.size());
+    for (auto& tracked : globals->outputs) names.push_back(tracked->name);
+    int index = findOutputIndex(wanted, names);
+    return index < 0 ? nullptr : globals->outputs[static_cast<size_t>(index)].get();
 }
 
 // ---- clipboard (ext-data-control-v1) ----
@@ -1423,9 +1608,13 @@ bool WaylandClient::connect(const char* socketPath) {
         disconnect();
         return false;
     }
-    if (!globals_->shm || !globals_->output) {
+    if (!globals_->shm || globals_->outputs.empty()) {
         LOGW("compositor advertised no wl_shm or no wl_output yet — screencopy will fail "
-             "until presentPrimaryOutput() is retried after one appears");
+             "until presentOutput() is retried after one appears");
+    }
+    for (auto& tracked : globals_->outputs) {
+        LOGI("compositor output %s%s", tracked->name.empty() ? "(unnamed)" : tracked->name.c_str(),
+             tracked.get() == globals_->outputs.front().get() ? " (primary)" : "");
     }
 
     // Virtual input devices are created once, up front, and reused for the
@@ -1493,7 +1682,7 @@ bool WaylandClient::connect(const char* socketPath) {
 }
 
 void WaylandClient::disconnect() {
-    stopPresenting();
+    stopAllPresenting();
     stopDispatchThread();
 
     // After the dispatch thread is down, so no callback can be running
@@ -1533,6 +1722,11 @@ void WaylandClient::disconnect() {
         if (globals_->toplevel_manager) zwlr_foreign_toplevel_manager_v1_destroy(globals_->toplevel_manager);
         if (textField_ && textField_->method) zwp_input_method_v2_destroy(textField_->method);
         if (globals_->input_method_manager) zwp_input_method_manager_v2_destroy(globals_->input_method_manager);
+        // Their captures were stopped above (stopAllPresenting).
+        for (auto& tracked : globals_->outputs) {
+            if (tracked->version >= 3) wl_output_release(tracked->output); else wl_output_destroy(tracked->output);
+        }
+        globals_->outputs.clear();
     }
     delete textField_;
     textField_ = nullptr;
@@ -1553,60 +1747,89 @@ void WaylandClient::disconnect() {
 
 namespace {
 struct PresentRequest {
+    const std::string& outputName;
     ANativeWindow* window;
-    bool ok = false;
+    uint32_t outputId = 0;
+};
+struct StopRequest {
+    const std::string& outputName;
+    uint32_t outputId = 0;
 };
 } // namespace
 
 // Capture state belongs to the dispatch thread (its frame callbacks run
 // there), so starting and stopping a capture happens there too: tearing
 // it down from the UI thread raced a frame callback still using it.
-bool WaylandClient::presentPrimaryOutput(ANativeWindow* window) {
-    PresentRequest request{window};
+uint32_t WaylandClient::presentOutput(const std::string& outputName, ANativeWindow* window) {
+    PresentRequest request{outputName, window};
     runOnDispatchThread([](WaylandClient* self, void* arg) {
         auto* req = static_cast<PresentRequest*>(arg);
         auto* globals = self->globals_;
-        if (!globals || !globals->output || !globals->shm || !globals->screencopy_manager) {
-            LOGE("presentPrimaryOutput: missing output/shm/screencopy_manager global");
+        if (!globals || !globals->shm || !globals->screencopy_manager) {
+            LOGE("presentOutput: missing shm/screencopy_manager global");
             return;
         }
-        self->stopPresentingOnDispatchThread();
+        TrackedOutput* tracked = findOutput(globals, req->outputName);
+        if (!tracked) {
+            LOGE("presentOutput: the compositor has no output %s",
+                 req->outputName.empty() ? "at all" : req->outputName.c_str());
+            return;
+        }
+        // One capture per output: a new surface for it replaces the old.
+        destroyCapture(tracked->capture);
         auto* cap = new OutputCapture();
         cap->window = req->window;
         cap->manager = globals->screencopy_manager;
-        cap->output = globals->output;
+        cap->output = tracked->output;
         cap->shm = globals->shm;
         cap->screencopyVersion = globals->screencopy_version;
         cap->running = true;
-        self->capture_ = cap;
+        tracked->capture = cap;
         startNextCapture(cap);
-        req->ok = true;
+        req->outputId = tracked->globalName;
     }, &request);
-    return request.ok;
+    return request.outputId;
 }
 
-void WaylandClient::stopPresenting() {
-    runOnDispatchThread([](WaylandClient* self, void*) { self->stopPresentingOnDispatchThread(); }, nullptr);
+uint32_t WaylandClient::stopPresenting(const std::string& outputName) {
+    StopRequest request{outputName};
+    runOnDispatchThread([](WaylandClient* self, void* arg) {
+        auto* req = static_cast<StopRequest*>(arg);
+        if (!self->globals_) return;
+        TrackedOutput* tracked = findOutput(self->globals_, req->outputName);
+        if (!tracked || !tracked->capture) return;
+        destroyCapture(tracked->capture);
+        tracked->capture = nullptr;
+        req->outputId = tracked->globalName;
+    }, &request);
+    return request.outputId;
 }
 
-void WaylandClient::stopPresentingOnDispatchThread() {
-    if (!capture_) return;
+void WaylandClient::stopAllPresenting() {
+    runOnDispatchThread([](WaylandClient* self, void*) {
+        if (!self->globals_) return;
+        for (auto& tracked : self->globals_->outputs) {
+            destroyCapture(tracked->capture);
+            tracked->capture = nullptr;
+        }
+    }, nullptr);
+}
 
-    capture_->running = false;
-    if (capture_->frame) {
-        zwlr_screencopy_frame_v1_destroy(capture_->frame);
-    }
-    if (capture_->buffer) wl_buffer_destroy(capture_->buffer);
-    if (capture_->pool) wl_shm_pool_destroy(capture_->pool);
-    if (capture_->shmData) munmap(capture_->shmData, capture_->shmSize);
-    if (capture_->shmFd >= 0) close(capture_->shmFd);
-
-    delete capture_;
-    capture_ = nullptr;
+std::vector<std::string> WaylandClient::outputNames() {
+    std::vector<std::string> names;
+    runOnDispatchThread([](WaylandClient* self, void* arg) {
+        auto* out = static_cast<std::vector<std::string>*>(arg);
+        if (!self->globals_) return;
+        for (auto& tracked : self->globals_->outputs) {
+            if (!tracked->name.empty()) out->push_back(tracked->name);
+        }
+    }, &names);
+    return names;
 }
 
 namespace {
 struct SizeRequest {
+    const std::string& outputName;
     int32_t width;
     int32_t height;
     double scale;
@@ -1614,8 +1837,8 @@ struct SizeRequest {
 };
 } // namespace
 
-bool WaylandClient::setOutputSize(int32_t width, int32_t height, double scale) {
-    SizeRequest request{width, height, scale};
+bool WaylandClient::setOutputSize(const std::string& outputName, int32_t width, int32_t height, double scale) {
+    SizeRequest request{outputName, width, height, scale};
     runOnDispatchThread([](WaylandClient* self, void* arg) {
         auto* req = static_cast<SizeRequest*>(arg);
         auto* globals = self->globals_;
@@ -1623,17 +1846,12 @@ bool WaylandClient::setOutputSize(int32_t width, int32_t height, double scale) {
             LOGW("compositor offers no wlr-output-management; the desktop stays at its own size");
             return;
         }
-        globals->wanted_width = req->width;
-        globals->wanted_height = req->height;
-        globals->wanted_scale = req->scale;
-        self->applyOutputSizeOnDispatchThread();
+        // Kept until the output's head is known, and for every later `done`.
+        globals->wanted[req->outputName] = WantedOutputSize{req->width, req->height, req->scale};
+        applyOutputSize(globals);
         req->supported = true;
     }, &request);
     return request.supported;
-}
-
-void WaylandClient::applyOutputSizeOnDispatchThread() {
-    if (globals_) applyOutputSize(globals_);
 }
 
 void WaylandClient::injectPointerMotion(double dx, double dy) {

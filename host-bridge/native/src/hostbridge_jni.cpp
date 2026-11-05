@@ -11,8 +11,11 @@
 #include <android/native_window_jni.h>
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
+#include <string>
+#include <utility>
 #include <unordered_map>
 
 #define LOG_TAG "hostbridge"
@@ -113,11 +116,14 @@ std::unordered_map<jint, std::shared_ptr<TextFieldSink>> g_textFieldSinks;
 std::mutex g_clientsMutex;
 std::unordered_map<jint, std::unique_ptr<hostbridge::WaylandClient>> g_clients;
 
-// The ANativeWindow currently backing each client's screencopy target, so
-// nativeStopPresenting/nativeDisconnect can ANativeWindow_release it —
-// ANativeWindow_fromSurface() in nativePresentOutput acquires a reference
-// this map is responsible for eventually releasing.
-std::unordered_map<jint, ANativeWindow*> g_presentedWindows;
+// The ANativeWindow backing each output's screencopy target, per client,
+// so stopping and disconnecting can ANativeWindow_release it:
+// ANativeWindow_fromSurface() in presentOn acquires a reference this map is
+// responsible for eventually releasing. Keyed by the output id the native
+// client reports (WaylandClient::presentOutput), not the name asked for:
+// "" and the primary's own name are the same output, and a window may only
+// be released once the capture of the output it went to has stopped.
+std::map<std::pair<jint, uint32_t>, ANativeWindow*> g_presentedWindows;
 
 jint identityHash(JNIEnv* env, jobject obj) {
     return env->CallIntMethod(obj, env->GetMethodID(env->GetObjectClass(obj), "hashCode", "()I"));
@@ -128,12 +134,68 @@ hostbridge::WaylandClient* findClient(jint key) {
     return it != g_clients.end() ? it->second.get() : nullptr;
 }
 
-void releasePresentedWindowLocked(jint key) {
-    auto it = g_presentedWindows.find(key);
+void releasePresentedWindowLocked(jint key, uint32_t outputId) {
+    auto it = g_presentedWindows.find({key, outputId});
     if (it != g_presentedWindows.end()) {
         ANativeWindow_release(it->second);
         g_presentedWindows.erase(it);
     }
+}
+
+void releaseAllPresentedWindowsLocked(jint key) {
+    for (auto it = g_presentedWindows.begin(); it != g_presentedWindows.end();) {
+        if (it->first.first == key) {
+            ANativeWindow_release(it->second);
+            it = g_presentedWindows.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+// A Java String as UTF-8. Output names are ASCII ("HEADLESS-1"), where JNI's
+// modified UTF-8 and real UTF-8 agree. null reads as "", the primary.
+std::string toStdString(JNIEnv* env, jstring value) {
+    if (!value) return {};
+    const char* chars = env->GetStringUTFChars(value, nullptr);
+    if (!chars) return {};
+    std::string result(chars);
+    env->ReleaseStringUTFChars(value, chars);
+    return result;
+}
+
+// Presents [outputName] ("" the primary) into [surface]. Callers hold g_clientsMutex.
+jboolean presentOnLocked(JNIEnv* env, jint key, const std::string& outputName, jobject surface) {
+    auto* client = findClient(key);
+    if (!client) {
+        LOGI("presentOutput: no connected client");
+        return JNI_FALSE;
+    }
+
+    ANativeWindow* window = ANativeWindow_fromSurface(env, surface);
+    if (!window) {
+        LOGI("presentOutput: ANativeWindow_fromSurface failed");
+        return JNI_FALSE;
+    }
+
+    // presentOutput stops the output's previous capture before it returns,
+    // so its previous window is no longer drawn into and can go.
+    uint32_t outputId = client->presentOutput(outputName, window);
+    if (outputId == 0) {
+        ANativeWindow_release(window);
+        return JNI_FALSE;
+    }
+    releasePresentedWindowLocked(key, outputId);
+    g_presentedWindows[{key, outputId}] = window; // ownership of the acquired reference moves here
+    return JNI_TRUE;
+}
+
+// Stops [outputName] ("" the primary). Callers hold g_clientsMutex.
+void stopOnLocked(jint key, const std::string& outputName) {
+    auto* client = findClient(key);
+    if (!client) return;
+    uint32_t outputId = client->stopPresenting(outputName);
+    if (outputId != 0) releasePresentedWindowLocked(key, outputId);
 }
 
 /**
@@ -353,10 +415,10 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeDisconnect(JNIEnv* env, jobject th
         g_textFieldSinks.erase(key);
     }
     std::lock_guard<std::mutex> lock(g_clientsMutex);
-    // Capture stops before its window is released: the dispatch thread
-    // draws into that window until stopPresenting() returns.
-    if (auto* client = findClient(key)) client->stopPresenting();
-    releasePresentedWindowLocked(key);
+    // Capture stops before its windows are released: the dispatch thread
+    // draws into them until stopAllPresenting() returns.
+    if (auto* client = findClient(key)) client->stopAllPresenting();
+    releaseAllPresentedWindowsLocked(key);
     g_clients.erase(key);
 }
 
@@ -370,42 +432,52 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeConnectionLost(JNIEnv* env, jobjec
     return client && client->connectionLost() ? JNI_TRUE : JNI_FALSE;
 }
 
+// The primary output (the first the compositor advertised).
 extern "C" JNIEXPORT jboolean JNICALL
 Java_dev_droidtop_hostbridge_HostBridge_nativePresentOutput(JNIEnv* env, jobject thiz, jobject surface) {
     std::lock_guard<std::mutex> lock(g_clientsMutex);
-    jint key = identityHash(env, thiz);
-    auto* client = findClient(key);
-    if (!client) {
-        LOGI("nativePresentOutput: no connected client");
-        return JNI_FALSE;
-    }
+    return presentOnLocked(env, identityHash(env, thiz), std::string(), surface);
+}
 
-    ANativeWindow* window = ANativeWindow_fromSurface(env, surface);
-    if (!window) {
-        LOGI("nativePresentOutput: ANativeWindow_fromSurface failed");
-        return JNI_FALSE;
-    }
-
-    // Stop drawing into the previous target before dropping it.
-    client->stopPresenting();
-    releasePresentedWindowLocked(key);
-    bool ok = client->presentPrimaryOutput(window);
-    if (ok) {
-        g_presentedWindows[key] = window; // ownership of the acquired reference moves here
-    } else {
-        ANativeWindow_release(window);
-    }
-    return ok ? JNI_TRUE : JNI_FALSE;
+extern "C" JNIEXPORT jboolean JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativePresentNamedOutput(
+    JNIEnv* env, jobject thiz, jstring outputName, jobject surface) {
+    std::string name = toStdString(env, outputName);
+    if (name.empty()) return JNI_FALSE; // a name is required here; the primary has its own call
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    return presentOnLocked(env, identityHash(env, thiz), name, surface);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_dev_droidtop_hostbridge_HostBridge_nativeStopPresenting(JNIEnv* env, jobject thiz) {
     std::lock_guard<std::mutex> lock(g_clientsMutex);
-    jint key = identityHash(env, thiz);
-    if (auto* client = findClient(key)) {
-        client->stopPresenting();
+    stopOnLocked(identityHash(env, thiz), std::string());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeStopPresentingOutput(JNIEnv* env, jobject thiz, jstring outputName) {
+    std::string name = toStdString(env, outputName);
+    if (name.empty()) return;
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    stopOnLocked(identityHash(env, thiz), name);
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeOutputNames(JNIEnv* env, jobject thiz) {
+    std::vector<std::string> names;
+    {
+        std::lock_guard<std::mutex> lock(g_clientsMutex);
+        if (auto* client = findClient(identityHash(env, thiz))) names = client->outputNames();
     }
-    releasePresentedWindowLocked(key);
+    jclass stringClass = env->FindClass("java/lang/String");
+    jobjectArray result = env->NewObjectArray(static_cast<jsize>(names.size()), stringClass, nullptr);
+    for (size_t i = 0; i < names.size(); i++) {
+        jstring name = env->NewStringUTF(names[i].c_str());
+        env->SetObjectArrayElement(result, static_cast<jsize>(i), name);
+        env->DeleteLocalRef(name);
+    }
+    env->DeleteLocalRef(stringClass);
+    return result;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -496,7 +568,19 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_dev_droidtop_hostbridge_HostBridge_nativeSetOutputSize(JNIEnv* env, jobject thiz, jint width, jint height, jdouble scale) {
     std::lock_guard<std::mutex> lock(g_clientsMutex);
     if (auto* client = findClient(identityHash(env, thiz))) {
-        return client->setOutputSize(width, height, scale) ? JNI_TRUE : JNI_FALSE;
+        return client->setOutputSize(std::string(), width, height, scale) ? JNI_TRUE : JNI_FALSE;
+    }
+    return JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeSetNamedOutputSize(
+    JNIEnv* env, jobject thiz, jstring outputName, jint width, jint height, jdouble scale) {
+    std::string name = toStdString(env, outputName);
+    if (name.empty()) return JNI_FALSE;
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    if (auto* client = findClient(identityHash(env, thiz))) {
+        return client->setOutputSize(name, width, height, scale) ? JNI_TRUE : JNI_FALSE;
     }
     return JNI_FALSE;
 }

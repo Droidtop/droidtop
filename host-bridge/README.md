@@ -11,10 +11,10 @@ module is a Wayland **client** of that compositor, plus a JNI bridge, doing
 exactly two things:
 
 1. **Frame passthrough** — capture buffers from the primary container's
-   headless output via `wlr-screencopy-unstable-v1` and present them on an
-   Android `Surface`. Currently single-output only (always the primary
-   screen) — matches the merged-desktop MVP; see "Not yet implemented" below
-   for what real multi-output support needs.
+   headless outputs via `wlr-screencopy-unstable-v1` and present them on
+   Android `Surface`s, one capture per output (Droidtop/tracker#908). The
+   Desktop shows the primary output only today; see "Not yet implemented"
+   below for what showing a second one still needs.
 2. **Input injection** — turn normalized events from `:input-seat` into
    `wlr-virtual-pointer-v1` / `virtual-keyboard-v1` protocol messages sent
    into the container.
@@ -48,7 +48,8 @@ it is not the same as confirmed-working. Treat the implementation below as
   explicit filesystem path (not `wl_display_connect(name)`, since the
   compositor's socket lives inside the primary container's mount namespace),
   connects via `wl_display_connect_to_fd`, binds `wl_compositor`, `wl_seat`,
-  `wl_shm`, `wl_output` (first one only — see multi-output note below),
+  `wl_shm`, every `wl_output` (version 4 when offered, for its name — see
+  "Outputs" below),
   `zwlr_screencopy_manager_v1`, `zwlr_virtual_pointer_manager_v1`, and
   `zwp_virtual_keyboard_manager_v1`. Fails loudly if any of the five
   required globals (compositor/seat/screencopy/vptr/vkbd) is missing.
@@ -57,7 +58,18 @@ it is not the same as confirmed-working. Treat the implementation below as
   one whose clipboard does not cross. Starts a background dispatch thread
   (`wl_display_dispatch` loop) so screencopy's async frame-ready callbacks
   actually get delivered.
-- **Frame capture** (`presentPrimaryOutput` → `startNextCapture` and the
+- **Outputs** (Droidtop/tracker#908) — `WaylandGlobals::outputs` holds every
+  `wl_output` in bind order, with its name (`HEADLESS-1` under sway; only
+  from wl_output v4), current mode and scale, and drops one on the
+  registry's `global_remove`, stopping its capture. The first is the
+  primary: `presentOutput("")`, `stopPresenting("")` and
+  `setOutputSize("", ...)` mean it, which is what the unnamed Kotlin calls
+  use. `setOutputSize` with a name goes to the wlr-output-management head of
+  that name; the primary's goes to the head of its name, or the first head
+  when it has none (`output_match.h`). All wanted sizes go out in one
+  configuration, since a second one quoting the same serial would be
+  cancelled.
+- **Frame capture** (`presentOutput` → `startNextCapture` and the
   `frame_*` callbacks) — a continuous capture loop: request a frame via
   `zwlr_screencopy_manager_v1_capture_output`, wait for the compositor's
   `buffer`/`buffer_done` events, allocate a `wl_shm` buffer backed by
@@ -118,23 +130,24 @@ it is not the same as confirmed-working. Treat the implementation below as
 
 ### Known simplifications / not yet implemented
 
-- **Single output only.** `WaylandGlobals::output` tracks the first
-  `wl_output` the compositor advertises; there's no list, and no way for
-  the Kotlin side to pick a different one. Real multi-output support (the
-  "pop this window to the second screen" feature from SPEC.md §4) needs
-  that list plus a per-`DisplayOutput` capture session, not just one.
+- **Only the primary output takes pointer input.** Every output can be
+  captured into its own `Surface`, but absolute pointer motion is still
+  mapped onto one extent, the primary's (Droidtop/tracker#908 D1b). Nothing
+  in the app presents a second output yet (D2/D3), and `toplevel`'s
+  output_enter/output_leave are not tracked.
 - **CPU blit, not zero-copy.** Frames are copied pixel-by-pixel from the shm
   buffer to the `ANativeWindow`. Fine for a first correctness pass; will
   matter for real framerate once there's something live to measure against.
 - **Coarse thread-safety.** Dispatch runs on one dedicated thread; input
-  injection and `presentPrimaryOutput`/`stopPresenting` are called from
+  injection and `presentOutput`/`stopPresenting` are called from
   whatever thread the JNI caller uses. This relies on libwayland-client's
   documented guarantee that request marshaling is safe from other threads
   as long as only one thread ever calls `wl_display_dispatch` — that's the
   design here, but it hasn't been stress-tested.
-- **No output-removal handling.** If the primary container's compositor
-  restarts or the output disappears mid-session, nothing currently notices
-  or recovers.
+- **Little global-removal handling.** An output that goes away is dropped
+  and its capture stopped (its `Surface` keeps the last frame); the next
+  output becomes the primary. Any other global going away is not handled;
+  the compositor exiting is noticed as a lost connection.
 - **Clipboard is text only.** Images and file lists on the container's
   selection are ignored rather than converted; the same applies in reverse.
 
