@@ -254,11 +254,7 @@ class SecondScreenOrchestrator(
      */
     fun coverVacatedDisplays(launchTargetDisplayId: Int?) {
         val outputs = displayOutputs.currentOutputsSnapshot()
-        val secondaryIds = outputs
-            .filter { it.kind == DisplayOutputKind.SECOND_SCREEN && it.androidDisplayId !in mirroredIds }
-            .map { it.androidDisplayId }
-            // The companion's screen first (ScreenRoles).
-            .sortedBy { if (it == companionDisplayId) 0 else 1 }
+        val secondaryIds = SecondScreenPlan.coverCandidates(outputs, mirroredIds, companionDisplayId)
         DualScreenOrchestration
             .displaysNeedingIdleCover(
                 secondaryDisplayIds = secondaryIds,
@@ -320,8 +316,7 @@ class SecondScreenOrchestrator(
                 // menus are elsewhere, else the companion's; a screen nobody answered for gets nothing of droidtop's.
                 val arrangement = withContext(Dispatchers.IO) { ScreenRoles.arrangement(context, outputs) }
                 companionDisplayId = arrangement.companionId
-                val pairedId = if (arrangement.mainId != Display.DEFAULT_DISPLAY) arrangement.mainId else arrangement.companionId
-                val second = outputs.firstOrNull { it.androidDisplayId == pairedId && it.kind == DisplayOutputKind.SECOND_SCREEN }
+                val second = SecondScreenPlan.pairedSecond(outputs, arrangement.mainId, arrangement.companionId)
                 val mainElsewhere = second != null && second.androidDisplayId == arrangement.mainId
                 val showCompanion = arrangement.companionId != null
                 mirroredIds = arrangement.mirrored

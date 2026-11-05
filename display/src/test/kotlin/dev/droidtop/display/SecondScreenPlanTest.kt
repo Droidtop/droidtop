@@ -51,3 +51,29 @@ class SecondScreenPlanTest {
         assertEquals(Relocation.NONE, relocation(ShellMove.NONE))
     }
 }
+
+class SecondScreenPairingTest {
+    private fun output(id: Int, kind: dev.droidtop.runtime.DisplayOutputKind = dev.droidtop.runtime.DisplayOutputKind.SECOND_SCREEN) =
+        dev.droidtop.runtime.DisplayOutput(id = "d$id", androidDisplayId = id, kind = kind, widthPx = 1920, heightPx = 1080)
+
+    private val builtIn = output(0, dev.droidtop.runtime.DisplayOutputKind.PRIMARY_SCREEN)
+
+    @Test
+    fun `the paired screen is the main one when the menus are elsewhere, else the companion's`() {
+        val outputs = listOf(builtIn, output(2), output(3))
+        assertEquals(2, SecondScreenPlan.pairedSecond(outputs, mainId = 2, companionId = 3)?.androidDisplayId)
+        assertEquals(3, SecondScreenPlan.pairedSecond(outputs, mainId = 0, companionId = 3)?.androidDisplayId)
+        assertNull(SecondScreenPlan.pairedSecond(outputs, mainId = 0, companionId = null))
+        // A screen that is gone, or the built-in one, is never the paired second screen.
+        assertNull(SecondScreenPlan.pairedSecond(outputs, mainId = 0, companionId = 7))
+        assertNull(SecondScreenPlan.pairedSecond(listOf(builtIn), mainId = 0, companionId = 0))
+    }
+
+    @Test
+    fun `every unmirrored second screen is covered, the companion's first`() {
+        val outputs = listOf(builtIn, output(2), output(3), output(4))
+        assertEquals(listOf(3, 2, 4), SecondScreenPlan.coverCandidates(outputs, mirroredIds = emptySet(), companionDisplayId = 3))
+        assertEquals(listOf(2), SecondScreenPlan.coverCandidates(outputs, mirroredIds = setOf(3, 4), companionDisplayId = 3))
+        assertEquals(emptyList<Int>(), SecondScreenPlan.coverCandidates(listOf(builtIn), emptySet(), null))
+    }
+}

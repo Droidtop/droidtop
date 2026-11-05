@@ -1,6 +1,8 @@
 package dev.droidtop.display
 
 import android.view.Display
+import dev.droidtop.runtime.DisplayOutput
+import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DualScreenOrchestration
 
 /**
@@ -63,4 +65,23 @@ internal object SecondScreenPlan {
         !companionVisible && !appOnCompanionScreen -> Relocation.COMPANION_ON_BUILT_IN
         else -> Relocation.NONE
     }
+
+    /**
+     * The one screen paired with the built-in one (docs/SPEC.md 4c "What each screen is for"): the main screen when the
+     * menus are elsewhere, else the companion's; null when that screen is not a second screen in [outputs].
+     */
+    fun pairedSecond(outputs: List<DisplayOutput>, mainId: Int, companionId: Int?): DisplayOutput? {
+        val pairedId = if (mainId != Display.DEFAULT_DISPLAY) mainId else companionId
+        return outputs.firstOrNull { it.androidDisplayId == pairedId && it.kind == DisplayOutputKind.SECOND_SCREEN }
+    }
+
+    /**
+     * The second screens a launch may leave empty, for the idle cover (4c, the mirroring fix): every second screen
+     * that is not mirrored, the companion's first.
+     */
+    fun coverCandidates(outputs: List<DisplayOutput>, mirroredIds: Set<Int>, companionDisplayId: Int?): List<Int> =
+        outputs
+            .filter { it.kind == DisplayOutputKind.SECOND_SCREEN && it.androidDisplayId !in mirroredIds }
+            .map { it.androidDisplayId }
+            .sortedBy { if (it == companionDisplayId) 0 else 1 }
 }
