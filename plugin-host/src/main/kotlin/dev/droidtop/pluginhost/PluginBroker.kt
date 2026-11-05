@@ -215,6 +215,9 @@ interface BrokerEnvironment {
     /** docs/plugin-api.md 3 G3: droidtop's own web view for a plugin's session; blocks until the person is done. Null where there is none. */
     fun webSession(request: WebSessionRequest): WebSessionResult? = null
 
+    /** Android's media library for `media.*` (docs/plugin-api.md 3 A9); null where there is none. */
+    fun media(): MediaLibrary? = null
+
     /**
      * An Open view's link opened out of sight first ([HiddenWebSession], Droidtop/tracker#783). Null where there is no
      * hidden view or no droidtop screen to run it behind, and then [webSession] shows the page as before.
@@ -678,7 +681,7 @@ object HostApis {
     }
 
     /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
-    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostSettingsApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPowerApis.ops + HostSourcesApis.ops }
+    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostSettingsApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPowerApis.ops + HostSourcesApis.ops + HostMediaApis.ops }
 
     const val MAX_ENGINES = 50
     const val MAX_PATH = 4096
