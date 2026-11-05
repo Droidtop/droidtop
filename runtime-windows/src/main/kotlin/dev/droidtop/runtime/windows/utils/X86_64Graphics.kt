@@ -3,6 +3,7 @@ package dev.droidtop.runtime.windows.utils
 import android.content.Context
 import com.winlator.container.Container
 import com.winlator.core.envvars.EnvVars
+import com.winlator.xenvironment.XEnvironment
 import java.io.File
 import org.json.JSONObject
 
@@ -17,6 +18,12 @@ import org.json.JSONObject
  *   every x86_64 device. Built by `build-scripts/x86_64-lavapipe` in this
  *   repository's CI from Termux's x86_64 packages and recipe and downloaded
  *   when a container first uses it.
+ * - [VENUS]: Mesa's virtio Vulkan driver (Venus) from the same archive, whose
+ *   commands a vtest server ([VtestServerComponent], `libvirgl_vtest.so` in the
+ *   APK) replays on Android's own Vulkan, i.e. the device's GPU
+ *   (docs/SPEC.md 10b, "A real GPU on x86_64: Venus"; Droidtop/tracker#608).
+ *   Offered where the device's Vulkan qualifies ([venusQualifies]); not the
+ *   default until a rig has run it (owner to confirm).
  * - [NONE]: no Vulkan driver in the guest. Wine still draws 2D and GDI through
  *   the X server; Direct3D has no device.
  *
@@ -24,11 +31,12 @@ import org.json.JSONObject
  */
 object X86_64Graphics {
     const val LAVAPIPE = "lavapipe"
+    const val VENUS = "venus"
     const val NONE = "none"
 
     /** Every driver an x86_64 container can choose, the default first. */
     @JvmField
-    val DRIVERS: List<String> = listOf(LAVAPIPE, NONE)
+    val DRIVERS: List<String> = listOf(LAVAPIPE, VENUS, NONE)
 
     /**
      * The name [id] is shown with. What follows the name in parentheses is a
@@ -38,6 +46,7 @@ object X86_64Graphics {
     @JvmStatic
     fun label(id: String): String = when (id) {
         LAVAPIPE -> "Lavapipe (software Vulkan and OpenGL)"
+        VENUS -> "Venus (the device's GPU through Vulkan)"
         NONE -> "None (2D and GDI only)"
         else -> id
     }
@@ -47,8 +56,8 @@ object X86_64Graphics {
     val LABELS: List<String> = DRIVERS.map(::label)
 
     /** Release of Droidtop/droidtop that carries the asset; see .github/workflows/x86_64-lavapipe.yml. */
-    const val LAVAPIPE_TAG = "x86_64-lavapipe-20261008-f96d28e7"
-    const val LAVAPIPE_SHA256 = "0e5aafd768f5c488277c7bd031a50cb373066a7e99f372f6c689af962166e7c4"
+    const val LAVAPIPE_TAG = "x86_64-lavapipe-20261105-c93b1003"
+    const val LAVAPIPE_SHA256 = "610fe7d1728c38d5bda45ae3d24248d7351d9dede8a05bbffee20f6082b4cbc4"
     private val lavapipe = PinnedReleaseAsset(
         LAVAPIPE_TAG,
         "x86_64-lavapipe.tzst",
@@ -59,12 +68,15 @@ object X86_64Graphics {
 
     /** Whether [driver] has everything it needs on this device. */
     @JvmStatic
-    fun isInstalled(context: Context, driver: String): Boolean =
-        driver != LAVAPIPE || lavapipe.isInstalled(context)
+    fun isInstalled(context: Context, driver: String): Boolean = when (driver) {
+        LAVAPIPE -> lavapipe.isInstalled(context)
+        VENUS -> lavapipe.isInstalled(context) && vtestServer(context).isFile
+        else -> true
+    }
 
     /** Fetches what [driver] needs, once; nothing for a driver that needs no download. */
     suspend fun ensureInstalled(context: Context, driver: String, onProgress: (Float) -> Unit) {
-        if (driver == LAVAPIPE) lavapipe.ensureInstalled(context, onProgress)
+        if (driver == LAVAPIPE || driver == VENUS) lavapipe.ensureInstalled(context, onProgress)
     }
 
     /**
@@ -88,12 +100,19 @@ object X86_64Graphics {
      */
     @JvmStatic
     fun applyLaunchEnv(context: Context, container: Container, envVars: EnvVars) {
-        if (container.graphicsDriver != LAVAPIPE || !lavapipe.isInstalled(context)) return
+        val driver = container.graphicsDriver
+        if ((driver != LAVAPIPE && driver != VENUS) || !isInstalled(context, driver)) return
         val root = lavapipe.root(context)
         val lib = File(root, "usr/lib")
         val existing = envVars.get("LD_LIBRARY_PATH")
         envVars.put("LD_LIBRARY_PATH", if (existing.isEmpty()) lib.path else lib.path + ":" + existing)
-        val icd = writeIcd(root, lib).path
+        val icd = if (driver == VENUS) {
+            // The guest's Venus driver talks to this session's vtest server (VtestServerComponent) on this socket.
+            envVars.put("VTEST_SOCKET_NAME", vtestSocket(context).path)
+            writeIcd(root, "virtio_icd.x86_64.json", "virtio_icd.json", File(lib, "libvulkan_virtio.so")).path
+        } else {
+            writeIcd(root, "lvp_icd.x86_64.json", "lvp_icd.json", File(lib, "libvulkan_lvp.so")).path
+        }
         envVars.put("VK_ICD_FILENAMES", icd)
         envVars.put("VK_DRIVER_FILES", icd)
         envVars.put("MESA_VK_WSI_DEBUG", "sw,noshm")
@@ -126,11 +145,48 @@ object X86_64Graphics {
         }
     }
 
-    private fun writeIcd(root: File, lib: File): File {
-        val shipped = File(root, "usr/share/vulkan/icd.d/lvp_icd.x86_64.json")
-        val written = File(root, "lvp_icd.json")
+    /**
+     * The drivers this device is offered: [DRIVERS], with [VENUS] only where its Vulkan qualifies
+     * ([venusQualifies], read once through `GPUHelper`). JNI and a Vulkan instance: never on the main thread.
+     */
+    fun offered(): List<String> = if (venusHere) DRIVERS else DRIVERS - VENUS
+
+    private val venusHere: Boolean by lazy {
+        runCatching {
+            venusQualifies(com.winlator.core.GPUHelper.vkGetApiVersion(), com.winlator.core.GPUHelper.vkGetDeviceExtensions().orEmpty().toList())
+        }.getOrDefault(false)
+    }
+
+    /** Whether [container] runs on Venus here, so its session needs the vtest server. Disk read. */
+    @JvmStatic
+    fun usesVenus(context: Context, container: Container): Boolean =
+        X86_64GuestLibs.isX86_64Host() && container.graphicsDriver == VENUS && isInstalled(context, VENUS)
+
+    /** The vtest server the APK carries (built by .github/workflows/x86_64-lavapipe.yml, fetched by components.pin). */
+    fun vtestServer(context: Context): File = File(context.applicationInfo.nativeLibraryDir, "libvirgl_vtest.so")
+
+    /** The socket the session's vtest server listens on and the guest's Venus driver connects to. */
+    fun vtestSocket(context: Context): File = File(XEnvironment.getTmpDir(context), ".virgl_vtest")
+
+    /**
+     * Whether a device's Vulkan can carry Venus, from the instance [apiVersion] and the GPU's device [extensions]
+     * (`GPUHelper`): Vulkan 1.1 or later, file-descriptor external memory (the server shares the guest's memory
+     * through it) and timeline semaphores (core in 1.2, else the KHR extension). Pure.
+     */
+    fun venusQualifies(apiVersion: Int, extensions: Collection<String>): Boolean {
+        val major = apiVersion ushr 22
+        val minor = (apiVersion ushr 12) and 0x3ff
+        val atLeast11 = major > 1 || (major == 1 && minor >= 1)
+        val atLeast12 = major > 1 || (major == 1 && minor >= 2)
+        return atLeast11 && "VK_KHR_external_memory_fd" in extensions &&
+            (atLeast12 || "VK_KHR_timeline_semaphore" in extensions)
+    }
+
+    private fun writeIcd(root: File, shippedName: String, writtenName: String, library: File): File {
+        val shipped = File(root, "usr/share/vulkan/icd.d/$shippedName")
+        val written = File(root, writtenName)
         val json = JSONObject(shipped.readText())
-        json.getJSONObject("ICD").put("library_path", File(lib, "libvulkan_lvp.so").path)
+        json.getJSONObject("ICD").put("library_path", library.path)
         val text = json.toString(2) + "\n"
         if (!written.isFile || written.readText() != text) written.writeText(text)
         return written
