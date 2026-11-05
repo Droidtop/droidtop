@@ -3,17 +3,6 @@
 version = 4
 
 [[package]]
-name = "addchain"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e33f6a175ec6a9e0aca777567f9ff7c3deefc255660df887e7fa3585e9801d8"
-dependencies = [
- "num-bigint 0.3.3",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -77,16 +66,16 @@ dependencies = [
 
 [[package]]
 name = "aes-gcm"
-version = "0.11.0-rc.4"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da8c919c118108f144adecad74b425b804ad075580d605d9b33c2d6d1c62a2f8"
+checksum = "7f2b8006a0c83f52b62ba44a97b58bf76fe2f70a329e588f67f89691d93d498f"
 dependencies = [
  "aead 0.6.1",
  "aes 0.9.4",
  "cipher 0.5.2",
  "ctr 0.10.1",
+ "ctutils",
  "ghash 0.6.0",
- "subtle",
 ]
 
 [[package]]
@@ -906,15 +895,16 @@ dependencies = [
 
 [[package]]
 name = "curve25519-dalek"
-version = "5.0.0-rc.1"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c906a87e53a36ff795d72e06e8162a83c5436e3ea89e942a9cb9fc083f0a384f"
+checksum = "b5eed333089e2e1c1ac8c6c0398e5e2497b4c9926ca6d0365ed1e099afa5bc23"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.3.1",
  "curve25519-dalek-derive",
  "digest 0.11.3",
  "fiat-crypto 0.3.0",
+ "rand_core 0.10.1",
  "rustc_version",
  "subtle",
  "zeroize",
@@ -984,8 +974,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7c1832837b905bbfb5101e07cc24c8deddf52f93225eee6ead5f4d63d53ddcb"
 dependencies = [
  "const-oid 0.9.6",
- "der_derive",
- "flagset",
  "zeroize",
 ]
 
@@ -996,6 +984,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a996a108feb8b427a6e12fcf6af4aa83409b79d72c15337d7741368131ee004"
 dependencies = [
  "const-oid 0.10.2",
+ "der_derive",
+ "flagset",
  "pem-rfc7468 1.0.0",
  "zeroize",
 ]
@@ -1009,7 +999,7 @@ dependencies = [
  "asn1-rs 0.6.2",
  "displaydoc",
  "nom",
- "num-bigint 0.4.8",
+ "num-bigint",
  "num-traits",
  "rusticata-macros",
 ]
@@ -1023,16 +1013,16 @@ dependencies = [
  "asn1-rs 0.7.2",
  "displaydoc",
  "nom",
- "num-bigint 0.4.8",
+ "num-bigint",
  "num-traits",
  "rusticata-macros",
 ]
 
 [[package]]
 name = "der_derive"
-version = "0.7.3"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8034092389675178f570469e6c3b0465d3d30b4505c294a6550db47f3c17ad18"
+checksum = "59600e2c2d636fde9b65e99cc6445ac770c63d3628195ff39932b8d6d7409903"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1119,7 +1109,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "droidtop-agent-service"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=fd46b3304805bd04ff1fc91700d827905b8a82bc#fd46b3304805bd04ff1fc91700d827905b8a82bc"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=fc5273896cbd31cc00fb140b1db29b8b81f94bff#fc5273896cbd31cc00fb140b1db29b8b81f94bff"
 dependencies = [
  "dirs",
  "droidtop-agent-stream",
@@ -1143,11 +1133,12 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-stream"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=fd46b3304805bd04ff1fc91700d827905b8a82bc#fd46b3304805bd04ff1fc91700d827905b8a82bc"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=fc5273896cbd31cc00fb140b1db29b8b81f94bff#fc5273896cbd31cc00fb140b1db29b8b81f94bff"
 dependencies = [
  "tokio",
  "windowcast-agent-windows",
  "windowcast-host",
+ "windowcast-identity 0.38.0",
  "windows-sys 0.59.0",
 ]
 
@@ -1186,14 +1177,14 @@ dependencies = [
 
 [[package]]
 name = "ecdsa"
-version = "0.17.0-rc.22"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7c72d1455753a703ad4b90ed2a759f2bc4562024a303176439cf6e593b5ade4"
+checksum = "c0681a4fc24c767085329728d8dfba959af91228aa4610cca4f8ce317ba46ae0"
 dependencies = [
  "der 0.8.3",
  "digest 0.11.3",
  "elliptic-curve 0.14.3",
- "rfc6979 0.6.0-pre.0",
+ "rfc6979 0.6.0",
  "signature 3.0.0",
  "spki 0.8.1",
  "zeroize",
@@ -1235,14 +1226,15 @@ dependencies = [
 
 [[package]]
 name = "ed25519-dalek"
-version = "3.0.0-rc.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1685663e23882cd8517dcbcb1c23a6ebff4433c22dfb681d760219b62cd1b849"
+checksum = "6ebaa1a2bf1290ab3bfe5a7b771d050ebffab2711c19a81691c683a5144a25de"
 dependencies = [
- "curve25519-dalek 5.0.0-rc.1",
+ "curve25519-dalek 5.0.0",
  "ed25519 3.0.0",
  "rand_core 0.10.1",
  "sha2 0.11.1",
+ "signature 3.0.0",
  "subtle",
  "zeroize",
 ]
@@ -1290,8 +1282,8 @@ dependencies = [
 
 [[package]]
 name = "engines-detect"
-version = "0.1.0"
-source = "git+https://github.com/Droidtop/lib-engines?tag=v0.1.0#35d180cdecb8d4c37e12c91cbcd0aa6575dac8d2"
+version = "0.1.1"
+source = "git+https://github.com/Droidtop/lib-engines?tag=v0.1.1#72d7346dc36a8d4439f1b212a6dbd7b870d891eb"
 dependencies = [
  "regex",
  "serde_json",
@@ -1428,6 +1420,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs4"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e72ed92b67c146290f88e9c89d60ca163ea417a446f61ffd7b72df3e7f1dfd5"
+dependencies = [
+ "rustix 1.1.6",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "fs_extra"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1529,8 +1531,8 @@ dependencies = [
 
 [[package]]
 name = "games-scan"
-version = "0.1.3"
-source = "git+https://github.com/Droidtop/lib-games?rev=664265258b06db4f4d41b0d3658154c78e462647#664265258b06db4f4d41b0d3658154c78e462647"
+version = "0.3.1"
+source = "git+https://github.com/Droidtop/lib-games?rev=ee121ab997b76c3f24951aae6ffe49d670d822da#ee121ab997b76c3f24951aae6ffe49d670d822da"
 dependencies = [
  "dirs",
  "engines-detect",
@@ -1542,6 +1544,8 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sync-core",
+ "unicode-normalization",
+ "uuid",
  "windows-sys 0.59.0",
  "winreg 0.52.0",
 ]
@@ -1563,7 +1567,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc3655aa6818d65bc620d6911f05aa7b6aeb596291e1e9f79e52df85583d1e30"
 dependencies = [
- "rustix",
+ "rustix 0.38.44",
  "windows-targets 0.52.6",
 ]
 
@@ -2112,23 +2116,25 @@ checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 
 [[package]]
 name = "ironrdp-acceptor"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30885a3bdbd0fcf2b9aa27ae9298d8858b9e101c4ac795d3d47ff917efaee63f"
+version = "0.12.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
+ "async-trait",
  "ironrdp-async",
  "ironrdp-connector",
  "ironrdp-core",
  "ironrdp-pdu",
  "ironrdp-svc",
+ "rand 0.9.5",
+ "sha2 0.10.9",
  "tracing",
+ "windows",
 ]
 
 [[package]]
 name = "ironrdp-ainput"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98ee3ba1d2c7cbe0769c5e552c9c7fbc68aa594d1f74f755c63a544a2176b974"
+version = "0.10.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "bitflags 2.13.2",
  "ironrdp-core",
@@ -2139,22 +2145,21 @@ dependencies = [
 
 [[package]]
 name = "ironrdp-async"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bea12d80384007fe321eb6b36c9225be9559c655fd581458a6a1386c1774d729"
+version = "0.12.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "bytes",
  "ironrdp-connector",
  "ironrdp-core",
  "ironrdp-pdu",
  "tracing",
+ "web-time",
 ]
 
 [[package]]
 name = "ironrdp-blocking"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11f69f98a65a1aaf7b359ccec058a8dc8a227f8905d4e472a757b2b701f74071"
+version = "0.12.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "bytes",
  "ironrdp-connector",
@@ -2165,15 +2170,13 @@ dependencies = [
 
 [[package]]
 name = "ironrdp-bulk"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e548d9fd162558a5a8aaed72e528556ce88e77773634e3722b8d01d6f170388"
+version = "0.2.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 
 [[package]]
 name = "ironrdp-cliprdr"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb9050999a1e032f4313788ac5a6d06e897a4f672f1de2ed98683001fc1abf56"
+version = "0.9.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "bitflags 2.13.2",
  "ironrdp-core",
@@ -2184,9 +2187,8 @@ dependencies = [
 
 [[package]]
 name = "ironrdp-connector"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5898b3f1fcaca0f9b923b1463e158aeb64dfdec4ac361b7c086492466ff341c"
+version = "0.12.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "ironrdp-core",
  "ironrdp-error",
@@ -2196,6 +2198,7 @@ dependencies = [
  "picky-asn1-der",
  "picky-asn1-x509",
  "rand 0.9.5",
+ "serde_json",
  "sspi",
  "tracing",
  "url",
@@ -2203,18 +2206,16 @@ dependencies = [
 
 [[package]]
 name = "ironrdp-core"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef0875b98275068b88652e49ba2e0a1150a1390aad69d26c942c8c59e8ec918e"
+version = "0.3.1"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "ironrdp-error",
 ]
 
 [[package]]
 name = "ironrdp-displaycontrol"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74a111a6fd25abbe51b6a15276fe980c6b9eee50a1421224b0c3f45848d45bcf"
+version = "0.10.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "ironrdp-core",
  "ironrdp-dvc",
@@ -2225,10 +2226,10 @@ dependencies = [
 
 [[package]]
 name = "ironrdp-dvc"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a5de64988ddabf96928e2f042e1772a5f7201f0001ea99012129c73a105fc52"
+version = "0.10.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
+ "ironrdp-bulk",
  "ironrdp-core",
  "ironrdp-pdu",
  "ironrdp-svc",
@@ -2237,9 +2238,8 @@ dependencies = [
 
 [[package]]
 name = "ironrdp-echo"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ed0c8de080a88b9a3c5dd7978c4c4ca46a5ddbc81315b799000938f743055c0"
+version = "0.6.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "ironrdp-core",
  "ironrdp-dvc",
@@ -2248,16 +2248,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ironrdp-egfx"
+version = "0.5.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
+dependencies = [
+ "bit_field",
+ "bitflags 2.13.2",
+ "ironrdp-core",
+ "ironrdp-dvc",
+ "ironrdp-graphics",
+ "ironrdp-pdu",
+ "tracing",
+]
+
+[[package]]
 name = "ironrdp-error"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97c5b444931aeea5d2967c94d493bcc809de63b491ec96389e643c224ba60849"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 
 [[package]]
 name = "ironrdp-graphics"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7493e426b6a8104cd497e518ba7781a9c7fc9a5f58a9cc0c1111e6d66f63bcc"
+version = "0.11.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "bit_field",
  "bitflags 2.13.2",
@@ -2267,14 +2279,14 @@ dependencies = [
  "ironrdp-pdu",
  "num-derive",
  "num-traits",
+ "wide 0.7.33",
  "yuv",
 ]
 
 [[package]]
 name = "ironrdp-input"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b1658a0c1d2911b767b71c2f9e07550d7a267bffaaaaeeec868d1752c8ec0f4"
+version = "0.9.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "bitvec",
  "ironrdp-pdu",
@@ -2283,62 +2295,151 @@ dependencies = [
 
 [[package]]
 name = "ironrdp-pdu"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ccd1179a4d106df1930347701388b5c79bc3725fa7dab4438d57db0d9d19347"
+version = "0.11.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "bit_field",
  "bitflags 2.13.2",
  "byteorder",
  "der-parser 10.0.0",
+ "hmac 0.12.1",
  "ironrdp-core",
  "ironrdp-error",
  "md-5 0.10.6",
- "num-bigint 0.4.8",
+ "num-bigint",
  "num-derive",
  "num-integer",
  "num-traits",
  "pkcs1 0.7.5",
- "sha1 0.10.7",
+ "sha1 0.11.0",
  "tap",
  "x509-cert",
 ]
 
 [[package]]
-name = "ironrdp-rdpsnd"
+name = "ironrdp-rdpdr"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d1a4f7092ae8fdc0a2f61be8e100277dc6f4ad51b85455dc9e8157979993ea2"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "bitflags 2.13.2",
+ "getrandom 0.3.4",
  "ironrdp-core",
+ "ironrdp-error",
  "ironrdp-pdu",
  "ironrdp-svc",
  "tracing",
 ]
 
 [[package]]
-name = "ironrdp-server"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d3922b23ad9f262b932d42fa37df87f7e45c2d12f45433c0cc084f8762fb09a"
+name = "ironrdp-rdpeai"
+version = "0.2.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
- "anyhow",
+ "ironrdp-core",
+ "ironrdp-dvc",
+ "ironrdp-pdu",
+ "ironrdp-rdpsnd",
+ "ironrdp-svc",
+ "tracing",
+]
+
+[[package]]
+name = "ironrdp-rdpei"
+version = "0.3.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
+dependencies = [
+ "bitflags 2.13.2",
+ "ironrdp-core",
+ "ironrdp-dvc",
+ "ironrdp-pdu",
+ "ironrdp-svc",
+ "tracing",
+]
+
+[[package]]
+name = "ironrdp-rdpemt"
+version = "0.1.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
+dependencies = [
+ "ironrdp-core",
+ "ironrdp-error",
+ "subtle",
+ "tracing",
+]
+
+[[package]]
+name = "ironrdp-rdpeudp"
+version = "0.1.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
+dependencies = [
+ "bitflags 2.13.2",
+ "ironrdp-core",
+ "ironrdp-error",
+ "tracing",
+]
+
+[[package]]
+name = "ironrdp-rdpeudp-tokio"
+version = "0.2.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
+dependencies = [
+ "bytes",
+ "ironrdp-async",
+ "ironrdp-core",
+ "ironrdp-error",
+ "ironrdp-pdu",
+ "ironrdp-rdpemt",
+ "ironrdp-rdpeudp",
+ "ironrdp-tls",
+ "sha2 0.10.9",
+ "tokio",
+ "tokio-rustls",
+ "tracing",
+]
+
+[[package]]
+name = "ironrdp-rdpsnd"
+version = "0.11.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
+dependencies = [
+ "bitflags 2.13.2",
+ "ironrdp-core",
+ "ironrdp-dvc",
+ "ironrdp-pdu",
+ "ironrdp-svc",
+ "sha1 0.11.0",
+ "tracing",
+]
+
+[[package]]
+name = "ironrdp-server"
+version = "0.14.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
+dependencies = [
  "async-trait",
  "bytes",
  "ironrdp-acceptor",
  "ironrdp-ainput",
  "ironrdp-async",
  "ironrdp-cliprdr",
+ "ironrdp-connector",
  "ironrdp-core",
  "ironrdp-displaycontrol",
  "ironrdp-dvc",
  "ironrdp-echo",
+ "ironrdp-error",
  "ironrdp-graphics",
  "ironrdp-pdu",
+ "ironrdp-rdpdr",
+ "ironrdp-rdpeai",
+ "ironrdp-rdpei",
+ "ironrdp-rdpemt",
+ "ironrdp-rdpeudp",
+ "ironrdp-rdpeudp-tokio",
  "ironrdp-rdpsnd",
  "ironrdp-svc",
  "ironrdp-tokio",
+ "rand 0.9.5",
  "tokio",
  "tokio-rustls",
  "tracing",
@@ -2346,26 +2447,26 @@ dependencies = [
 
 [[package]]
 name = "ironrdp-session"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f1a5a20c24d8ebf47477f9f513201aeb894e7c7f779ea633ece65e42a9f0652"
+version = "0.13.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "ironrdp-bulk",
  "ironrdp-core",
  "ironrdp-displaycontrol",
  "ironrdp-dvc",
+ "ironrdp-egfx",
  "ironrdp-error",
  "ironrdp-graphics",
  "ironrdp-pdu",
+ "ironrdp-rdpei",
  "ironrdp-svc",
  "tracing",
 ]
 
 [[package]]
 name = "ironrdp-svc"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24c36b82ab0f7fef2668fb7004008a0f3c100a3d9a7b18bd4495a71aba55b796"
+version = "0.10.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "bitflags 2.13.2",
  "ironrdp-core",
@@ -2373,10 +2474,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ironrdp-tls"
+version = "0.3.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
+dependencies = [
+ "rustls-native-certs",
+ "tokio",
+ "tokio-rustls",
+]
+
+[[package]]
 name = "ironrdp-tokio"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7692ac83a98e4b3ac01405e311bbbd5a33683447032986ed92a4a44d46ad6344"
+version = "0.12.0"
+source = "git+https://github.com/Devolutions/IronRDP?rev=f96f664abf0bdfe547f222bcd37e09899f00f310#f96f664abf0bdfe547f222bcd37e09899f00f310"
 dependencies = [
  "ironrdp-async",
  "ironrdp-connector",
@@ -2640,6 +2750,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d26c52dbd32dccf2d10cac7725f8eae5296885fb5703b261f7d0a0739ec807ab"
 
 [[package]]
+name = "linux-raw-sys"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
+
+[[package]]
 name = "litemap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2688,11 +2804,11 @@ dependencies = [
 
 [[package]]
 name = "md4"
-version = "0.10.2"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7da5ac363534dce5fabf69949225e174fbf111a498bf0ff794c8ea1fba9f3dda"
+checksum = "bd76fb0fd6b2e4be62a73f8e0858ca97f81babcb1af322dcaca196f735f17f80"
 dependencies = [
- "digest 0.10.7",
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -2819,17 +2935,6 @@ dependencies = [
 
 [[package]]
 name = "num-bigint"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f6f7833f2cbf2360a6cfd58cd41a53aa7a90bd4c202f5b1c7dd2ed73c57b2c3"
-dependencies = [
- "autocfg",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-bigint"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367"
@@ -2862,13 +2967,13 @@ checksum = "521739c6d2bac4aa25192232afe6841231376b2b26d4d9fae5ecf8ca5772e441"
 
 [[package]]
 name = "num-derive"
-version = "0.4.2"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
+checksum = "e4e98dc3b890f6c23a0f9d3d491a2823d0dea0fa656302a13dd225fa924112a8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -2946,7 +3051,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e54411f498088327bf5c45d2de7e5b0ed25875ee3be5800485afe45da7206bff"
 dependencies = [
  "openh264-sys2",
- "wide",
+ "wide 1.7.1",
 ]
 
 [[package]]
@@ -2988,7 +3093,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
@@ -3005,14 +3110,14 @@ dependencies = [
 
 [[package]]
 name = "p256"
-version = "0.14.0-rc.14"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c855a8d2ffd346aa03122626f22e96e3aa75e3bfe64e6bf6cb82f71821ed6ae7"
+checksum = "d2c9239b2dbc807adbbe147e8cf72ea7450c3a0aabe62cb8e75ff4ec22e1f72a"
 dependencies = [
- "ecdsa 0.17.0-rc.22",
+ "ecdsa 0.17.0",
  "elliptic-curve 0.14.3",
  "primefield",
- "primeorder 0.14.0-rc.14",
+ "primeorder 0.14.0",
  "sha2 0.11.1",
 ]
 
@@ -3030,15 +3135,15 @@ dependencies = [
 
 [[package]]
 name = "p384"
-version = "0.14.0-rc.14"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62941b68907ddf996ac20f0debf700c236ccc3d874637731a93c631129ca042f"
+checksum = "d17b851e6b3e378ab4ecb07fa2ed23f4d15f075735f8fec9fa1e7bdce5f8301f"
 dependencies = [
- "ecdsa 0.17.0-rc.22",
+ "ecdsa 0.17.0",
  "elliptic-curve 0.14.3",
  "fiat-crypto 0.3.0",
  "primefield",
- "primeorder 0.14.0-rc.14",
+ "primeorder 0.14.0",
  "sha2 0.11.1",
 ]
 
@@ -3058,15 +3163,15 @@ dependencies = [
 
 [[package]]
 name = "p521"
-version = "0.14.0-rc.14"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dd6f2fe6e76c8d5e8828e92aafa463777d1e72e70b78acc724214757e92479a"
+checksum = "4ad64cc32c2dc466317c12ee5853e61f159f9eab1fe7efade0395dc2e7b43449"
 dependencies = [
  "base16ct 1.0.0",
- "ecdsa 0.17.0-rc.22",
+ "ecdsa 0.17.0",
  "elliptic-curve 0.14.3",
  "primefield",
- "primeorder 0.14.0-rc.14",
+ "primeorder 0.14.0",
  "sha2 0.11.1",
 ]
 
@@ -3166,51 +3271,45 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "picky"
-version = "7.0.0-rc.25"
+version = "7.0.0-rc.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1ae9cd78eb1d61be4790713d28368cf71c844218fcd91542768805423f02666"
+checksum = "3bcf32b73bfc151bc07c3fbf35e729ad3078d48c581f8656c0f62a529fbf681c"
 dependencies = [
  "aes 0.9.4",
- "aes-gcm 0.11.0-rc.4",
+ "aes-gcm 0.11.1",
  "aes-kw",
- "base64 0.22.1",
+ "base64 0.23.1",
  "cbc",
  "crypto-bigint 0.7.10",
  "crypto-common 0.2.2",
  "ctr 0.10.1",
- "curve25519-dalek 5.0.0-rc.1",
  "des",
  "digest 0.11.3",
- "ecdsa 0.17.0-rc.22",
- "ed25519-dalek 3.0.0-rc.1",
+ "ed25519-dalek 3.0.0",
  "hex",
  "hmac 0.13.0",
  "http",
  "inout 0.2.5",
  "md-5 0.11.0",
- "p256 0.14.0-rc.14",
- "p384 0.14.0-rc.14",
- "p521 0.14.0-rc.14",
+ "p256 0.14.0",
+ "p384 0.14.0",
+ "p521 0.14.0",
  "pbkdf2",
  "picky-asn1",
  "picky-asn1-der",
  "picky-asn1-x509",
  "pkcs1 0.8.0-rc.4",
- "primeorder 0.14.0-rc.14",
  "rand 0.10.3",
  "rand_core 0.10.1",
  "rc2",
  "rsa 0.10.0-rc.18",
- "rustcrypto-ff",
- "rustcrypto-ff_derive",
- "rustcrypto-group",
  "serde",
  "serde_json",
  "sha1 0.11.0",
  "sha2 0.11.1",
  "sha3",
  "thiserror 2.0.21",
- "x25519-dalek 3.0.0-rc.1",
+ "x25519-dalek 3.0.0",
  "zeroize",
 ]
 
@@ -3256,9 +3355,9 @@ dependencies = [
 
 [[package]]
 name = "picky-krb"
-version = "0.12.4"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d188f3192356068dbdba54bddbca6fd0f7a09565d3861eeb8efe1ab77ae8e97"
+checksum = "9306c2a07e8bfd1faa0985b76bc7b86ab98f2b9a1433fdfa4c9a116b6e4c8a3d"
 dependencies = [
  "aes 0.9.4",
  "block-padding",
@@ -3356,8 +3455,8 @@ dependencies = [
 
 [[package]]
 name = "plugins-contexts"
-version = "0.2.1"
-source = "git+https://github.com/Droidtop/lib-plugins?tag=v0.2.1#97088e3e56337d69ac681f06e57d817602253fe3"
+version = "0.2.2"
+source = "git+https://github.com/Droidtop/lib-plugins?rev=17c2981eb275abaeb1425489061834c09b3eec36#17c2981eb275abaeb1425489061834c09b3eec36"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",
@@ -3485,14 +3584,15 @@ dependencies = [
 
 [[package]]
 name = "primeorder"
-version = "0.14.0-rc.14"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e56e6d67fdf5744e9e245ae571450fe584b91f5af261d0e40163b618e53a1f6"
+checksum = "5c9f42978c78a00e3d68f69fc03e57a234debae69da4020a4fb588fcdcd07b06"
 dependencies = [
  "elliptic-curve 0.14.3",
  "once_cell",
  "primefield",
  "serdect",
+ "wnaf",
 ]
 
 [[package]]
@@ -3797,11 +3897,11 @@ dependencies = [
 
 [[package]]
 name = "rfc6979"
-version = "0.6.0-pre.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9935425142ac6e252364413291d96c8bc9898d0876a801824c7af4eae397b689"
+checksum = "b4a459cddafb3fe76b31fd8f1108007566c40301feb64dc7b54656eb7388172b"
 dependencies = [
- "ctutils",
+ "crypto-bigint 0.7.10",
  "hmac 0.13.0",
 ]
 
@@ -4184,44 +4284,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustcrypto-ff"
-version = "0.14.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd2a8adb347447693cd2ba0d218c4b66c62da9b0a5672b17b981e4291ec65ff6"
-dependencies = [
- "bitvec",
- "rand_core 0.10.1",
- "rustcrypto-ff_derive",
- "subtle",
-]
-
-[[package]]
-name = "rustcrypto-ff_derive"
-version = "0.14.0-rc.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cda22ea03582974ab5687fc131eba2dc78e258e7eef4d7e01bcd0522ed79f66"
-dependencies = [
- "addchain",
- "num-bigint 0.3.3",
- "num-integer",
- "num-traits",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "rustcrypto-group"
-version = "0.14.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "369f9b61aa45933c062c9f6b5c3c50ab710687eca83dd3802653b140b43f85ed"
-dependencies = [
- "rand_core 0.10.1",
- "rustcrypto-ff",
- "subtle",
-]
-
-[[package]]
 name = "rusticata-macros"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4239,8 +4301,21 @@ dependencies = [
  "bitflags 2.13.2",
  "errno",
  "libc",
- "linux-raw-sys",
+ "linux-raw-sys 0.4.15",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "rustix"
+version = "1.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5e76742e5294153d4dde1207dbec5bdd81eef6fabdc0d2118babadabfd858aa"
+dependencies = [
+ "bitflags 2.13.2",
+ "errno",
+ "libc",
+ "linux-raw-sys 0.12.1",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4325,6 +4400,15 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "safe_arch"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96b02de82ddbe1b636e6170c21be622223aea188ef2e139be0a5b219ec215323"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
+name = "safe_arch"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42c6efa15875e6ecb39ca61fb0b0c1a40b84fac5a5ffe71eef7d1000c8eb3f5f"
@@ -4349,8 +4433,8 @@ checksum = "c62751faa8bc286982334a082fe125184a29fc89d17775766e4f891b7d726980"
 
 [[package]]
 name = "saves-locate"
-version = "0.1.3"
-source = "git+https://github.com/Droidtop/lib-saves?rev=d5d848fea9123e7ec7bd5f882a1bd92a36bcf97d#d5d848fea9123e7ec7bd5f882a1bd92a36bcf97d"
+version = "0.2.1"
+source = "git+https://github.com/Droidtop/lib-saves?rev=b1e11080dc3a93031f344073f0e835dfa8192621#b1e11080dc3a93031f344073f0e835dfa8192621"
 dependencies = [
  "dirs",
  "flate2",
@@ -4566,6 +4650,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1_smol"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4700,7 +4790,7 @@ version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d585997b0ac10be3c5ee635f1bab02d512760d14b7c468801ac8a01d9ae5f1d"
 dependencies = [
- "num-bigint 0.4.8",
+ "num-bigint",
  "num-traits",
  "thiserror 2.0.21",
  "time",
@@ -4833,9 +4923,9 @@ dependencies = [
 
 [[package]]
 name = "sspi"
-version = "0.21.3"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c3bd2a45e7e24fd72eba100ced3fd847e05fe4657d7f067eb06d1a894f0d4e5"
+checksum = "3d3fa5e1405884e88be309bd801760caa84c654be746fe4261ab407496263692"
 dependencies = [
  "async-dnssd",
  "async-recursion",
@@ -4846,8 +4936,6 @@ dependencies = [
  "crypto-bigint 0.7.10",
  "crypto-mac",
  "cryptoki",
- "curve25519-dalek 5.0.0-rc.1",
- "ed25519-dalek 3.0.0-rc.1",
  "futures",
  "getrandom 0.3.4",
  "hmac 0.13.0",
@@ -4856,22 +4944,15 @@ dependencies = [
  "num-derive",
  "num-traits",
  "oid",
- "p256 0.14.0-rc.14",
- "p384 0.14.0-rc.14",
- "p521 0.14.0-rc.14",
  "picky",
  "picky-asn1",
  "picky-asn1-der",
  "picky-asn1-x509",
  "picky-krb",
  "pkcs1 0.8.0-rc.4",
- "primeorder 0.14.0-rc.14",
  "rand 0.10.3",
  "rand_core 0.10.1",
  "rsa 0.10.0-rc.18",
- "rustcrypto-ff",
- "rustcrypto-ff_derive",
- "rustcrypto-group",
  "rustls",
  "serde",
  "sha1 0.11.0",
@@ -4911,17 +4992,6 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
-version = "1.0.109"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
-dependencies = [
- "proc-macro2",
- "quote",
- "unicode-ident",
-]
-
-[[package]]
-name = "syn"
 version = "2.0.119"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "872831b642d1a07999a962a351ed35b955ea2cfc8f3862091e2a240a84f17297"
@@ -4944,8 +5014,8 @@ dependencies = [
 
 [[package]]
 name = "sync-core"
-version = "0.1.2"
-source = "git+https://github.com/Droidtop/lib-sync?tag=v0.1.2#f4a661bab2cdc1d4dc90731f76835741abff5db8"
+version = "0.1.6"
+source = "git+https://github.com/Droidtop/lib-sync?tag=v0.1.6#816d9198c633719d65c387658ece0aa7c3b0fc4e"
 dependencies = [
  "boringtun",
  "chacha20poly1305",
@@ -4960,23 +5030,24 @@ dependencies = [
  "sha2 0.10.9",
  "smoltcp",
  "thiserror 1.0.69",
- "windowcast-identity",
- "windowcast-pairing",
- "windowcast-rendezvous",
+ "windowcast-identity 0.37.0",
+ "windowcast-pairing 0.37.0",
+ "windowcast-rendezvous 0.37.0",
  "x25519-dalek 2.0.1",
 ]
 
 [[package]]
 name = "sync-store"
-version = "0.1.2"
-source = "git+https://github.com/Droidtop/lib-sync?tag=v0.1.2#f4a661bab2cdc1d4dc90731f76835741abff5db8"
+version = "0.1.6"
+source = "git+https://github.com/Droidtop/lib-sync?tag=v0.1.6#816d9198c633719d65c387658ece0aa7c3b0fc4e"
 dependencies = [
  "dirs",
+ "fs4",
  "gethostname",
  "serde",
  "serde_json",
  "sync-core",
- "windowcast-identity",
+ "windowcast-identity 0.37.0",
 ]
 
 [[package]]
@@ -5308,6 +5379,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
 
 [[package]]
+name = "unicode-normalization"
+version = "0.1.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75cd3fb03d5288b3ba9a1ee103ac7e9cbb59f0b03d64f8ddfcc04dd42758a85d"
+dependencies = [
+ "tinyvec",
+]
+
+[[package]]
 name = "universal-hash"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5393,6 +5473,7 @@ dependencies = [
  "getrandom 0.4.3",
  "js-sys",
  "serde_core",
+ "sha1_smol",
  "wasm-bindgen",
 ]
 
@@ -5517,6 +5598,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "web-time"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "webpki-roots"
 version = "0.26.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5554,12 +5645,22 @@ dependencies = [
 
 [[package]]
 name = "wide"
+version = "0.7.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce5da8ecb62bcd8ec8b7ea19f69a51275e91299be594ea5cc6ef7819e16cd03"
+dependencies = [
+ "bytemuck",
+ "safe_arch 0.7.4",
+]
+
+[[package]]
+name = "wide"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d920ac99c3c8edce110cb8d07dbb324d6d026011dce85b1e9355b70f0adacc4f"
 dependencies = [
  "bytemuck",
- "safe_arch",
+ "safe_arch 1.2.0",
 ]
 
 [[package]]
@@ -5601,8 +5702,8 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windowcast-accounts"
-version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -5619,15 +5720,15 @@ dependencies = [
  "thiserror 1.0.69",
  "ureq",
  "url",
- "windowcast-identity",
+ "windowcast-identity 0.38.0",
  "windowcast-protocol",
  "windows",
 ]
 
 [[package]]
 name = "windowcast-agent-windows"
-version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "tokio",
  "vigem-client",
@@ -5642,16 +5743,16 @@ dependencies = [
 
 [[package]]
 name = "windowcast-discovery"
-version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "thiserror 1.0.69",
 ]
 
 [[package]]
 name = "windowcast-host"
-version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "async-trait",
  "audiopus_sys",
@@ -5664,11 +5765,11 @@ dependencies = [
  "tracing",
  "windowcast-accounts",
  "windowcast-discovery",
- "windowcast-identity",
- "windowcast-pairing",
+ "windowcast-identity 0.38.0",
+ "windowcast-pairing 0.38.0",
  "windowcast-protocol",
  "windowcast-pty",
- "windowcast-rendezvous",
+ "windowcast-rendezvous 0.38.0",
  "windowcast-transport",
 ]
 
@@ -5676,6 +5777,16 @@ dependencies = [
 name = "windowcast-identity"
 version = "0.37.0"
 source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+dependencies = [
+ "ed25519-dalek 2.2.0",
+ "rand_core 0.6.4",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "windowcast-identity"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "ed25519-dalek 2.2.0",
  "rand_core 0.6.4",
@@ -5693,14 +5804,29 @@ dependencies = [
  "sha2 0.10.9",
  "spake2",
  "thiserror 1.0.69",
- "windowcast-identity",
+ "windowcast-identity 0.37.0",
+ "zeroize",
+]
+
+[[package]]
+name = "windowcast-pairing"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+dependencies = [
+ "hkdf 0.12.4",
+ "hmac 0.12.1",
+ "rand_core 0.6.4",
+ "sha2 0.10.9",
+ "spake2",
+ "thiserror 1.0.69",
+ "windowcast-identity 0.38.0",
  "zeroize",
 ]
 
 [[package]]
 name = "windowcast-protocol"
-version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "bincode",
  "serde",
@@ -5709,16 +5835,16 @@ dependencies = [
 
 [[package]]
 name = "windowcast-pty"
-version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "portable-pty",
 ]
 
 [[package]]
 name = "windowcast-rdp"
-version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5762,9 +5888,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "windowcast-rendezvous"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
+dependencies = [
+ "ed25519-dalek 2.2.0",
+ "rand_core 0.6.4",
+ "rcgen 0.13.2",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "ureq",
+ "webpki-roots 0.26.11",
+]
+
+[[package]]
 name = "windowcast-secure-helper"
-version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "bincode",
  "serde",
@@ -5774,8 +5916,8 @@ dependencies = [
 
 [[package]]
 name = "windowcast-transport"
-version = "0.37.0"
-source = "git+https://github.com/Droidtop/windowcast?rev=7359936a6083cc7f2ca6cae67aedf45ad9797026#7359936a6083cc7f2ca6cae67aedf45ad9797026"
+version = "0.38.0"
+source = "git+https://github.com/Droidtop/windowcast?rev=37e2e432d565e94a83e49ea064283fbc661c2ef0#37e2e432d565e94a83e49ea064283fbc661c2ef0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -5788,10 +5930,10 @@ dependencies = [
  "tracing",
  "webrtc",
  "windowcast-accounts",
- "windowcast-identity",
- "windowcast-pairing",
+ "windowcast-identity 0.38.0",
+ "windowcast-pairing 0.38.0",
  "windowcast-protocol",
- "windowcast-rendezvous",
+ "windowcast-rendezvous 0.38.0",
 ]
 
 [[package]]
@@ -6159,9 +6301,9 @@ dependencies = [
 
 [[package]]
 name = "winscard"
-version = "0.3.3"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12dafb3c1468d0a3f5440e21e51614b53d1fdc62c9f82cc861c447906d09c69a"
+checksum = "0d8812a45e99e652100e89a19fb464ff607b35ec49ad723f59a9e83863906365"
 dependencies = [
  "bitflags 2.13.2",
  "crypto-bigint 0.7.10",
@@ -6185,6 +6327,18 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
+
+[[package]]
+name = "wnaf"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "795ca18b3fdb5e62bf982199278341ddcf7ebf7d32e25e212ad05d496e95f6fa"
+dependencies = [
+ "ff 0.14.0",
+ "group 0.14.0",
+ "hybrid-array",
+ "primefield",
+]
 
 [[package]]
 name = "writeable"
@@ -6215,24 +6369,24 @@ dependencies = [
 
 [[package]]
 name = "x25519-dalek"
-version = "3.0.0-rc.1"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eee64e8620caa64914d669b1f68f858aaff54e2d0f9ad3b30a613b58a1baa83e"
+checksum = "e7e8131a03190127fb2263afc72b322ecadae46b6ff8c6f399ff5d02f5559af6"
 dependencies = [
- "curve25519-dalek 5.0.0-rc.1",
+ "curve25519-dalek 5.0.0",
  "rand_core 0.10.1",
  "zeroize",
 ]
 
 [[package]]
 name = "x509-cert"
-version = "0.2.5"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1301e935010a701ae5f8655edc0ad17c44bad3ac5ce8c39185f75453b720ae94"
+checksum = "105ef4642d9cb137ef83d623d0e4bf08b8adf69e9918ca904a174adb6d3d038b"
 dependencies = [
- "const-oid 0.9.6",
- "der 0.7.10",
- "spki 0.7.3",
+ "const-oid 0.10.2",
+ "der 0.8.3",
+ "spki 0.8.1",
  "tls_codec",
 ]
 

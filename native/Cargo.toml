@@ -19,7 +19,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Identity, pairing, the channel, the protocol and the sync rules: Droidtop/lib-sync.
-droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.2" }
+droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.6" }
 # The person's own shares (Droidtop/tracker#573): Droidtop/lib-net's share client, WebDAV and the backends to come.
 # S3 as well as WebDAV (lib-net ci/remote-sftp-feature, on top of ci/remote-s3), pinned by that commit until lib-net
 # releases it as v0.2.4; then that tag. Default features off, so no SFTP yet: russh 0.65 needs ed25519-dalek ^3, and the
@@ -32,10 +32,11 @@ serde_json = "1"
 
 [dev-dependencies]
 # The mesh test runs the real agent as one of its computers: droidtop-agent's service, at a release.
-# droidtop-agent ci/link-change fd46b33 (Droidtop/tracker#798): the agent on lib-sync 0.1.2, as this library is. build-150
-# is on lib-sync 0.1.1, and the test cannot link two sync-cores. Becomes the agent release that carries it.
-droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "fd46b3304805bd04ff1fc91700d827905b8a82bc" }
-droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.2" }
+# droidtop-agent main fc52738 (Droidtop/tracker#867, #870, #573): the agent on lib-sync 0.1.6 and Rust 1.85, keying
+# games by catalog id and title2:, with windowcast on IronRDP and sspi 0.23.1 (no patches needed any more).
+# Becomes the agent release that carries it.
+droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "fc5273896cbd31cc00fb140b1db29b8b81f94bff" }
+droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.6" }
 
 [profile.release]
 # As droidtop-agent built it.

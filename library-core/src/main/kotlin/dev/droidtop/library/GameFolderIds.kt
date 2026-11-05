@@ -124,10 +124,11 @@ class GameFolderIds(
         /**
          * A folder name's title with its version taken off, by the one parse a
          * folder game's Version comes from ([GameTitleParser]), compared
-         * without case or punctuation; null when nothing of a title is left.
+         * without case, accents, spacing or punctuation ([TitleKeys.compact]);
+         * null when nothing of a title is left.
          */
         fun titleKey(name: String): String? =
-            GameTitleParser.parseName(name).title.lowercase().filter { it.isLetterOrDigit() }.ifEmpty { null }
+            TitleKeys.compact(GameTitleParser.parseName(name).title).ifEmpty { null }
 
         private const val MAX_FILES = 200
         private const val MAX_DEPTH = 3

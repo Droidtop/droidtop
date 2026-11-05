@@ -56,17 +56,27 @@ object StoreIdentity {
     private val MARKS = Regex("\\p{M}+")
     private val SPACES = Regex(" +")
     private val NOT_ALNUM = Regex("[^a-z0-9]+")
+    private val NOT_WORD = Regex("[^\\p{L}\\p{N}\\p{M}]+")
 
     /**
      * The key two spellings of one title share, or "" when nothing is left
-     * of it. Folds case, diacritics, trademark symbols, apostrophes and
-     * punctuation; reads "&" as "and"; drops a leading "The" and any
-     * trailing edition labels. Keeps every number.
+     * of it. Built on the game's identity fold ([TitleKeys.latinSlug],
+     * Lutris's slug, Droidtop/tracker#870): case, diacritics, trademark
+     * symbols, apostrophes and punctuation folded. On top of it, for store
+     * matching only: compatibility forms folded (fullwidth letters), "&" read
+     * as "and", any other punctuation or underscore a word break (the slug
+     * would glue "Game:Deluxe Edition" into "gamedeluxe-edition" and keep its
+     * label), a leading "The" and any trailing edition labels dropped, the
+     * words joined with nothing between them. Keeps every number.
      */
     fun titleKey(title: String): String {
-        val folded = fold(title)
-        if (folded.isEmpty()) return ""
-        var tokens = folded.split(' ').filter { it.isNotEmpty() }
+        val spaced = Normalizer.normalize(title.replace(TRADEMARKS, ""), Normalizer.Form.NFKC)
+            .replace(APOSTROPHES, "")
+            .replace("&", " and ")
+            .replace(NOT_WORD, " ")
+        val slug = TitleKeys.latinSlug(spaced)
+        if (slug.isEmpty()) return ""
+        var tokens = slug.split('-').filter { it.isNotEmpty() }
         if (tokens.size > 1 && tokens.first() == ARTICLE) tokens = tokens.drop(1)
         tokens = stripEditions(tokens)
         return tokens.joinToString("")

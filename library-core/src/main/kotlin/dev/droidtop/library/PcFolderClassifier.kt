@@ -164,8 +164,8 @@ object PcFolderClassifier {
         val title = GameTitleParser.parseName(folderName).title
         val words = title.trim().split(WHITESPACE)
         val withoutArticle = if (words.size > 1 && words.first().lowercase() in LEADING_ARTICLES) words.drop(1).joinToString(" ") else null
-        fun base(file: ListedFile) = GameNaming.nameKey(file.name.substringBeforeLast('.'))
-        for (key in listOfNotNull(title, withoutArticle).map(GameNaming::nameKey).distinct()) {
+        fun base(file: ListedFile) = TitleKeys.compact(file.name.substringBeforeLast('.'))
+        for (key in listOfNotNull(title, withoutArticle).map(TitleKeys::compact).distinct()) {
             if (key.isEmpty()) continue
             layer.filter { base(it) == key }.singleOrNull()?.let { return it }
             if (key.length < 3) continue

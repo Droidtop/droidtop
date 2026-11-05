@@ -27,9 +27,31 @@ import java.io.File
 object ComputerLibrary {
     fun stateFile(context: Context): File = File(Computers.folder(context), "library.json")
 
-    /** A title as the agent keys a game without a store id: lower case, letters and digits, single spaces. */
-    fun titleKey(title: String): String =
-        "title:" + title.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }.joinToString(" ")
+    /**
+     * A title as every device keys a game without a store id: `title2:` and its Lutris slug ([TitleKeys.slug];
+     * Droidtop/tracker#870, owner 2026-11-05: "letters and digits only, but with space-to-hyphen conversion. Lutris's
+     * standard"). "Being a DIK" is `title2:being-a-dik`.
+     */
+    fun titleKey(title: String): String = TITLE2 + dev.droidtop.library.TitleKeys.slug(title)
+
+    /**
+     * The key the agent used before `title2:`: `title:` and the words joined by single spaces. Still read, so marks a
+     * computer keyed this way before its own migration still find their game; never written. A ROM's key keeps this
+     * word form after its system, unchanged by #870.
+     */
+    fun legacyTitleKey(title: String): String = TITLE1 + legacyWords(title)
+
+    private fun legacyWords(title: String): String =
+        title.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }.joinToString(" ")
+
+    private const val TITLE1 = "title:"
+    private const val TITLE2 = "title2:"
+
+    /** Every key [entry] may arrive under: [keyOf], and for a title-keyed game its [legacyTitleKey] too. */
+    fun keysOf(entry: LibraryEntry): List<String> {
+        val key = keyOf(entry)
+        return if (key.startsWith(TITLE2)) listOf(key, legacyTitleKey(entry.title)) else listOf(key)
+    }
 
     /** The key a game goes by on every device: its store id, a ROM's system and file name, or its title. */
     fun keyOf(entry: LibraryEntry): String {
@@ -37,7 +59,7 @@ object ComputerLibrary {
         if (dev.droidtop.library.stores.StoreLibraries.forKey(entry.id) != null) return entry.id
         if (entry.kind == LibraryEntryKind.CONSOLE_ROM && entry.systemId != null) {
             val stem = if ('/' in entry.id) File(entry.id).nameWithoutExtension else entry.title
-            return "rom:${entry.systemId}/${titleKey(stem).removePrefix("title:")}"
+            return "rom:${entry.systemId}/${legacyWords(stem)}"
         }
         return titleKey(entry.title)
     }
@@ -100,7 +122,9 @@ object ComputerLibrary {
     private suspend fun writeMarks(context: Context, library: Library, games: List<LibraryEntry>, marks: JSONObject?): Int {
         if (marks == null || marks.length() == 0) return 0
         val dao = RomDatabase.get(context).romDao()
-        val byKey = games.groupBy(::keyOf)
+        // A computer that has not moved to title2: yet still sends title: keys (#870): both find the game.
+        val byKey = HashMap<String, MutableList<LibraryEntry>>()
+        games.forEach { entry -> keysOf(entry).forEach { key -> byKey.getOrPut(key) { mutableListOf() } += entry } }
         var written = 0
         marks.keys().forEach { key ->
             val fields = marks.optJSONObject(key) ?: return@forEach

@@ -935,16 +935,12 @@ object GameEngineDetector {
         if (inner.displayFolder.parentFile != folder) return null
         // Not an inner wrapper result in its own right: one rename only.
         if (inner.displayFolder != inner.gameRoot) return null
-        val namedAfterThisFolder = nameKey(inner.displayFolder.name).startsWith(nameKey(folder.name))
+        val namedAfterThisFolder = TitleKeys.compact(inner.displayFolder.name).startsWith(TitleKeys.compact(folder.name))
         val holdsOwnFiles = (folder.listFiles() ?: emptyArray()).any { it.isFile && !it.name.startsWith(".") }
         val insideStoreTree = ScanPrune.storeTreeRoot(folder) != null
         if (!namedAfterThisFolder && !(holdsOwnFiles && !insideStoreTree)) return null
         return DetectedGame(folder, inner.gameRoot, inner.engine)
     }
-
-    /** Folder names compared for [wrapper]'s version-folder test only. */
-    private fun nameKey(name: String): String =
-        name.lowercase().filter { it.isLetterOrDigit() }
 
     /**
      * Is this ONE folder a game, and if so which engine and where are its

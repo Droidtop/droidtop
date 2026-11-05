@@ -338,9 +338,9 @@ object GameNaming {
 
     /**
      * Two derived names for the same game, decided by the names alone:
-     * everything that is not a letter or a digit is noise a distribution
-     * added, so `GoodbyeEternity` and `Goodbye Eternity` are one game and
-     * one library entry with two versions.
+     * case, punctuation and the separators a distribution added are noise,
+     * so `GoodbyeEternity` and `Goodbye Eternity` are one game and one
+     * library entry with two versions ([nameKey]).
      */
     /**
      * A name as droidtop's own chrome draws it. A folder name is often a
@@ -365,8 +365,14 @@ object GameNaming {
 
     fun sameGame(a: String, b: String): Boolean = nameKey(a) == nameKey(b) && nameKey(a).isNotEmpty()
 
-    /** [sameGame]'s comparison key. */
-    fun nameKey(name: String): String = name.lowercase().filter { it.isLetterOrDigit() }
+    /**
+     * [sameGame]'s comparison key: the game-identity fold ([TitleKeys]) without its separators, [TitleKeys.compact],
+     * so spacing a distribution added or took away does not split a game (`ThiefofHearts` beside `Thief of Hearts`,
+     * the real folder set GameGroupingTest keeps whole). The cross-device key is [TitleKeys.slug], which keeps word
+     * breaks (the owner's Lutris form, Droidtop/tracker#870); keeping them here too would split real libraries, so this is
+     * built to the recommendation, owner to confirm.
+     */
+    fun nameKey(name: String): String = TitleKeys.compact(name)
 
     /**
      * Pythia's `NAME_SIMILARITY_THRESHOLD`, and what it is for.
