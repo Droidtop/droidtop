@@ -5299,7 +5299,10 @@ droidtop 0.2.0-dev.1931).
   a stream or a PC game runs, unless already chosen), then More, always last, holding every other tab. Chosen
   tabs never move for a running one. Labels wrap to two lines; the bar measures them at the current font and
   passes their sizes in, and when they do not fit, chosen tabs move into More from the right end and come back
-  when there is room, so the person decides what goes first by their order. Where the mode hides the Companion
+  when there is room, so the person decides what goes first by their order. **The companion's own settings on the
+  companion** (Droidtop/tracker#786 S2b): More's last row, "Companion settings", opens the screen Settings shows
+  under "Companion screen" (`GamingSettingsCatalog.companionScreen`), in place, as a nested screen; where the mode
+  hides the Companion group (Kid, Kiosk, Guest) there is no such row. S3 moves it under the droidtop tab. Where the mode hides the Companion
   group (Kid, Kiosk) nobody can choose, so the bar is the mode's whole tab set. Defaults: Home, System, Apps,
   Social in Gaming and Mobile; Input, Home, System, Apps in Desktop. A tab under More passes its badge to
   More (the Social unread count, spoken with it). Every entry has the tab role, its selected state and a spoken
