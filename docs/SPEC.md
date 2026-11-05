@@ -21065,10 +21065,10 @@ segment (`BeingADik/Chap3+/10.0-sancho` is version 10.0 of chapter 3).
 
 ### What merges, and what only suggests
 
-Two folders are the same game when their derived names, read as words,
-have the same title key (`GoodbyeEternity` = `Goodbye Eternity`; since
-Droidtop/tracker#870 the key is the one every device uses, so case and
-punctuation are dropped but word breaks count, see 7o's title key).
+Two folders are the same game when their derived names are equal once case,
+Latin accents, punctuation and spacing are dropped (`GoodbyeEternity` =
+`Goodbye Eternity`; `TitleKeys.compact`, the cross-device key's fold without
+separators, Droidtop/tracker#870, see 7o's title key).
 Similarity does NOT merge. Pythia's `NAME_SIMILARITY_THRESHOLD` of 0.6
 (difflib's `SequenceMatcher.ratio`, ported exactly, because the threshold
 was chosen against that measure) decides what Pythia SUGGESTS to the
@@ -21900,16 +21900,18 @@ the right ones is the person's call, as in "Removing an older version"
   halves land in the same batch. ROM keys (`rom:<system>/<words>`) are unchanged. Before this droidtop had four title
   folds and the handheld's merge key (`beingadik`) disagreed with the cross-device key (`title:being a dik`), so a
   merge made on one device did not carry. Now:
-  - the handheld's same-game test (`GameNaming.nameKey`) is the slug of the name as a title reads
-    (`GameTitleParser.words`, the words a folder game's title is), so two names are one game here exactly when they
-    are one key everywhere. `GoodbyeEternity`, `Goodbye Eternity` and `Anomalous_Coffee_Machine_2` still merge; a
-    name joined in lower case (`ThiefofHearts`) has no word breaks to read and no longer merges with `Thief of Hearts`;
+  - the handheld's same-game test (`GameNaming.nameKey`) is the same fold without separators (`TitleKeys.compact`),
+    so two names that are one key everywhere are one game here, and spellings that differ only in spacing still merge
+    as before. Making it the slug itself was tried and splits real libraries: the Thief of Hearts set
+    (`ThiefofHeartsPart3-0.0.9-pc` beside `Part1` and `Part2`, GameGroupingTest) became two games, because a name
+    joined in lower case has no word breaks to read. Whether to accept that is the owner's call on #870;
   - store matching (`StoreIdentity.titleKey`: the wishlist, new games, search de-duplication, card identity) is the
     slug with its own store rules on top ("&" as "and", punctuation a word break, a leading "The" and edition labels
     dropped) and joined with nothing between the words, the form card keys are stored in, which does not change;
   - matching a program's file name to its folder (`PcFolderClassifier`, the wrapper-folder test in
-    `GameEngineDetector`) and a renamed folder's id (`GameFolderIds.titleKey`) use the same fold without separators
-    (`TitleKeys.compact`), because there "SampleSE.exe" is "Sample SE" and spacing must not matter;
+    `GameEngineDetector`) and a renamed folder's id (`GameFolderIds.titleKey`) use that same `TitleKeys.compact`,
+    because there "SampleSE.exe" is "Sample SE" and spacing must not matter. It drops only Latin accents
+    (U+0300-U+036F), so a kana keeps its dakuten;
   - search keeps its own word fold (`StoreIdentity.fold`): it compares words typed against words, not identities.
 - **In this device's own library, behind switches** (owner, 2026-10-10:
   "Apps should be toggleable"; "Games on the desktop should ALSO be

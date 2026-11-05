@@ -37,16 +37,14 @@ class TitleKeysTest {
     }
 
     @Test
-    fun `the handheld's same game is the cross-device key's`() {
-        // The bug: two names were one game here and two across devices. Now one game here is one key everywhere.
-        val names = listOf("Being a DIK", "BeingADik", "being a dik!", "BeingADIK", "GoodbyeEternity", "Goodbye Eternity",
-            "Anomalous_Coffee_Machine_2", "Anomalous Coffee Machine 2", "ThiefofHearts", "Thief of Hearts")
+    fun `the handheld's same game is never stricter than the cross-device key`() {
+        // For these titles one key everywhere is one game here; the handheld also joins spellings that differ only in spacing.
+        val names = listOf("Being a DIK", "BeingADik", "being a dik!", "GoodbyeEternity", "Goodbye Eternity",
+            "Anomalous_Coffee_Machine_2", "Anomalous Coffee Machine 2", "ThiefofHearts", "Thief of Hearts", "Pokémon", "Pokemon")
         for (a in names) for (b in names) {
-            val keyed = dev.droidtop.library.computers.ComputerLibrary.titleKey(GameTitleParser.words(a)) ==
-                dev.droidtop.library.computers.ComputerLibrary.titleKey(GameTitleParser.words(b))
-            assertEquals("$a / $b", keyed, GameNaming.sameGame(a, b))
+            if (TitleKeys.slug(a) == TitleKeys.slug(b)) assertEquals("$a / $b", true, GameNaming.sameGame(a, b))
         }
-        assertEquals(true, GameNaming.sameGame("Being a DIK", "being a dik!"))
-        assertEquals(true, GameNaming.sameGame("BeingADik", "Being a DIK"))
+        assertEquals(true, GameNaming.sameGame("ThiefofHearts", "Thief of Hearts"))
+        assertEquals(true, GameNaming.sameGame("ドキドキ文芸部", "ドキドキ 文芸部"))
     }
 }

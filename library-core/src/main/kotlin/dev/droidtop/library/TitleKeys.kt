@@ -47,11 +47,14 @@ object TitleKeys {
 
     /**
      * [slug]'s fold with no separators, for matching names that may or may not be spaced ("SampleSE" and "Sample SE"):
-     * accents folded, letters and digits only, any script kept (a name in Japanese still compares with itself).
+     * Latin accents folded, letters and digits only, any script kept (a name in Japanese still compares with itself,
+     * its voiced kana whole: only the combining accents U+0300-U+036F are dropped, not a kana's dakuten).
      */
     fun compact(name: String): String =
-        Normalizer.normalize(name, Normalizer.Form.NFD).filter { Character.getType(it) != Character.NON_SPACING_MARK.toInt() }
+        Normalizer.normalize(Normalizer.normalize(name, Normalizer.Form.NFD).replace(LATIN_ACCENTS, ""), Normalizer.Form.NFC)
             .lowercase().filter { it.isLetterOrDigit() }
+
+    private val LATIN_ACCENTS = Regex("[\\u0300-\\u036F]+")
 
     /** RFC 4122 version 5 (SHA-1) UUID of [name] in [namespace], as Python's `uuid.uuid5`. */
     internal fun uuid5(namespace: UUID, name: String): UUID {

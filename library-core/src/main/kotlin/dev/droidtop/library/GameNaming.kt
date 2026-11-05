@@ -366,13 +366,13 @@ object GameNaming {
     fun sameGame(a: String, b: String): Boolean = nameKey(a) == nameKey(b) && nameKey(a).isNotEmpty()
 
     /**
-     * [sameGame]'s comparison key: the name as a title reads ([GameTitleParser.words]: `GoodbyeEternity` is
-     * `Goodbye Eternity`, `Anomalous_Coffee_Machine_2` is spaced) folded to the game's identity, [TitleKeys.slug],
-     * the fold of the cross-device key (Droidtop/tracker#870). A folder game's title is already those words, so two
-     * names are one game here exactly when they are one key on every device. A name joined in lower case
-     * (`ThiefofHearts`) has no word breaks to read and is its own game.
+     * [sameGame]'s comparison key: the game-identity fold ([TitleKeys]) without its separators, [TitleKeys.compact],
+     * so spacing a distribution added or took away does not split a game (`ThiefofHearts` beside `Thief of Hearts`,
+     * the real folder set GameGroupingTest keeps whole). The cross-device key is [TitleKeys.slug], which keeps word
+     * breaks (the owner's Lutris form, Droidtop/tracker#870); whether this test should keep them too is the owner's to
+     * decide, because doing so splits real libraries.
      */
-    fun nameKey(name: String): String = TitleKeys.slug(GameTitleParser.words(name))
+    fun nameKey(name: String): String = TitleKeys.compact(name)
 
     /**
      * Pythia's `NAME_SIMILARITY_THRESHOLD`, and what it is for.

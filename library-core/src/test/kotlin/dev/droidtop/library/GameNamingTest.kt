@@ -73,9 +73,7 @@ class GameNamingTest {
         assertEquals("ThiefofHearts", third.name)
         assertEquals("Part 3", third.segment?.label)
         assertEquals("0.0.9", third.version)
-        // Droidtop/tracker#870: the one key is Lutris's slug, which keeps word breaks, and a name joined in
-        // lower case has none to read; "ThiefofHearts" is its own game, here and on every device.
-        assertFalse(GameNaming.sameGame(third.name, "Thief of Hearts"))
+        assertTrue(GameNaming.sameGame(third.name, "Thief of Hearts"))
     }
 
     @Test
