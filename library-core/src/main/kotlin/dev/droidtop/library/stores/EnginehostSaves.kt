@@ -105,10 +105,22 @@ object EnginehostSaves {
      * should write saves to the user folder, and tell droidtop when it doesn't work. That's not the user's problem"):
      * its saves are copied into the game's synced folder, newer files winning, and uploaded from there. When no
      * synced folder is known yet, that folder is kept and the next launch brings its saves in.
+     *
+     * [adoptOther] says the report came from Enginehost itself (its app interface plugin's broker call,
+     * `saves.changed`), not from a broadcast any app can send (Droidtop/tracker#550 build review): only then is a folder
+     * other than the one droidtop passed copied from, so a forged report cannot put a folder's files into a synced
+     * game's saves. A report that names the passed folder only asks for its upload, which is harmless from anyone.
      */
-    suspend fun afterGameEnded(context: Context, storeKey: String, gameFolder: String, saveFolder: String?): Boolean {
+    suspend fun afterGameEnded(context: Context, storeKey: String, gameFolder: String, saveFolder: String?, adoptOther: Boolean): Boolean {
         val passed = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PASSED_PREFIX + storeKey, null)
-        if (sameFolder(passed, saveFolder)) return true
+        when (reportTrust(passed, saveFolder, adoptOther)) {
+            ReportTrust.UPLOAD_PASSED -> return true
+            ReportTrust.REFUSED -> {
+                android.util.Log.w("droidtop.EnginehostSaves", "a game-ended broadcast named a folder droidtop did not pass; not copied from (only Enginehost's own report is)")
+                return false
+            }
+            ReportTrust.MAY_ADOPT -> Unit
+        }
         // Only a folder Enginehost could have been handed (shared storage or a card), never one of droidtop's own: whoever
         // reports names it, and droidtop copies from it.
         val used = saveFolder?.let(::readableSaveFolder) ?: return false
@@ -133,6 +145,20 @@ object EnginehostSaves {
         if (path.isBlank()) return null
         val real = runCatching { File(path).canonicalFile }.getOrNull() ?: return null
         return real.takeIf { it.isDirectory && acceptablePath(it.absolutePath) }
+    }
+
+    /** What a game-ended report may make droidtop do ([afterGameEnded]). */
+    internal enum class ReportTrust { UPLOAD_PASSED, MAY_ADOPT, REFUSED }
+
+    /**
+     * A report naming [reported] after droidtop passed [passed]: the passed folder is an upload from anyone; any other
+     * folder may be copied from only when the report is Enginehost's own ([fromEnginehost], its broker call), never a
+     * broadcast's (Droidtop/tracker#550). Pure but for the paths it builds.
+     */
+    internal fun reportTrust(passed: String?, reported: String?, fromEnginehost: Boolean): ReportTrust = when {
+        sameFolder(passed, reported) -> ReportTrust.UPLOAD_PASSED
+        fromEnginehost -> ReportTrust.MAY_ADOPT
+        else -> ReportTrust.REFUSED
     }
 
     /** Whether [passed] and [reported] name the same folder, path for path. Pure but for the paths it builds. */

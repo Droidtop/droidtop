@@ -105,4 +105,16 @@ class EnginehostSavesTest {
         assertEquals(null, EnginehostSaves.readableSaveFolder(""))
         assertEquals(null, EnginehostSaves.readableSaveFolder("/storage/emulated/0/no/such/folder/here"))
     }
+
+    @Test
+    fun aBroadcastOnlyAsksForTheUploadOfTheFolderDroidtopPassed() {
+        // Droidtop/tracker#550: any app can send GAME_ENDED. Naming the passed folder only asks for its upload; naming any
+        // other folder copies from it only when the report is Enginehost's own, through its plugin's broker.
+        val other = "/storage/emulated/0/Documents"
+        assertEquals(EnginehostSaves.ReportTrust.UPLOAD_PASSED, EnginehostSaves.reportTrust(passed, passed, fromEnginehost = false))
+        assertEquals(EnginehostSaves.ReportTrust.REFUSED, EnginehostSaves.reportTrust(passed, other, fromEnginehost = false))
+        assertEquals(EnginehostSaves.ReportTrust.REFUSED, EnginehostSaves.reportTrust(null, other, fromEnginehost = false))
+        assertEquals(EnginehostSaves.ReportTrust.MAY_ADOPT, EnginehostSaves.reportTrust(passed, other, fromEnginehost = true))
+        assertEquals(EnginehostSaves.ReportTrust.UPLOAD_PASSED, EnginehostSaves.reportTrust(passed, passed, fromEnginehost = true))
+    }
 }
