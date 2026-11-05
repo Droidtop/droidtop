@@ -14817,6 +14817,19 @@ trusted (`stopTrustingOrigin`, `stopTrustingApp`, the same calls "Keys you
 trust" makes). Pressing a row asks, then removes it. The page stores nothing: it
 reads each key from where it lives, so the service's own page and this one never
 disagree.
+**Keys and accounts (built 2026-11-05, Droidtop/tracker#12; the owner, 2026-10-28: "Add one 'Keys and accounts' page
+under Settings > Accounts and sources. It lists every key and token droidtop holds, where each is used, and a Remove.
+Each service's own page keeps its row.").** Accounts and sources has a "Keys and accounts" row
+(`KeysAndAccountsCatalog`) that opens one list in three groups:
+- Sign-ins: GitHub, and each store signed in to (an itch.io API key, a Steam, GOG, Epic or Amazon sign-in, a
+  plugin's store).
+- Keys: each service with a key in `CredentialStore` (ScreenScraper, TheGamesDB, IGDB, SteamGridDB,
+  RetroAchievements, TorBox, Real-Debrid, Pixeldrain, Gofile), each saying where it is used.
+- Plugins: a link to "Keys you trust", whose review and remove rules stay its own.
+The page stores nothing. Remove goes through the service's own clear: GitHub's Sign out, the store's Sign out (which,
+as on its page, removes its games that are not installed), or a blank write to the store's keys, which is what
+clearing the service's field does. `CredentialServices` names each `CredentialStore` key's service, and a test fails
+when a key is added to the store without one, so the page can never miss a key.
 
 **A plugin's store (2026-10-28, Droidtop/tracker#220, docs/plugin-api.md 3
 A13).** A plugin that provides `library.stores` adds a store beside

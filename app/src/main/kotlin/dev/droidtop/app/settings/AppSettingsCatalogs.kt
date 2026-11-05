@@ -1047,6 +1047,8 @@ object AppSettingsCatalogs {
                     GitHubAccountCatalog.accountRow(context),
                     // Every key droidtop holds, in one place (Droidtop/tracker#12, the owner's choice (b), 2026-10-28).
                     keysAndAccountsRow(keysHeld),
+                    // Every key and sign-in droidtop holds, in one list (Droidtop/tracker#12, the owner's 2026-10-28 choice).
+                    KeysAndAccountsCatalog.linkRow(),
                     // Each store's sign-in, library and sync live on its own page in Stores (docs/SPEC.md 7j "Places").
                     NestedScreenItem(
                         id = "accounts_stores_link",
