@@ -110,4 +110,29 @@ class EmojiTest {
         val catalog = EmojiCatalog.parse(sample).drawable { it != "👋🏻" }
         assertEquals(emptyList<String>(), catalog.groups[1].entries[0].variants)
     }
+
+    // Droidtop/tracker#903 H4: emoji for the word just typed.
+
+    @Test fun aWholeWordOffersItsEmojiBestFirst() {
+        val catalog = EmojiCatalog.parse(sample)
+        // "joy" is a keyword of tears of joy; "smile" a keyword of two, ranked in the data's order.
+        assertEquals(listOf("😂"), catalog.suggest("joy").map { it.emoji })
+        assertEquals(listOf("😀", "🙂"), catalog.suggest("smile").map { it.emoji })
+        // A name word beats a keyword: "waving" is in the hand's name.
+        assertEquals(listOf("👋"), catalog.suggest("Waving").map { it.emoji })
+    }
+
+    @Test fun halfWordsShortWordsAndNumbersOfferNothing() {
+        val catalog = EmojiCatalog.parse(sample)
+        assertTrue(catalog.suggest("smi").isEmpty())
+        assertTrue(catalog.suggest("hi").isEmpty())
+        assertTrue(catalog.suggest("joy2").isEmpty())
+    }
+
+    @Test fun theWordBeforeTheCursor() {
+        assertEquals("pizza", EmojiWords.lastWord("I want pizza"))
+        assertEquals("", EmojiWords.lastWord("I want pizza "))
+        assertEquals("", EmojiWords.lastWord(null))
+        assertEquals("caf\u00e9", EmojiWords.lastWord("le caf\u00e9"))
+    }
 }

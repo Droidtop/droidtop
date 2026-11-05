@@ -74,6 +74,35 @@ class EmojiCatalog(val groups: List<EmojiGroup>) {
         HashMap<String, EmojiEntry>().also { map -> all.forEach { entry -> map[entry.emoji] = entry; entry.variants.forEach { map[it] = entry } } }
     }
 
+    /**
+     * Emoji for a whole word just typed (Droidtop/tracker#903 H4), best first, at most [limit]: an emoji whose name is
+     * the word, then one with the word among its name's words, then one with it as a keyword ("pizza", "cat", "love").
+     * Only words of three letters or more; kaomoji are left to their tab. Exact words, not prefixes, so a word half
+     * typed offers nothing. Pure.
+     */
+    fun suggest(word: String, limit: Int = 3): List<EmojiEntry> {
+        val w = word.lowercase()
+        if (w.length < 3 || !w.all { it.isLetter() }) return emptyList()
+        val found = suggestIndex[w] ?: return emptyList()
+        return found.sortedBy { entry ->
+            when {
+                entry.lowerName == w -> 0
+                w in entry.nameWords -> 1
+                else -> 2
+            }
+        }.take(limit)
+    }
+
+    private val suggestIndex: Map<String, List<EmojiEntry>> by lazy {
+        val index = HashMap<String, MutableList<EmojiEntry>>()
+        groups.filter { it.id != "kaomoji" }.flatMap { it.entries }.forEach { entry ->
+            (entry.nameWords + entry.lowerKeywords).filter { ' ' !in it && it.length >= 3 }.toSet().forEach { token ->
+                index.getOrPut(token) { ArrayList() } += entry
+            }
+        }
+        index
+    }
+
     /** The entry an emoji is, or is a tone of (a recent can be either). */
     fun entryOf(emoji: String): EmojiEntry? = byEmoji[emoji]
 
@@ -164,6 +193,16 @@ object Kaomoji {
             entries += EmojiEntry(line, if (group.isEmpty()) GROUP else "$GROUP $group", listOfNotNull(group.ifEmpty { null }))
         }
         return EmojiGroup(GROUP, entries)
+    }
+}
+
+/** The word right before the cursor, from the text before it, or "" when the cursor is not just after one. Pure. */
+object EmojiWords {
+    fun lastWord(before: CharSequence?): String {
+        if (before.isNullOrEmpty() || !before.last().isLetter()) return ""
+        var i = before.length
+        while (i > 0 && before[i - 1].isLetter()) i--
+        return before.subSequence(i, before.length).toString()
     }
 }
 

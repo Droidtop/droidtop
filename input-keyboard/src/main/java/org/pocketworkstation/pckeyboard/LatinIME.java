@@ -1035,6 +1035,22 @@ public class LatinIME extends InputMethodService implements
         return view;
     }
 
+    /**
+     * droidtop patch (Droidtop/tracker#903 H4): emoji for the word just typed, on the tool strip. Only with a plain cursor
+     * (no selection), and never in a password or no-learning field (IncognitoRules.sensitiveField).
+     */
+    private void offerEmojiForWord(int selStart, int selEnd) {
+        if (mToolsDeck == null) return;
+        final InputConnection ic = getCurrentInputConnection();
+        final EditorInfo info = getCurrentInputEditorInfo();
+        final boolean sensitive = info == null || IncognitoRules.INSTANCE.sensitiveField(info.inputType, info.imeOptions);
+        String word = "";
+        if (ic != null && !sensitive && selStart == selEnd) {
+            word = EmojiWords.INSTANCE.lastWord(ic.getTextBeforeCursor(32, 0));
+        }
+        mToolsDeck.offerEmoji(word, sensitive);
+    }
+
     /** The tool strip around the current input view, if there is one; shows the autofill suggestions. */
     private ToolsDeck mToolsDeck;
 
@@ -1105,6 +1121,7 @@ public class LatinIME extends InputMethodService implements
             int candidatesEnd) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
                 candidatesStart, candidatesEnd);
+        offerEmojiForWord(newSelStart, newSelEnd);
 
         // If the current selection in the text view changes, we should
         // clear whatever candidate text we have.

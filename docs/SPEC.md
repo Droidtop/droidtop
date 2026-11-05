@@ -9053,6 +9053,13 @@ proposal) is not built; these helpers are in the one settings tree that already 
   kept (`EmojiTones`, `pref_emoji_skin_tone`) for the grid and search from then on: a one-person emoji in that tone, a
   two-person one where both share it, as Gboard does. A mixed two-person pick is typed without changing the tone. An
   emoji keeps its tones only while the device's font can draw all of them.
+- **Emoji for the word just typed (Droidtop/tracker#903 H4).** In the input method, a whole word of three letters or
+  more right before the cursor that names an emoji ("pizza", "cat") or is one of its keywords ("love") offers up to three
+  emoji in a row above the tool strip, in the tone last picked: an emoji whose name is the word first, then one with the
+  word in its name, then a keyword match (`EmojiCatalog.suggest`). A tap replaces the word with the emoji. Exact words
+  only, so a half-typed word offers nothing; never in a password or no-learning field (`IncognitoRules.sensitiveField`),
+  never with a selection, and not when the emoji panel is switched off. It does not depend on word suggestions being
+  on. Kaomoji are left to their tab.
 - **Kaomoji (Droidtop/tracker#903 H4).** The emoji panel's last tab is Kaomoji: AnySoftKeyboard's list (Apache-2.0,
   104 faces in 19 groups such as Joy, Love, Sympathy, Music and Animals; `assets/kaomoji/`, whose SOURCE.txt names the
   commit and the three entries corrected there). They show in wider cells in smaller type, are typed as they are, go to
