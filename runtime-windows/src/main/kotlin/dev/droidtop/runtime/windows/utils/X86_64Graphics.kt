@@ -102,6 +102,28 @@ object X86_64Graphics {
             envVars.put("XLIB_NO_SHM", "1")
         }
         envVars.put("MESA_SHADER_CACHE_DIR", File(root, "cache").apply { mkdirs() }.path)
+        envVars.put("DXVK_CONFIG", withOneCompilerThread(envVars.get("DXVK_CONFIG")))
+    }
+
+    /**
+     * [config] (a `DXVK_CONFIG` value) with `dxvk.numCompilerThreads = 1` added, unless it already names a count
+     * (Droidtop/tracker#894; built to the recommendation, owner to confirm). On lavapipe, LLVM compiles each
+     * pipeline on DXVK's compiler threads, and with one thread per core the many 32 and 64 KB blocks it holds fill
+     * Scudo's fixed 256 MB per size class: malloc fails and vkCreateGraphicsPipelines asserts (Slime Rancher on
+     * BlueStacks, 79 s in). One thread keeps fewer compiles in flight. That only delays the cap, so it is a stopgap
+     * until the allocator question is settled. A count the person set (Game properties, `DXVK_CONFIG`) is kept.
+     */
+    internal fun withOneCompilerThread(config: String?): String {
+        val existing = config.orEmpty()
+        if (existing.contains("numCompilerThreads")) return existing
+        val setting = "dxvk.numCompilerThreads = 1"
+        if (existing.isBlank()) return setting
+        // DXVKHelper writes the value wrapped in double quotes; the setting goes inside them.
+        return if (existing.length >= 2 && existing.startsWith('"') && existing.endsWith('"')) {
+            existing.dropLast(1).trimEnd(';', '\n', ' ') + "; " + setting + '"'
+        } else {
+            existing.trimEnd(';', '\n', ' ') + "; " + setting
+        }
     }
 
     private fun writeIcd(root: File, lib: File): File {

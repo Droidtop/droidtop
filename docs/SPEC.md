@@ -23696,7 +23696,13 @@ app gets it too:
     `WINE_X11FORCEGLX=1` (the Android patch to winex11 that skips the
     server GLX check) and `XLIB_NO_SHM=1` (the same SysV reason as
     `noshm` above) are set. WineD3D is then a working choice on x86_64;
-    DXVK stays the default.
+    DXVK stays the default. On lavapipe, DXVK compiles with one thread
+    (`dxvk.numCompilerThreads = 1` added to `DXVK_CONFIG` unless a count is
+    set; Droidtop/tracker#894, built to the recommendation, owner to
+    confirm). With a thread per core, LLVM's pipeline compiles fill
+    Scudo's fixed 256 MB per size class and malloc fails (Slime Rancher on
+    BlueStacks). This is a stopgap that delays the cap; the allocator
+    question waits for the owner.
     Limits that are the components', not droidtop's (rig, 2026-10-03,
     Droidtop/tracker#304): WineD3D with its Vulkan renderer
     (`renderer=vulkan`, Wine's experimental one) over lavapipe stays black,
