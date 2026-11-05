@@ -48,7 +48,12 @@ object ContainerRuntimeFactory {
                 cachePolicy = policy,
             )
         } else {
-            ProotRuntime(app, store, policy) { DesktopSetupPrefs.microphone(app) }
+            ProotRuntime(
+                app, store, policy,
+                microphoneEnabled = { DesktopSetupPrefs.microphone(app) },
+                // The games folders a container sees without "All internal storage" (Droidtop/tracker#584).
+                sharedFolders = { dev.droidtop.library.GamesRoots.current(app).map { it.absolutePath } },
+            )
         }
     }
 }

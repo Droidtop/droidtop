@@ -25,6 +25,12 @@ sealed interface HomeChoice {
 data class EnvironmentMounts(
     val home: HomeChoice = HomeChoice.Private,
     val folders: List<ExtraMount> = emptyList(),
+    /**
+     * "All internal storage" (docs/SPEC.md 5a, "What a game can reach", 4; Droidtop/tracker#584): every mounted
+     * volume bound whole. Off unless the person allowed it, for new and existing containers alike (owner,
+     * 2026-10-22: "Nope, turn it off. If it breaks, we fix it then."); without it only the shared folders are bound.
+     */
+    val allStorage: Boolean = false,
 ) {
     /**
      * Host-to-guest binds, home first. A folder that no longer exists on the host is left out (a card taken out,
@@ -69,6 +75,7 @@ data class EnvironmentMounts(
         val NEW_CONTAINER = EnvironmentMounts(home = HomeChoice.Shared)
 
         private const val HOME_KEY = "@home"
+        private const val ALL_STORAGE_KEY = "@allStorage"
 
         /**
          * Reads the mounts file both backends keep per container. Folder lines are `hostPath<TAB>name` (the format
@@ -78,10 +85,13 @@ data class EnvironmentMounts(
          */
         fun decode(text: String): EnvironmentMounts {
             var home: HomeChoice = HomeChoice.Private
+            var allStorage = false
             val folders = mutableListOf<ExtraMount>()
             text.lineSequence().forEach { line ->
                 val parts = line.split("\t")
-                if (parts.firstOrNull() == HOME_KEY) {
+                if (parts.firstOrNull() == ALL_STORAGE_KEY) {
+                    allStorage = parts.getOrNull(1) == "1"
+                } else if (parts.firstOrNull() == HOME_KEY) {
                     home = when (parts.getOrNull(1)) {
                         "shared" -> HomeChoice.Shared
                         "chosen" -> parts.getOrNull(2)?.takeIf { it.isNotBlank() }?.let { HomeChoice.Chosen(it) } ?: HomeChoice.Private
@@ -92,7 +102,7 @@ data class EnvironmentMounts(
                     if (folder.size == 2 && folder[0].isNotBlank() && folder[1].isNotBlank()) folders += ExtraMount(folder[0], folder[1])
                 }
             }
-            return EnvironmentMounts(home, folders)
+            return EnvironmentMounts(home, folders, allStorage)
         }
 
         fun encode(mounts: EnvironmentMounts): String = buildString {
@@ -101,6 +111,7 @@ data class EnvironmentMounts(
                 HomeChoice.Private -> append("$HOME_KEY\tprivate\n")
                 is HomeChoice.Chosen -> append("$HOME_KEY\tchosen\t${h.hostPath}\n")
             }
+            if (mounts.allStorage) append("$ALL_STORAGE_KEY\t1\n")
             mounts.folders.forEach { append("${it.hostPath}\t${it.name}\n") }
         }
     }

@@ -404,6 +404,20 @@ object ContainerLayout {
         volumes.map { it.root.absolutePath to "$SHARED_STORAGE_DIR/${it.name}" }
 
     /**
+     * The binds a container gets without "All internal storage" (docs/SPEC.md 5a, 4; Droidtop/tracker#584): each of
+     * [folders] (the person's games folders) that lies on one of [volumes], at the same guest path
+     * [sharedStorageBinds] would give it, so paths read the same whichever way it is bound. A folder that is itself
+     * wide ([WideAccess.classify] against the volumes and droidtop's [privateDir]) is left out: that is what the
+     * toggle is for. Pure.
+     */
+    fun sharedFolderBinds(volumes: List<SharedVolume>, folders: List<String>, privateDir: String): List<Pair<String, String>> {
+        val roots = volumes.map { it.root.absolutePath }
+        return folders.distinct()
+            .filter { WideAccess.classify(it, roots, privateDir) == WideAccess.Kind.NARROW }
+            .mapNotNull { folder -> sharedStorageToContainerPath(volumes, File(folder))?.let { folder to it } }
+    }
+
+    /**
      * [hostPath] as seen inside a container through [sharedStorageBinds],
      * or null when it is on none of [volumes] (a file only a content
      * provider serves, or one in another app's private storage).
