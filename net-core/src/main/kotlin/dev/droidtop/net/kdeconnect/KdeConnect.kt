@@ -165,6 +165,12 @@ object KdeConnect {
         AgentNative.failure(call("ping", JSONObject().put("id", id).put("message", "Ping from droidtop")))
     }
 
+    /** This device's clipboard is now [text] (already checked against droidtop's clipboard rules): sent to paired devices. */
+    suspend fun clipboardSet(text: String): Int = withContext(Dispatchers.IO) {
+        if (!_running.value) return@withContext 0
+        call("clipboard_set", JSONObject().put("text", text)).optInt("sent_to", 0)
+    }
+
     suspend fun shareText(id: String, text: String): String? = withContext(Dispatchers.IO) {
         AgentNative.failure(call("share_text", JSONObject().put("id", id).put("text", text)))
     }
@@ -244,6 +250,8 @@ sealed class KdcEvent {
     /** Whole, at [path] in droidtop's cache; moved to the person's folder by :app. */
     data class FileReceived(val id: String, val name: String, val path: String, val size: Long, val open: Boolean) : KdcEvent()
     data class FileFailed(val id: String, val name: String, val why: String) : KdcEvent()
+    /** The other device's clipboard: put on this one's. */
+    data class Clipboard(val id: String, val text: String) : KdcEvent()
     data class FileSent(val id: String, val name: String, val size: Long) : KdcEvent()
     data class FileSendFailed(val id: String, val name: String, val why: String) : KdcEvent()
     /** Anything else (reachable, unreachable, unpaired): only the device list changes. */
@@ -260,6 +268,7 @@ sealed class KdcEvent {
                 val p = o.optJSONObject("plugin")
                 when (p?.optString("plugin")) {
                     "ping" -> Ping(o.optString("id"), p.optString("message").takeIf { it.isNotEmpty() && !p.isNull("message") })
+                    "clipboard" -> Clipboard(o.optString("id"), p.optString("text"))
                     "share_text" -> ShareText(o.optString("id"), p.optString("text"))
                     "share_url" -> ShareUrl(o.optString("id"), p.optString("url"))
                     "file_receiving" -> FileReceiving(

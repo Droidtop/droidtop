@@ -121,7 +121,7 @@ object RemoteInputs {
  * (`ClipDescription.EXTRA_IS_SENSITIVE`) is classified before any of its content is read, and only plain text
  * is read (`ClipData.Item.text`, never `coerceToText`, which would query a content provider).
  */
-private class AndroidClipboard(private val context: Context) : ConsoleClipboard {
+internal class AndroidClipboard(private val context: Context) : ConsoleClipboard {
     private val manager get() = context.getSystemService(ClipboardManager::class.java)
 
     override fun write(text: String): Boolean = MainThread.call {
