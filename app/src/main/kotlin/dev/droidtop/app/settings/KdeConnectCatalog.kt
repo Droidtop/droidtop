@@ -30,7 +30,11 @@ object KdeConnectCatalog {
         id = SCREEN_ID,
         title = "KDE Connect",
         subtitle = "Pair phones and computers running KDE Connect, or Pythia",
-        groups = { context -> groups(context) },
+        groups = { context ->
+            // Opening the screen is how find my device's sound is stopped.
+            dev.droidtop.app.KdeConnectNotification.stopRinging(context)
+            groups(context)
+        },
         live = KdeConnect.changes,
         needsNetwork = true,
     )
@@ -144,6 +148,12 @@ object KdeConnectCatalog {
 
     /** Send a file (the system's document picker; the file is read where it is, never copied) and send a text. */
     private fun sendRows(d: KdcDevice): List<CatalogItem> = listOf(
+        AsyncActionItem(
+            id = "kdeconnect_ring_${d.id}",
+            title = "Ring ${d.name}",
+            subtitle = "Plays a sound there until it is stopped, to find it",
+            run = { _, _ -> KdeConnect.ring(d.id) ?: "Ringing ${d.name}" },
+        ),
         DocumentPickItem(
             id = "kdeconnect_send_file_${d.id}",
             title = "Send a file to ${d.name}",
