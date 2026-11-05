@@ -427,6 +427,8 @@ object GamingSettingsCatalog {
                     registryId = "android_settings",
                     icon = CatalogIcon.ANDROID_SETTINGS,
                 ),
+                // Reachable from the main screen too, not only the companion's System card (Droidtop/tracker#826 item 6).
+                privacyDashboardItem(),
             ),
         ),
         CatalogGroup(
@@ -1180,7 +1182,7 @@ object GamingSettingsCatalog {
 
     /**
      * Android's privacy dashboard (which apps used the camera, microphone and location lately, Android 12 and later),
-     * else its Privacy settings. The companion's System > Privacy card.
+     * else its Privacy settings. The companion's System > Privacy card, and Settings > System > Android.
      */
     fun privacyDashboardItem(): ActionItem = ActionItem(
         id = ID_PRIVACY_DASHBOARD,

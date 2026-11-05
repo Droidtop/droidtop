@@ -299,9 +299,7 @@ object QuickTiles {
         GamingSettingsCatalog.ID_DISPLAY_REINIT -> QuickGlyph.DISPLAY
         GamingSettingsCatalog.ID_SCREENSHOT -> QuickGlyph.CAMERA
         GamingSettingsCatalog.ID_STOP_FOREGROUND -> QuickGlyph.STOP
-        GamingSettingsCatalog.ID_COMPANION_WAKE,
-        GamingSettingsCatalog.ID_DISPLAY_COMPANION,
-        -> QuickGlyph.SECOND_SCREEN
+        GamingSettingsCatalog.ID_COMPANION_WAKE -> QuickGlyph.SECOND_SCREEN
         GamingSettingsCatalog.ID_SYSTEM_LOCATION -> QuickGlyph.LOCATION
         GamingSettingsCatalog.ID_SYSTEM_FLASHLIGHT -> QuickGlyph.FLASHLIGHT
         ID_SEARCH -> QuickGlyph.SEARCH
