@@ -21,12 +21,15 @@ class UpdateRowInPlaceTest {
     @Before
     fun installWords() = WordsForTests.install()
 
-    private val row = UpdatesPage.sourceUpdateRow(
-        library = { error("the library is asked for only when the update's screen is opened") },
-        entryId = "/games/30 Year Old Virgin 0.37",
-        title = "30 Year Old Virgin",
-        step = "v0.37 → v0.38",
-    )
+    // Built after installWords: a property initializer runs before @Before.
+    private val row by lazy {
+        UpdatesPage.sourceUpdateRow(
+            library = { error("the library is asked for only when the update's screen is opened") },
+            entryId = "/games/30 Year Old Virgin 0.37",
+            title = "30 Year Old Virgin",
+            step = "v0.37 → v0.38",
+        )
+    }
 
     @Test
     fun `A on a game's update row pushes the update's own screen and runs nothing`() {
