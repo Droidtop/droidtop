@@ -7,7 +7,6 @@ import android.net.Uri
 import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.LibraryCore
 import dev.droidtop.app.PluginStatusWidgetProvider
-import dev.droidtop.app.ScraperKeySetupActivity
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.LibraryScrapeJob
 import dev.droidtop.library.consoles.ConsoleSystemDef

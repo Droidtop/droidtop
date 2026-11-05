@@ -80,9 +80,10 @@ internal object Seams {
         // A source's engine hint (docs/plugin-api.md 1.6, acquire reply `engine`) pins the placed download to that
         // engine before the library indexes it, and an update's saves are copied into its new version folder
         // (docs/SPEC.md 7g, "Getting an update"), with the version it follows offered for removal.
-        // The guided key setup, opened in place from a game page's sign-in row (Droidtop/tracker#143).
+        // The source's key page, opened from a game page's sign-in row (Droidtop/tracker#143): the same Settings page
+        // its row opens (Droidtop/tracker#869).
         dev.droidtop.library.scraper.ScraperKeySetupLink.open = { context, service ->
-            context.startActivity(ScraperKeySetupActivity.intent(context, service).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            dev.droidtop.app.settings.KeySetupCatalog.open(context, service)
         }
         // Debrid (Droidtop/tracker#638): a torrent job asks the person's accounts first, from the keys they entered.
         dev.droidtop.pluginhost.debrid.DebridStep.accounts = { context -> dev.droidtop.library.debrid.DebridAccounts.connected(context) }

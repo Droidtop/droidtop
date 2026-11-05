@@ -7,7 +7,6 @@ import android.net.Uri
 import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.LibraryCore
 import dev.droidtop.app.PluginStatusWidgetProvider
-import dev.droidtop.app.ScraperKeySetupActivity
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.LibraryScrapeJob
 import dev.droidtop.library.consoles.ConsoleSystemDef
@@ -221,6 +220,7 @@ object AppSettingsCatalogs {
         // The one game folders screen (Droidtop/tracker#589).
         SettingsScreenRegistry.register(FoldersCatalog.screen())
         SettingsScreenRegistry.register(scraperScreen())
+        SettingsScreenRegistry.register(KeySetupCatalog.screen())
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
         SettingsScreenRegistry.register(pluginsScreen())
@@ -1345,11 +1345,6 @@ object AppSettingsCatalogs {
     )
 
     /**
-     * An optional source that needs the person's own credential: one row,
-     * its state ("Not set", "Not tested", "Connected") as the value, and the
-     * numbered guide, QR code and fields behind it (ScraperKeySetupActivity).
-     */
-    /**
      * Each debrid account in the person's order (Droidtop/tracker#638): its key row, whether it is used for downloads,
      * and moving it in the order, which settles a tie between accounts a job costs the same (the cheapest serves first).
      */
@@ -1377,13 +1372,12 @@ object AppSettingsCatalogs {
         }
     }
 
-    private fun guidedKeyRow(context: Context, service: ScraperKeyService, title: String) = ActionItem(
-        id = "accounts_" + service.name.lowercase(),
-        title = title,
-        value = ScraperKeyCheck.state(context, service),
-        icon = CatalogIcon.GLOBAL,
-        run = { ctx -> ctx.startActivity(ScraperKeySetupActivity.intent(ctx, service).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
-    )
+    /**
+     * An optional source that needs the person's own credential: one row, its state ("Not set", "Not tested",
+     * "Connected") as the value, and its Settings page behind it in the shared frame (KeySetupCatalog,
+     * Droidtop/tracker#869).
+     */
+    private fun guidedKeyRow(context: Context, service: ScraperKeyService, title: String) = KeySetupCatalog.row(context, service, title)
 
     private fun integrationsScreen() = CatalogScreen(
         id = SCREEN_INTEGRATIONS,

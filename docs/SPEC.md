@@ -16381,7 +16381,17 @@ droidtop ships no RetroAchievements key, and the Connect key is never asked for,
 own sign-in stays the emulator's: RetroArch's RetroAchievements login is RetroArch's). Each has ONE row under Settings > Accounts and sources whose value
 is its state (`Not set`, `Not tested`, `Connected`; `Built in` for TheGamesDB on a build that
 carries the application key, `No account` for ScreenScraper, `ScraperKeyState`) and whose guide is
-a screen behind the row (`ScraperKeySetupActivity`). Store sign-ins (Steam, GOG, Epic, Amazon,
+its **Settings page in the shared frame** behind the row (`KeySetupCatalog`, one screen `key_setup` deep-linked by
+the service, so a game page's sign-in row opens the same page; Droidtop/tracker#869, the owner on the TorBox page,
+2026-11-04: "We need to clean up and unify this page, it's a massive breach of UI rules"). The page is rows like every
+Settings page: Status (the state as its value, what the source gives and its credit line as its words); Get the key
+(Real-Debrid's "Sign in with a code", whose row shows the code, the address and the time left as its progress line
+and stops the wait when the page is left; "Open the key page here", the browser pane below; "Open on this device",
+whose words carry the address so any other device can open it; "Type from another device"); the fields, each the
+app's one text-entry row (Paste is in its dialog), saved as typed; Test, which says "Testing" while it runs; and
+Clear, which asks first. The how-to is one hint under the row it belongs to (`KeySetupCatalog.stepsHint`), never a
+numbered list, and there is no QR code on the page. Only the browser pane is a window of its own
+(`ScraperKeySetupActivity`), because a web page cannot be a settings row. Store sign-ins (Steam, GOG, Epic, Amazon,
 itch.io) and the GitHub token have their own flows (7g, 12a) and are not repeated here. A
 service's fields (`ScraperKeyService.fields`) have the same ids in the key page and
 the vault. The state is `Connected` only after a test passed with the stored credential; any change
@@ -16422,14 +16432,13 @@ Details already credits each source for the fields it supplied ("Where these fac
    browser (a sign-in that redirects to another host, such as a third-party OAuth page, is not
    loaded in the pane, and an HTTP 403 on the page counts too) the panel shows one row, "Use
    browser and phone", which opens the system browser on the service's page and starts the phone
-   page below.
-2. **The official page elsewhere.** The guide's manual screen shows the page as a QR code
-   generated on the device and "Open on this device" for the system browser, the numbered
-   steps, and the fields. Each field has Paste (the clipboard) beside it, and takes text from the
-   on-screen keyboard.
+   page below, and the pane closes back to the Settings page; its other ways go back there too.
+2. **The official page elsewhere.** The Settings page's "Open on this device" opens the system browser; its words
+   name the address for any other device. The fields are text-entry rows whose dialog has Paste (the clipboard)
+   and the on-screen keyboard.
 3. **Type from another device (nobody types a 30 character secret on a gamepad).** "Type from another
    device" is the one session that types a phone's or PC's text into the field in focus (Droidtop/tracker#645, the
-   section below). The screen has the button under its fields, and "Use browser and phone", after a provider refused
+   section below). The page has it as a row under Get the key, and "Use browser and phone", after a provider refused
    the pane, opens the browser and the same session over it. The person scans the code, confirms it on the console,
    puts the cursor in a field of the key screen and types on the phone; the field takes it like any typed text, and
    nothing is stored or tested until Save and Test are pressed there. The earlier one-time form page with a
