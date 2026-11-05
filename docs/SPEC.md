@@ -2243,8 +2243,12 @@ asked: droidtop never asks for root itself (root goes through Shizuku). A failed
 start reads "The desktop didn't start", with Try again and Desktop setup (worded
 once #688's "The desktop stopped" beside it in the same file had landed). Its reason
 is plain: "Couldn't install the Linux system", "The Linux system didn't start",
-"The desktop started, but droidtop couldn't show it". The container, compositor and
-socket details go to logcat (`DesktopSessionService.fail`'s `log`). A view that
+"The desktop started, but droidtop couldn't show it", and, with no system chosen or a chosen one gone from the
+catalog, "No Linux system is chosen yet" or "The Linux system chosen for the desktop isn't offered any more", each
+pointing at Desktop setup. The container, compositor and socket details, the runtime's own error text included, go to
+logcat only (`DesktopSessionService.fail`'s `log`); until 2026-11-05 two reasons still carried that text in brackets
+(Droidtop/tracker#693). A desktop that stopped on its own says "It closed unexpectedly, and the windows that were open
+on it closed with it.", not that a compositor exited. A view that
 cannot present the output says "Couldn't show the desktop. Restart it from Start,
 under System."
 

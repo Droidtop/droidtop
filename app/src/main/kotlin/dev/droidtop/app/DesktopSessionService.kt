@@ -178,9 +178,9 @@ class DesktopSessionService : Service() {
             // A kernel that refuses ptrace has one way that works, said as onboarding says it (Droidtop/tracker#555).
             fail(
                 if (runtime !is dev.droidtop.runtime.linux.root.DroidSpacesRuntime && detail.contains("ptrace", ignoreCase = true)) {
-                    "${desktopCheckMessage(false, rooted = false, error = detail)} ($detail)"
+                    desktopCheckMessage(false, rooted = false, error = detail)
                 } else {
-                    "This device can't run the desktop ($detail)."
+                    "This device can't run the desktop."
                 },
                 log = "This device can't run ${runtime.javaClass.simpleName}: $detail",
             )
@@ -191,7 +191,12 @@ class DesktopSessionService : Service() {
         val repository = try {
             chosenRepository()
         } catch (t: Throwable) {
-            fail(t.message ?: "No desktop image chosen", t)
+            val reason = if (DesktopSetupPrefs.preferredPrimaryImageId(applicationContext) == null) {
+                "No Linux system is chosen yet. Choose one in Desktop setup."
+            } else {
+                "The Linux system chosen for the desktop isn't offered any more. Choose another in Desktop setup."
+            }
+            fail(reason, t, log = t.message ?: "No desktop image chosen")
             return
         }
         val provisioning = try {
@@ -211,7 +216,8 @@ class DesktopSessionService : Service() {
             // failure to report either.
             throw e
         } catch (t: Throwable) {
-            fail("Couldn't install the Linux system (${t.message}).", t, log = "Couldn't create the primary container: ${t.message}")
+            // Plain on the page; the runtime's own text (paths, ids, the compositor) goes to logcat only (SPEC 2b, #693).
+            fail("Couldn't install the Linux system.", t, log = "Couldn't create the primary container: ${t.message}")
             return
         }
         android.util.Log.i(TAG, "Primary container: ${primary.id}")
@@ -237,7 +243,7 @@ class DesktopSessionService : Service() {
             // Stop, leaving Desktop): that is not a failure to report.
             throw e
         } catch (t: Throwable) {
-            fail("The Linux system didn't start (${t.message}).", t, log = "Couldn't start the primary container: ${t.message}")
+            fail("The Linux system didn't start.", t, log = "Couldn't start the primary container: ${t.message}")
             return
         }
         android.util.Log.i(TAG, "Primary container started")
@@ -289,7 +295,7 @@ class DesktopSessionService : Service() {
     private suspend fun watchCompositor(hostBridge: HostBridge) {
         while (!hostBridge.connectionLost()) kotlinx.coroutines.delay(COMPOSITOR_CHECK_MS)
         android.util.Log.e(TAG, "The compositor closed the connection; ending the desktop session")
-        endedBecause = "Its compositor exited, and the windows that were open on it closed with it."
+        endedBecause = "It closed unexpectedly, and the windows that were open on it closed with it."
         stopSelf()
     }
 
