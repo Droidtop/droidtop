@@ -2219,9 +2219,12 @@ Try again.
 
 **The desktop's pages speak plainly (decided 2026-10-29, Droidtop/tracker#693).**
 The Starting, failed and "couldn't show" pages say what happened and the one thing
-to do, never the machinery. "Starting the desktop…" says the first start downloads
-a Linux system and sets up the desktop, which takes several minutes, with the boot's
-own latest line under it. It no longer tells a rooted device to grant root when
+to do, never the machinery. "Starting the desktop…" has the boot's own latest line under
+it; on the start that makes the Linux system (`DesktopSessionState.Connecting.firstStart`,
+set where the primary container is created) it also says the first start downloads a
+Linux system and sets up the desktop, which takes several minutes. A restart or a later
+start, which reuses the system and is back in seconds, does not say so (rig 2026-11-04,
+build 2852, #687 and #693: Restart desktop showed the first-start sentence). It no longer tells a rooted device to grant root when
 asked: droidtop never asks for root itself (root goes through Shizuku). A failed
 start reads "The desktop didn't start", with Try again and Desktop setup (worded
 once #688's "The desktop stopped" beside it in the same file had landed). Its reason
