@@ -25,6 +25,7 @@ import com.winlator.xenvironment.components.VortekRendererComponent
 import com.winlator.xenvironment.components.XServerComponent
 import com.winlator.xserver.XServer
 import dev.droidtop.library.diagnostics.RunLogCollector
+import dev.droidtop.runtime.windows.utils.X86_64Graphics
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
@@ -131,6 +132,10 @@ class WineXSession(
         // installer payload left there is read back as if it were this
         // launch's.
         runCatching { FileUtils.clear(imageFs.tmpDir) }
+
+        // OpenGL on x86_64 software graphics (Droidtop/tracker#309): the X server answers the GLX question for the
+        // client-side GLX of Mesa's xlib libGL, before the guest connects.
+        if (X86_64Graphics.clientSideGlx(context, prefix)) xServer.advertiseClientSideGlx()
 
         val environment = XEnvironment(context, imageFs)
         this.environment = environment

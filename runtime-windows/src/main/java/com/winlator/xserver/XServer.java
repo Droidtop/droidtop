@@ -10,6 +10,7 @@ import com.winlator.winhandler.WinHandler;
 import com.winlator.xserver.extensions.BigReqExtension;
 import com.winlator.xserver.extensions.DRI3Extension;
 import com.winlator.xserver.extensions.Extension;
+import com.winlator.xserver.extensions.GLXExtension;
 import com.winlator.xserver.extensions.GenericEventExtension;
 import com.winlator.xserver.extensions.MITSHMExtension;
 import com.winlator.xserver.extensions.PresentExtension;
@@ -296,6 +297,14 @@ public class XServer {
             }
             registerExtension(new XInput2Extension(),   nextEventId, nextErrorId);
         }
+    }
+
+    /**
+     * Advertises "GLX" ([GLXExtension]) for a session whose OpenGL is Mesa's xlib libGL, which does GLX on the
+     * client side (x86_64 software graphics, Droidtop/tracker#309). Call before the guest connects.
+     */
+    public void advertiseClientSideGlx() {
+        if (extensions.get(GLXExtension.MAJOR_OPCODE) == null) extensions.put(GLXExtension.MAJOR_OPCODE, new GLXExtension());
     }
 
     static boolean supportsXInput2(boolean useGlibcContainer) {
