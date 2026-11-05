@@ -11,6 +11,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import dev.droidtop.app.settings.KdeConnectCatalog
+import dev.droidtop.library.credentials.handoff.ClipRead
+import dev.droidtop.library.credentials.handoff.ClipRules
 import dev.droidtop.library.credentials.handoff.FileNames
 import dev.droidtop.library.settings.CatalogScreenLink
 import dev.droidtop.net.kdeconnect.KdcEvent
@@ -47,7 +49,43 @@ object KdeConnectNotification {
         scope.launch {
             KdeConnect.events.collect { e -> runCatching { handle(app, e) } }
         }
+        followClipboard(app)
     }
+
+    /**
+     * This device's clipboard to paired devices (docs/SPEC.md 7p, clipboard): Android tells droidtop of a change only
+     * while it is in front or its input method is the active one, and only then lets it read the clip, so that is when
+     * it is sent. The rules are the shared clipboard's ([ClipRules]): a clip marked sensitive never leaves, only plain
+     * text, at most 64 KB. A clip that just arrived from a paired device is not sent back (the library holds it).
+     */
+    private fun followClipboard(context: Context) {
+        val manager = context.getSystemService(android.content.ClipboardManager::class.java) ?: return
+        val clipboard = AndroidClipboard(context)
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            manager.addPrimaryClipChangedListener {
+                if (!KdeConnect.running.value) return@addPrimaryClipChangedListener
+                scope.launch { sendClipboard(clipboard) }
+            }
+        }
+    }
+
+    /** Sends the clipboard as it is now; what happened, in words for the screen. */
+    suspend fun sendClipboard(clipboard: dev.droidtop.library.credentials.handoff.ConsoleClipboard): String =
+        when (val read = clipboard.read()) {
+            is ClipRead.Text -> if (!ClipRules.fits(read.text)) {
+                "The clipboard holds more than 64 KB, so it is not sent"
+            } else {
+                val n = KdeConnect.clipboardSet(read.text)
+                if (n == 0) "Paired devices already have it, or none is connected" else "Sent to $n device${if (n == 1) "" else "s"}"
+            }
+            ClipRead.Sensitive -> "The clipboard holds something marked sensitive, so it is not sent"
+            ClipRead.Empty -> "The clipboard is empty"
+            ClipRead.NotText -> "The clipboard holds something other than text"
+            ClipRead.Unavailable -> "Android did not let droidtop read the clipboard"
+        }
+
+    /** Sends this device's clipboard now (the screen's Send clipboard row). */
+    suspend fun sendClipboard(context: Context): String = sendClipboard(AndroidClipboard(context.applicationContext))
 
     private suspend fun nameOf(id: String): String = KdeConnect.devices().firstOrNull { it.id == id }?.name ?: "A paired device"
 
@@ -84,6 +122,8 @@ object KdeConnectNotification {
             is KdcEvent.FileFailed -> post(context, FILE_ID, "Could not receive ${e.name}", e.why, screen(context, FILE_ID))
             is KdcEvent.FileSent -> post(context, FILE_ID, "Sent ${e.name}", "${nameOf(e.id)} has it (${FileNames.size(e.size)})", screen(context, FILE_ID))
             is KdcEvent.FileSendFailed -> post(context, FILE_ID, "Could not send ${e.name}", e.why, screen(context, FILE_ID))
+            // Written as the shared clipboard writes (64 KB at most); nothing is shown, as in the official apps.
+            is KdcEvent.Clipboard -> if (ClipRules.fits(e.text)) AndroidClipboard(context).write(e.text)
             is KdcEvent.Other -> Unit
         }
     }

@@ -65,6 +65,14 @@ class KdeConnectTest {
     }
 
     @Test
+    fun clipboardEvent() {
+        assertEquals(
+            KdcEvent.Clipboard("a", "copied"),
+            KdcEvent.parse(JSONObject("""{"event":"plugin","id":"a","plugin":{"plugin":"clipboard","text":"copied"}}""")),
+        )
+    }
+
+    @Test
     fun addresses() {
         assertEquals(listOf("100.64.0.2", "192.168.1.9"), KdeConnect.parseAddresses(" 100.64.0.2, 192.168.1.9\n100.64.0.2 "))
         assertEquals(emptyList<String>(), KdeConnect.parseAddresses(""))
