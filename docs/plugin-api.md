@@ -4432,6 +4432,19 @@ Containment check's "droidtop's files" line looks for droidtop's
 `files/plugins` folder by its own name, which in a plugin process is the
 plugin's folder, where there is none.
 
+**Listing and folders in an isolated process (built 2026-11-05,
+Droidtop/tracker#741).** SELinux checks every descriptor a process receives
+(`file_receive`), and an isolated process may receive a file droidtop opened
+for it, but not a folder. So a brokered folder open used to answer `EIO`:
+`File.list` returned null, and `File.mkdirs` failed, because bionic's
+`realpath` opens the folder. Fibrewall 8be4adc holds such a folder by its
+path. The plugin's handler answers the open with a placeholder descriptor and
+keeps the folder's path for it. Listing, `fstat`, the calls relative to it,
+`fchdir`, `getcwd` and `readlink` of `/proc/self/fd/N` then go to the broker
+by path, decided by the same rules. droidtop's plugin broker sets
+`sbx_policy_set_folders_by_path`, so it sends no folder descriptor at all.
+`ContainedFilesRigTest`'s own-folder test is off the known-failing list.
+
 **Preferences and SQLite are droidtop's (decided 2026-10-29,
 Droidtop/tracker#741).** The first emulator run of `ContainedFilesRigTest`
 (Android 13 and 14) found Android's own Java paths to preferences and SQLite

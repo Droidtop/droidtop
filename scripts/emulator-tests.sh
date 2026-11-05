@@ -28,9 +28,8 @@ say() { echo "$*" | tee -a "$summary"; }
 # tests anywhere, which found the contained plugin folder failing in an isolated process on stock Android 13 and 14).
 # A known test that fails is reported and does not fail the run. One that PASSES fails the run, so that the entry is
 # removed as the issue is fixed and cannot go stale; any other failure is a failure.
-KNOWN_FAILING=(
-  "dev.droidtop.app.ContainedFilesRigTest#theOwnFolderBehavesForPathsListingChmodUtimesPrefsAndSqlite|Droidtop/tracker#741"
-)
+# Empty since Fibrewall 8be4adc held folders by path in an isolated process (#741's list and mkdirs).
+KNOWN_FAILING=()
 
 # The "class#method" of every test am instrument says failed, one per line ("1) method(class)").
 failing_tests() { sed -n 's/^[0-9][0-9]*) \([^(]*\)(\(.*\))$/\2#\1/p' "$1"; }

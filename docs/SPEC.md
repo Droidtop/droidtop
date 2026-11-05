@@ -24789,7 +24789,11 @@ Advanced.
   plugin depends on the plugin API only, never on Android's services or on
   the Android it runs on: its preferences and its SQLite are droidtop's own,
   in both tiers (2026-10-29, Droidtop/tracker#741; `docs/plugin-api.md` §5.3
-  "Preferences and SQLite are droidtop's"). Its
+  "Preferences and SQLite are droidtop's"). It lists and makes its own
+  folders in an isolated process too: the sandbox holds a folder by its path,
+  since SELinux refuses an isolated process any folder descriptor droidtop
+  sends it (2026-11-05, Droidtop/tracker#741, Fibrewall 8be4adc; §5.3
+  "Listing and folders in an isolated process"). Its
   code arrives as file descriptors, and everything it does
   beyond its process goes through its broker, where the caller's grant, the
   parameters it declared, the quota and the activity log apply. **For a
@@ -25715,7 +25719,8 @@ the secondary path for sources that publish no key.
   running, or has crashed, 30 s after it is started, except that the two `ContainedFilesRigTest` tests are listed as
   known failing under Droidtop/tracker#741 (the contained plugin folder failed in an isolated process on stock Android
   13 and 14, the first run of those tests anywhere): they are reported and do not fail the run, and one of them passing
-  fails it, so the entry (`KNOWN_FAILING` in the script) is removed when #741 is fixed. `PluginStartRigTest` is run and reported without failing the run,
+  fails it, so the entry (`KNOWN_FAILING` in the script) is removed when #741 is fixed. It was removed on
+  2026-11-05 with the sandbox pin that holds folders by path. `PluginStartRigTest` is run and reported without failing the run,
   since the start-time budget it holds is the rig's and not an emulator's. `PythonPluginStartRigTest` is run and
   reported the same way: it times a contained python plugin's start step by step (the runtime's download and extract,
   the first plugin, a second in its own process, a warm call, four at once), Droidtop/tracker#848. Each number a rig test

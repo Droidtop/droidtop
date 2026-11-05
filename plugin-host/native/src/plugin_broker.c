@@ -122,6 +122,12 @@ Java_dev_droidtop_pluginhost_SandboxBroker_nativeServe(JNIEnv *env, jclass clazz
     if (aliases != (*env)->GetArrayLength(env, alias_to)) return -EINVAL;
     struct sbx_policy *policy = sbx_policy_new();
     if (!policy) return -ENOMEM;
+    /*
+     * A contained plugin runs in an isolated process, which SELinux refuses any folder descriptor droidtop sends it
+     * (file_receive). Its handler holds a folder by its path instead (Fibrewall 8be4adc), so the broker sends none:
+     * the denial is not even logged. Droidtop/tracker#741.
+     */
+    sbx_policy_set_folders_by_path(policy, 1);
     jint *mode = (*env)->GetIntArrayElements(env, modes, NULL);
     for (jsize i = 0; i < count; i++) {
         jstring path = (jstring) (*env)->GetObjectArrayElement(env, paths, i);
