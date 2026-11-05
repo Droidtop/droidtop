@@ -50,6 +50,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [7m. One game, its versions and its segments (directed 2026-09-16)](#7m-one-game-its-versions-and-its-segments-directed-2026-09-16)
 - [7n. PC game titles, executables and multi-part games (Droidtop/tracker#264)](#7n-pc-game-titles-executables-and-multi-part-games-droidtoptracker264)
 - [7o. Computers: droidtop-agent (decided 2026-10-08, Droidtop/tracker#373)](#7o-computers-droidtop-agent-decided-2026-10-08-droidtoptracker373)
+- [7p. KDE Connect (decided 2026-11-05, Droidtop/tracker#645)](#7p-kde-connect-decided-2026-11-05-droidtoptracker645)
 - [8. Licensing](#8-licensing)
 - [9. Module map](#9-module-map)
 - [10. Build order](#10-build-order)
@@ -22190,6 +22191,49 @@ The design's order (droidtop-agent docs/DESIGN.md section 10) holds:
 
 No relay carries data. Syncthing's discovery and STUN servers carry
 addresses only (the owner's decision above), and Tailscale is never required.
+
+## 7p. KDE Connect (decided 2026-11-05, Droidtop/tracker#645)
+
+The owner, 2026-11-05: "We want to get kde connect and tailscale integrated more closely. File transfer, keyboard
+input, and etc are good first things" and "Remember we wanted to implement the kde connect protocol and stuff
+internally". On #645, 2026-10-24: "We might as well implement all of kde connect, both client and server stuff. We
+wanna be a whole computer, but sometimes we're a phone. Can't be too pedantic". Library home, owner, 2026-11-05:
+"lib-kdeconnect implements explicitly kde-connect as a programmatic module". Tailscale, owner, 2026-11-05: "We control
+tailscale like any other VPN. It's just a more useful one for home networks. Tailcale plugin, not full tailscale
+client." The plan and its slices are on #645.
+
+- **droidtop is a KDE Connect device.** The protocol (version 8), discovery, the TLS link, pairing and the plugins
+  are Droidtop/lib-kdeconnect's (Rust, platform-neutral), linked into droidtop's native library (`native/`), so the
+  official KDE Connect apps (Android, Plasma, Windows, macOS) and Pythia find and pair with droidtop as with any KDE
+  Connect device. droidtop's code is the switch, the screen and the notices. droidtop reaches the library through
+  `AgentNative.call("kdeconnect_<op>")`, which `native/src/api.rs` passes to lib-kdeconnect's one operation table
+  (`kdeconnect_service::ops`); Pythia uses the same table.
+- **It runs while it is on.** Settings > Accounts and sources > KDE Connect has the switch (off until the person turns
+  it on). While on, from droidtop's start (`KdeConnectNotification.start` in the init provider), it listens on UDP
+  1716 and a TCP port in 1716-1764. It is the one part of the native library that runs between calls, and droidtop
+  follows it with one `event` call at a time (`:net-core` `KdeConnect`, at most 30 s each, on Dispatchers.IO).
+  Switching it off closes every link and frees the ports at once. It has no foreground service yet: it runs while
+  droidtop's process does, which as the home app is nearly always.
+- **What it keeps** is in `files/kdeconnect/`: the KDE Connect device id with its own certificate (not the agent's
+  identity: the official apps need CN = device id and no SAN), and the paired devices, each with its pinned
+  certificate and last address. Paired devices are announced to at that address on start, so they reconnect when the
+  network's broadcast does not reach them.
+- **Pairing is the person's** (the owner's code rule of 2026-10-24 on #645 carries over): a request shows the
+  8-character verification key both devices display, as a notification and on the screen's "Asking to pair" group,
+  with Accept and Refuse. Nothing but pairing reaches droidtop from a device that is not paired. Pair asks the other
+  device; Unpair asks first, then forgets the certificate.
+- **The screen** (`KdeConnectCatalog`, live on `KdeConnect.changes`):
+  - the switch, with why it could not start when it failed ("Another KDE Connect is running on this device", for
+    the official app on the same handheld);
+  - Name: what the others show, the device's model until changed;
+  - Devices by address: IP addresses announced to besides the broadcast, for a device on another network or one the
+    broadcast misses (the official apps have no QR pairing; adding by address is theirs too);
+  - Asking to pair, Paired (Ping, Unpair) and Available (Pair, and Look again, which announces again).
+- **Device type** `tablet`: the official apps choose what to offer by capability, not by type.
+- **Plugins, as built:** ping both ways (a ping shows as a notification). Share, clipboard and remote input follow in
+  #645's slices 2 to 4; each will have its own switch.
+- **Tailscale** is a VPN plugin, not a client of droidtop's own (owner, above). It feeds its tailnet's online devices
+  to the same address list (`kdeconnect_addresses`), slice 5 of #645.
 
 ## 8. Licensing
 

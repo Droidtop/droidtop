@@ -254,6 +254,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(UpdatesPage.screen())
         SettingsScreenRegistry.register(UpdatesPage.quickMenuScreen())
         SettingsScreenRegistry.register(ComputersCatalog.screen())
+        SettingsScreenRegistry.register(KdeConnectCatalog.screen())
         SettingsScreenRegistry.register(DroidtopWideSettings.globalScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.desktopScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.standardScreen())
@@ -1125,6 +1126,8 @@ object AppSettingsCatalogs {
                     ),
                     // The person's computers running droidtop-agent (docs/SPEC.md 7o).
                     ComputersCatalog.linkRow(pairedComputers),
+                    // Phones and computers with KDE Connect, and Pythia (docs/SPEC.md "KDE Connect").
+                    KdeConnectCatalog.linkRow(dev.droidtop.net.kdeconnect.KdeConnect.isOn(context)),
                 ),
             ),
             CatalogGroup(

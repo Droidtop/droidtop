@@ -71,6 +71,9 @@ pub fn call(op: &str, args: &str) -> String {
         "serve_stop" => serve_stop(),
         "share_library" => share_library(&args),
         "share_post_saves" => share_post_saves(&args),
+        // KDE Connect (Droidtop/tracker#645, docs/SPEC.md "KDE Connect"): kdeconnect_<op> is
+        // lib-kdeconnect's operation <op>, passed through as it is.
+        op if op.starts_with("kdeconnect_") => return kdeconnect_service::ops::call(&op["kdeconnect_".len()..], &args).to_string(),
         other => Err(Failure::Error(format!("unknown operation {other}"))),
     };
     match result {

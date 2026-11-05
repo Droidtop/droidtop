@@ -20,6 +20,10 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # Identity, pairing, the channel, the protocol and the sync rules: Droidtop/lib-sync.
 droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.1" }
+# KDE Connect, both ways (Droidtop/tracker#645, SPEC "KDE Connect"): kdeconnect_<op> is passed to
+# this library's operation table. Pinned to the commit on lib-kdeconnect's ci/kdeconnect-core-645
+# until it lands and is tagged v0.1.0.
+kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", rev = "89afa65869e527f57909538875703ee075143396" }
 jni = { version = "0.21", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
