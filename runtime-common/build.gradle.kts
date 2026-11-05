@@ -20,12 +20,12 @@ android {
         // compile (vendor/notices, Droidtop/notices, pinned as a submodule; docs/SPEC.md 7k "Notices").
         getByName("main") {
             java.srcDir("../vendor/notices/src/main/kotlin")
-            // The version and trust code droidtop and Enginehost share (vendor/droidtop-shared, Droidtop/droidtop-shared,
+            // The version and trust code droidtop and Enginehost share (vendor/lib-net, Droidtop/lib-net,
             // pinned as a submodule; docs/SPEC.md 12a "Shared trust code"): compiled in the same way as the notices.
-            java.srcDir("../vendor/droidtop-shared/version/src/main/kotlin")
-            java.srcDir("../vendor/droidtop-shared/trust/src/main/kotlin")
+            java.srcDir("../vendor/lib-net/version/src/main/kotlin")
+            java.srcDir("../vendor/lib-net/trust/src/main/kotlin")
             // The names droidtop and Enginehost agree on to start each other (docs/SPEC.md 7d, Droidtop/tracker#204).
-            java.srcDir("../vendor/droidtop-shared/launch-contract/src/main/kotlin")
+            java.srcDir("../vendor/lib-net/launch-contract/src/main/kotlin")
             // The pad model droidtop and Enginehost share: Droidtop/lib-input's PadFamily, PadFamilies.classify (SDL's ids)
             // and FaceLayout (Droidtop/tracker#867 D4), compiled in the same way.
             java.srcDir("../vendor/lib-input/pads/src/main/kotlin")

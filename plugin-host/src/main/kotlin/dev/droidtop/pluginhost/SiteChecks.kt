@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Droidtop/tracker#600, #751): the plugin gets one plain `BROWSER_CHECK_REQUIRED` and never the challenge's HTML,
  * droidtop remembers the site waits for a check ([pending]), the person passes it in droidtop's web view, and the
  * clearance the view earned goes with droidtop's requests to that site after. Telling a check from the page, the
- * clearance cookies and the pass test are the shared `SiteCheck` and `Clearance` (droidtop-shared `:sitecheck`),
+ * clearance cookies and the pass test are the shared `SiteCheck` and `Clearance` (lib-net `:sitecheck`),
  * which Enginehost uses too; what is here is what only a plugin has: its vault, and what it was last refused.
  */
 object SiteChecks {

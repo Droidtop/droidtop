@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * What droidtop adds around the shared certificate-chain verifier (vendor/droidtop-shared, `:trust`, whose own tests cover the
+ * What droidtop adds around the shared certificate-chain verifier (vendor/lib-net, `:trust`, whose own tests cover the
  * format): its revocation list, the catalog signature and the pinned signing root (docs/SPEC.md 12a). Every key and
  * certificate here is generated in the test; Core is a stand-in.
  */

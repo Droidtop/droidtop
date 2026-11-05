@@ -22,7 +22,7 @@ object RuntimeArtifactInstaller {
      * Where an archive entry named [relative] goes under [installDir], or null when it must not be written: a name with
      * a `..` or `.` part, an absolute name, or one whose real path is not strictly inside [installDir] (a symlink in the
      * way). A plain prefix check let `lib/../../python-evil/x` reach a sibling folder sharing the install folder's name
-     * as its prefix (Droidtop/tracker#874); this refuses `..` outright as droidtop-shared's `BundleTar.validatePath`
+     * as its prefix (Droidtop/tracker#874); this refuses `..` outright as lib-net's `BundleTar.validatePath`
      * does, then compares real paths with the separator after the root. Pure but for the paths it resolves.
      */
     fun entryTarget(installDir: File, relative: String): File? {

@@ -10989,7 +10989,7 @@ ever copied, moved or imported by either app; both read it in place.
 
 **The names are held once (2026-10-29, Droidtop/tracker#204).** The actions, the extras, the reasons a game
 ended, the capabilities provider's authority and the `enginehost.json` keys are
-`Droidtop/droidtop-shared`'s `:launch-contract` (`EnginehostIntents`, `EnginehostConfig`), compiled into
+Droidtop/lib-net's `:launch-contract` (droidtop-shared until 2026-11-05) (`EnginehostIntents`, `EnginehostConfig`), compiled into
 `:runtime-common` like `:version` and `:trust`. `EngineHost`, `EnginehostEndGame` and `TaskPolicy` use its
 constants, and every string is the one released builds already send and read. `EnginehostContractTest`
 checks droidtop's names and the config droidtop writes against it; Enginehost checks its manifest and its
@@ -20600,7 +20600,7 @@ A condition the person should know about (an unofficial plugin, a feature that i
     again (`PluginViewCall.errorNotice`, `PluginViews.accountNotice`); a source's row in the one search does the same
     (`PluginSearchAggregator.failureOutcome`). For every source, whatever its age.
   - **Recognition is shared (2026-10-29, Droidtop/tracker#751 slice 1).** Telling a check from a page, the clearance
-    cookies, `mergeCookies`, the web view's pass test and the `Clearance` model are droidtop-shared's `:sitecheck`
+    cookies, `mergeCookies`, the web view's pass test and the `Clearance` model are lib-net's `:sitecheck`
     (`SiteCheck`, `Clearance`), compiled into `:runtime-common` beside the other shared modules, so Enginehost tells a check
     the same way; `SiteChecks` keeps only what a plugin has (its vault entry, what it was last refused, the sentence it
     gets). The same module defines `SiteSolver` (the browser's own try, nobody asked, never a click, a solving service or a
@@ -24587,7 +24587,7 @@ one runner per kind:
     inside that folder, the root followed by a separator
     (`RuntimeArtifactInstaller.entryTarget`, 2026-11-05, Droidtop/tracker#874:
     a plain prefix check let `lib/../../python-evil/x` reach a sibling folder;
-    droidtop-shared's `BundleTar.validatePath` already refused `..`). The
+    lib-net's (then droidtop-shared's) `BundleTar.validatePath` already refused `..`). The
     digest is checked before anything is extracted. The download is a separate,
     explicit, progress-shown Settings action (an `AsyncActionItem` in the
     Plugins screen, the same "long action with live status text" shape
@@ -25499,8 +25499,9 @@ the secondary path for sources that publish no key.
 Droidtop/tracker#191 and #192).** The verifier, the bundle reader, the version
 ordering and the parsing of a source's published key are not droidtop's own code:
 droidtop and Enginehost each vendor the same small library,
-`Droidtop/droidtop-shared`, and neither depends on the other. droidtop pins it as
-the submodule `vendor/droidtop-shared` and compiles its `version` and `trust`
+`Droidtop/lib-net` (droidtop-shared until 2026-11-05, when it moved there with its history as one of the
+shared libraries of Droidtop/tracker#867), and neither depends on the other. droidtop pins it as
+the submodule `vendor/lib-net` and compiles its `version` and `trust`
 sources into `:runtime-common` the way it compiles `vendor/notices`
 (`runtime-common/build.gradle.kts`), so no composite build or Kotlin plugin
 version is shared. The package is `dev.droidtop.shared.*`: `ChainSignature` and
@@ -25523,7 +25524,7 @@ control character, and may never be empty, `.`, `..` or absolute.
 shares with Enginehost, Pythia and droidtop-agent moves into library repositories that belong to no program
 (owner: "The scaffold belongs to wach one. The libraries are shared, and don't "belong" to either"), each
 "versioned and pinned by each app; each repo's CI builds and tests every app that uses it". droidtop takes a
-library as a submodule under `vendor/`, as it takes droidtop-shared. A library's CI calls
+library as a submodule under `vendor/`, as it takes lib-net. A library's CI calls
 `.github/workflows/library-check.yml` with its submodule path and the commit under test; that workflow checks out
 droidtop's `main`, moves only that submodule to the commit, and runs every module's unit tests and the debug
 build through droidtop's own build setup (`.github/actions/android-setup`), so how droidtop builds stays in

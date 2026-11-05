@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The contract with Enginehost is held once, in droidtop-shared's `:launch-contract` (Droidtop/tracker#204).
+ * The contract with Enginehost is held once, in lib-net's `:launch-contract` (Droidtop/tracker#204).
  * droidtop's own names are the contract's, and what droidtop writes into an Enginehost config passes the
  * shared shape check.
  */

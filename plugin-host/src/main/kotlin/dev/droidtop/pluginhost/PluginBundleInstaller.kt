@@ -90,7 +90,7 @@ object PluginBundleInstaller {
         try {
             var count = 0
             val buffer = ByteArray(64 * 1024)
-            // BundleTar (vendor/droidtop-shared, :trust) refuses a path that could leave the plugin's own directory, a link or
+            // BundleTar (vendor/lib-net, :trust) refuses a path that could leave the plugin's own directory, a link or
             // special file, a path that appears twice, an entry over the per-file cap and an xz stream that asks for too much
             // memory, before an entry reaches this code.
             BundleTar.read(bundleFile, BundleTar.Limits(maxEntryBytes = MAX_ENTRY_BYTES, pathChars = BundleTar.PERMISSIVE_PATH_CHARS)) { entry ->
