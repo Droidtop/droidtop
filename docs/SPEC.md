@@ -15534,6 +15534,23 @@ follows:
   app, so this store lists them and its Install says so; running the EA app in a
   Wine prefix (`origin2://game/launch?offerIds=<content id>`, Lutris's way) is
   the next EA step on Droidtop/tracker#335.
+- **Ubisoft Connect** (`UbisoftStore`; Droidtop/tracker#335, built to the
+  recommendation of its design comment, owner to confirm): after Lutris's Ubisoft
+  service (GPL-3.0, from the Galaxy integration by Rasmus Luund). Ubisoft's sign-in
+  page keeps its session in the page's own storage, so the web sign-in runs a
+  script on its return pages (`StoreSignIn.WebPage.codeInScript`): on
+  `connect.ubisoft.com/ready` it moves on to `change_domain/`, where it answers the
+  stored `PRODloginData`, `PRODrememberMe` and `PRODlastProfile` as one object
+  (ticket, session id, account, remember-me ticket). The session is opened for
+  Ubisoft Club's application (`POST /v2/profiles/sessions`, its public app id,
+  `Ubi-AppId`) and renewed before it expires (`PUT /v3/profiles/sessions` with the
+  ticket, else `POST` with the remember-me ticket), the lifetime taken from the
+  server's own `expiration` less `serverTime`. The owned games come from
+  Ubisoft's GraphQL service (`AllGames`, `games(filterBy: {isOwned: true})`:
+  space id, name, cover). Ubisoft serves games only through Ubisoft Connect, so
+  this store lists them and its Install says so; running Ubisoft Connect in a
+  Wine prefix (`uplay://launch/<id>`) is the next Ubisoft step on
+  Droidtop/tracker#335.
 - **Amazon Games** (`AmazonStore`): sign-in is Amazon's own page with a
   fresh PKCE session per sign-in (nile's device registration, through
   GameNative's `AmazonAuthManager`); the code comes back on the address

@@ -118,6 +118,12 @@ sealed interface StoreSignIn {
          * session lives on another host than its sign-in returns to (EA: `accounts.ea.com`).
          */
         val cookieUrl: String? = null,
+        /**
+         * A script run on each return page, for a store that keeps its session in the page's own storage (Ubisoft:
+         * `localStorage`): its string result is the sign-in, a null result waits for the next return page (the script
+         * may move the page on itself).
+         */
+        val codeInScript: String? = null,
     ) : StoreSignIn {
         companion object {
             /**

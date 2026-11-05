@@ -209,6 +209,11 @@ class StoreSignInActivity : AppCompatActivity() {
                     super.onPageFinished(view, url)
                     if (url == null || view == null || captured.get()) return
                     if (codeFromAddress(store, signIn, url)) return
+                    signIn.codeInScript?.let { script ->
+                        // The store keeps its session in the page's storage (Ubisoft): the script's answer is the sign-in.
+                        if (signIn.isReturnPage(url)) view.evaluateJavascript(script) { result -> scriptString(result)?.let { finishWith(store, it) } }
+                        return
+                    }
                     signIn.codeInCookie?.let { name ->
                         // The store's session itself is the sign-in (Humble): its cookie, once the return page is reached.
                         if (signIn.isReturnPage(url)) {
@@ -289,6 +294,10 @@ class StoreSignInActivity : AppCompatActivity() {
     }
 
     /** evaluateJavascript hands back a JSON string ("\"abc\"") or null. */
+    /** What [WebView.evaluateJavascript] gives for a string, decoded as the JSON value it is; null for null or blank. */
+    private fun scriptString(result: String?): String? =
+        runCatching { org.json.JSONArray("[${result ?: "null"}]").let { if (it.isNull(0)) null else it.get(0).toString() } }.getOrNull()?.takeIf { it.isNotBlank() }
+
     private fun unquote(result: String?): String? {
         val raw = result?.trim()?.takeIf { it.isNotEmpty() && it != "null" } ?: return null
         if (!raw.startsWith("\"") || !raw.endsWith("\"")) return raw
