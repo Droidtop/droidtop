@@ -3675,10 +3675,59 @@ database on the PC follows.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | H1 | Per-plugin storage | the plugin's own files and preferences | `privateDataDir()` (exists; a path in every tier, in a plugin process the private-folder path its broker answers with the plugin's own folder, 2026-10-29); `preferences(name)` (droidtop's store, §5.3 "Preferences and SQLite are droidtop's", 2026-10-29); `prefs.get/set` (small key/value, host-stored, shown in the export); quota §8 | — | — (own data) | low | built: `privateDataDir` with full access; contained, the `data` API on the same folder (2026-10-08): `write {name, text \| base64, append}`, `read {name, offset, length ≤ 48 KiB, as}` (2026-10-15, Droidtop/tracker#544 item 4: the reply crosses the broker as UTF-16 text and base64 adds a third, so 120 KiB came back as a 327808-byte binder reply; a longer `length` is answered with 48 KiB and `eof: false`, so a reader that loops until `eof` is unchanged; a large file is opened instead, `open` → fd; writes stay at 128 KiB), `list {prefix}`, `delete`, `move {from, to}`, `usage`, `open {name, mode}` → fd, `path {name}` (droidtop's path of the file, only to hand to a provider plugin), names of `[A-Za-z0-9._-]` segments, writes stop at 512 MiB; `prefs` not built |
 | H2 | Shared databases | data other plugins or droidtop may read: droidtop's library index (A1), and a plugin's own published dataset | droidtop's own databases: only through A1 APIs, never a handle. A plugin publishing data does it as a plugin-provided API (§2), e.g. `acme.playlog.query` | — | per API | varies | by design |
-| H3 | Import and export | move a plugin's settings or data between devices | EP `data.export@1`: `export → job writing into a host-chosen fd`; `import {fd}` | A/G/D: Accounts and sources → Plugins → <plugin> → Export / Import | none (user-initiated) | low | not built |
+| H3 | Data kinds: moving data between equivalent plugins | hand a plugin's state to another plugin that takes the same kind, native or an app's (Syncthing-Fork's to droidtop's Syncthing plugin first) | manifest `dataKinds`; a data kind is a context (F8) whose copy carries files: `context.stage {context, name}` → write fd, `context.publish {context, records, files: [{name, size, sha256}]}`, `context.copy`, `context.open_file {context, name}` → read fd; droidtop's transfer moves a whole copy (below) | a plugin's page: Import <kind> from <plugin> | `data.kinds` (normal) | low | store and ops built (Droidtop/tracker#793, slice 1); the transfer screen, the root reader and the Syncthing import follow |
 | H4 | Backup and restore | droidtop's own backup includes plugin data | manifest `backup: {include: ["prefs", "data/<subpath>"]}`; vault entries never included; restore re-verifies the plugin and asks before re-granting dangerous permissions | Settings → Backup | none | medium | not built (#46 is the credentials-in-backup issue) |
 | H5 | Logs and diagnostics | debugging a plugin; including it in "Share diagnostics" (#48) | `log.write {level, msg}` → a per-plugin ring buffer (256 KiB); the host scrubs tokens, emails, IPs, paths under the user's home and anything in the vault before any export; `diagnostics.read` would let a plugin read **droidtop's** logs | Accounts and sources → Plugins → <plugin> → Log; Share diagnostics | `log.write` (—) / `diagnostics.read` (dangerous, official only) | low / high | not built |
 | H6 | Telemetry | a plugin's own usage or crash reporting to its author | `telemetry.send {endpoint declared, payload ≤ 16 KiB}`: **off until the user turns it on per plugin**; the host shows the exact payload on the first send; nothing leaves the device without the user | Accounts and sources → Plugins → <plugin> → Share usage data (off) | `telemetry.send` (dangerous, opt-in) | high | not built |
+
+#### H3 Data kinds: moving data between equivalent plugins (Droidtop/tracker#793)
+
+The owner, 2026-10-29: "We can use the syncable-data cache for the index transfer, make it a droidtop api function.
+expanding the API to allow transfers to equivalent internal and external plugins", and "The syncable data cache is
+the mechanism things like f95 use to do atomic database syncs". That mechanism is F8's protocol 2, syncable data
+(Droidtop/tracker#794): a copy made current whole, in one rename. A data kind is built on it, with no second store.
+
+- **A data kind** is a named, versioned format a plugin declares in its manifest:
+  `"dataKinds": [{"kind": "syncthing.state", "version": 1, "export": true, "import": true}]` (a name of lowercase
+  dotted segments, a version of 1 or more), with the permission `data.kinds` (normal). Plugins that declare the same
+  kind and version are **equivalent** for it, whatever their kind: a native plugin, an app's (`app_interface`), and
+  later a portable app.
+- **Its copy is a context's copy (F8) that carries files.**
+  - The records hold the record-shaped part: Syncthing's device ID, folders, devices and ignores.
+  - The files hold what a record cannot: its key, certificate and index database.
+  - A file is one plain name of up to 64 characters, and a copy carries at most 16.
+- **Publishing a copy** (`PluginContexts.publish`):
+  1. The plugin writes each file through a descriptor droidtop hands it (`context.stage {context, name}`). The files
+     live in droidtop's own `plugins/<id>/contexts/<kind>.staging/`, outside the plugin's folder, and the plugin
+     never sees a path.
+  2. It publishes with `context.publish {context, records, files: [{name, size, sha256}]}`.
+  3. droidtop checks each file against its size and SHA-256. A missing or different file refuses the whole copy,
+     and nothing changes.
+  4. droidtop moves the files into a new fileset (`<kind>.files/<n>/`) and makes records and files current together,
+     in the copy file's one rename. A reader sees the whole old copy or the whole new one, never half.
+  5. The fileset before stays, so going back is possible. Older ones are removed.
+- **Reading a copy:** `context.copy` gives the records and the files' list, and `context.open_file {context, name}`
+  a read descriptor to one file.
+- **A data kind with no computer adapter is not synced with computers.** It moves only when the person asks. One
+  with an adapter (F8) syncs its records as before. Carrying files to a paired device through droidtop-agent is the
+  Platforms lane's step, after this.
+- **The transfer** (`PluginContexts.transfer`):
+  - droidtop gives the receiver the source's current copy as the receiver's next copy: the records whole, each file
+    copied into the receiver's own fileset and checked again, then made current in one rename.
+  - The source is only read.
+  - On either plugin's page droidtop offers "Import <kind> from <plugin>", asks first and names what moves, then
+    tells the receiver, which reads the copy with `context.copy` and `context.open_file` and reports what it took.
+  - The screen and the receiver's call are the next slice.
+- **An app with no exporter** (Syncthing-Fork keeps its state in its private folder):
+  - droidtop makes the copy itself, after the person's press. With root, it reads the app's files through a root
+    provider; it never holds root itself (Droidtop/tracker#852). Without root, it uses the app's own export, and the
+    copy says what is missing ("no index: a full rescan will follow").
+  - **The owner, 2026-11-05: Fork is on Syncthing 2.0 ("It's on 2.0")**, so its index is taken as it is.
+  - **Stopping the app first, the owner's decision 2026-11-05.** With root, droidtop says so and asks for a yes, then
+    force-stops Syncthing-Fork and turns off its start-on-boot itself, before the plugin takes over the device ID.
+    Without root, it asks the person to stop Fork and waits.
+- **Safety:** a copy never holds droidtop's vault or another plugin's data. A plugin sees only its own copies, and
+  files only through descriptors.
 
 ### I. Developer
 

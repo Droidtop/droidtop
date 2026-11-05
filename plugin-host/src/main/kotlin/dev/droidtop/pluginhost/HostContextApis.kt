@@ -42,11 +42,33 @@ internal object HostContextApis {
         return JSONObject().put("plugin", manifest.id).put("label", point.label ?: manifest.label).put("programs", programs)
     }
 
-    /** A context the plugin may use: one its manifest declares an adapter for. */
+    /** A context the plugin may use: one its manifest declares an adapter for, or one of its data kinds (H3). */
     private fun contextId(manifest: PluginManifest, args: JSONObject): String {
         val id = args.optString("context")
-        if (adapterFor(manifest, id) == null) invalid("context is one the plugin's manifest declares in $ADAPTER_POINT")
+        if (adapterFor(manifest, id) == null && dataKind(manifest, id) == null) {
+            invalid("context is one the plugin's manifest declares in $ADAPTER_POINT or in dataKinds")
+        }
         return id
+    }
+
+    /** [manifest]'s declared data kind [id] (docs/plugin-api.md 3 H3), or null. */
+    fun dataKind(manifest: PluginManifest, id: String): DataKind? = manifest.v2.dataKinds.firstOrNull { it.kind == id }
+
+    /** The permission a context op needs: `data.kinds` for a data kind with no computer adapter, `context.sync` otherwise. */
+    private val permissionOf: (List<DeclaredPermission>, JSONObject, BrokerEnvironment) -> String = { declared, args, _ ->
+        val id = args.optString("context")
+        if (declared.any { it.id == DATA_KINDS } && declared.none { it.id == "context.sync" } && id.isNotBlank()) DATA_KINDS else "context.sync"
+    }
+
+    const val DATA_KINDS = "data.kinds"
+
+    /** The files a published copy carries (H3): `[{name, size, sha256}]`, each written with `context.stage` first. */
+    private fun files(args: JSONObject): List<PluginContexts.CopyFile> {
+        val array = args.optJSONArray("files") ?: return emptyList()
+        return (0 until array.length()).map { i ->
+            array.optJSONObject(i)?.let(PluginContexts.CopyFile::fromJson)
+                ?: invalid("each file is {name, size, sha256}: ${PluginContexts.FILE_NAME_RULE}, its size in bytes, its SHA-256 in hex")
+        }
     }
 
     private fun key(args: JSONObject): String = args.optString("key").takeIf { KEY.matches(it) } ?: invalid("key is 1 to 128 of letters, digits, '.', '_', ':' and '-'")
@@ -67,13 +89,13 @@ internal object HostContextApis {
     }
 
     val ops: List<HostOp> = listOf(
-        HostOp("context", "open", permission = "context.sync", target = { it.optString("context") }) { env, record, args ->
+        HostOp("context", "open", permissionFor = permissionOf, target = { it.optString("context") }) { env, record, args ->
             val id = contextId(record.manifest, args)
             val state = contextsOf(env).open(record.manifest.id, id, declaration(id, args))
             JSONObject().put("records", state.records.length()).put("conflicts", state.conflicts)
         },
         // Records a page at a time: a large context does not fit one reply.
-        HostOp("context", "get", permission = "context.sync", target = { it.optString("context") }) { env, record, args ->
+        HostOp("context", "get", permissionFor = permissionOf, target = { it.optString("context") }) { env, record, args ->
             val id = contextId(record.manifest, args)
             val state = contextsOf(env).load(record.manifest.id, id) ?: invalid("open the $id context first")
             val keys = state.records.keys().asSequence().sorted().toList()
@@ -88,22 +110,52 @@ internal object HostContextApis {
                 .put("conflicts", state.conflicts)
         },
         // Protocol 2: the whole copy, made current in one step, then synced. Records as `context.get` gives them.
-        HostOp("context", "publish", permission = "context.sync", alwaysAudit = true, target = { it.optString("context") }) { env, record, args ->
+        HostOp("context", "publish", permissionFor = permissionOf, alwaysAudit = true, target = { it.optString("context") }) { env, record, args ->
             val id = contextId(record.manifest, args)
             val records = args.optJSONObject("records") ?: invalid("records is required: {key: {field: value}}")
             if (records.length() > MAX_RECORDS) invalid("a copy holds at most $MAX_RECORDS records")
             records.keys().forEach { k -> if (!KEY.matches(k) || records.optJSONObject(k) == null) invalid("each record is {field: value} under a key of 1 to 128 of letters, digits, '.', '_', ':' and '-'") }
             val contexts = contextsOf(env)
-            val copy = contexts.publish(record.manifest.id, id, records)
-            val synced = contexts.sync(record.manifest.id, id, adapterOffer(record.manifest, id))
-            synced.put("published", copy.generation)
+            val copy = contexts.publish(record.manifest.id, id, records, files(args))
+            // A data kind with no computer adapter is not synced with computers: it moves only when the person asks.
+            if (adapterFor(record.manifest, id) == null) {
+                JSONObject().put("published", copy.generation).put("files", copy.files.size)
+            } else {
+                contexts.sync(record.manifest.id, id, adapterOffer(record.manifest, id)).put("published", copy.generation)
+            }
         },
         // The current copy, for the plugin to bring in when that is safe; null before the first publish.
-        HostOp("context", "copy", permission = "context.sync", target = { it.optString("context") }) { env, record, args ->
+        HostOp("context", "copy", permissionFor = permissionOf, target = { it.optString("context") }) { env, record, args ->
             val id = contextId(record.manifest, args)
             val copy = contextsOf(env).copy(record.manifest.id, id)
-            if (copy == null) JSONObject().put("generation", JSONObject.NULL).put("records", JSONObject()) else JSONObject().put("generation", copy.generation).put("records", copy.records)
+            if (copy == null) {
+                JSONObject().put("generation", JSONObject.NULL).put("records", JSONObject()).put("files", JSONArray())
+            } else {
+                JSONObject().put("generation", copy.generation).put("records", copy.records).put("files", JSONArray(copy.files.map { it.toJson() }))
+            }
         },
+        // H3: a write descriptor for one file of the next copy, in droidtop's staging folder; the plugin never sees a path.
+        HostOp(
+            "context", "stage", permissionFor = permissionOf,
+            target = { "${it.optString("context")} ${it.optString("name")}" },
+            open = { env, record, args ->
+                val file = contextsOf(env).stagingFile(record.manifest.id, contextId(record.manifest, args), args.optString("name"))
+                android.os.ParcelFileDescriptor.open(
+                    file,
+                    android.os.ParcelFileDescriptor.MODE_WRITE_ONLY or android.os.ParcelFileDescriptor.MODE_CREATE or android.os.ParcelFileDescriptor.MODE_TRUNCATE,
+                )
+            },
+        ),
+        // H3: a read descriptor for one file of the current copy, its own or one droidtop moved to it from another plugin.
+        HostOp(
+            "context", "open_file", permissionFor = permissionOf,
+            target = { "${it.optString("context")} ${it.optString("name")}" },
+            open = { env, record, args ->
+                val file = contextsOf(env).copyFileOf(record.manifest.id, contextId(record.manifest, args), args.optString("name"))
+                    ?: throw BrokerException(PluginErrorCode.NOT_FOUND, "the current copy has no file by that name")
+                android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
+            },
+        ),
         HostOp("context", "put", permission = "context.sync", target = { "${it.optString("context")} ${it.optString("key")}" }) { env, record, args ->
             val fields = args.optJSONObject("fields") ?: invalid("fields is required")
             contextsOf(env).put(record.manifest.id, contextId(record.manifest, args), key(args), fields)

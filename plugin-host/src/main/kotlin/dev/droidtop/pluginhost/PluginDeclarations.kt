@@ -22,6 +22,8 @@ data class V2Declarations(
     val subscribes: List<EventSubscription> = emptyList(),
     val exports: List<ExportedApi> = emptyList(),
     val requires: List<RequiredApi> = emptyList(),
+    /** The data kinds it can hand to, and take from, an equivalent plugin ([DataKind], docs/plugin-api.md 3 H3). */
+    val dataKinds: List<DataKind> = emptyList(),
 ) {
     /** Writes the five arrays into [json], the same keys [fromJson] reads, so the manifest and [PluginRecord] share one mechanism. */
     fun putInto(json: JSONObject) {
@@ -30,6 +32,7 @@ data class V2Declarations(
         json.put("subscribes", JSONArray(subscribes.map { it.toJson() }))
         json.put("exports", JSONArray(exports.map { it.toJson() }))
         json.put("requires", JSONArray(requires.map { it.toJson() }))
+        if (dataKinds.isNotEmpty()) json.put("dataKinds", JSONArray(dataKinds.map { it.toJson() }))
     }
 
     companion object {
@@ -42,11 +45,36 @@ data class V2Declarations(
             subscribes = objects(json, "subscribes").mapNotNull { EventSubscription.fromJson(it) },
             exports = objects(json, "exports").mapNotNull { ExportedApi.fromJson(it) },
             requires = objects(json, "requires").mapNotNull { RequiredApi.fromJson(it) },
+            dataKinds = objects(json, "dataKinds").mapNotNull { DataKind.fromJson(it) }.distinctBy { it.kind },
         )
 
         private fun objects(json: JSONObject, key: String): List<JSONObject> {
             val array = json.optJSONArray(key) ?: return emptyList()
             return buildList { for (i in 0 until array.length()) array.optJSONObject(i)?.let { add(it) } }
+        }
+    }
+}
+
+/**
+ * A named, versioned kind of data a plugin can export and import (docs/plugin-api.md 3 H3, Droidtop/tracker#793):
+ * `syncthing.state` version 1 is a Syncthing node's identity, configuration and index. Plugins that declare the same
+ * [kind] and [version] are equivalent for it, whether native or an app's. A data kind is a context of the plugin
+ * (F8) whose copy carries files beside its records; droidtop moves a copy whole from one plugin to another.
+ */
+data class DataKind(val kind: String, val version: Int, val export: Boolean, val import: Boolean) {
+    fun toJson(): JSONObject = JSONObject().put("kind", kind).put("version", version).put("export", export).put("import", import)
+
+    /** Whether [other] can take this kind from a plugin declaring this one. */
+    fun feeds(other: DataKind): Boolean = export && other.import && kind == other.kind && version == other.version
+
+    companion object {
+        /** A kind's name: lowercase segments joined by dots, the shape context ids already take. */
+        val NAME = Regex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
+
+        fun fromJson(json: JSONObject): DataKind? {
+            val kind = json.optString("kind").takeIf { NAME.matches(it) } ?: return null
+            val version = json.optInt("version", 0).takeIf { it >= 1 } ?: return null
+            return DataKind(kind, version, json.optBoolean("export", false), json.optBoolean("import", false))
         }
     }
 }

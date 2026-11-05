@@ -21814,6 +21814,14 @@ streamed by windowcast's host, which the agent embeds (Stream from
   the other handheld". Handhelds share no library or saves yet; they are
   paired for the plugins that keep them in step (below). Each paired
   handheld has a page with when it was paired, its key and Forget.
+- **Moving a plugin's data to an equivalent plugin** (docs/plugin-api.md 3 H3, Droidtop/tracker#793). A data kind is a
+  context whose copy carries files, published whole and made current in one rename (#794's syncable data). droidtop
+  moves a whole copy from one plugin to another that declares the same kind and version, and only reads the source.
+  The first use is the owner's Syncthing-Fork setup into droidtop's Syncthing plugin. The owner's answers, 2026-11-05:
+  - Fork is on Syncthing 2.0 ("It's on 2.0"), so its index is taken as it is.
+  - With root, reached only through a root provider, droidtop tells the person and asks for a yes, then force-stops
+    Syncthing-Fork and turns off its start-on-boot itself, before the plugin takes over the device ID. Without root,
+    it asks the person to stop Fork and waits.
 - **Paired devices for plugins** (`PairedDevices`, docs/plugin-api.md D21,
   Droidtop/tracker#553): `devices.list_paired` gives each paired device's
   id, name, kind, when it was paired, whether it was seen in the last 10

@@ -109,6 +109,8 @@ object PluginPermissions {
         PluginPermission("apps.bind", PermissionTier.DANGEROUS, "Stay connected to other apps"),
         PluginPermission("vault.own", PermissionTier.NORMAL, "Keep its own saved passwords"),
         PluginPermission("context.sync", PermissionTier.DANGEROUS, "Keep its data in step with apps on your paired computers"),
+        // docs/plugin-api.md 3 H3 (Droidtop/tracker#793): its declared data kinds, which move only when the person asks.
+        PluginPermission("data.kinds", PermissionTier.NORMAL, "Hand its data to plugins that can take it, when you ask"),
         PluginPermission("auth.oauth", PermissionTier.NORMAL, "Ask you to sign in to a service"),
         PluginPermission("web.session", PermissionTier.DANGEROUS, "Use your sign-in on its sites"),
         PluginPermission("github.api", PermissionTier.NORMAL, "Use your GitHub account for GitHub requests"),
