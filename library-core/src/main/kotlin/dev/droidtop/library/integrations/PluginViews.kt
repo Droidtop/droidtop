@@ -99,7 +99,10 @@ object PluginViews {
         // Told of each input value the person commits, for a page whose values droidtop keeps (a source's search options).
         onCommit: ((Context, ViewNode, String) -> Unit)? = null,
         itemPage: ((Context, JSONObject, MutableList<String>) -> SourceItemPage.Page?)? = null,
-    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups, leadGroups, onCommit, itemPage).screen(id, title, panel, iconFile)
+        // A page that only works online (a source's item page): headed by the offline notice while there is no network.
+        needsNetwork: Boolean = false,
+    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups, leadGroups, onCommit, itemPage)
+        .screen(id, title, panel, iconFile, needsNetwork)
 
     /**
      * What running one view action came to: the sentence to show, a view the reply carried, whether the page should be
@@ -365,7 +368,7 @@ private class PluginPage(
         initial?.let { putAll(it.initialValues()) }
     }
 
-    fun screen(id: String, title: String, panel: Boolean = false, iconFile: String? = null): CatalogScreen = CatalogScreen(
+    fun screen(id: String, title: String, panel: Boolean = false, iconFile: String? = null, needsNetwork: Boolean = false): CatalogScreen = CatalogScreen(
         id = id,
         title = title,
         subtitle = "From ${record.manifest.label}",
@@ -380,6 +383,7 @@ private class PluginPage(
         indexGroups = { emptyList() },
         panel = panel,
         iconFile = iconFile,
+        needsNetwork = needsNetwork,
     )
 
     private suspend fun load(context: Context) {

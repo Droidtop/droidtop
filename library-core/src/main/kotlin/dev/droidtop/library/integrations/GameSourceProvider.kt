@@ -219,6 +219,8 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
             },
             // A reply of the item's bundles is its item page, drawn as droidtop draws a record (Droidtop/tracker#737).
             itemPage = { ctx, data, messages -> SourceItemPage.read(ctx, source.record, result.id, ref, context, data, messages) },
+            // The record page asks the source and downloads from it: offline it says so first (Droidtop/tracker#594).
+            needsNetwork = true,
         )
     }
 

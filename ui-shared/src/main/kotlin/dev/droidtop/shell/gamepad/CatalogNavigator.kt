@@ -2206,13 +2206,6 @@ internal suspend fun withOfflineNotice(screen: CatalogScreen, context: Context, 
             dev.droidtop.runtime.systemstatus.NetworkKind.NONE
     }
     if (!offline) return groups
-    val notice = dev.droidtop.library.settings.NoticeItem(
-        id = "${screen.id}_offline",
-        notice = dev.droidtop.library.settings.Notice(
-            dev.droidtop.library.settings.NoticeTone.Caution,
-            "You're offline",
-            body = "This page needs a connection. What it shows may be out of date, and its actions wait until you're back online.",
-        ),
-    )
+    val notice = dev.droidtop.library.settings.NoticeItem(id = "${screen.id}_offline", notice = dev.droidtop.ui.shared.Offline.notice())
     return listOf(CatalogGroup(id = "${screen.id}_offline_group", title = null, items = listOf(notice))) + groups
 }

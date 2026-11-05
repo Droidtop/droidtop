@@ -100,6 +100,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
     var fetchRunning by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     val emptyFocus = remember { FocusRequester() }
+    val offline by dev.droidtop.ui.shared.rememberOffline()
 
     suspend fun refresh() {
         withContext(Dispatchers.IO) {
@@ -196,6 +197,14 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
         ) {
             Text(stringResource(R.string.browse_themes), color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(16.dp))
+            // Every network page's one offline notice, before a download is pressed only to fail (Droidtop/tracker#594).
+            if (offline) {
+                dev.droidtop.ui.shared.NoticeCard(
+                    dev.droidtop.ui.shared.Offline.notice(),
+                    dev.droidtop.library.settings.NoticePlacement.Group,
+                    Modifier.padding(bottom = 12.dp),
+                )
+            }
             // A refresh of a stale list runs under the list it already has,
             // and says so above it, with a real spinner while it runs --
             // static text alone read as "stuck" (rig,

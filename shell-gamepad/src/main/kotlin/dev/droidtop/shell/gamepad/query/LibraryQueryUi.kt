@@ -94,7 +94,6 @@ import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.ui.shared.holdKeyFocus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -575,11 +574,7 @@ internal fun LibrarySearchDialog(
     var searchTick by remember { mutableIntStateOf(0) }
     // Whether the device has no network at all (the one status source, read off the main thread): every source then
     // fails for the same reason, and the page says so once.
-    val offline by produceState(false, context) {
-        dev.droidtop.runtime.systemstatus.SystemStatus.flow(context)
-            .flowOn(Dispatchers.IO)
-            .collect { value = it.network == dev.droidtop.runtime.systemstatus.NetworkKind.NONE }
-    }
+    val offline by dev.droidtop.ui.shared.rememberOffline()
     // What a failed source reported in its own words, shown on request under its plain sentence (Droidtop/tracker#167), by source id.
     var technicalDetails by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     // Whether the folded "N sources need attention" row was opened; a new search folds them again.
