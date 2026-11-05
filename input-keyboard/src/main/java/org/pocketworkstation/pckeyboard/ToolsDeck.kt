@@ -125,7 +125,10 @@ class ToolsDeck private constructor(
         overlay = panel
         overlayId = id
         keyboard.visibility = INVISIBLE
-        stack.addView(panel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        // The panel takes the keys' place and no more (Droidtop/tracker#903, console 3057: the emoji panel covered the
+        // whole screen). Matching its parent in this wrapping frame measured it against the window, so it grew to the
+        // window's height; it is the keys' height instead, which they keep while hidden.
+        stack.addView(panel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, panelHeight(keyboard.height)))
     }
 
     /** Closes the open panel and shows the keys again. */
@@ -359,6 +362,9 @@ class ToolsDeck private constructor(
          * for a tool, so an input method can finish the word it is composing; [relayout] rebuilds the key grid
          * after the layout form changed, for a surface that is not the input method (which rebuilds itself).
          */
+        /** A panel's height: the keys' [keysHeight] when they have been laid out, else the parent's. Pure. */
+        internal fun panelHeight(keysHeight: Int): Int = if (keysHeight > 0) keysHeight else FrameLayout.LayoutParams.MATCH_PARENT
+
         @JvmStatic
         @JvmOverloads
         fun wrap(

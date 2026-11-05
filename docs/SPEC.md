@@ -8956,6 +8956,9 @@ proposal) is not built; these helpers are in the one settings tree that already 
   width; the grid sits at its edge in the tool strip's key area, so with the strip off a right-hand grid is drawn
   at the left. A change rebuilds the input method's view (the setting's flags) or, for a panel droidtop draws,
   rebuilds its grid (`KeyboardPanel.rebuildKeys`).
+- **A panel takes the keys' place.** The clipboard, macro and emoji panels open where the keys were, at the keys'
+  height, never taller (Droidtop/tracker#903, console 3057: the emoji panel covered the whole screen, because it was
+  laid out to match its parent in a frame that wraps its content, and so was measured against the window).
 - **More layouts.** Every locale Android reports is already selectable; the layouts are the existing `xml-*`
   folders and each locale's key text. Locales that have their own key text but were missing from the picker's
   5-row label list now carry it. A reader for HeliBoard-style text layouts is a later item on Droidtop/tracker#342.
