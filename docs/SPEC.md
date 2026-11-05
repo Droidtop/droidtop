@@ -8252,10 +8252,16 @@ What the code holds today, against the rule (2026-11-05, droidtop main):
   `steam_api` will not start without a running Steam client, and none runs on the device ("Steamworks in the prefix"
   in §10b). It reports only the DLC the person owns (`unlock_all=0`, `SteamworksShim.kt:196`), and droidtop's Steam
   path does not run Valve's client: the shim sets `PROTON_DISABLE_LSTEAMCLIENT=1` (`SteamworksShim.kt:156`), and the
-  arm64 in-prefix client is not carried since 2026-10-08. gbe_fork is a Steam API emulator, so whether this counts as
-  platform enablement, given that it also starts a game nobody owns once the person types an app ID, is **the owner's
-  decision, not yet given**. The coordinator's note (2026-11-05) that the ColdClient loader is "present but unused" is
-  not what the code does.
+  arm64 in-prefix client is not carried since 2026-10-08. **The owner decided (2026-11-05, Droidtop/tracker#718,
+  verbatim):** "That's fine. Yes. We don't add a check that explicitly checks an account and refuses to run. We DO add a
+  check that checks against an account, and warns the user if it can't find the game on it, with the general checkbox
+  for 'yes, I own this game'. Any stronger patch is simple to remove from an open source project." So gbe_fork stays as
+  platform enablement, and `SteamworksOwnership` checks the app ID the shim starts as against droidtop's Steam sign-in
+  (`StoreLibraries.byId("steam")`: signed in, and the account's games with how each is held; owned, shared by a family
+  or a held free licence count, "no longer in your library" does not). When the account doesn't list it, or nobody is
+  signed in, droidtop **warns and never refuses**: the game's Steamworks row says so and a "Yes, I own this game" row
+  appears (stored with the app ID it was ticked for, so another app ID asks again), and a launch shows the same warning
+  as a short notice and logs `Steamworks ownership: <verdict> for app <id>; starting anyway`, then starts the game.
 - **Vendored GameNative switches, present but unused.** `Container.java:168` (`unpackFiles`, with `needsUnpacking`)
   and `useLegacyDRM` are stored and copied (`ContainerUtils.kt:400-405`), but no droidtop code reads them to act, and
   nothing runs Steamless (`ImageFsInstaller.java:231` only marks its file executable when an extras payload carries

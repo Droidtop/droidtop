@@ -2,6 +2,7 @@ package dev.droidtop.runtime.windows
 
 import android.content.Context
 import dev.droidtop.runtime.windows.utils.ContainerUtils
+import dev.droidtop.runtime.windows.utils.SteamworksOwnership
 import dev.droidtop.runtime.windows.utils.SteamworksShim
 import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
 import com.winlator.container.Container
@@ -507,6 +508,19 @@ class DroidtopPcGameRuntime(
         // are left as they are.
         val shim = withContext(Dispatchers.IO) { WineOptions.steamworksNeed(context, entryId, gameRoot) }
         if (shim != null) {
+            // Is the app on the signed-in Steam account? Only ever a warning, never a refusal (owner, 2026-11-05;
+            // docs/SPEC.md 5b, "DRM: platform enablement"; Droidtop/tracker#718).
+            val verdict = withContext(Dispatchers.IO) {
+                SteamworksOwnership.check(context, shim.appId, WineOptions.steamworksConfirmed(context, entryId, shim.appId))
+            }
+            if (SteamworksOwnership.warns(verdict)) {
+                val text = SteamworksOwnership.warning(verdict, shim.appId) +
+                    " If you own it, say so under the game's Wine settings, \"Yes, I own this game\"."
+                android.util.Log.w(WinePresentation.LOG_TAG, "Steamworks ownership: $verdict for app ${shim.appId}; starting anyway")
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(context.applicationContext, text, android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
             val launch = runCatching {
                 SteamworksShim.prepare(
                     context, container, shim, entryId, executable, gameRoot, workingDir, arguments,
