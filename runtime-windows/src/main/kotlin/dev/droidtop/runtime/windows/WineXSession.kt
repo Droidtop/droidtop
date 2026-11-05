@@ -176,6 +176,8 @@ class WineXSession(
             // 2026-10-17), bounded where the full trace would flood the output tail; a prefix's own WINEDEBUG,
             // set below, still wins.
             put("WINEDEBUG", WineLaunchPlan.DEFAULT_WINEDEBUG)
+            // DIAGNOSTIC BUILD (#897): GStreamer's warnings, and the media converter and Wine's GStreamer glue in detail.
+            put("GST_DEBUG", "2,protonmediaconverter:5,WINE:4,asfdemux:4,matroskademux:4,decodebin:5,uridecodebin:4,GST_PLUGIN_LOADING:4,GST_ELEMENT_FACTORY:4,opus*:4")
             // EnvVars parses a string or copies another EnvVars; there is
             // no map overload, so the plan's pairs go in one at a time.
             if (!silent) WineLaunchPlan.audioEnvVars(prefix.audioDriver, rootPath).forEach { (name, value) -> put(name, value) }
@@ -374,7 +376,10 @@ internal object WineWorkingDirectory {
  */
 object WineLaunchPlan {
     /** Wine's log channels by default: errors only ("-all,err+all"), never the full trace. */
-    const val DEFAULT_WINEDEBUG = "-all,err+all"
+    // DIAGNOSTIC BUILD, not to land (Droidtop/tracker#897): Clover Days stalls after Proton's placeholder video plays.
+    // Module loads, exceptions, and every Media Foundation, DirectShow and GStreamer channel, to see what the game
+    // waits on (an end-of-stream or session event that never arrives would fit).
+    const val DEFAULT_WINEDEBUG = "-all,err+all,+loaddll,+seh,+mfplat,+mf,+mfreadwrite,+mfmediaengine,+quartz,+gstreamer,+strmbase,+mfsrcsnk"
 
 
     enum class AudioDriver { PULSEAUDIO, ALSA, NONE }
