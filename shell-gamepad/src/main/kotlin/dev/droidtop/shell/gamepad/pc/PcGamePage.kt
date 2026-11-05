@@ -823,6 +823,7 @@ internal fun PcGamePage(
                                         subtitle = fact.subtitle,
                                         value = fact.value,
                                         switchOn = fact.on,
+                                        valuePath = fact.path,
                                         statusMark = fact.mark,
                                         chevron = fact.onActivate != null,
                                         selected = zone == PageZone.CONTENT && row == index,
@@ -1405,6 +1406,8 @@ internal data class PageFact(
     val onOptions: (() -> Unit)? = null,
     /** An on/off row's state, drawn as a switch (show, then say: Droidtop/tracker#738); null for any other row. */
     val on: Boolean? = null,
+    /** The value is a place: one line, cut in the middle so the folder at its end shows (Droidtop/tracker#672). */
+    val path: Boolean = false,
     /** A state drawn as its glyph beside the title (synced, offline, working); null for none. */
     val mark: dev.droidtop.library.settings.StatusMark? = null,
 )
@@ -1653,7 +1656,7 @@ private fun pageRows(
         entry.pcInfo?.marker?.let { add(PageFact("Store id", it.key, subtitle = words(R.string.gamepad_from_the_store_s_files_in), tab = PageTab.DETAILS)) }
         entry.pcInfo?.installedVersion?.let { add(PageFact("Installed build", it, tab = PageTab.DETAILS)) }
         // Where it lives as a person names it; the whole path is the tooltip.
-        folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it, tab = PageTab.DETAILS)) }
+        folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it, tab = PageTab.DETAILS, path = true)) }
         shownVersion?.let { (version, from) -> add(PageFact("Version from", from.words, subtitle = version, tab = PageTab.DETAILS)) }
     }
     if (more.isNotEmpty()) {

@@ -234,6 +234,9 @@ fun MenuRow(
     // The value drawn as a state chip (ChoiceItem.toned): in [valueTone]'s colours, or neutral when it has none
     // (Droidtop/tracker#519).
     valueChip: Boolean = false,
+    // The value is a place (a folder, a path): one line, cut in the middle, so its start (the volume) and its end
+    // (the folder that is the game) both show (Droidtop/tracker#672).
+    valuePath: Boolean = false,
     valueTone: NoticeTone? = null,
     // The row has Info (a sentence beyond its title): a 20dp glyph says so, and a screen reader hears
     // "More info available" (docs/SPEC.md 7k, "Explanations").
@@ -431,8 +434,8 @@ fun MenuRow(
                     color = valueColor,
                     style = TypeRole.value,
                     textAlign = TextAlign.End,
-                    maxLines = valueLines,
-                    overflow = TextOverflow.Ellipsis,
+                    maxLines = if (valuePath) 1 else valueLines,
+                    overflow = if (valuePath) TextOverflow.MiddleEllipsis else TextOverflow.Ellipsis,
                     modifier = Modifier.valueShare().then(
                         if (columnWidth != null) {
                             // The shared width is a minimum, not a box: a value measured narrower than it draws
