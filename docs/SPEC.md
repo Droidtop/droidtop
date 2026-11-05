@@ -17940,9 +17940,9 @@ structure, top to bottom, drawn only from theme tokens:
   right of a plate, never stretched or blown up across the band, and the name keeps to
   the width left of it, wrapping to three lines, never running under the art
   (Droidtop/tracker#666). Its height is a share of the window's (46 percent landscape,
-  Steam's hero ends at about 46; 30 percent portrait). No art at all (no hero, cover or logo): the plate and the
-  name, only as tall as the name, at least 96 dp, so the page does not open on an empty plate above a one-line title
-  (Droidtop/tracker#666, rig 2783).
+  Steam's hero ends at about 46; 30 percent portrait). No art at all (no hero, cover or logo): the band at its
+  full height on a plain plate, the name drawn as text where the logo goes, as Steam's page does (owner,
+  2026-11-05, Droidtop/tracker#666).
 - **One scrolling page** (2026-10-08, Droidtop/tracker#363, Steam's game
   page): the hero, the action band, the tab strip and the tab's rows are ONE
   list. With the cursor down in the rows the hero and the band scroll away
