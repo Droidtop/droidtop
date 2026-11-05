@@ -476,7 +476,10 @@ class DroidtopPcGameRuntime(
         // A game sharing the prefix runs with its own Wine choices laid over
         // it for this launch only (docs/SPEC.md 5a); the shared prefix's
         // saved settings are not touched.
-        val overrides = withContext(Dispatchers.IO) { WineOptions.launchOverrides(context, entryId, container) }
+        // The game's own folder rides along so it stays reachable when a whole-volume drive is not linked
+        // (WineStorageGrants, Droidtop/tracker#584).
+        val overrides = withContext(Dispatchers.IO) { WineOptions.launchOverrides(context, entryId, container) } +
+            (WineStorageGrants.GAME_FOLDER to gameRoot.absolutePath)
 
         // The game's own language and the variables the person set for it
         // (docs/SPEC.md 7i, "Game properties"): laid over this one launch with

@@ -129,6 +129,12 @@ object WineOptions {
 
     /** The "Prepare for first launch" row (docs/SPEC.md 9; Droidtop/tracker#866): a game's, when its folder is known. */
     const val PREPARE = "wine_prepare_first_launch"
+
+    /** The two wide grants (docs/SPEC.md 5a, "What a game can reach", 4; Droidtop/tracker#584), off until turned on. */
+    const val GRANT_DEVICE_SYSTEM = "wine_grant_device_system"
+    const val GRANT_ALL_STORAGE = "wine_grant_all_storage"
+    private const val GRANT_DENY = "deny"
+    private const val GRANT_ALLOW = "allow"
     private const val PREPARED_KEY = "prepared"
     private const val PREPARE_IDLE = "idle"
     private const val PREPARE_NOW = "now"
@@ -150,7 +156,10 @@ object WineOptions {
     private const val STEAMWORKS_OFF = "off"
 
     /** A game's choices that are not prefix settings: kept when its Wine choices change or are dropped. */
-    private val OWN_KEYS = setOf(LSFG_KEY, STEAMWORKS_KEY, STEAMWORKS_APPID_KEY, CACHE_KEY, PREPARED_KEY, PcContainers.PREFIX_KEY)
+    private val OWN_KEYS = setOf(
+        LSFG_KEY, STEAMWORKS_KEY, STEAMWORKS_APPID_KEY, CACHE_KEY, PREPARED_KEY, PcContainers.PREFIX_KEY,
+        WineStorageGrants.DEVICE_SYSTEM, WineStorageGrants.ALL_STORAGE,
+    )
 
     /**
      * Where the choices made before Set up Windows games are kept (in [WineGameOptionsPrefs], under a name no
@@ -219,6 +228,7 @@ object WineOptions {
     private suspend fun gameRows(context: Context, entryId: String?, gameRoot: String?): List<WineOptionRow> =
         listOfNotNull(entryId?.let { prefixRow(context, it) }) +
             listOf(translationCacheRow(context, entryId)) +
+            grantRows(context, entryId) +
             (if (entryId != null && gameRoot != null) listOf(prepareRow(context, entryId, gameRoot)) else emptyList()) +
             if (entryId == null) emptyList() else listOf(lsfgRow(context, entryId)) + steamworksRows(context, entryId, gameRoot?.let(::File))
 
@@ -301,6 +311,39 @@ object WineOptions {
             ownId -> "$name (this game's own)"
             else -> name
         } + " · " + container.wineVersion.orEmpty()
+    }
+
+    /** Each wide grant's row id and the key it is kept under (a game's own choice, or its prefix's extra). */
+    private val GRANTS = listOf(
+        Triple(GRANT_DEVICE_SYSTEM, WineStorageGrants.DEVICE_SYSTEM, "Device system folders"),
+        Triple(GRANT_ALL_STORAGE, WineStorageGrants.ALL_STORAGE, "All internal storage"),
+    )
+
+    /**
+     * "Device system folders" and "All internal storage": Deny (the default for every game and prefix) or Allow, with
+     * the owner's line under each. In the shared settings they are the shared prefix's, for every game in it; on a
+     * game, the game's own, and a grant its prefix gives is shown as "Allowed by its prefix". Disk work.
+     */
+    private fun grantRows(context: Context, entryId: String?): List<WineOptionRow> {
+        val prefix = runCatching {
+            if (entryId == null) ContainerManager(context).getContainerById(DroidtopPcGameRuntime.CONTAINER_ID) else PcContainers.forGame(context, entryId)
+        }.getOrNull()
+        val own = entryId?.let { WineGameOptionsPrefs.get(context, it) }.orEmpty()
+        return GRANTS.map { (rowId, key, title) ->
+            val byPrefix = prefix?.getExtra(key) == "1"
+            val allowed = if (entryId == null) byPrefix else own[key] == "1"
+            val summary = when {
+                entryId == null -> "${WineStorageGrants.LINE}. For every game in the shared prefix."
+                byPrefix && !allowed -> "${WineStorageGrants.LINE}. Allowed by its prefix."
+                else -> "${WineStorageGrants.LINE}."
+            }
+            WineOptionRow(
+                rowId, title, summary,
+                if (allowed || (entryId != null && byPrefix)) GRANT_ALLOW else GRANT_DENY,
+                listOf(WineOptionChoice(GRANT_DENY, "Deny"), WineOptionChoice(GRANT_ALLOW, "Allow")),
+                ownChoice = entryId != null && own[key] != null,
+            )
+        }
     }
 
     /** Whether [entryId]'s own choice leaves its translation cache on (the setting for every game is [TranslationCache.enabled]). */
@@ -426,6 +469,18 @@ object WineOptions {
                     if (before != null && after != null && before.id != after.id) {
                         val copied = WinePrefixSaves.copy(before.rootDir, after.rootDir)
                         android.util.Log.i(TAG, "Moved $entryId from prefix ${before.id} to ${after.id}; copied $copied save files")
+                    }
+                    return@runCatching
+                }
+                GRANTS.firstOrNull { it.first == rowId }?.let { (_, key, _) ->
+                    if (entryId == null) {
+                        ContainerManager(app).getContainerById(DroidtopPcGameRuntime.CONTAINER_ID)?.let { shared ->
+                            shared.putExtra(key, if (value == GRANT_ALLOW) "1" else null)
+                            shared.saveData()
+                        }
+                    } else {
+                        val stored = WineGameOptionsPrefs.get(app, entryId) - key
+                        WineGameOptionsPrefs.set(app, entryId, if (value == GRANT_ALLOW) stored + (key to "1") else stored)
                     }
                     return@runCatching
                 }
@@ -600,7 +655,14 @@ object WineOptions {
      * in a prefix of its own, and its frame generation. Disk work.
      */
     fun launchOverrides(context: Context, entryId: String?, container: Container): Map<String, String> =
-        wineOverrides(context, entryId, container) + lsfgOverrides(context, entryId) + gestureOverrides(context, entryId)
+        wineOverrides(context, entryId, container) + lsfgOverrides(context, entryId) + gestureOverrides(context, entryId) +
+            grantOverrides(context, entryId)
+
+    /** The game's own wide grants (WineStorageGrants), when it has allowed one. */
+    private fun grantOverrides(context: Context, entryId: String?): Map<String, String> {
+        val own = entryId?.let { WineGameOptionsPrefs.get(context, it) } ?: return emptyMap()
+        return listOf(WineStorageGrants.DEVICE_SYSTEM, WineStorageGrants.ALL_STORAGE).filter { own[it] == "1" }.associateWith { "1" }
+    }
 
     /** The game's own touchscreen gestures over the prefix's (Droidtop/tracker#618 C8), when it has chosen any. */
     private fun gestureOverrides(context: Context, entryId: String?): Map<String, String> {
