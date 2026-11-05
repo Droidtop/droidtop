@@ -1347,6 +1347,13 @@ type and the data source, which a third-party home cannot have.
   or not, what runs) is worked out off the main thread, the home apps are read again only when a package
   changes, and a bar is rebuilt only when what it shows changed.
 - *Recents.* The same single path as the gesture slot: `GLOBAL_ACTION_RECENTS` through the service.
+- *Status and the Quick Menu* (Droidtop/tracker#701). The bar ends with the shared status readout
+  (`StatusCluster`: clock, network, battery, the one Gaming's header, the companion and the Desktop tray draw),
+  so a full-screen app on an external display still has a clock. It is a Compose view in the bar's View window
+  (`StatusViews`, ui-shared, which gives it the lifecycle the overlay window lacks), drawn in the bar's text ink
+  (`TaskbarInks`). A tap opens the Quick Menu over that display (`OverlayRequests`, the overlay HOME + R2 opens),
+  whose Notifications section is the bar's notifications; like the pad's status readout elsewhere it is a touch
+  target, not a stop of the bar's D-pad, since HOME + R2 already opens the same menu from the pad.
 - *D-pad.* The window is not focusable, so it never steals keys from the app. The service's key filter
   (`canRequestFilterKeyEvents`, requested only while the setting is on) looks for exactly two keys, the Meta
   key and the pad's Mode button, and consumes only those (Meta not while droidtop's Desktop is in front, where it

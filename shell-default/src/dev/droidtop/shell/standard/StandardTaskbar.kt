@@ -88,6 +88,9 @@ class StandardTaskbar(private val service: AccessibilityService) {
     private var openKeys: List<String> = emptyList()
     private val openEntries = HashMap<String, Entry>()
     private var appInFront = false
+
+    /** The app last in front that is not the home screen or System UI, for the Quick Menu's per-app tiles. */
+    private var frontPackage: String? = null
     private var droidtopIsHome = false
     /** The packages still running, as of the last app switch: the dot, and which opened apps stay listed. */
     private var running: Set<String> = emptySet()
@@ -205,6 +208,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 appInFront = false
             } else if (pkg != SYSTEM_UI) {
                 appInFront = true
+                frontPackage = pkg
                 if (launch != null) {
                     openKeys = TaskbarPolicy.withOpened(openKeys, pkg)
                     if (pkg !in openEntries) loadOpenEntry(pkg, launch)
@@ -361,6 +365,14 @@ class StandardTaskbar(private val service: AccessibilityService) {
         endFocus()
     }
 
+    /** The Quick Menu over [displayId], drawn by droidtop's in-game overlay as for HOME + R2 (docs/SPEC.md "In-game overlays"). */
+    private fun openQuickMenu(displayId: Int) {
+        endFocus()
+        dev.droidtop.runtime.overlay.OverlayRequests.raise(
+            dev.droidtop.runtime.overlay.OverlayRequest(dev.droidtop.runtime.overlay.OverlayRequest.Kind.QUICK_MENU, displayId, frontPackage),
+        )
+    }
+
     private fun openDrawer(displayId: Int) {
         // Standard's drawer, from Standard's bar: never a way into Standard from another mode (Droidtop/tracker#639).
         if (modeInUse != Mode.LAUNCHER.id) return
@@ -403,6 +415,10 @@ class StandardTaskbar(private val service: AccessibilityService) {
         private var added = false
         private var drawn: List<Any>? = null
 
+        // The shared status readout (clock, network, battery), made once and moved into each rebuilt bar; its tap is
+        // the Quick Menu over this display, the same one R2 and the Desktop tray open (Droidtop/tracker#701).
+        private var status: dev.droidtop.ui.shared.StatusViews.Readout? = null
+
         fun show(pinned: List<Entry>, open: List<Entry>, running: Set<String>, collapsed: Boolean) {
             // Nothing the bar shows changed (a display's refresh rate, a dialog in the same app): nothing is rebuilt.
             val state = listOf(pinned, open, running, collapsed, inks)
@@ -434,6 +450,8 @@ class StandardTaskbar(private val service: AccessibilityService) {
         }
 
         fun remove() {
+            status?.dispose()
+            status = null
             if (!added) return
             try {
                 windowManager.removeView(root)
@@ -480,6 +498,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 addView(apps)
             }
             bar.addView(scroller, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            bar.addView(statusButton())
             bar.addView(textButton(windowContext.getString(R.string.taskbar_recents)) {
                 service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
             })
@@ -519,6 +538,16 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 button.addView(dot, FrameLayout.LayoutParams(dp(5), dp(5), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
             }
             return button
+        }
+
+        /** The readout, out of the bar it was in (the bar is rebuilt on a change) and in its current ink. */
+        private fun statusButton(): View {
+            val readout = status ?: dev.droidtop.ui.shared.StatusViews.create(windowContext, inks.text) { openQuickMenu(displayId) }
+                .also { status = it }
+            (readout.view.parent as? ViewGroup)?.removeView(readout.view)
+            readout.setInk(inks.text)
+            readout.view.setPadding(dp(8), 0, dp(8), 0)
+            return readout.view
         }
 
         private fun textButton(label: String, onClick: () -> Unit): View = TextView(windowContext).apply {
