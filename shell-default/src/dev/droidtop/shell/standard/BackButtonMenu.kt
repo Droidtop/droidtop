@@ -159,7 +159,8 @@ object BackButtonMenu {
         // surface back (HomeEntry.enterStandard), so the add-on display kept the last mode's page: a switch from
         // Gaming left Gaming Home there, with no companion tabs (Droidtop/tracker#347, RP5 3061). The Alternative
         // forwarder and the trampoline do this themselves.
-        if (home.component?.className == StandardComponents.LAUNCHER) reassertSecondaryDisplays(context)
+        val ownLauncher = implementation == HomeRolePrefs.HomeImplementation.DROIDTOP && HomeRolePrefs.isDroidtopHome(context)
+        if (ownLauncher) reassertSecondaryDisplays(context)
     }
 
     /** What [openHome] starts, without recording the mode: for a notification that returns to the Android home screen. */
