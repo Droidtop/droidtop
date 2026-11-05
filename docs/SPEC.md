@@ -22924,6 +22924,17 @@ in Proton. Container setup copies those folders into a new prefix (`ContainerMan
   game's own variables (Game properties, 7i) or the prefix's override it; a person can also set it for one game
   there when ICU itself misbehaves.
 
+### Proton's media converter (built 2026-11-05, Droidtop/tracker#897, #601)
+
+The Wine builds droidtop runs carry Proton's GStreamer media converter, which Media Foundation decodes through. It
+opens the files the MEDIACONV_* variables name: a dump of the media it met, Valve's transcoded media, and a blank video
+and audio it plays in place of media it cannot decode. Proton's launcher sets them; droidtop's did not, so the
+converter's audio element failed to start and a Unity game's intro video never played (Clover Days, black on the
+console). `WineMediaConverter`, at each launch, sets all six as Proton does: the databases under the prefix's
+`mediaconv/` folder, and the blank media Proton ships (`blank.mkv`, `blank.mka`, `blank.ptna`, from Proton's media/
+folder, kept in droidtop's assets and unpacked once into `files/mediaconv`). A prefix's or game's own value wins.
+GameNative sets these only behind a per-container switch that is off by default, with paths under its own package.
+
 ### Translation cache, precache and mixed-arch running (decided 2026-11-04, Droidtop/tracker#865, #866)
 
 The owner, relayed by the coordinator on 2026-11-04, approved the cache plan in #865 (mixed-architecture running
