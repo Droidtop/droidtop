@@ -25,7 +25,8 @@ import kotlinx.coroutines.flow.onStart
  * could be fetched (docs/SPEC.md 12a "One search"), and a web search, where a
  * surface offers one, last.
  */
-enum class SearchRowKind { APP, GAME, SOURCE, WEB }
+/** What a row is; on an equal match, rows sort in this order. CALC is the calculator's answer (Droidtop/tracker#704). */
+enum class SearchRowKind { CALC, APP, GAME, SOURCE, WEB }
 
 /**
  * A row the caller found on the device (an installed app, a library game).
