@@ -334,7 +334,9 @@ private fun catalogSearchGroup(context: Context): CatalogGroup? {
  * Null when no app carries one. Reads every such app's APKs (kept until they change): off the main thread.
  */
 internal fun AppSettingsCatalogs.appInterfacesGroup(context: Context, installed: List<dev.droidtop.pluginhost.PluginRecord>): CatalogGroup? {
-    val found = runCatching { dev.droidtop.pluginhost.AppInterfaces.discover(context) }.getOrDefault(emptyList())
+    val found = runCatching { dev.droidtop.pluginhost.AppInterfaces.discover(context) }
+        .onFailure { android.util.Log.w("droidtop.plugin", "In your apps: looking for apps that carry a plugin failed", it) }
+        .getOrDefault(emptyList())
     val items = found.mapNotNull { app ->
         if (dev.droidtop.pluginhost.AppInterfaces.isAdded(context, app)) return@mapNotNull null
         val record = installed.firstOrNull { it.manifest.kind == PluginKind.APP_INTERFACE && it.manifest.app?.packageName == app.packageName }

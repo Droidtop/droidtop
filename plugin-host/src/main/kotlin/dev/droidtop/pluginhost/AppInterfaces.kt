@@ -91,11 +91,24 @@ object AppInterfaces {
      */
     fun discover(context: Context): List<Found> {
         val pm = context.packageManager
-        val services = runCatching { pm.queryIntentServices(Intent(AppInterfaceTrust.ACTION), 0) }.getOrDefault(emptyList())
-        return services.mapNotNull { it.serviceInfo }
+        val services = runCatching { pm.queryIntentServices(Intent(AppInterfaceTrust.ACTION), 0) }
+            .onFailure { android.util.Log.w(TAG, "looking for apps that carry a plugin failed", it) }
+            .getOrDefault(emptyList())
+        val found = services.mapNotNull { it.serviceInfo }
             .filter { it.packageName != context.packageName }
             .distinctBy { it.packageName }
             .map { inspect(context, it.packageName, it.name) }
+        // What was found and what droidtop decided, so a missing "In your apps" row can be told apart on a device
+        // (Droidtop/tracker#547: Enginehost dev.658 was not listed on the AVD and nothing said why).
+        android.util.Log.i(
+            TAG,
+            "apps that carry a plugin: ${services.size} service(s)" +
+                found.joinToString("") { f ->
+                    val refused = (f.verdict as? AppInterfaceTrust.Verdict.Refused)?.reason
+                    "; ${f.packageName}: ${f.verdict::class.java.simpleName}" + listOfNotNull(refused, f.problem).joinToString("") { p -> " ($p)" }
+                },
+        )
+        return found
     }
 
     /** One app, checked: its signature, its manifest asset and the verdict. [serviceName] is the service it exports, when known. */
@@ -237,4 +250,6 @@ object AppInterfaces {
 
     /** The largest manifest asset read: a manifest is a few kilobytes. */
     private const val MAX_MANIFEST_BYTES = 256L * 1024
+
+    private const val TAG = "droidtop.plugin"
 }
