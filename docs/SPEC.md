@@ -4596,9 +4596,14 @@ droidtop's raw code. Everything runs as an isolated plugin now, so the API handl
   carries as a library.
 - **Not concerns** (owner): restricted settings, since scoping is the API's job, and Play Protect, which already
   warns about droidtop.
-- **Built in steps.** The host, its signing, install and connection come first and hold nothing. Then the root,
-  Shizuku and wireless debugging providers move into it, then droidtop's own Shizuku and wireless debugging code and
-  the full-trust tier go. The Fibrewall lane confines the host's processes, each provider isolated from the others.
+- **The host is the enhanced privileges provider; the ways in are plugins inside it.** The owner, 2026-11-05: "the
+  provider isn't the "shizuku" provider. It's the enhanced privileges provider, and shizuku is one plugin that runs
+  in it. Magisk's hooks are another". A caller (droidtop's own task manager, a Syncthing-Fork import) asks the host
+  for a level (`adb` or `root`), never for Shizuku or Magisk by name. Whichever of the host's plugins holds that
+  level on the device serves the call.
+- **Built in steps.** The host, its signing, install and connection come first and hold nothing. Then its plugins:
+  Shizuku, Magisk's hooks and wireless debugging. Then droidtop's own Shizuku and wireless debugging code, and the
+  full-trust tier, go. The Fibrewall lane confines the host's processes, each plugin in it isolated from the others.
 
 ### Wireless debugging (Droidtop/tracker#816, owner 2026-10-30)
 
