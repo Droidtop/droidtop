@@ -122,7 +122,7 @@ internal data class CompanionBarLayout(val tabs: List<CompanionTab>, val more: L
 }
 
 /** Runners that ask for Input while they run: a stream, and a PC game played with mouse and keyboard. */
-private val INPUT_RUNNERS = setOf(LibraryEntryKind.REMOTE_STREAM, LibraryEntryKind.WINE_PROFILE, LibraryEntryKind.LINUX_CONTAINER_APP)
+private val INPUT_RUNNERS = STREAM_KINDS + setOf(LibraryEntryKind.WINE_PROFILE, LibraryEntryKind.LINUX_CONTAINER_APP)
 
 internal fun runnerWantsInput(kind: LibraryEntryKind?): Boolean = kind in INPUT_RUNNERS
 
@@ -336,7 +336,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         else -> opening
     }
     val jobs by dev.droidtop.pluginhost.PluginJobsCenter.entries().collectAsState()
-    val idleExempt = shownForIdle == CompanionTab.SOCIAL.id || requested != null || runningKind == LibraryEntryKind.REMOTE_STREAM ||
+    val idleExempt = shownForIdle == CompanionTab.SOCIAL.id || requested != null || runningKind in STREAM_KINDS ||
         jobShownOnHome(shownForIdle, jobs.any { !it.done && !it.paused })
     CompanionIdleLayer(exempt = idleExempt, input = shownForIdle == CompanionTab.INPUT.id && requested == null, wakeRequest = showTabsNow) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {

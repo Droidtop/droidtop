@@ -37,7 +37,7 @@ class CompanionTabsTest {
     }
 
     @Test fun streamsAndPcGamesAddInputUnlessChosen() {
-        for (kind in listOf(LibraryEntryKind.REMOTE_STREAM, LibraryEntryKind.WINE_PROFILE)) {
+        for (kind in listOf(LibraryEntryKind.REMOTE_STREAM, LibraryEntryKind.COMPUTER_GAME, LibraryEntryKind.WINE_PROFILE)) {
             val running = runningTabs(gameRunning = true, wantsInput = runnerWantsInput(kind))
             val gaming = slots(gamingDefault, UiMode.FULL, running, 0f, emptyMap())
             assertEquals(listOf("home", "system", "apps", "social", "game", "input"), ids(gaming.tabs))

@@ -82,9 +82,12 @@ internal object CompanionConfirm {
     }
 }
 
+/** The kinds that run as a windowcast stream: a computer's application, and a computer's game, which opening streams (#860). */
+internal val STREAM_KINDS = setOf(LibraryEntryKind.REMOTE_STREAM, LibraryEntryKind.COMPUTER_GAME)
+
 /** What a running entry's runner is: a stream disconnects (windowcast), everything else is a local game. */
 internal fun runnerOf(entry: LibraryEntry?): GameRunner =
-    if (entry?.kind == LibraryEntryKind.REMOTE_STREAM) GameRunner.STREAM else GameRunner.LOCAL
+    if (entry?.kind in STREAM_KINDS) GameRunner.STREAM else GameRunner.LOCAL
 
 /**
  * The Game tab, on the bar while a game runs (docs/SPEC.md "The companion's tabs", slice C8; dense since

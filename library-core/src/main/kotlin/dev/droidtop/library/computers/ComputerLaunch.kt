@@ -2,6 +2,8 @@ package dev.droidtop.library.computers
 
 import android.content.Context
 import android.content.Intent
+import dev.droidtop.library.LaunchContext
+import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.net.peer.AgentNative
 import dev.droidtop.net.peer.Computer
 import dev.droidtop.net.peer.Computers
@@ -38,6 +40,9 @@ object ComputerLaunch {
     const val EXTRA_HOST_ID = "dev.droidtop.app.extra.HOST_ID"
     const val EXTRA_ADDRESS = "dev.droidtop.app.extra.ADDRESS"
     const val EXTRA_WINDOW = "dev.droidtop.app.extra.WINDOW"
+
+    /** The library entry the stream is the running game of (Droidtop/tracker#428): the companion's Game tab names it. */
+    const val EXTRA_ENTRY_ID = "dev.droidtop.app.extra.ENTRY_ID"
 
     /** The port a windowcast host listens on unless its owner changed it (windowcast `app/src/config.rs`, `listen`). */
     const val WINDOWCAST_DEFAULT_PORT = 47100
@@ -134,9 +139,9 @@ object ComputerLaunch {
 
     /**
      * "Stream from <computer>": starts [key] on [computer] and shows it here through windowcast, and returns the one line
-     * to show. Network and file work: never on the main thread.
+     * to show. [entryId] is the library entry the stream runs as. Network and file work: never on the main thread.
      */
-    fun stream(context: Context, computer: Computer, key: String, title: String): String {
+    fun stream(context: Context, computer: Computer, key: String, title: String, entryId: String?): String {
         val viewer = viewerId(context) ?: return "This device's windowcast identity could not be opened, so nothing can be streamed."
         val (_, outcome) = start(context, listOf(computer), key, title, viewer) ?: return "${computer.name} could not be asked."
         if (!outcome.started) {
@@ -148,7 +153,7 @@ object ComputerLaunch {
         }
         // The agent trusts this device's viewer; this device trusts the computer it paired with, so no PIN is asked.
         runCatching { trustHost(context, computer.id) }.onFailure { Timber.w(it, "Stream from %s: could not trust it for windowcast", computer.name) }
-        return openWindowcast(context, computer, outcome.streamAddress, title, outcome.line)
+        return openWindowcast(context, computer, outcome.streamAddress, title, outcome.line, entryId)
     }
 
     /** droidtop's windowcast client folder: its identity and the hosts it trusts. The stream screen opens the same one. */
@@ -239,11 +244,20 @@ object ComputerLaunch {
      * window, and returns the line to show after [started]. The stream screen asks for the PIN when this device has not
      * paired with that computer's windowcast. A computer with no address to name cannot be opened.
      */
-    fun openWindowcast(context: Context, computer: Computer, answered: String?, title: String, started: String): String {
+    fun openWindowcast(context: Context, computer: Computer, answered: String?, title: String, started: String, entryId: String?): String {
         val open = streamIntent(context, computer, answered, title)
             ?: return "$started ${computer.name} has no address to show it from."
-        val failure = runCatching { context.startActivity(open) }.exceptionOrNull()
+        // The stream is the running game, as a Windows game's screen is (Droidtop/tracker#428): it goes through the one
+        // launch path, so the companion's Game tab and the Quick Menu name it and Quit is Disconnect.
+        val ctx = entryId?.let { id -> LaunchDisplay.launchContext?.takeIf { it.gameId == id } ?: LaunchContext(id, null) }
+        ctx?.let { open.putExtra(EXTRA_ENTRY_ID, it.gameId) }
+        val failure = runCatching { LaunchDisplay.start(context, open, ctx) }.exceptionOrNull()
             ?: return "$started Opening ${computer.name} in windowcast."
         return "$started The stream would not open: ${failure.message}."
     }
+
+    /** The running stream screen to the front, without connecting again: opening a stream that runs resumes it. */
+    fun resumeIntent(context: Context): Intent =
+        Intent(ACTION_REMOTE_STREAM).setPackage(context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
 }

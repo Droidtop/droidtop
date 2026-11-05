@@ -219,8 +219,11 @@ object LaunchDisplay {
     /** How long a dispatched launch is given to take the screen before it counts as played. */
     const val BOUNCE_WINDOW_MS = 1500L
 
-    fun start(context: Context, intent: Intent) {
-        val ctx = launchContext
+    /**
+     * Starts [intent] as the launch of [ctx]: the game the Quick Menu's Game section and the companion then name. [ctx]
+     * is the running [Library.launch]'s by default; a launch from outside one (a game page's "Stream from" row) names it.
+     */
+    fun start(context: Context, intent: Intent, ctx: LaunchContext? = launchContext) {
         // Read before this launch overwrites them: the game it may replace.
         val replacing = runningFlow.value?.context?.gameId?.let { id -> runningPackageName?.let { LaunchReplace.Running(id, it) } }
         runningPackageName = null

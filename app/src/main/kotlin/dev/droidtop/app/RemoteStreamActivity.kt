@@ -19,6 +19,8 @@ import android.view.WindowManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.TextView
+import dev.droidtop.library.LaunchDisplay
+import dev.droidtop.library.OwnGameScreens
 import dev.droidtop.library.computers.ComputerLaunch
 import dev.windowcast.AudioPlayer
 import dev.windowcast.ConnectRequest
@@ -53,6 +55,10 @@ import java.util.concurrent.Executors
  * device id, its windowcast address and, optionally, part of a window's title. A computer this device has not
  * paired with windowcast asks for the PIN its windowcast shows.
  *
+ * Opened for a library entry, it is that entry's running game (Droidtop/tracker#428), registered as droidtop's own game
+ * screen ([OwnGameScreens]) the way a Windows game's screen is: the companion's Game and Input tabs show while it runs,
+ * Quit (Disconnect) ends it, and opening the entry again returns to it. Leaving it ends the running game.
+ *
  * Not built: switching a window's carrier while watching (the library's automatic switching is turned off, so the
  * window stays on the carrier it started on), the host's pointer, popups and extra windows, the soft keyboard, and
  * starting a program that is not running.
@@ -79,9 +85,22 @@ class RemoteStreamActivity : Activity() {
     private var audio: AudioPlayer? = null
     private var dialog: AlertDialog? = null
 
+    /** The library entry this stream runs as; null when it was opened for none. */
+    private var entryId: String? = null
+
+    /** What the Quick Menu's and the companion's Quit reaches: Disconnect, which closes this screen. */
+    private val ownScreen = object : OwnGameScreens.Screen {
+        override val entryId: String? get() = this@RemoteStreamActivity.entryId
+        override fun stop() {
+            main.post { finish() }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        entryId = intent?.getStringExtra(ComputerLaunch.EXTRA_ENTRY_ID)
+        if (entryId != null) OwnGameScreens.register(ownScreen)
         val asked = ConnectRequest.of(
             intent?.getStringExtra(ComputerLaunch.EXTRA_HOST_ID),
             intent?.getStringExtra(ComputerLaunch.EXTRA_ADDRESS),
@@ -324,6 +343,9 @@ class RemoteStreamActivity : Activity() {
     }
 
     override fun onDestroy() {
+        OwnGameScreens.unregister(ownScreen)
+        // Leaving the stream ends its running game; a rotation does not (configChanges keeps this screen).
+        if (isFinishing && entryId != null && LaunchDisplay.runningGame?.gameId == entryId) LaunchDisplay.clearRunning()
         dialog?.dismiss()
         main.removeCallbacksAndMessages(null)
         val shown = renderer

@@ -6,6 +6,7 @@ import android.os.Looper
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
+import dev.droidtop.library.OwnGameScreens
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.PcSource
 import dev.droidtop.net.peer.Computers
@@ -80,6 +81,11 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
      * same stream screen on its computer, at a window named like it (7a).
      */
     override suspend fun launch(entry: LibraryEntry) {
+        // Its stream is open behind the shell (Back from the Quick Menu): opening it again returns to it.
+        if (OwnGameScreens.isRunning(entry.id)) {
+            context.startActivity(ComputerLaunch.resumeIntent(context))
+            return
+        }
         val text = withContext(Dispatchers.IO) { answerFor(entry) }
         Handler(Looper.getMainLooper()).post { dev.droidtop.library.settings.Notices.flash(text, context = context) }
     }
@@ -91,10 +97,10 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
         val name = computer?.name ?: "one of your computers"
         return when {
             computer != null && entry.kind == LibraryEntryKind.REMOTE_STREAM ->
-                ComputerLaunch.openWindowcast(context, computer, null, entry.title, "${entry.title} is installed on $name; its window is shown if it is open there.")
+                ComputerLaunch.openWindowcast(context, computer, null, entry.title, "${entry.title} is installed on $name; its window is shown if it is open there.", entry.id)
             computer == null || entry.kind != LibraryEntryKind.COMPUTER_GAME -> "${entry.title} is installed on $name, not on this device"
             // Opening a computer's game streams it from there (Droidtop/tracker#860): Steam's too, through windowcast.
-            else -> ComputerLaunch.stream(context, computer, key, entry.title)
+            else -> ComputerLaunch.stream(context, computer, key, entry.title, entry.id)
         }
     }
 

@@ -10002,7 +10002,22 @@ named), `WatchSet`, `WindowRenderers` (RDP pictures or decoded video),
 `dev.droidtop.app.action.REMOTE_STREAM`, extras: the computer's device id, its
 windowcast address and optionally part of a window's title). droidtop has its
 own windowcast identity (`filesDir/windowcast`): a computer it has not paired
-with asks for the PIN its windowcast shows, then connects. Not built, each its
+with asks for the PIN its windowcast shows, then connects.
+
+**A stream is the running game (Droidtop/tracker#428).** Opening a computer's
+application (`REMOTE_STREAM`) or a computer's game (`COMPUTER_GAME`, which
+streams it, Droidtop/tracker#860) starts the stream screen through the one
+launch path, `LaunchDisplay.start`, with the entry as its `LaunchContext`
+(extra `dev.droidtop.app.extra.ENTRY_ID`), the way a Windows game's screen is
+started. The screen registers itself as droidtop's own game screen
+(`OwnGameScreens`) while it runs. So the companion's Game and Input tabs show
+for it, the Game tab uses the runner's own Quit label ("Disconnect") with no
+Restart or Kill (slice C8 of Droidtop/tracker#414), Quit closes the screen, and
+opening the entry again while it runs returns to it without connecting again.
+Leaving the screen ends the running game. A game page's "Stream from
+<computer>" row for a game this device also has opens the stream screen without
+naming it the running game: the entry it would name is the local one, whose
+Resume would start it here. Not built, each its
 own item: switching a window's carrier while watching (the library's automatic
 switching is turned off, so a window stays on the carrier it started on), the
 host's pointer, popups and extra windows, the soft keyboard, starting a program

@@ -710,7 +710,7 @@ private fun PcGameMenuSheet(
                 scope.launch {
                     status = "Starting it on ${pc.name}…"
                     status = withContext(Dispatchers.IO) {
-                        dev.droidtop.library.computers.ComputerLaunch.stream(context, pc, streamKey, GameNaming.displayName(entry.title))
+                        dev.droidtop.library.computers.ComputerLaunch.stream(context, pc, streamKey, GameNaming.displayName(entry.title), null)
                     }
                 }
             },
