@@ -2442,13 +2442,19 @@ talk over the API".
 - **For:** box art, logos, heroes, screenshots, videos and manuals (the
   SteamGridDB shape, and theme media slots).
 - **Ops:**
-  - `list {entry ids, kinds} → [{kind, url, w, h, lang}]`;
-  - `fetch`, which runs through the host's download manager into
-    `downloaded_media`.
-- **Surfaces:** G/A/D: the artwork picker on a game, and scrape
-  settings.
+  - `list {entry: {title, system, ids: {steam?, gog?, igdb?, steamgriddb?}}, kinds}` →
+    `{items: [{kind, url, w?, h?, lang?}]}`: `kind` one of `cover`, `wide`, `hero`, `logo`,
+    `icon` (droidtop's artwork roles, docs/SPEC.md 7h); `url` https only; at most 200 items.
+    droidtop takes the first picture of each kind, one in the device's language (`lang`)
+    before one in another, one with none counting as any; a `wide` fills the landscape slot
+    when there is no `hero`. 10 s per provider.
+  - No `fetch`: droidtop downloads each `url` itself with the scrape's own write.
+- **When (2026-11-05, Droidtop/tracker#714):** during a PC game's scrape, after droidtop's own
+  sources (SteamGridDB, the Steam store, IGDB, the match), each allowed provider in turn,
+  filling only the roles those left empty (`PluginArtwork`, called from `PcFlavour`).
+- **Surfaces:** the scrape (Scrape PC games). The artwork picker on a game is not yet offered.
 - **Permission:** `provide:library.artwork`, `net.domains`.
-- **Status:** not built.
+- **Status:** built (2026-11-05) for the scrape.
 - **Rules:** the host downloads, validates the image type and size, and
   stores the file. A plugin never writes the media folder.
 

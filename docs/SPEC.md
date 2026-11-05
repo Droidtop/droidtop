@@ -16572,6 +16572,12 @@ the same care as the art.
   | Logo | free, transparent | any | drawn over the hero | `marquees` |
   | Icon | square | 1:1 | small lists | droidtop's own `icons` |
 
+  **Plugins that provide artwork (2026-11-05, Droidtop/tracker#714, docs/plugin-api.md 3 A4).** A PC game's scrape
+  asks each allowed `library.artwork` provider after droidtop's own sources, telling it the game's title, system and
+  store ids; its pictures come back by role (`cover`, `wide`, `hero`, `logo`, `icon`), fill only the roles the
+  built-in sources left empty, and go through the same write as theirs: droidtop downloads, checks and files them
+  by role. A plugin never writes the media folder.
+
   Built so far: a plugin's cover is filed by its shape (above). Not yet: the same check on scraped pictures from
   the built-in sources and on folder and store art, and a role a plugin names itself (docs/plugin-api.md 3 A3).
   - **Fewer requests (2026-10-17).** The owner: "Maybe caching might reduce our hits to the service somewhat". A

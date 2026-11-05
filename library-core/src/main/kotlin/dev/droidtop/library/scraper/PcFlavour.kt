@@ -101,6 +101,8 @@ internal fun IgdbGameMetadata.toPcMatch() = PcMatch(
  */
 internal class PcFlavour(context: Context) {
 
+    private val app = context.applicationContext
+
     private val igdb = igdbCredentials(context)
     private val steamGridDbKey = SteamGridDbPrefs.apiKey(context).ifBlank { null }
 
@@ -165,9 +167,14 @@ internal class PcFlavour(context: Context) {
                 )
             }
         }
+        // Plugins that provide artwork (docs/plugin-api.md 3 A4, Droidtop/tracker#714), after droidtop's own sources: they
+        // fill only the roles those left empty, and the scrape's own write downloads and checks what they name.
+        val pluginArt = dev.droidtop.runtime.util.runCatchingCancellable {
+            kotlinx.coroutines.runBlocking { dev.droidtop.library.integrations.PluginArtwork.matches(app, entry, ids, identity.name) }
+        }.getOrDefault(emptyList())
         return PcRecord.of(
             text = listOfNotNull(igdbRecord, steamRecord, lutrisRecord, identity).distinct(),
-            art = listOfNotNull(steamGridDbRecord, steamRecord, igdbRecord, identity).distinct(),
+            art = listOfNotNull(steamGridDbRecord, steamRecord, igdbRecord, identity).distinct() + pluginArt,
         ).copy(ids = ids)
     }
 
