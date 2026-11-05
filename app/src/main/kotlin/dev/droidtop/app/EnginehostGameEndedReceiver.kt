@@ -19,8 +19,10 @@ import kotlinx.coroutines.launch
  * person's own location instead, those saves are brought into droidtop's folder first
  * ([EnginehostSaves.afterGameEnded]), and an engine that saves beside the game leaves nothing to upload.
  *
- * A broadcast naming a folder droidtop never launched starts nothing, so another app sending one can at most ask
- * for a sync of a game droidtop already syncs.
+ * Any app can send this broadcast, so it is trusted for nothing but an upload of the folder droidtop itself passed
+ * (Droidtop/tracker#550 build review): it never makes droidtop copy saves from another folder, which only Enginehost's
+ * own report through its plugin's broker does (`saves.changed`, [dev.droidtop.library.saves.SaveSyncEngines]). A
+ * broadcast naming a game droidtop never launched starts nothing.
  */
 class EnginehostGameEndedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -35,7 +37,7 @@ class EnginehostGameEndedReceiver : BroadcastReceiver() {
                 intent.getStringExtra("saveRootRefused")?.let { why ->
                     android.util.Log.i(TAG, "Enginehost did not take droidtop's save folder for $path: $why")
                 }
-                if (!EnginehostSaves.afterGameEnded(app, key, path, saveFolder)) {
+                if (!EnginehostSaves.afterGameEnded(app, key, path, saveFolder, adoptOther = false)) {
                     android.util.Log.i(TAG, "$path ended (${intent.getStringExtra("reason")}) saving to $saveFolder: nothing to upload")
                     return@launch
                 }

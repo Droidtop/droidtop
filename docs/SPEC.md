@@ -15605,6 +15605,15 @@ follows:
     folder (missing or older ones, as deep as Steam Auto-Cloud looks, `adopt`) and then uploaded. Steam is asked
     for the game's save list when none is kept (`SteamStore.saveFolder`, at most 15 s); when it still cannot be
     named (offline), the folder is kept and the next launch brings its saves in before the game starts.
+  - **Only Enginehost's own report copies from another folder (2026-11-05, Droidtop/tracker#885, from the #550 build review).**
+    `GAME_ENDED` is a broadcast any app can send, and the receiver is exported with no permission (droidtop's minSdk
+    26 rules out a `knownSigner` permission on every device, and Enginehost is signed by another key). A forged one
+    naming a shared-storage folder made droidtop copy its "newer" files over the game's synced saves and upload
+    them. So the broadcast is trusted for one thing: a `saveFolder` that is exactly the folder droidtop passed starts
+    its upload, harmless from anyone. Any other folder is copied from only when Enginehost reports it through its
+    app interface plugin's broker (`saves.changed`, `AppInterfaceSaves`), where droidtop knows the caller
+    (`EnginehostSaves.reportTrust`, `afterGameEnded(adoptOther)`). A broadcast naming another folder is logged and
+    copies nothing.
 
   A refused path is accepted from any app the person allowed in App launch access, droidtop with no standing of its
   own.

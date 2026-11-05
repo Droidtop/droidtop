@@ -117,7 +117,7 @@ object StoreCloudSaveEngine : SaveSyncEngine {
         if (!EnginehostSaves.prepare(context, key, File(saves.gameFolder))) {
             return SaveHandoff(id, "Cloud saves: droidtop could not make its folder for this game", started = false)
         }
-        val upload = EnginehostSaves.afterGameEnded(context, key, saves.gameFolder, saves.saveFolder)
+        val upload = EnginehostSaves.afterGameEnded(context, key, saves.gameFolder, saves.saveFolder, adoptOther = true)
         if (upload) StoreSaves.afterExit(context, key, saves.title)
         return SaveHandoff(id, if (upload) "Cloud saves: uploading" else "Cloud saves: nothing to upload", started = upload)
     }
