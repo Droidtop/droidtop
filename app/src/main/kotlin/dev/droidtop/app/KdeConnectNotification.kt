@@ -40,6 +40,9 @@ object KdeConnectNotification {
     private const val PING_ID = 0x4B02
     private const val SHARE_ID = 0x4B03
     private const val FILE_ID = 0x4B04
+    private const val RING_ID = 0x4B05
+    /** Another device's notifications: one id each, from this base, by their key. */
+    private const val MIRROR_BASE = 0x4C00
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** Starts the device when it was left on, and follows its events for the life of the process. Called once at process start. */
@@ -50,6 +53,70 @@ object KdeConnectNotification {
             KdeConnect.events.collect { e -> runCatching { handle(app, e) } }
         }
         followClipboard(app)
+        followBattery(app)
+    }
+
+    /** This device's battery to paired devices (docs/SPEC.md 7p, battery), from Android's battery broadcast. */
+    private fun followBattery(context: Context) {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, intent: Intent) {
+                val present = intent.getBooleanExtra(android.os.BatteryManager.EXTRA_PRESENT, false)
+                val level = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                val scale = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                val charge = if (present && level >= 0 && scale > 0) level * 100 / scale else null
+                val plugged = intent.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0) != 0
+                scope.launch { KdeConnect.setBattery(charge, plugged) }
+            }
+        }
+        val filter = android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        // A sticky system broadcast: the current state arrives at once, then each change.
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.registerReceiver(receiver, filter)
+            }
+        }
+        // The device may come on after that: send the state again whenever it does.
+        scope.launch {
+            KdeConnect.running.collect { on ->
+                if (!on) return@collect
+                val sticky = runCatching { context.registerReceiver(null, filter) }.getOrNull() ?: return@collect
+                receiver.onReceive(context, sticky)
+            }
+        }
+    }
+
+    @Volatile
+    private var ringing: android.media.Ringtone? = null
+
+    @Volatile
+    private var ringStarted = 0L
+
+    /** Find my device: the alarm sound, loud, for 30 seconds or until the notice is opened. */
+    private fun ring(context: Context, from: String) {
+        val uri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
+            ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE) ?: return
+        val tone = android.media.RingtoneManager.getRingtone(context, uri) ?: return
+        tone.audioAttributes = android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM).build()
+        ringing?.stop()
+        ringing = tone
+        ringStarted = android.os.SystemClock.elapsedRealtime()
+        tone.play()
+        post(context, RING_ID, "$from is looking for this device", "Open to stop the sound", screen(context, RING_ID))
+        scope.launch {
+            kotlinx.coroutines.delay(30_000)
+            if (ringing === tone) stopRinging(context, force = true)
+        }
+    }
+
+    /** Stops find my device's sound (opening the KDE Connect screen does). */
+    fun stopRinging(context: Context, force: Boolean = false) {
+        // The screen is drawn again on every change, the ring's own included: only a later opening stops it.
+        if (!force && android.os.SystemClock.elapsedRealtime() - ringStarted < 3_000) return
+        ringing?.stop()
+        ringing = null
+        context.getSystemService(NotificationManager::class.java)?.cancel(RING_ID)
     }
 
     /**
@@ -125,6 +192,21 @@ object KdeConnectNotification {
             // Written as the shared clipboard writes (64 KB at most); nothing is shown, as in the official apps.
             is KdcEvent.Clipboard -> if (ClipRules.fits(e.text)) AndroidClipboard(context).write(e.text)
             is KdcEvent.Input -> typeHere(context, e)
+            is KdcEvent.Ring -> ring(context, nameOf(e.id))
+            is KdcEvent.Battery -> if (e.low) post(context, PING_ID, "${nameOf(e.id)}'s battery is low", "${e.charge}%", screen(context, PING_ID))
+            // Another device's notifications, shown as its own (docs/SPEC.md 7p, notifications): one notice each,
+            // updated in place and taken away when it goes there.
+            is KdcEvent.Notification -> post(
+                context,
+                MIRROR_BASE + (e.id + e.key).hashCode().mod(0x3FF),
+                listOf(e.app, e.title).filter { it.isNotBlank() }.joinToString(": ").ifBlank { nameOf(e.id) },
+                e.text,
+                screen(context, MIRROR_BASE),
+                channel = MIRROR_CHANNEL,
+                channelName = "Notifications from paired devices",
+                silent = e.silent,
+            )
+            is KdcEvent.NotificationGone -> manager.cancel(MIRROR_BASE + (e.id + e.key).hashCode().mod(0x3FF))
             is KdcEvent.Other -> Unit
         }
     }
@@ -186,15 +268,27 @@ object KdeConnectNotification {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    private fun post(context: Context, id: Int, title: String, text: String, tap: PendingIntent) {
+    private const val MIRROR_CHANNEL = "kdeconnect_mirror"
+
+    private fun post(
+        context: Context,
+        id: Int,
+        title: String,
+        text: String,
+        tap: PendingIntent,
+        channel: String = CHANNEL_ID,
+        channelName: String = "KDE Connect",
+        silent: Boolean = false,
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "KDE Connect", NotificationManager.IMPORTANCE_HIGH))
+        manager.createNotificationChannel(NotificationChannel(channel, channelName, NotificationManager.IMPORTANCE_HIGH))
         manager.notify(
             id,
-            Notification.Builder(context, CHANNEL_ID)
+            Notification.Builder(context, channel)
+                .setOnlyAlertOnce(silent)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setStyle(Notification.BigTextStyle().bigText(text))

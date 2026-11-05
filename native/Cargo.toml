@@ -23,7 +23,7 @@ droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidto
 # KDE Connect, both ways (Droidtop/tracker#645, SPEC "KDE Connect"): kdeconnect_<op> is passed to
 # this library's operation table. Pinned to the commit on lib-kdeconnect's ci/kdeconnect-core-645
 # until it lands and is tagged v0.1.0.
-kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", rev = "dc7f5559aa26c6819590e55e4ec979347ce35d10" }
+kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", rev = "aadd0931fac06cce2cd3f65dae99b205d3f214b6" }
 jni = { version = "0.21", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
