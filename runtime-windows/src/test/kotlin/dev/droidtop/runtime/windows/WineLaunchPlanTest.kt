@@ -170,7 +170,7 @@ class WineLaunchPlanTest {
 
     @Test
     fun `Wine prints errors by default`() {
-        assertEquals("-all,err+all", WineLaunchPlan.DEFAULT_WINEDEBUG)
+        assertTrue(WineLaunchPlan.DEFAULT_WINEDEBUG.startsWith("-all,err+all")) // DIAGNOSTIC BUILD (#897) adds channels
         assertEquals("wine", WinePresentation.RUN_RECORD_PREFIX)
     }
 
