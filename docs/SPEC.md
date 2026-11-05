@@ -8194,6 +8194,45 @@ class -- a delete that can leave the tree it was pointed at:
   staging dirs hold only droidtop-written flat files), and test-only
   temp dirs.
 
+### DRM: platform enablement, never piracy enablement (owner, 2026-11-05)
+
+Owner, 2026-11-05 (relayed by the coordinator, verbatim): "I'm not explicitly against USING DRM bypass functions to
+enable games the user provides to run, if we can't actually run the game. Our "pretend the kernel level anticheat
+really installed" hack qualifies as that. It's platform enablement, not piracy enablement. I AM against directly
+writing and supplying code that explicitly enables piracy, and not because I believe piracy is morally wrong (I am
+firmly a piracy supporter, morally), but because by doing so, we run the risk of getting shut down, which hurts users
+who DON'T pirate their games but use us. So, yes, our core implementations do not need to bypass DRM, and we shouldn't
+write them to".
+
+The rule, for droidtop's own code, the Windows runtime and every Enginehost core (§7d "What droidtop requires of
+Enginehost"):
+
+- **Never strip, crack or emulate DRM.** No code droidtop or a core writes removes, patches or answers a game's copy
+  protection.
+- **Platform enablement is allowed, with its reason written here.** Using an existing mechanism so a game the person
+  provides can run where it otherwise can't (an anti-cheat presence shim such as the kernel-driver placeholder in
+  §5b "Containment and copy-on-write layers", a compatibility layer) is allowed. Each such mechanism gets a line in
+  this section saying what platform gap it closes.
+- **Nothing whose purpose is running games without owning them** is written, wired in or shipped.
+
+What the code holds today, against the rule (2026-11-05, droidtop main):
+
+- **Steamworks shim (gbe_fork ColdClientLoader), wired in.** `DroidtopPcGameRuntime.kt:511` starts a game through
+  `SteamworksShim.prepare` when `WineOptions.steamworksNeed` (`WineOptions.kt:589`) says so: on by default for a game
+  Steam owns, off for others until the person turns it on (`SteamworksShim.kt:85`). Its gap: a Windows Steam game's
+  `steam_api` will not start without a running Steam client, and none runs on the device ("Steamworks in the prefix"
+  in §10b). It reports only the DLC the person owns (`unlock_all=0`, `SteamworksShim.kt:196`), and droidtop's Steam
+  path does not run Valve's client: the shim sets `PROTON_DISABLE_LSTEAMCLIENT=1` (`SteamworksShim.kt:156`), and the
+  arm64 in-prefix client is not carried since 2026-10-08. gbe_fork is a Steam API emulator, so whether this counts as
+  platform enablement, given that it also starts a game nobody owns once the person types an app ID, is **the owner's
+  decision, not yet given**. The coordinator's note (2026-11-05) that the ColdClient loader is "present but unused" is
+  not what the code does.
+- **Vendored GameNative switches, present but unused.** `Container.java:168` (`unpackFiles`, with `needsUnpacking`)
+  and `useLegacyDRM` are stored and copied (`ContainerUtils.kt:400-405`), but no droidtop code reads them to act, and
+  nothing runs Steamless (`ImageFsInstaller.java:231` only marks its file executable when an extras payload carries
+  it). GameNative's `replaceSteamApi` is not on main. Wiring any of these in needs the owner's decision with a
+  platform-enablement reason recorded here.
+
 ### Containment and copy-on-write layers for Wine (decided 2026-10-22, Droidtop/tracker#584)
 
 Design only; nothing here is built. The choices and the grants a person
@@ -11280,6 +11319,10 @@ so neither app assumes the other:
   moved to one permanent release per build, tagged by version
   (Droidtop/tracker#119, §10b "Build history"); enginehost has not been
   changed to match.
+- **No core strips, cracks or emulates DRM** (owner, 2026-11-05): a core
+  runs the game the person provides, and an existing mechanism that lets
+  it run where it otherwise can't is allowed only with its reason written
+  in §5b "DRM: platform enablement, never piracy enablement".
 
 ## 7e. Second-screen / ambient integrations (Spotify now-playing, Discord presence)
 
@@ -24081,7 +24124,7 @@ app gets it too:
     `libvirglrenderer` droidtop already builds). Each becomes a value of the
     same option, fetched the same way, when its component is built.
 
-**Steamworks in the prefix (2026-10-08, Droidtop/tracker#310).** A Windows
+**Steamworks in the prefix (2026-10-08, Droidtop/tracker#310; held against the DRM rule in §5b, 2026-11-05).** A Windows
 Steam game's own `steam_api(64).dll` starts only when it finds a running
 Steam and loads that Steam's `steamclient(64).dll`; droidtop's Steam is its
 own store (`:stores`) and runs no client in the prefix, so a game that needs
