@@ -555,7 +555,7 @@ private const val SEARCH_ICON_PX = 96
 internal fun linuxIconUri(app: ContainerApp): String? = app.iconFile?.let { "file://$it" }
 
 /** [pins] with a Linux pin that has no picture given its app's icon, when the app has one now. */
-private fun withLinuxIcons(pins: List<TaskbarPin>, linuxApps: List<ContainerApp>): List<TaskbarPin> =
+internal fun withLinuxIcons(pins: List<TaskbarPin>, linuxApps: List<ContainerApp>): List<TaskbarPin> =
     pins.map { pin ->
         if (pin.art != null) return@map pin
         val app = linuxApps.firstOrNull { TaskbarPins.linuxKey(it.id) == pin.key } ?: return@map pin
@@ -567,5 +567,5 @@ private fun withLinuxIcons(pins: List<TaskbarPin>, linuxApps: List<ContainerApp>
  * `.desktop` (foot's windows are `foot`, from `foot.desktop`), which is how the bar finds a window's icon. Matched
  * without case: some toolkits capitalise the id their program gives.
  */
-private fun windowIcons(linuxApps: List<ContainerApp>): Map<String, String> =
+internal fun windowIcons(linuxApps: List<ContainerApp>): Map<String, String> =
     linuxApps.mapNotNull { app -> linuxIconUri(app)?.let { app.id.removeSuffix(".desktop").lowercase() to it } }.toMap()

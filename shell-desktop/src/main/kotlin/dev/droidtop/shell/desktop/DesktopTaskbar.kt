@@ -57,6 +57,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.hostbridge.DesktopWindows
@@ -183,7 +184,7 @@ internal fun BoxScope.Taskbar(
             .fillMaxWidth(),
     ) {
         val itemsWidth = with(density) { (startWidth + (if (pins.isEmpty()) 0 else pinsWidth) + extrasWidth + trayWidth).toDp() }
-        val oneRow = maxWidth - itemsWidth >= WINDOW_LIST_MIN
+        val oneRow = windowsFitBeside(maxWidth, itemsWidth)
         val pinChips: @Composable () -> Unit = {
             Box(modifier = Modifier.onSizeChanged { pinsWidth = it.width }) { TaskbarPinChips(pins, onOpenPin, onUnpin) }
         }
@@ -269,6 +270,9 @@ internal fun BoxScope.Taskbar(
  * windows move to a strip of their own (docs/SPEC.md 2b).
  */
 internal val WINDOW_LIST_MIN = 200.dp
+
+/** Whether a bar [barWidth] wide keeps the window list beside items [itemsWidth] wide, at least [WINDOW_LIST_MIN]. Pure. */
+internal fun windowsFitBeside(barWidth: Dp, itemsWidth: Dp): Boolean = barWidth - itemsWidth >= WINDOW_LIST_MIN
 
 /**
  * A taskbar button with the narrow padding a bar needs. The stock Button's
