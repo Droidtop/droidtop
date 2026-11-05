@@ -83,7 +83,7 @@ object KdeConnectCatalog {
                 id = "kdeconnect_on",
                 title = "KDE Connect",
                 subtitle = KdeConnect.lastError?.takeIf { on && !KdeConnect.running.value }
-                    ?: "Other devices on this network can find this one and ask to pair. Nothing is shared before you accept",
+                    ?: "Devices on this network can find this one and ask to pair",
                 current = on,
                 onToggle = { ctx, value -> KdeConnect.setOn(ctx, value) },
             ),
@@ -101,7 +101,7 @@ object KdeConnectCatalog {
             TextInputItem(
                 id = "kdeconnect_addresses",
                 title = "Devices by address",
-                subtitle = "IP addresses to reach besides this network's own, separated by commas (a device on another network, or one the network's broadcast misses)",
+                subtitle = "IP addresses of devices this network does not find, separated by commas",
                 value = KdeConnect.addresses(context).joinToString(", "),
                 onChange = { ctx, text -> KdeConnect.setAddresses(ctx, text) },
             ),
