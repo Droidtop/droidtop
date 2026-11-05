@@ -862,74 +862,67 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // Real `tile` -- repeats the source texture across the element's box
     // instead of stretching one copy over it. Falls through to the plain
     // stretched draw below when the source can't be decoded to a bitmap
-    // (an SVG tile) -- see rememberTileBitmap's own doc comment.
-    val tileBitmap = rememberTileBitmap(if (tileEnabled) path else null)
-    if (tileBitmap != null) {
-        val tileSize = element.valueOrNull<EsDeThemeValue.Pair>("tileSize")
-        val density = LocalDensity.current
-        val tile = esDeTileSize(
-            declaredWidthPx = if (tileSize == null) null else with(density) { (viewWidth * tileSize.x.coerceIn(0f, 1f)).toPx() },
-            declaredHeightPx = if (tileSize == null) null else with(density) { (viewHeight * tileSize.y.coerceIn(0f, 1f)).toPx() },
-            sourceWidthPx = tileBitmap.width.toFloat(),
-            sourceHeightPx = tileBitmap.height.toFloat(),
-        )
-        if (tile != null) {
-            // `interpolation` on a tiled image (ImageComponent.cpp:590).
-            // This Compose version's ImageShader takes no filterQuality
-            // and a per-tile drawImage loop would be tens of thousands of
-            // draws, so the resampling happens ONCE instead: the tile is
-            // scaled to the size the theme asked for with the filter the
-            // theme asked for, and the shader then repeats it one to one.
-            // A theme that declares nothing keeps the platform's filtered
-            // default, exactly as esDeFilterQuality's own doc comment
-            // explains for every other image path.
-            val nearestTile = esDeFilterQuality(element) == FilterQuality.None
-            val tilePixels = remember(tileBitmap, tile, nearestTile) {
-                esDeResampledTile(tileBitmap, tile.first, tile.second, nearestTile)
-            }
-            val brush = remember(tilePixels) {
-                ShaderBrush(ImageShader(tilePixels, TileMode.Repeated, TileMode.Repeated))
-            }
-            // The tile is already at its requested size, so the fill is
-            // drawn one to one.
-            val scaleX = 1f
-            val scaleY = 1f
-            // Real `tileHorizontalAlignment`/`tileVerticalAlignment`
-            // (ImageComponent.cpp:684-718): exactly two literals each,
-            // anything else warned about and treated as the default.
-            val tileAlignRight = element.strOrNull("tileHorizontalAlignment") == "right"
-            val tileAlignBottom = element.strOrNull("tileVerticalAlignment") == "bottom"
-            Box(
-                modifier = placement.drawBehind {
-                    // The shader repeats at the bitmap's own pixel size, so
-                    // the whole tiled fill is drawn scaled by the requested
-                    // tile size over the un-scaled box -- equivalent to
-                    // repeating at the tile size itself.
-                    scale(scaleX = scaleX, scaleY = scaleY, pivot = Offset.Zero) {
-                        // Widths in the SHADER's own coordinates: the
-                        // scale above is what turns one bitmap pixel into
-                        // one tileSize pixel, so the phase shift is
-                        // computed in bitmap pixels too.
-                        val boxW = size.width / scaleX
-                        val boxH = size.height / scaleY
-                        val phaseX =
-                            esDeTilePhaseOffset(boxW, tilePixels.width.toFloat(), tileAlignRight)
-                        val phaseY =
-                            esDeTilePhaseOffset(boxH, tilePixels.height.toFloat(), tileAlignBottom)
-                        // The rect grows by exactly what the shift moved
-                        // it back by, so the box stays fully covered.
-                        drawRect(
-                            brush = brush,
-                            topLeft = Offset(phaseX, phaseY),
-                            size = Size(boxW - phaseX, boxH - phaseY),
-                            alpha = opacity,
-                            colorFilter = imageColorFilter,
-                        )
-                    }
-                },
-            )
-            return
+    // (an SVG tile) -- see rememberTilePixels' own doc comment.
+    val tileSize = element.valueOrNull<EsDeThemeValue.Pair>("tileSize")
+    val density = LocalDensity.current
+    // `interpolation` on a tiled image (ImageComponent.cpp:590).
+    // This Compose version's ImageShader takes no filterQuality
+    // and a per-tile drawImage loop would be tens of thousands of
+    // draws, so the resampling happens ONCE instead: the tile is
+    // scaled to the size the theme asked for with the filter the
+    // theme asked for, and the shader then repeats it one to one.
+    // A theme that declares nothing keeps the platform's filtered
+    // default, exactly as esDeFilterQuality's own doc comment
+    // explains for every other image path.
+    val tilePixels = rememberTilePixels(
+        path = if (tileEnabled) path else null,
+        declaredWidthPx = if (tileSize == null) null else with(density) { (viewWidth * tileSize.x.coerceIn(0f, 1f)).toPx() },
+        declaredHeightPx = if (tileSize == null) null else with(density) { (viewHeight * tileSize.y.coerceIn(0f, 1f)).toPx() },
+        nearest = esDeFilterQuality(element) == FilterQuality.None,
+    )
+    if (tilePixels != null) {
+        val brush = remember(tilePixels) {
+            ShaderBrush(ImageShader(tilePixels, TileMode.Repeated, TileMode.Repeated))
         }
+        // The tile is already at its requested size, so the fill is
+        // drawn one to one.
+        val scaleX = 1f
+        val scaleY = 1f
+        // Real `tileHorizontalAlignment`/`tileVerticalAlignment`
+        // (ImageComponent.cpp:684-718): exactly two literals each,
+        // anything else warned about and treated as the default.
+        val tileAlignRight = element.strOrNull("tileHorizontalAlignment") == "right"
+        val tileAlignBottom = element.strOrNull("tileVerticalAlignment") == "bottom"
+        Box(
+            modifier = placement.drawBehind {
+                // The shader repeats at the bitmap's own pixel size, so
+                // the whole tiled fill is drawn scaled by the requested
+                // tile size over the un-scaled box -- equivalent to
+                // repeating at the tile size itself.
+                scale(scaleX = scaleX, scaleY = scaleY, pivot = Offset.Zero) {
+                    // Widths in the SHADER's own coordinates: the
+                    // scale above is what turns one bitmap pixel into
+                    // one tileSize pixel, so the phase shift is
+                    // computed in bitmap pixels too.
+                    val boxW = size.width / scaleX
+                    val boxH = size.height / scaleY
+                    val phaseX =
+                        esDeTilePhaseOffset(boxW, tilePixels.width.toFloat(), tileAlignRight)
+                    val phaseY =
+                        esDeTilePhaseOffset(boxH, tilePixels.height.toFloat(), tileAlignBottom)
+                    // The rect grows by exactly what the shift moved
+                    // it back by, so the box stays fully covered.
+                    drawRect(
+                        brush = brush,
+                        topLeft = Offset(phaseX, phaseY),
+                        size = Size(boxW - phaseX, boxH - phaseY),
+                        alpha = opacity,
+                        colorFilter = imageColorFilter,
+                    )
+                }
+            },
+        )
+        return
     }
 
     AsyncImage(
@@ -967,18 +960,6 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     )
 }
 
-/**
- * Decodes a theme's own local image file to a bitmap so the real
- * `tile`/`tileSize` rules can be applied -- they all need the source's
- * real intrinsic pixel size (ImageComponent.cpp:838-850), which Coil's
- * AsyncImage never hands back. Theme assets are always real files on
- * disk, so BitmapFactory reads them directly, off the main thread.
- *
- * Returns null for [path] null (the element isn't tiled) and for any file
- * BitmapFactory can't decode -- notably SVG, which is the honest gap
- * here: an SVG tile falls back to the plain stretched draw rather than
- * being rendered as something invented.
- */
 /**
  * [entry]'s media for [imageTypes] ([LibraryEntry.mediaForImageTypes]),
  * looked up on IO rather than in composition. See [rememberOffMain].
@@ -1042,18 +1023,59 @@ private fun rememberIntrinsicImageSize(path: String?): kotlin.Pair<Float, Float>
     return size
 }
 
+/**
+ * A tiled theme image's one tile, at the size the `tile`/`tileSize` rules give it ([esDeTileSize]), with the filter
+ * the theme asked for. Those rules need the source's real intrinsic pixel size (ImageComponent.cpp:838-850), which
+ * Coil's AsyncImage never hands back, so the file is read with BitmapFactory: its bounds first, then the pixels at
+ * the largest power-of-two sample that still covers the tile ([esDeTileSampleSize]), then resampled to the tile. A
+ * 2000 px cover tiled at 200 px used to be decoded whole for every tile element and resampled in composition, on the
+ * main thread (Droidtop/tracker#733). All of it runs on IO, and the result is kept in [TileCache].
+ *
+ * Null for [path] null (the element isn't tiled), for a size the rules turn tiling off for, and for any file
+ * BitmapFactory can't decode -- notably SVG, which is the honest gap here: an SVG tile falls back to the plain
+ * stretched draw rather than being rendered as something invented.
+ */
 @Composable
-private fun rememberTileBitmap(path: String?): ImageBitmap? {
-    val bitmap by produceState<ImageBitmap?>(initialValue = null, path) {
-        value = if (path == null) {
-            null
-        } else {
-            withContext(Dispatchers.IO) {
-                runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull()
-            }
+private fun rememberTilePixels(path: String?, declaredWidthPx: Float?, declaredHeightPx: Float?, nearest: Boolean): ImageBitmap? {
+    val pixels by produceState<ImageBitmap?>(initialValue = null, path, declaredWidthPx, declaredHeightPx, nearest) {
+        value = if (path == null) null else withContext(Dispatchers.IO) {
+            runCatching { TileCache.tile(path, declaredWidthPx, declaredHeightPx, nearest) }.getOrNull()
         }
     }
-    return bitmap
+    return pixels
+}
+
+/** The tiles [rememberTilePixels] made, by file (and its last change), tile size and filter; an eighth of the heap. */
+private object TileCache {
+    private val cache = object : android.util.LruCache<String, ImageBitmap>((Runtime.getRuntime().maxMemory() / 8).toInt()) {
+        override fun sizeOf(key: String, value: ImageBitmap): Int = value.asAndroidBitmap().allocationByteCount
+    }
+
+    fun tile(path: String, declaredWidthPx: Float?, declaredHeightPx: Float?, nearest: Boolean): ImageBitmap? {
+        val file = java.io.File(path)
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val tile = esDeTileSize(declaredWidthPx, declaredHeightPx, bounds.outWidth.toFloat(), bounds.outHeight.toFloat()) ?: return null
+        val key = "$path|${file.lastModified()}|${tile.first}x${tile.second}|$nearest"
+        cache.get(key)?.let { return it }
+        val sample = esDeTileSampleSize(bounds.outWidth, bounds.outHeight, tile.first, tile.second)
+        val decoded = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+        return esDeResampledTile(decoded.asImageBitmap(), tile.first, tile.second, nearest).also { cache.put(key, it) }
+    }
+}
+
+/**
+ * The inSampleSize a [sourceWidth] x [sourceHeight] image is decoded at for a [tileWidth] x [tileHeight] tile: the
+ * largest power of two that still leaves the decoded image at least the tile's size on both axes, so the resample
+ * to the tile only ever shrinks (no detail is lost that the tile would show). 1 for a tile as big as the source or
+ * bigger. Pure.
+ */
+internal fun esDeTileSampleSize(sourceWidth: Int, sourceHeight: Int, tileWidth: Float, tileHeight: Float): Int {
+    if (tileWidth <= 0f || tileHeight <= 0f) return 1
+    var sample = 1
+    while (sourceWidth / (sample * 2) >= tileWidth && sourceHeight / (sample * 2) >= tileHeight) sample *= 2
+    return sample
 }
 
 /**

@@ -56,4 +56,25 @@ class EsDeTileSizeTest {
     fun `a degenerate source size is rejected`() {
         assertNull(esDeTileSize(10f, 10f, 0f, 0f))
     }
+
+    /** Droidtop/tracker#733: a 2000 px cover tiled at 200 px is decoded at an eighth, still covering the tile. */
+    @Test
+    fun `a big source is sampled down to the largest power of two that still covers the tile`() {
+        assertEquals(8, esDeTileSampleSize(2000, 2000, 200f, 200f))
+        // 2000 / 16 = 125 would be smaller than the tile.
+        assertEquals(4, esDeTileSampleSize(2000, 2000, 300f, 300f))
+    }
+
+    @Test
+    fun `the tighter axis decides the sample`() {
+        // Width alone would allow 8; the height (1000 / 4 = 250 < 300) holds it at 2.
+        assertEquals(2, esDeTileSampleSize(2000, 1000, 200f, 300f))
+    }
+
+    @Test
+    fun `a tile as big as the source or bigger is decoded whole`() {
+        assertEquals(1, esDeTileSampleSize(32, 16, 32f, 16f))
+        assertEquals(1, esDeTileSampleSize(32, 16, 64f, 64f))
+        assertEquals(1, esDeTileSampleSize(32, 16, 0f, 16f))
+    }
 }
