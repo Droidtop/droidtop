@@ -232,4 +232,15 @@ class WineLaunchPlanTest {
         assertTrue(!WinePresentation.crashedAtEnd(output))
         assertNull(WinePresentation.exitReport(0, 600_000, showedWindow = true, output = output))
     }
+
+    @Test
+    fun `a game that closed itself cleanly is said, a prefix tool just closes`() {
+        // The owner, 2026-11-05 (Droidtop/tracker#896): "yes, an end screen for clean self-exits".
+        val ended = WinePresentation.selfExitEnd(754_000, tool = false)!!
+        assertEquals("This Windows game closed.", ended.title)
+        assertEquals("It ended by itself after 12 min, with no error.", ended.detail)
+        assertEquals("It ended by itself after 45 s, with no error.", WinePresentation.selfExitEnd(45_000, tool = false)!!.detail)
+        assertEquals("It ended by itself after 2 h 5 min, with no error.", WinePresentation.selfExitEnd(125 * 60_000L, tool = false)!!.detail)
+        assertNull(WinePresentation.selfExitEnd(754_000, tool = true))
+    }
 }

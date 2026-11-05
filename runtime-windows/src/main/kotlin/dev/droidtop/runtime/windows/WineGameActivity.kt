@@ -351,8 +351,8 @@ class WineGameActivity : Activity() {
     }
 
     /**
-     * Wine has ended. A game that ran and quit with code 0 just closes this
-     * screen; any other end is reported here, with Wine's exit code and the
+     * Wine has ended. A game that closed itself cleanly says so
+     * ([WinePresentation.selfExitEnd]); any other end is reported here, with Wine's exit code and the
      * last lines it printed. This screen is droidtop's own, so the launch
      * watchdog leaves it alone (LaunchDisplay): its "closed straight after it
      * started" named droidtop and gave emulator advice for a Windows game
@@ -389,6 +389,14 @@ class WineGameActivity : Activity() {
             if (isFinishing || isDestroyed) return@runOnUiThread
             if (report != null) {
                 showFailure(report.detail, title = report.title)
+                return@runOnUiThread
+            }
+            // The game closed itself: droidtop's own Quit, Kill and Back finish this screen first and never get here.
+            // It is said, not left to a silent return to the shell (the owner, 2026-11-05, Droidtop/tracker#896: "yes,
+            // an end screen for clean self-exits"). A prefix tool closing is its work done, and just closes.
+            val ended = WinePresentation.selfExitEnd(SystemClock.elapsedRealtime() - startedAtMs, tool = tool != null)
+            if (ended != null) {
+                showFailure(ended.detail, title = ended.title, ended = true)
             } else {
                 // A clean end is an end too: the shell must not open the running game's sheet for it
                 // (Droidtop/tracker#896: Quit, Restart and Kill were offered for a game that was gone).
@@ -536,11 +544,15 @@ class WineGameActivity : Activity() {
         message: String,
         cause: Throwable? = null,
         title: String = if (tool != null) "This Windows program did not start." else "This Windows game did not start.",
+        // The game ended by itself, cleanly: said on the same screen, without the setup advice a failure gets.
+        ended: Boolean = false,
     ) {
         if (failed) return
         failed = true
         blackScreen?.pause()
-        if (cause == null) {
+        if (ended) {
+            Timber.i("Wine game ended by itself: %s", message)
+        } else if (cause == null) {
             Timber.e("Wine launch failed: %s", message)
         } else {
             Timber.e(cause, "Wine launch failed: %s", message)
@@ -554,7 +566,7 @@ class WineGameActivity : Activity() {
                 setOnClickListener { leaveFailure() }
                 text = title + "\n" + "\n" +
                     message + "\n" + "\n" +
-                    "Check that Windows games is set up in Settings, then try again." + "\n" + "\n" +
+                    (if (ended) "" else "Check that Windows games is set up in Settings, then try again." + "\n" + "\n") +
                     "Press B to return to droidtop."
                 gravity = Gravity.CENTER
                 // droidtop's own screen, not the game's frame: it follows Light or dark (Droidtop/tracker#561).
@@ -927,6 +939,22 @@ object WinePresentation {
     }
 
     private const val EXIT_DETAIL_CHARS = 1200
+
+    /**
+     * What to say when a game ended by itself after [ranMs], cleanly (code 0, a window shown, no crash line): the
+     * owner, 2026-11-05 (Droidtop/tracker#896): "yes, an end screen for clean self-exits". Null for a prefix [tool],
+     * which closes when its work is done. Pure.
+     */
+    fun selfExitEnd(ranMs: Long, tool: Boolean): ExitReport? {
+        if (tool) return null
+        val minutes = ranMs / 60_000
+        val ran = when {
+            minutes >= 60 -> "${minutes / 60} h ${minutes % 60} min"
+            minutes >= 1 -> "$minutes min"
+            else -> "${(ranMs / 1000).coerceAtLeast(0)} s"
+        }
+        return ExitReport("This Windows game closed.", "It ended by itself after $ran, with no error.")
+    }
 
     /**
      * Whether Wine's last lines say the game crashed: an unhandled exception, an unhandled page fault or a failed

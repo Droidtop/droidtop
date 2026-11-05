@@ -11685,8 +11685,11 @@ Rancher's failed assertion both read "Wine exited with code 0" and Slime Rancher
 said. When Wine's last 40 lines hold its own crash line (`err:seh:NtRaiseException Unhandled exception`, `wine:
 Unhandled exception`, `wine: Unhandled page fault`, `err:msvcrt:_wassert`; `WinePresentation.crashedAtEnd`), the end is
 reported as "stopped with an error" with those lines. A crash earlier in a long run, while the game played on, does not
-count. A game that closes itself cleanly, with no such line, still just closes; whether that should say anything is
-the owner's to decide.
+count. **A game that closes itself is said too** (the owner, 2026-11-05: "yes, an end screen for clean self-exits"). When
+a game ends by itself with code 0, a window shown and no crash line, the screen says "This Windows game closed." and
+"It ended by itself after 12 min, with no error." (`WinePresentation.selfExitEnd`), with "Press B to return to
+droidtop" and none of a failure's setup advice. droidtop's own Quit, Kill and Back finish the screen first and never
+reach it; a prefix tool (Wine configuration, an installer) closing is its work done and just closes.
 
 **Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
 first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
