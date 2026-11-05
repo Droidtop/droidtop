@@ -1533,6 +1533,13 @@ object GamingSettingsCatalog {
             ChoiceItem(
                 id = ID_DISPLAY_KEYBOARD_PLACEMENT,
                 title = words(R.string.gaming_keyboard_displays_on),
+                // "Companion" that cannot be honoured says so, and why, instead of reading as if it were in effect
+                // (Droidtop/tracker#523).
+                subtitle = when (keyboard.lastCompanionFallback.value.takeIf { keyboard.placement.value == dev.droidtop.runtime.keyboard.KeyboardPlacement.COMPANION }) {
+                    dev.droidtop.runtime.keyboard.CompanionFallback.COMPANION_KEYBOARD_OFF -> words(R.string.gaming_keyboard_companion_off)
+                    dev.droidtop.runtime.keyboard.CompanionFallback.NO_COMPANION_ON_OTHER_SCREEN -> words(R.string.gaming_keyboard_no_companion)
+                    null -> null
+                },
                 options = dev.droidtop.runtime.keyboard.KeyboardPlacement.entries.map { ChoiceOption(it.key, it.label) },
                 current = keyboard.placement.value.key,
                 onSelect = { ctx, value -> keyboard.setPlacement(ctx, dev.droidtop.runtime.keyboard.KeyboardPlacement.fromKey(value)) },

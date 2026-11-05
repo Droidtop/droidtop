@@ -200,6 +200,23 @@ object AddonKeyboardRules {
             if (internalAvailable && fieldDisplay != DEFAULT_DISPLAY) KeyboardPlacement.INTERNAL_SCREEN else KeyboardPlacement.SAME_SCREEN
     }
 
+    /**
+     * Why "Companion" could not be honoured for a field on [fieldDisplay], or null when it was (or was not asked for):
+     * the same two conditions [keyboardPlacement] reads, named, so the Displays row and the log can say which one held
+     * (Droidtop/tracker#523: on the console the keyboard rose on the field's screen while the row read "Companion").
+     */
+    fun companionFallback(
+        setting: KeyboardPlacement,
+        fieldDisplay: Int,
+        companionDisplays: Set<Int>,
+        companionHostsKeyboard: Boolean,
+    ): CompanionFallback? = when {
+        setting != KeyboardPlacement.COMPANION -> null
+        !companionHostsKeyboard -> CompanionFallback.COMPANION_KEYBOARD_OFF
+        companionDisplays.none { it != fieldDisplay } -> CompanionFallback.NO_COMPANION_ON_OTHER_SCREEN
+        else -> null
+    }
+
     /** What one pass of the policy keeper does: displays to set local, and displays to give back their old policy. */
     data class PolicyPlan(val setLocal: Set<Int>, val restore: Map<Int, DisplayImePolicy>)
 
@@ -280,6 +297,18 @@ object AddonKeyboard {
     /** The companion's own setting: whether it may host the keyboard for the other screen. */
     val companionHostsKeyboard: StateFlow<Boolean> = companionHosts
 
+    private val fallbackFlow = MutableStateFlow<CompanionFallback?>(null)
+
+    /**
+     * Why the last field's keyboard did not go to the companion although "Companion" is chosen, or null: set by the
+     * keyboard's placement each time it decides (`KeyboardTargets`, ui-shared), read by the Displays row.
+     */
+    val lastCompanionFallback: StateFlow<CompanionFallback?> = fallbackFlow
+
+    fun noteCompanionFallback(reason: CompanionFallback?) {
+        fallbackFlow.value = reason
+    }
+
     /** Reads the settings this object mirrors into flows; called by `:app` off the main thread. */
     fun load(context: Context) {
         val prefs = prefs(context)
@@ -319,4 +348,13 @@ object AddonKeyboard {
     }
 
     private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+}
+
+/** Why "Keyboard displays on: Companion" fell back to the field's own screen (Droidtop/tracker#523). */
+enum class CompanionFallback {
+    /** The companion's own "Keyboard for the other screen" is off. */
+    COMPANION_KEYBOARD_OFF,
+
+    /** No companion is started on a screen other than the field's. */
+    NO_COMPANION_ON_OTHER_SCREEN,
 }

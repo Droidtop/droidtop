@@ -68,15 +68,25 @@ object KeyboardTargets {
     fun raisesOnOwnFocus(): Boolean =
         AddonKeyboardRules.raisesOnOwnFocus(companionDisplays().isNotEmpty(), dev.droidtop.shell.gamepad.input.ControllerLayouts.padOrKeyboard.value)
 
-    /** Where the keyboard for a field on [fieldDisplay] goes right now. */
-    fun placement(fieldDisplay: Int, assistive: Boolean = false): KeyboardPlacement = AddonKeyboardRules.keyboardPlacement(
-        AddonKeyboard.placement.value,
-        fieldDisplay,
-        companionDisplays(),
-        AddonKeyboard.companionHostsKeyboard.value,
-        internalSurface?.available() == true,
-        assistive,
-    )
+    /**
+     * Where the keyboard for a field on [fieldDisplay] goes right now. When "Companion" cannot be honoured it says why,
+     * once per change, in the log and to the Displays row ([AddonKeyboard.lastCompanionFallback], Droidtop/tracker#523).
+     */
+    fun placement(fieldDisplay: Int, assistive: Boolean = false): KeyboardPlacement {
+        val companions = companionDisplays()
+        val hosts = AddonKeyboard.companionHostsKeyboard.value
+        val setting = AddonKeyboard.placement.value
+        val fallback = if (assistive) null else AddonKeyboardRules.companionFallback(setting, fieldDisplay, companions, hosts)
+        if (fallback != AddonKeyboard.lastCompanionFallback.value) {
+            if (fallback != null) {
+                android.util.Log.i(TAG, "Companion keyboard not used for a field on display $fieldDisplay: $fallback (companions started on $companions)")
+            }
+            AddonKeyboard.noteCompanionFallback(fallback)
+        }
+        return AddonKeyboardRules.keyboardPlacement(setting, fieldDisplay, companions, hosts, internalSurface?.available() == true, assistive)
+    }
+
+    private const val TAG = "droidtop.Keyboard"
 
     /**
      * Whether an assistive service that drives the system keyboard is on (TalkBack or any touch exploration, Switch

@@ -6537,6 +6537,11 @@ companion trackpad's pointer, `canPerformGestures`, see "Input (slice C12)"), wh
     Internal screen, Companion (the default), Not controlled by droidtop. A future target (an external
     display) is one more entry, one branch in `AddonKeyboardRules.keyboardPlacement` and one surface in
     `KeyboardTargets`.
+  - Companion falls back to the field's own screen when the companion's "Keyboard for the other screen" is off,
+    or no companion is started on a screen other than the field's (`AddonKeyboardRules.companionFallback`). The
+    row then says so and why ("Not available now: …"), and the log names the reason and the displays the
+    companions were counted on (`droidtop.Keyboard`), once per change (Droidtop/tracker#523: on the console the
+    keyboard rose on the field's screen while the row read "Companion").
   - Every surface that would draw droidtop's keyboard for a field on a screen without Android's
     keyboard (`InWindowKeyboard`, `OwnFieldKeyboard`, and `PlacedKeyboard` for both overlays over
     other apps) asks `KeyboardTargets.open`, which answers draw it here, elsewhere, or nowhere. The

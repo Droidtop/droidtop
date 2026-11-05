@@ -232,6 +232,8 @@
     <string name="gaming_while_a_game_runs">While a game runs</string>
     <string name="gaming_android_keyboard_on_second_screen">Android keyboard on second screen</string>
     <string name="gaming_keyboard_displays_on">Keyboard displays on</string>
+    <string name="gaming_keyboard_companion_off">Not available now: the companion\'s keyboard is off, so it opens here</string>
+    <string name="gaming_keyboard_no_companion">Not available now: no companion on another screen, so it opens here</string>
     <string name="gaming_companion">Companion</string>
     <string name="gaming_screen">Screen</string>
     <string name="gaming_lock_to_landscape">Lock to landscape</string>

@@ -148,4 +148,15 @@ class AddonKeyboardRulesTest {
         assertEquals(DisplayImePolicy.LOCAL, AddonKeyboardRules.parsePolicyLine("noise\npolicy=0\n"))
         assertNull(AddonKeyboardRules.parsePolicyLine("error: java.lang.SecurityException"))
     }
+
+    @Test
+    fun `a Companion that falls back says why`() {
+        val c = KeyboardPlacement.COMPANION
+        assertEquals(null, AddonKeyboardRules.companionFallback(c, 5, setOf(0), true))
+        assertEquals(CompanionFallback.COMPANION_KEYBOARD_OFF, AddonKeyboardRules.companionFallback(c, 5, setOf(0), false))
+        // The console run on 3061 (Droidtop/tracker#523): no companion counted as started on a screen other than the field's.
+        assertEquals(CompanionFallback.NO_COMPANION_ON_OTHER_SCREEN, AddonKeyboardRules.companionFallback(c, 5, emptySet(), true))
+        assertEquals(CompanionFallback.NO_COMPANION_ON_OTHER_SCREEN, AddonKeyboardRules.companionFallback(c, 0, setOf(0), true))
+        assertEquals(null, AddonKeyboardRules.companionFallback(KeyboardPlacement.SAME_SCREEN, 5, emptySet(), false))
+    }
 }
