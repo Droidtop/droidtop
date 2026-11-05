@@ -8,6 +8,7 @@ import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
+import java.util.stream.Collectors
 
 /**
  * A game's saves, carried from one prefix to another when the person moves the game (docs/SPEC.md 5a "Per-game
@@ -26,7 +27,7 @@ object WinePrefixSaves {
         val toUsers = File(toPrefix, ".wine/drive_c/users").toPath()
         if (!Files.isDirectory(fromUsers, LinkOption.NOFOLLOW_LINKS)) return 0
         var copied = 0
-        val users = runCatching { Files.list(fromUsers).use { stream -> stream.toList() } }.getOrDefault(emptyList())
+        val users = runCatching { Files.list(fromUsers).use { stream -> stream.collect(Collectors.toList()) } }.getOrDefault(emptyList())
         for (user in users) {
             if (!Files.isDirectory(user, LinkOption.NOFOLLOW_LINKS)) continue
             for (name in SAVE_DIRS) {
