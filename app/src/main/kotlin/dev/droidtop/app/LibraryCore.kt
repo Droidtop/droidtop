@@ -70,7 +70,7 @@ object LibraryCore {
                     // The store's own facts about those installs, so engine
                     // detection owning a store game does not also lose its
                     // store, size, compatibility and cover art.
-                    storeInstalls = { dev.droidtop.runtime.windows.PcLibrary.knownInstalls() },
+                    storeInstalls = { dev.droidtop.runtime.windows.PcLibrary.knownInstallsOrNull() },
                     records = records,
                 ),
                 // Same roots as EngineGameProvider -- a folder can hold real

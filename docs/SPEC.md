@@ -15323,6 +15323,18 @@ from a folder (`GameNaming.derive`, `displayName`) has one space where a
 run was, and a new install folder (`StoreFiles.folderName`) is made with
 one.
 
+**Before the stores answer, a store game keeps its record's store facts**
+(Droidtop/tracker#891). The stores' install list (`PcLibrary.knownInstalls`) is
+held in memory and filled by the PC scan, so just after droidtop starts it is not
+known yet (`knownInstallsOrNull` is null). An engine walk in that window (on the
+console, the rescan after a game ended) gave the Steam install above its folder's
+name, "Love Sex Second Base"; that name was scraped (another genre and art) and
+the card stopped being Steam's until a later walk put it back. Now, while the
+list is not known, the walk takes the store facts (title, store id, art) the
+folder's own record last carried (`storeInstallFor`, from the record the walk
+already writes), and only from a record that came from a store. Once the stores
+have answered their list decides, so a game no store has any more keeps none.
+
 `GameEngineDetector.detectGame` is the single-folder half of `scan`,
 extracted so the scan loop, `EngineGameProvider.resolveEntry` and the PC
 provider's ownership check all ask the same question of a folder instead

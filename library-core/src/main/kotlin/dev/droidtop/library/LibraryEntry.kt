@@ -494,6 +494,27 @@ internal fun Map<String, StoreInstall>.forFolder(folder: File): StoreInstall? =
     folder.absolutePath.asInstallKey()?.let { this[it] }
 
 /**
+ * The [StoreInstall] for a detected game [folder]: the stores' own, else, only while the stores have not answered yet
+ * ([installsKnown] false, just after start), the store facts the folder's own last record carried ([recorded], by
+ * entry id). Droidtop/tracker#891: a walk that ran before the stores answered gave a Steam game's engine entry its
+ * install folder's name ("Love  Sex Second Base" for "Love & Sex: Second Base"); it was scraped by that name and
+ * stopped being the store's card until a later walk put it back. Only a record that came from a store (it has a store
+ * id) carries any. Once the stores have answered their list decides, so a game no store has any more keeps none.
+ * [recorded] is asked only in that window. Pure but for [recorded].
+ */
+internal fun Map<String, StoreInstall>.storeInstallFor(
+    folder: File,
+    installsKnown: Boolean,
+    recorded: (String) -> LibraryEntry?,
+): StoreInstall? {
+    forFolder(folder)?.let { return it }
+    if (installsKnown) return null
+    val before = recorded(folder.absolutePath) ?: return null
+    val info = before.pcInfo?.takeIf { it.storeId != null } ?: return null
+    return StoreInstall(folder, info, artworkUri = before.artworkUri, title = before.title)
+}
+
+/**
  * Folds a suppressed `pc` entry's information into the engine entry that
  * claimed the same folder. Returns the entry untouched when [install] is
  * null, which is the normal case: a game in the user's own games folder

@@ -1349,7 +1349,9 @@ class EngineGameProvider(
     // suppressing the duplicate `pc` entry (see
     // [GameEngineDetector.engineOwnsInstall]) would silently delete every
     // store-side fact about the game.
-    private val storeInstalls: () -> List<StoreInstall> = { emptyList() },
+    // Null while the stores have not answered yet (just after start): a store game's folder then keeps the store
+    // facts its own record last had ([storeInstallFor], Droidtop/tracker#891), not the folder's name.
+    private val storeInstalls: () -> List<StoreInstall>? = { emptyList() },
     // Where this provider's game records are written and read from
     // (docs/SPEC.md 7g, step 2) -- [NoOpGameRecordStore] by default so
     // this provider stays constructible in a JVM test with zero real
@@ -1476,7 +1478,8 @@ class EngineGameProvider(
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
             val defs = EnginesDatabase.defs(context)
-            val installs = storeInstalls()
+            val answered = storeInstalls()
+            val installs = answered.orEmpty()
             val place = GameEngineDetector.placeOf(path, rootsFor(installs), systemsById) ?: return@withContext emptyList()
             // A game's own subfolder is its payload, not another game: when a folder above the reported one
             // is the game, that is the folder to look at.
@@ -1501,7 +1504,7 @@ class EngineGameProvider(
                 EngineVerdictStore.save(context)
             }
             if (scanned.slow) return@withContext emptyList()
-            val entries = scanned.games.map { it.toEntry(place.root, place.part, installs.byInstallDir()) }.finish()
+            val entries = scanned.games.map { it.toEntry(place.root, place.part, installs.byInstallDir(), installsKnown = answered != null) }.finish()
             listOf(PathIndexing(key = place.part.absolutePath, root = place.root.absolutePath, entries = entries, under = folder.path))
         }
     }
@@ -1545,7 +1548,8 @@ class EngineGameProvider(
     ) {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val defs = EnginesDatabase.defs(context)
-        val installs = storeInstalls()
+        val answered = storeInstalls()
+        val installs = answered.orEmpty()
         val installsByDir = installs.byInstallDir()
         // A store game's install directory is a CHILD of the root
         // detection walks, so its parent is the root: the same
@@ -1640,7 +1644,7 @@ class EngineGameProvider(
                         ).joinToString("; "),
                         base = folder,
                     )
-                    publish(root, folder, scanned.games.map { it.toEntry(root, folder, installsByDir) }, stamp)
+                    publish(root, folder, scanned.games.map { it.toEntry(root, folder, installsByDir, installsKnown = answered != null) }, stamp)
                     if (pauseMs > 0) delay(pauseMs)
                 }
                 rootDone(root, top.folders)
@@ -1663,7 +1667,12 @@ class EngineGameProvider(
     /** The key the engine walk's progress is shown under ([ScanActivity]). */
     private val ENGINE_SCAN_SOURCE = "engines"
 
-    private fun DetectedGame.toEntry(root: File, part: File, installsByDir: Map<String, StoreInstall>): LibraryEntry {
+    private fun DetectedGame.toEntry(
+        root: File,
+        part: File,
+        installsByDir: Map<String, StoreInstall>,
+        installsKnown: Boolean = true,
+    ): LibraryEntry {
         val entry = LibraryEntry(
             id = displayFolder.absolutePath,
             title = qualifiedFolderTitle(displayFolder, root),
@@ -1680,7 +1689,7 @@ class EngineGameProvider(
             filesVersion = GameNaming.derive(GameNaming.relativeTo(root.absolutePath, displayFolder.absolutePath)).version
                 .takeIf { it.isBlank() }
                 ?.let { GameFileVersions.read(gameRoot) },
-        ).withStoreInstall(installsByDir.forFolder(displayFolder))
+        ).withStoreInstall(installsByDir.storeInstallFor(displayFolder, installsKnown) { records.get(it)?.entry })
         writeRecord(this, root, part, entry)
         return entry
     }

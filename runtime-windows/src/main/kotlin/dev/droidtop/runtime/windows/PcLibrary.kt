@@ -196,6 +196,7 @@ object PcLibrary {
         }.sortedBy { it.title.lowercase() }
             .also { games ->
                 storeSourceInstalls = games.mapNotNull { it.toStoreInstall() }
+                storesAnswered = true
                 // Asked in the background, for the next walk to read.
                 StoreUpdates.refreshInBackground(context, games.filter { it.installed }.map { it.id } + StoreUpdates.markerIds())
             }
@@ -453,6 +454,16 @@ object PcLibrary {
      * Room queries.
      */
     fun knownInstalls(): List<StoreInstall> = storeInstalls.filter { it.installDir.isDirectory }
+
+    /**
+     * [knownInstalls], or null until the stores have answered once since start: "no store installs" and "not known
+     * yet" are different answers, and engine detection keeps a store game's own facts in the second
+     * (Droidtop/tracker#891).
+     */
+    fun knownInstallsOrNull(): List<StoreInstall>? = if (storesAnswered) knownInstalls() else null
+
+    @Volatile
+    private var storesAnswered = false
 
     /**
      * The two halves are recorded separately because they are now walked
