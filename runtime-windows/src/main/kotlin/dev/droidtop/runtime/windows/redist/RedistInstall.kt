@@ -158,7 +158,7 @@ internal class RedistInstall(
             val view = line ?: TextView(activity).apply {
                 setTextColor(chrome()?.color("onSurface") ?: Color.WHITE)
                 gravity = Gravity.CENTER
-                parent.addView(this, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+                this@RedistInstall.parent.addView(this, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
             }.also { line = it }
             view.text = text
         }
