@@ -22332,6 +22332,40 @@ SteamBootstrap, libpatchelf and libdrawable.
   between the fork and upstream GameNative). The rig checks are in the
   change's commit message.
 
+### Translation cache, precache and mixed-arch running (decided 2026-11-04, Droidtop/tracker#865, #866)
+
+The owner, relayed by the coordinator on 2026-11-04, approved the cache plan in #865 (mixed-architecture running
+included, its container side coordinated with the Desktop lane), only option 2 of #866 ("an opt-in 'Prepare for first
+launch' job, never automatic on battery"), and proton-wine-tux 11.0-2 as the default Wine for new containers after a
+console check of a game on internal storage and one on an SD card. The owner's ask behind #866: "add a precache system,
+so the translation doesn't have to happen on first run, if possible. Steam already often precompiles shaders, after
+all". Behind mixed-arch: "Can we also use this to allow mixed-arch code? dynamically recompile libraries and the like,
+so we don't have to worry as much about linux runtime architecture?"
+
+**Translation cache (built).** `TranslationCache` keeps the code each translator generates, one folder per game,
+under `<imagefs>/translation-cache/<first 12 bytes of SHA-256 of the entry id>/` (droidtop's own storage, never the
+game's folder). A launch (`DroidtopPcGameRuntime`) puts the variables first in the launch environment, so a variable
+the person set for the game wins:
+- Box64 (DynaCache, from 0.3.8; on by default only from 0.4.4): `BOX64_DYNACACHE=1`, `BOX64_DYNACACHE_FOLDER` (the
+  folder's `box64/`), `BOX64_DYNACACHE_LIMIT` (1024 MiB).
+- FEX (DiskCache, from FEX-2609; also in its Windows ARM64EC and WOW64 modules): `FEX_DISKCACHE=1`,
+  `FEX_DISKCACHEPATH=Z:/translation-cache/<key>/fex/`. Wine's Z: is the ImageFs root (`WineUtils`), so FEX inside Wine
+  reaches the same folder. FEX maps cache files only when Wine provides its unixlib (proton-wine-tux does), and it has
+  no limit of its own.
+- WowBox64 compiles DynaCache out (`src/tools/dynacache.c` under `WIN32`): 32-bit code it runs is not cached.
+- Before each launch the game's folder is trimmed to 1 GB and all folders together to 4 GB, oldest files first.
+
+The rows: "Translation cache" in a game's Wine settings (On, Off, Clear now, with the size it takes) and in Settings >
+Library > Windows games for every game (On, Off, Clear now, total size). A game's Off is its own choice
+(`WineGameOptionsPrefs`, kept across Wine changes); Off for every game wins over a game's On. Older builds ignore the
+variables, so the cache starts working once a game runs Box64 0.3.8+ or FEXCore 2609+ (the bundled defaults are 0.4.2
+and 2605; the catalog has Box64 0.4.4 and FEXCore 2609).
+
+**Not built yet, in this order:** the proton-wine-tux default (behind its console check), the "Prepare for first
+launch" job (#866 option 2), then mixed-architecture running (#865). FEX also has a work-in-progress ahead-of-time path
+(`EnableCodeCachingWIP` code maps compiled by `FEXOfflineCompiler32/64.exe`, from FEX-2609): recorded on #866 as a
+follow-up, not part of the approved scope.
+
 ### What droidtop-components may re-host, and the catalog's signature (decided 2026-10-08, Droidtop/tracker#319, #313)
 
 Owner: "If we legally CAN keep rehosting them, that's fine. Include official

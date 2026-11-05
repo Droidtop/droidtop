@@ -464,6 +464,12 @@ class DroidtopPcGameRuntime(
             entryId?.let { WineGameSettingsPrefs.get(context, it) }?.environment?.let(GameLaunchOptions::launchEnvironment).orEmpty()
         }
 
+        // The game's translation cache (docs/SPEC.md 9, "Translation cache"), first, so a variable the person set for
+        // the game still wins over it.
+        val cacheEnv = withContext(Dispatchers.IO) {
+            runCatching { TranslationCache.prepare(context, entryId, WineOptions.translationCacheOn(context, entryId)) }.getOrNull().orEmpty()
+        }
+
         // A game Steam owns starts through the shim in the prefix unless it
         // turned it off, and any other game when it turned it on
         // (docs/SPEC.md 5b, "Steamworks in the prefix"); the game's own files
@@ -475,13 +481,14 @@ class DroidtopPcGameRuntime(
             }.getOrElse {
                 return PcLaunchResult(false, "couldn't set up Steamworks for this game: ${it.message ?: it}")
             }
-            val env = listOf(launch.env.entries.joinToString(" ") { (name, value) -> "$name=$value" }, ownEnv)
+            val env = listOf(cacheEnv, launch.env.entries.joinToString(" ") { (name, value) -> "$name=$value" }, ownEnv)
                 .filter { it.isNotEmpty() }
                 .joinToString(" ")
             container.setLaunchOverrides(overrides + (Container.LAUNCH_ENV to env))
             return launchInPrefix(wineEngine, container, launch.target.absolutePath, launch.workingDir, launch.arguments, entryId)
         }
-        container.setLaunchOverrides(if (ownEnv.isEmpty()) overrides else overrides + (Container.LAUNCH_ENV to ownEnv))
+        val env = listOf(cacheEnv, ownEnv).filter { it.isNotEmpty() }.joinToString(" ")
+        container.setLaunchOverrides(if (env.isEmpty()) overrides else overrides + (Container.LAUNCH_ENV to env))
         return launchInPrefix(wineEngine, container, executable.absolutePath, workingDir, arguments, entryId)
     }
 
