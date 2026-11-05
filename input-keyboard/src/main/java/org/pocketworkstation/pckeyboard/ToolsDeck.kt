@@ -31,6 +31,8 @@ class ToolsDeck private constructor(
     private val typeText: (CharSequence) -> Unit,
     private val beforeInsert: Runnable?,
     private val relayout: Runnable?,
+    /** The input method's own move to the next keyboard ([SwitchKeyboard]); null where droidtop is not the IME. */
+    private val switchKeyboard: Runnable?,
 ) : LinearLayout(context) {
     // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, Droidtop/tracker#562).
     private val colors = KeyboardAppearance.colors(context)
@@ -78,6 +80,9 @@ class ToolsDeck private constructor(
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
+        // Switch keyboard first, where other keyboards keep their globe key (Droidtop/tracker#717): the space bar's
+        // long press does the same, but nothing on screen said so (rig 2936). Only the input method has one to switch.
+        switchKeyboard?.let { switch -> row.addView(tool(context.getString(R.string.tool_switch_keyboard)) { switch.run() }) }
         if (ToolsPrefs.clipboardHistory(context)) row.addView(tool(context.getString(R.string.tool_clipboard)) { toggle("clipboard") { clipboardPanel() } })
         if (ToolsPrefs.emoji(context)) row.addView(tool(context.getString(R.string.tool_emoji)) { toggle("emoji") { emojiPanel() } })
         row.addView(tool(context.getString(R.string.title_macros)) { toggle("macros") { macroPanel() } })
@@ -363,11 +368,12 @@ class ToolsDeck private constructor(
             typeText: ((CharSequence) -> Unit)? = null,
             beforeInsert: Runnable? = null,
             relayout: Runnable? = null,
+            switchKeyboard: Runnable? = null,
         ): View {
             if (!ToolsPrefs.strip(context)) return keyboard
             (keyboard.parent as? ViewGroup)?.removeView(keyboard)
             ClipboardHistoryStore.start(context)
-            return ToolsDeck(context, keyboard, sink, typeText ?: { chars -> sink.text(chars) }, beforeInsert, relayout)
+            return ToolsDeck(context, keyboard, sink, typeText ?: { chars -> sink.text(chars) }, beforeInsert, relayout, switchKeyboard)
         }
     }
 }

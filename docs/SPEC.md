@@ -8827,7 +8827,10 @@ open Android's own pickers.
   itself. droidtop's own keyboard does (built 2026-10-29, Droidtop/tracker#717):
   a long press on the space bar moves to the next keyboard enabled on the
   device (`SwitchKeyboard`, code -106, beside the fork's other keyboard codes;
-  a layout may carry it as a key of its own). With no other keyboard enabled,
+  a layout may carry it as a key of its own). The tool strip's first button,
+  **Switch keyboard**, does the same as a key on screen (2026-11-05: the AVD rig on
+  2936 found no visible key, the long press being nowhere said); it is the input
+  method's only, so the in-app panel (`KeyboardPanel`) has none. With no other keyboard enabled,
   the system's picker opens instead, which also offers enabling one. The
   code addresses the keyboard, never the text, so it never reaches a
   container (`HackersKeyCodes` drops it). A space drag still moves the

@@ -1024,7 +1024,12 @@ public class LatinIME extends InputMethodService implements
                     commitTyped(ic, true);
                 }
             }
-        }, null);
+        }, null, new Runnable() {
+            public void run() {
+                // The strip's Switch keyboard (Droidtop/tracker#717): the same move as the space bar's long press.
+                switchToNextKeyboard();
+            }
+        });
         mToolsDeck = view instanceof ToolsDeck ? (ToolsDeck) view : null;
         return view;
     }

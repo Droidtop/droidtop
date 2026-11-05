@@ -762,6 +762,7 @@
     <string name="offline_voice_downloading_engine">Downloading the engine: %1$d of %2$d MB</string>
     <string name="offline_voice_downloading_model">Downloading the English model: %1$d of %2$d MB</string>
     <!-- The tool strip and its panels (Droidtop/tracker#340, #772). -->
+    <string name="tool_switch_keyboard">Switch keyboard</string>
     <string name="tool_clipboard">Clipboard</string>
     <string name="tool_emoji">Emoji</string>
     <string name="tool_layout">Layout: %1$s</string>
