@@ -27,8 +27,8 @@ droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidto
 # both. SFTP turns on ("sftp") once windowcast takes sspi 0.22 or later.
 net-remote = { git = "https://github.com/Droidtop/lib-net", rev = "43d9236f3605831669355caa755d197c87fe3bba", default-features = false }
 # KDE Connect, both ways (Droidtop/tracker#645, SPEC 7q): kdeconnect_<op> is passed to
-# lib-kdeconnect's operation table. At its commit on ci/notifications-out-645 until v0.1.1 is tagged.
-kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", rev = "8fc97b36410ed682a3859d6a21953ba0412539ae" }
+# lib-kdeconnect's operation table.
+kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", tag = "v0.1.1" }
 jni = { version = "0.21", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

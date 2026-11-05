@@ -2665,7 +2665,7 @@ dependencies = [
 [[package]]
 name = "kdeconnect-link"
 version = "0.1.1"
-source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=8fc97b36410ed682a3859d6a21953ba0412539ae#8fc97b36410ed682a3859d6a21953ba0412539ae"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?tag=v0.1.1#8fc97b36410ed682a3859d6a21953ba0412539ae"
 dependencies = [
  "kdeconnect-proto",
  "mdns-sd",
@@ -2680,7 +2680,7 @@ dependencies = [
 [[package]]
 name = "kdeconnect-proto"
 version = "0.1.1"
-source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=8fc97b36410ed682a3859d6a21953ba0412539ae#8fc97b36410ed682a3859d6a21953ba0412539ae"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?tag=v0.1.1#8fc97b36410ed682a3859d6a21953ba0412539ae"
 dependencies = [
  "serde",
  "serde_json",
@@ -2692,7 +2692,7 @@ dependencies = [
 [[package]]
 name = "kdeconnect-service"
 version = "0.1.1"
-source = "git+https://github.com/Droidtop/lib-kdeconnect?rev=8fc97b36410ed682a3859d6a21953ba0412539ae#8fc97b36410ed682a3859d6a21953ba0412539ae"
+source = "git+https://github.com/Droidtop/lib-kdeconnect?tag=v0.1.1#8fc97b36410ed682a3859d6a21953ba0412539ae"
 dependencies = [
  "base64 0.22.1",
  "kdeconnect-link",
