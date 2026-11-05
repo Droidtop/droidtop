@@ -334,6 +334,7 @@ class WineGameActivity : Activity() {
             surface = { rendererView as? android.view.SurfaceView },
             windowShown = { guestShowedWindow },
             report = ::reportBlackScreen,
+            chrome = { chrome },
         )
 
         val session = WineXSession(this, prefix, target, workingDir, xServer, arguments)

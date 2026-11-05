@@ -33,6 +33,8 @@ internal class WineBlackScreen(
     private val surface: () -> SurfaceView?,
     private val windowShown: () -> Boolean,
     private val report: (frame: Bitmap?, done: (String) -> Unit) -> Unit,
+    /** droidtop's colours in the current appearance, or null before they are read (the notice is then dark). */
+    private val chrome: () -> dev.droidtop.library.theme.RoleTokens.Set? = { null },
 ) {
     private val thread = HandlerThread("droidtop-black-screen").apply { start() }
     private val handler = Handler(thread.looper)
@@ -105,7 +107,8 @@ internal class WineBlackScreen(
         val message = TextView(activity).apply {
             text = "The game is showing a black screen.\nIt may still be loading. Report a problem saves what droidtop " +
                 "knows about this run and lets you share it."
-            setTextColor(Color.WHITE)
+            // droidtop's own notice over the game, so it follows Light or dark (Droidtop/tracker#561).
+            setTextColor(chrome()?.color("onSurface") ?: Color.WHITE)
         }
         val reportButton = Button(activity).apply {
             text = "Report a problem"
@@ -122,7 +125,11 @@ internal class WineBlackScreen(
         }
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.argb(230, 24, 24, 24))
+            val surface = chrome()?.color("surface")
+            setBackgroundColor(
+                if (surface != null) Color.argb(230, Color.red(surface), Color.green(surface), Color.blue(surface))
+                else Color.argb(230, 24, 24, 24),
+            )
             setPadding(pad, pad, pad, pad)
             addView(message)
             addView(row)
