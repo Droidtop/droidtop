@@ -22568,15 +22568,19 @@ SteamBootstrap, libpatchelf and libdrawable.
   source droidtop's lsfg layer is built from. The fork itself never held
   that source, only a pointer to it.
 - **Wine stays droidtop's own** (Droidtop/proton-wine-tux, the
-  shared-storage patches). The catalog defaults are not changed here.
-  `ContainerUtils` picks `proton-10.0-arm64ec-2` on every arm64 GPU path
-  and `proton-10.0-4-x86_64-1` on x86_64. Both are GameNative's Proton
-  builds (droidtop-components `wine` group, from downloads.gamenative.app),
-  as are the bundled `proton-9.0-*` base builds. droidtop's own builds are
-  the `droidtop` feed (proton-wine-tux's `proton-11.0-2-*` releases,
-  arm64ec and x86_64). Whether the defaults become proton-wine-tux builds,
-  so that games on shared storage and SD cards work without the person
-  picking a Wine, is proposed on #857 and waits for the owner's answer.
+  shared-storage patches), **and is the default for new containers**
+  (owner, relayed by the coordinator 2026-11-04: proton-wine-tux 11.0-2 as
+  the default "after a console check of an internal-storage game and an
+  SD-card game"). `ContainerUtils` picks `proton-11.0-2-arm64ec-1` on every
+  arm64 GPU path and `proton-11.0-2-x86_64-1` on x86_64 (`DEFAULT_WINE_*`,
+  the catalog's `droidtop` feed, release `proton-11.0-2-20261009`). They were
+  GameNative's Proton builds, `proton-10.0-arm64ec-2` and
+  `proton-10.0-4-x86_64-1`, which stay in the catalog. Existing containers
+  keep the Wine they have; only a container made after this (setup, or a
+  game's own prefix) starts on proton-wine-tux. The change lands only after
+  that console check. The catalog keeps the `droidtop` feed's last six
+  releases, so the default's id has to follow when proton-wine-tux moves
+  past 11.0-2.
 - **Not verified from a cloud session**: that the arm64 libraries built
   from source behave as GameNative's prebuilt ones did. The sources are the
   ones GameNative builds from, but its checked-in `.so` files may predate
