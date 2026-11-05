@@ -77,6 +77,23 @@ object PerformanceOverlay {
      */
     fun canDraw(context: Context): Boolean = AccessibilityKeyboard.connected || Settings.canDrawOverlays(context)
 
+    /** What an Overlay row says while [canDraw] is false, on every surface that draws one. */
+    const val NEEDS_GRANT = "Needs display over apps"
+
+    /**
+     * Opens Android's "Display over other apps" for droidtop, the one grant an Overlay row offers while [canDraw] is
+     * false (the Quick Menu's and the companion's Game tab alike, Droidtop/tracker#571 row 26).
+     */
+    fun openGrant(context: Context) {
+        SettingsLaunch.start(
+            context,
+            android.content.Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                android.net.Uri.parse("package:${context.packageName}"),
+            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
     /** Whether a `priv.shell` provider is running, which FPS, CPU and GPU need. Cheap: no provider call. */
     fun hasShell(): Boolean = TaskManager.shell.capabilities().shellCommand
 

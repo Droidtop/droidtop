@@ -400,13 +400,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
 
     val cycleOverlay = {
         if (!canDraw) {
-            SettingsLaunch.start(
-                context,
-                android.content.Intent(
-                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    android.net.Uri.parse("package:${context.packageName}"),
-                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
+            PerformanceOverlay.openGrant(context)
             onDismiss()
         } else {
             PerformanceOverlay.setLevel(context, overlayLevel.next())
@@ -469,7 +463,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
         ) {
             MenuRow(
                 title = "Overlay",
-                value = if (canDraw) overlayLevel.label else "Needs display over apps",
+                value = if (canDraw) overlayLevel.label else PerformanceOverlay.NEEDS_GRANT,
                 subtitle = if (overlayLevel != OverlayLevel.OFF && !hasShell) "FPS, CPU and GPU need More controls" else null,
                 adjustable = canDraw,
                 selected = rows.getOrNull(focusIndex) == PerfRow.OVERLAY,

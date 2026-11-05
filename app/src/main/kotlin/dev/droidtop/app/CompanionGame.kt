@@ -157,6 +157,10 @@ internal fun CompanionGameTab() {
         }
         var overlayVersion by remember { mutableIntStateOf(0) }
         val overlay by PerformanceOverlay.level.collectAsState()
+        var canDrawOverlay by remember { mutableStateOf(PerformanceOverlay.canDraw(context)) }
+        androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+            canDrawOverlay = PerformanceOverlay.canDraw(context)
+        }
         val performanceItem by produceState<dev.droidtop.library.settings.AsyncActionItem?>(null, overlayVersion) {
             value = withContext(Dispatchers.IO) { GamingSettingsCatalog.performanceModeItem() }
         }
@@ -179,8 +183,14 @@ internal fun CompanionGameTab() {
                 // While a Quit or Kill is ending the game, Resume is not the thing to press.
                 GameRow.RESUME -> GameActionRow(label, tone = if (stopping) RowTone.PLAIN else RowTone.PRIMARY) { CompanionState.onLaunchEntry?.invoke(entry) }
                 GameRow.EMULATOR -> CompanionEmulatorChoice(entry)
-                GameRow.OVERLAY -> GameActionRow(label, value = overlay.label) {
-                    if (PerformanceOverlay.canDraw(context)) PerformanceOverlay.setLevel(context, overlay.next())
+                // Without a way to draw over the game the row says so and opens the one grant, as the Quick Menu's
+                // does; it used to change nothing and say nothing (Droidtop/tracker#571 row 26). Read again on resume.
+                GameRow.OVERLAY -> GameActionRow(label, value = if (canDrawOverlay) overlay.label else PerformanceOverlay.NEEDS_GRANT) {
+                    if (PerformanceOverlay.canDraw(context)) {
+                        PerformanceOverlay.setLevel(context, overlay.next())
+                    } else {
+                        PerformanceOverlay.openGrant(context)
+                    }
                 }
                 GameRow.PERFORMANCE_MODE -> performanceItem?.let { item ->
                     CompanionCatalogItems(listOf(item), onChanged = { overlayVersion++ })
