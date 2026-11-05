@@ -54,6 +54,20 @@ object KdeConnectNotification {
         }
         followClipboard(app)
         followBattery(app)
+        holdMulticast(app)
+    }
+
+    /**
+     * The library also finds devices by mDNS (docs/SPEC.md 7p), which Wi-Fi drops on Android unless an app holds a
+     * multicast lock: held while KDE Connect is on, released when it goes off (the permission is already droidtop's,
+     * for pairing a computer).
+     */
+    private fun holdMulticast(context: Context) {
+        val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager ?: return
+        val lock = runCatching { wifi.createMulticastLock("droidtop-kdeconnect").apply { setReferenceCounted(false) } }.getOrNull() ?: return
+        scope.launch {
+            KdeConnect.running.collect { on -> runCatching { if (on) lock.acquire() else if (lock.isHeld) lock.release() } }
+        }
     }
 
     /** This device's battery to paired devices (docs/SPEC.md 7p, battery), from Android's battery broadcast. */
