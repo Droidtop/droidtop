@@ -25,6 +25,7 @@ import com.winlator.xenvironment.components.VortekRendererComponent
 import com.winlator.xenvironment.components.XServerComponent
 import com.winlator.xserver.XServer
 import dev.droidtop.library.diagnostics.RunLogCollector
+import dev.droidtop.runtime.windows.utils.X86_64Graphics
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
@@ -145,6 +146,10 @@ class WineXSession(
             XServerComponent(xServer, UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.XSERVER_PATH)),
         )
         environment.addComponent(NetworkInfoUpdateComponent())
+        // Venus on x86_64 (Droidtop/tracker#608): its vtest server, up before the guest starts.
+        if (X86_64Graphics.usesVenus(context, prefix)) {
+            environment.addComponent(VtestServerComponent(X86_64Graphics.vtestSocket(context)))
+        }
 
         envVars.apply {
             // The prefix's own locale. A Japanese-locale game reads

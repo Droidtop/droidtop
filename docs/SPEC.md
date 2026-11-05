@@ -23444,10 +23444,14 @@ Termux's prefix:
   under the same loader (its Termux dependencies join the same closure, and the build fails if any library cannot load),
   and the release also carries `libvirgl_vtest.so` with its SHA-256 for the APK to ship. A run started by hand on another
   branch builds and checks everything and publishes nothing.
-- **Next (slice 3b, wiring, after a release exists):** the app pins the new archive and the server
-  (`X86_64Graphics`, a build-time fetch of `libvirgl_vtest.so` into `jniLibs/x86_64`), a `VtestServerComponent` starts
-  the server per session with `--venus --multi-clients --socket-path <session tmp>/.virgl_vtest`, and a `venus` driver
-  joins `X86_64Graphics.DRIVERS` (first, and the default only where the device's Vulkan qualifies).
+- **Built (slice 3b, wiring):** the app pins release `x86_64-lavapipe-20261105-c93b1003` (`X86_64Graphics`) and
+  fetches its `libvirgl_vtest.so` into `jniLibs/x86_64` at build time (`components.pin`, that release as the URL). A
+  `venus` driver joins `X86_64Graphics.DRIVERS` and is offered where the device's Vulkan qualifies (`venusQualifies`:
+  1.1 or later, `VK_KHR_external_memory_fd`, timeline semaphores, read once through `GPUHelper`). On it, the guest
+  gets the archive's virtio ICD and `VTEST_SOCKET_NAME`, and `VtestServerComponent` starts the server per session with
+  `--venus --multi-clients --socket-path <files/tmp>/.virgl_vtest`. Presentation uses the same software path as
+  lavapipe (`MESA_VK_WSI_DEBUG=sw,noshm`). **Not the default yet:** lavapipe stays the x86_64 default until a rig has
+  run Venus (owner to confirm); the plan's "default where the device qualifies" follows that check.
 
 **Inside the guest on x86_64 (decided 2026-10-02, Droidtop/tracker#242).**
 The list above is the app's own natives; the guest process needs its own

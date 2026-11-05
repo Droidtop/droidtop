@@ -838,7 +838,7 @@ object WineOptions {
                     fexcore = versions(res.getStringArray(R.array.fexcore_version_entries).toList(), installed.fexcore, ManifestContentTypes.FEXCORE),
                     drivers = bionicDrivers.distinct().map { WineOptionChoice(StringUtils.parseIdentifier(it), it) },
                     // The names gamenative's own prefix dialog shows too (X86_64Graphics.label).
-                    x86Drivers = X86_64Graphics.DRIVERS.map { id ->
+                    x86Drivers = X86_64Graphics.offered().map { id ->
                         WineOptionChoice(
                             id,
                             X86_64Graphics.label(id) + if (X86_64Graphics.isInstalled(context, id)) "" else " ($NOT_HERE)",
