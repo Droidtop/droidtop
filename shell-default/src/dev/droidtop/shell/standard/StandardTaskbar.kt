@@ -100,11 +100,12 @@ class StandardTaskbar(private val service: AccessibilityService) {
     private var focusedDisplay: Int? = null
 
     /**
-     * The running dot's and the focus ring's colour: the accent of the colours outside Gaming (docs/SPEC.md 7k,
-     * "Colours outside Gaming"), the Gaming theme's by default, held to 3:1 on the bar's dark plate. Followed while
-     * attached; a change redraws every bar.
+     * The bar's inks, all from the colours outside Gaming (docs/SPEC.md 7k, "Colours outside Gaming"), the Gaming
+     * theme's by default: the plate, its text, the divider, the focus fill and the accent of the running dot and the
+     * focus ring. They were fixed dark-plate constants, so a light theme never reached the bar
+     * (Droidtop/tracker#701). Followed while attached; a change redraws every bar.
      */
-    private var accent = barAccent(dev.droidtop.library.theme.OutsideGamingColors.current(service).accent)
+    private var inks = dev.droidtop.library.theme.TaskbarInks.of(dev.droidtop.library.theme.OutsideGamingColors.current(service))
     private var accentWatch: kotlinx.coroutines.Job? = null
 
     private val prefListener = LauncherPrefChangeListener { key ->
@@ -143,9 +144,9 @@ class StandardTaskbar(private val service: AccessibilityService) {
         refreshPinned()
         accentWatch = dev.droidtop.runtime.util.AppScopes.main.launch {
             dev.droidtop.library.theme.OutsideGamingColors.colors(service).collect { colors ->
-                val next = barAccent(colors.accent)
-                if (next != accent) {
-                    accent = next
+                val next = dev.droidtop.library.theme.TaskbarInks.of(colors)
+                if (next != inks) {
+                    inks = next
                     renderAll()
                 }
             }
@@ -404,14 +405,14 @@ class StandardTaskbar(private val service: AccessibilityService) {
 
         fun show(pinned: List<Entry>, open: List<Entry>, running: Set<String>, collapsed: Boolean) {
             // Nothing the bar shows changed (a display's refresh rate, a dialog in the same app): nothing is rebuilt.
-            val state = listOf(pinned, open, running, collapsed, accent)
+            val state = listOf(pinned, open, running, collapsed, inks)
             if (added && state == drawn) return
             drawn = state
             root.removeAllViews()
             if (collapsed) {
                 params.width = ViewGroup.LayoutParams.WRAP_CONTENT
                 params.gravity = Gravity.BOTTOM or Gravity.END
-                root.setBackgroundColor(BAR_COLOR)
+                root.setBackgroundColor(inks.plate)
                 root.addView(textButton(windowContext.getString(R.string.taskbar_show)) {
                     this@StandardTaskbar.collapsed = false
                     renderAll()
@@ -419,7 +420,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
             } else {
                 params.width = ViewGroup.LayoutParams.MATCH_PARENT
                 params.gravity = Gravity.BOTTOM or Gravity.START
-                root.setBackgroundColor(BAR_COLOR)
+                root.setBackgroundColor(inks.plate)
                 root.addView(buildBar(pinned, open, running))
             }
             try {
@@ -512,7 +513,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 val dot = View(windowContext).apply {
                     background = GradientDrawable().apply {
                         shape = GradientDrawable.OVAL
-                        setColor(accent)
+                        setColor(inks.accent)
                     }
                 }
                 button.addView(dot, FrameLayout.LayoutParams(dp(5), dp(5), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
@@ -522,7 +523,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
 
         private fun textButton(label: String, onClick: () -> Unit): View = TextView(windowContext).apply {
             text = label
-            setTextColor(TEXT_COLOR)
+            setTextColor(inks.text)
             gravity = Gravity.CENTER
             minHeight = dp(48)
             setPadding(dp(12), 0, dp(12), 0)
@@ -533,7 +534,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
         }
 
         private fun divider(): View = View(windowContext).apply {
-            setBackgroundColor(DIVIDER_COLOR)
+            setBackgroundColor(inks.divider)
             layoutParams = LinearLayout.LayoutParams(dp(1), dp(28)).apply { setMargins(dp(6), 0, dp(6), 0) }
         }
 
@@ -542,15 +543,15 @@ class StandardTaskbar(private val service: AccessibilityService) {
                 intArrayOf(android.R.attr.state_focused),
                 GradientDrawable().apply {
                     cornerRadius = dp(8).toFloat()
-                    setStroke(dp(2), accent)
-                    setColor(FOCUS_FILL)
+                    setStroke(dp(2), inks.accent)
+                    setColor(inks.focusFill)
                 },
             )
             addState(
                 intArrayOf(android.R.attr.state_pressed),
                 GradientDrawable().apply {
                     cornerRadius = dp(8).toFloat()
-                    setColor(FOCUS_FILL)
+                    setColor(inks.focusFill)
                 },
             )
         }
@@ -597,14 +598,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
         // How old a read of the running apps may be at an app switch: switches in a burst share one read.
         const val RUNNING_MAX_AGE_MS = 2_000L
         const val SYSTEM_UI = "com.android.systemui"
-        const val BAR_COLOR = 0xE61F2124.toInt()
-        const val TEXT_COLOR = 0xFFFFFFFF.toInt()
-        const val DIVIDER_COLOR = 0x55FFFFFF
-        const val FOCUS_FILL = 0x33FFFFFF
 
-        /** [color] moved the shortest way in lightness until it holds 3:1 (a non-text mark) on the bar's plate. */
-        fun barAccent(color: Int): Int =
-            dev.droidtop.notices.ColorMath.ensure(color, listOf(dev.droidtop.notices.ColorMath.over(BAR_COLOR, dev.droidtop.notices.ColorMath.BLACK)), 3.0)
         const val NOT_FOCUSABLE_FLAGS = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
