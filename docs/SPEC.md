@@ -22229,6 +22229,8 @@ client." The plan and its slices are on #645.
   - Devices by address: IP addresses announced to besides the broadcast, for a device on another network or one the
     broadcast misses (the official apps have no QR pairing; adding by address is theirs too);
   - Asking to pair, Paired (Ping, Unpair) and Available (Pair, and Look again, which announces again).
+- **Discovery** is the library's: UDP broadcast, mDNS (`_kdeconnect._udp`; droidtop holds a Wi-Fi multicast lock
+  while KDE Connect is on, `KdeConnectNotification.holdMulticast`), the person's addresses and VPN plugins' ones.
 - **Device type** `tablet`: the official apps choose what to offer by capability, not by type.
 - **Plugins, as built:**
   - ping both ways (a ping shows as a notification);
