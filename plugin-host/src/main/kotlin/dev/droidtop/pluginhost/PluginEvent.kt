@@ -85,6 +85,13 @@ enum class PluginEvent(val id: String, val version: Int, val display: String) {
      * and brings it in when that is safe. Only to the plugin that owns the context. Args: `context`, `generation`.
      */
     CONTEXT_RECEIVED("context.received", 1, "A synced copy of the plugin's data arrived"),
+
+    /**
+     * Settings the person changed on the plugin's declared settings page (Droidtop/tracker#880), told the next time the
+     * plugin runs, never while the page is open. The plugin reads the values with `settings.get`. Args: `ids`, the
+     * changed settings, comma-separated.
+     */
+    SETTINGS_CHANGED("settings.changed", 1, "Its settings changed"),
     ;
 
     companion object {

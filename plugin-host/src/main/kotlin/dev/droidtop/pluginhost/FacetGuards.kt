@@ -30,6 +30,9 @@ object FacetGuards {
         Target("quickmenu", setOf("status", "toggle", "action", "progress", "meter", "chart", "choice", "group"), setOf("plugin", "device", "game"), PointRisk.LOW),
         Target("companion.tab", setOf("group"), setOf("plugin", "device", "game"), PointRisk.LOW),
         Target("companion.card", ALL_KINDS - "collection", setOf("plugin", "device", "game"), PointRisk.LOW),
+        // Retired (Droidtop/tracker#880, owner 2026-11-05: settings are declared in the manifest and "should not have to be
+        // asked or loaded for any of it"): still accepted in a manifest, so a plugin that declares it installs, but droidtop
+        // never asks for it or draws it. Its settings page is the manifest's `settings` ([DeclaredSetting]).
         Target("settings.page", INPUTS + setOf("info", "action", "notice", "account", "group", "secret"), setOf("plugin"), PointRisk.LOW),
         Target("notification", setOf("notice", "action", "progress"), setOf("plugin", "device", "game", "item"), PointRisk.MEDIUM),
         Target("status.area", setOf("status", "badge", "meter"), setOf("plugin", "device"), PointRisk.LOW),

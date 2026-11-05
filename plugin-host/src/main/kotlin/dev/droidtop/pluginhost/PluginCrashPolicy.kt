@@ -54,6 +54,20 @@ class PluginCrashPolicy(
         null to refusal
     }
 
+    /**
+     * The settings the person changed since [record] last heard (Droidtop/tracker#880), told now that it runs: the
+     * owner, "A setting changing is a notice the plugin gets the next time it runs, not a call made while the page is
+     * open". Only to a plugin that subscribed; the rest read them with `settings.get`.
+     */
+    private suspend fun tellSettingsChanged(record: PluginRecord) {
+        if (!record.manifest.subscribesTo(PluginEvent.SETTINGS_CHANGED)) return
+        val store = PluginSettings(context)
+        val changed = runCatching { store.pending(record.manifest.id) }.getOrDefault(emptyList())
+        if (changed.isEmpty()) return
+        val result = runCatching { runner.notifyEvent(record.manifest.id, PluginEvent.SETTINGS_CHANGED, mapOf("ids" to changed.joinToString(","))) }.getOrNull()
+        if (result?.ok == true) runCatching { store.pending(record.manifest.id, clear = true) }
+    }
+
     /** Loads [record] in the tier it may run in; false with the reason in [loadFailure] when it cannot. */
     private suspend fun loadFor(record: PluginRecord, userInitiated: Boolean): String? {
         val (tier, refusal) = tierFor(record, userInitiated)
@@ -62,6 +76,7 @@ class PluginCrashPolicy(
         val dir = PluginStore.payloadDirFor(context, record)
         if (runner.load(record, dir.absolutePath, tier)) {
             PluginDangers.loaded(id)
+            tellSettingsChanged(record)
             return null
         }
         // Protection did not start (Droidtop/tracker#481): during a call the person started, ask in red whether to run it

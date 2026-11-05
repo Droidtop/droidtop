@@ -1378,9 +1378,8 @@ point and `host.info().facets`); the renderer (facets become the view model the 
 group is a section, a list's entries are rows, a `page` call opens a page whose reply is facets, and an input's value
 goes back as `args.value`, typed); and the Quick Menu's plugin section (a plugin whose `ui.facets` entry declares
 `quickmenu` gets its panel from `get {target: "quickmenu"}`, through `FacetGuards.admit`, in place of its old
-`ui.panel`); and the plugin's settings (`settings.page`: the Settings row on its page, its Quick Menu panel and
-its game-source page all open `get {target: "settings.page"}` when it declares that target, in place of its old
-`ui.settings` view, `PluginSettingsRows.has` being the one test); and the game page (a plugin whose `ui.facets` entry
+`ui.panel`); and the plugin's settings (since Droidtop/tracker#880 declared in its manifest and drawn with no call, below
+"Declared settings"; the `settings.page` target is retired, `PluginSettingsRows.has` being the one test); and the game page (a plugin whose `ui.facets` entry
 declares `game.page` takes a section's place on every game's page in Gaming, asked `get {target: "game.page", subject}`
 with the game as its subject only when it holds `library.read`, its rows drawn as a section's are); the plugin's own page (`plugin.page`: a
 "Status and actions" row first on the plugin's page opens `get {target: "plugin.page"}`); and "Where it appears" (a
@@ -1559,6 +1558,35 @@ A plugin's failure carries a code from the fixed list (§1.3), and droidtop word
 - **A page droidtop cannot draw** is skipped and logged for the developer; the person sees an empty page.
 - **What the plugin said, and its `detail`, is in Info (Technical details) always**, not only with the Developer
   menu on: "no status shown without its reason" (DESIGN-LANGUAGE).
+#### Declared settings: drawn with no call (Droidtop/tracker#880, decided 2026-11-05)
+
+The owner: "opening the f95zones settings page gets me a spinner? why the hell should settings have to load?", then
+"The plugin should have exposed a Settings facet, or exposed things in advance. It should not have to be asked or
+loaded for any of it", and, of the proposal below, "For 880, that's fine". And on #883: "Plugins also provide their
+facet briefs in advance, as much as they can, too".
+
+- **The declaration.** A plugin lists its settings in its signed manifest, as a `settings` array of rows, at most 40:
+  - `{"id", "kind": "input", "label", "sub"?, "input": "toggle" | "choice" | "text", "choices"?: [{"value", "label"}], "default"?, "when"?}`;
+  - `{"id", "kind": "action", "label", "sub"?, "op", "when"?}`. Pressed, it runs the plugin's job `op` on
+    `ui.settings` (§1.6), because the person pressed it;
+  - `{"id", "kind": "info", "label", "sub"?, "when"?}`.
+  - An `id` is lowercase letters, digits, `_` and `.`, up to 64 characters.
+- **The page.** droidtop draws it from the declaration and from its own store (`PluginSettings`,
+  `plugins/settings/<id>.json`). Opening it never starts or calls the plugin.
+- **Values are droidtop's.** A value the person sets is checked against its row (a toggle is on or off, a choice one
+  of its choices, a text at most 1000 characters) and kept.
+  - The plugin reads every value, defaults included, with `settings.get {}` → `{values, changed}` when it runs.
+    `changed` lists what changed since it last asked.
+  - A plugin that subscribes to `settings.changed` hears it (`ids`) when it next runs: the owner, "A setting
+    changing is a notice the plugin gets the next time it runs, not a call made while the page is open".
+- **`when`** shows a row only while a state droidtop already knows holds: `web.session.signed_in`, `computer.paired`
+  or `permission:<id>` granted, optionally prefixed with `not `. No plugin is asked.
+- **Text only the plugin knows is pushed.** While it runs, the plugin calls `settings.set_text {id, value?, sub?}`
+  (each up to 120 characters), and droidtop keeps the last text for that row. A row nothing was pushed for shows its
+  declared label alone. F95's "12 watched threads" is pushed after each watch-list sync.
+- **`settings.page` facets are retired.** A manifest may still list the target, so a plugin that does still
+  installs, but droidtop never asks for it. A plugin with no declaration but an older `ui.settings` view is still drawn
+  from that view, until it declares its settings.
 
 #### Targets: where a facet can appear
 
@@ -1577,7 +1605,7 @@ its own (a game, an item) or none. A plugin declares the targets it uses on a `p
 | `home.shelf`, `home.card` | Home's shelves and cards (Droidtop/tracker#586) | `collection` (a shelf), `info`, `media`, `action`, `progress` (a card) | none |
 | `quickmenu` | The Quick Menu's plugin entries, which take over the left plugin menu (#586) | `status`, `toggle`, `action`, `progress`, `meter`, `chart`, `choice`, `group` | the device, the running game |
 | `companion.tab`, `companion.card` | The companion's tabs and cards (C15) | all but `collection` in a card; a tab is a `group` | the device, the running game |
-| `settings.page` | The plugin's settings (C1) | all inputs, `info`, `action`, `notice`, `account`, `group` | the plugin |
+| `settings.page` | **Retired** (Droidtop/tracker#880): the plugin's settings are declared in its manifest (below, "Declared settings"); still accepted in a manifest, never asked or drawn | — | — |
 | `notification` | droidtop's notifications (C6) | `notice`, up to three `action`s, `progress` | any |
 | `status.area` | The status bar and the floating status cluster | `status` (the dot and label only), `badge`, `meter` | the device |
 | `widget` | Android home-screen widgets (C10) | `info`, `status`, `progress`, `meter`, `media`, `list` (5 rows), `action` (2) | the plugin, the device |

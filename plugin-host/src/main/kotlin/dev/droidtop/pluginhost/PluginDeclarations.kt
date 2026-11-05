@@ -24,6 +24,8 @@ data class V2Declarations(
     val requires: List<RequiredApi> = emptyList(),
     /** The data kinds it can hand to, and take from, an equivalent plugin ([DataKind], docs/plugin-api.md 3 H3). */
     val dataKinds: List<DataKind> = emptyList(),
+    /** Its settings, declared ahead and drawn by droidtop with no call ([DeclaredSetting], Droidtop/tracker#880). */
+    val settings: List<DeclaredSetting> = emptyList(),
 ) {
     /** Writes the five arrays into [json], the same keys [fromJson] reads, so the manifest and [PluginRecord] share one mechanism. */
     fun putInto(json: JSONObject) {
@@ -33,6 +35,7 @@ data class V2Declarations(
         json.put("exports", JSONArray(exports.map { it.toJson() }))
         json.put("requires", JSONArray(requires.map { it.toJson() }))
         if (dataKinds.isNotEmpty()) json.put("dataKinds", JSONArray(dataKinds.map { it.toJson() }))
+        if (settings.isNotEmpty()) json.put("settings", JSONArray(settings.map { it.toJson() }))
     }
 
     companion object {
@@ -46,6 +49,7 @@ data class V2Declarations(
             exports = objects(json, "exports").mapNotNull { ExportedApi.fromJson(it) },
             requires = objects(json, "requires").mapNotNull { RequiredApi.fromJson(it) },
             dataKinds = objects(json, "dataKinds").mapNotNull { DataKind.fromJson(it) }.distinctBy { it.kind },
+            settings = objects(json, "settings").mapNotNull { DeclaredSetting.fromJson(it) }.distinctBy { it.id }.take(DeclaredSetting.MAX_ROWS),
         )
 
         private fun objects(json: JSONObject, key: String): List<JSONObject> {
@@ -76,6 +80,81 @@ data class DataKind(val kind: String, val version: Int, val export: Boolean, val
             val version = json.optInt("version", 0).takeIf { it >= 1 } ?: return null
             return DataKind(kind, version, json.optBoolean("export", false), json.optBoolean("import", false))
         }
+    }
+}
+
+/**
+ * One row of a plugin's settings, declared in its signed manifest and drawn by droidtop (Droidtop/tracker#880). The
+ * owner: "The plugin should have exposed a Settings facet, or exposed things in advance. It should not have to be
+ * asked or loaded for any of it". Opening the page never starts or calls the plugin.
+ *
+ * - [Kind.INPUT]: a value the person sets, kept by droidtop ([PluginSettings]). [input] is `toggle`, `choice` (one of
+ *   [choices]) or `text`, with [default].
+ * - [Kind.ACTION]: pressed, it runs the plugin's job [op] on `ui.settings`. That is the person's action, not the page's.
+ * - [Kind.INFO]: a line. Its value can be text the plugin pushed while it ran (`settings.set_text`).
+ *
+ * [whenCondition] (`when`) shows the row only while a state droidtop already knows holds: `web.session.signed_in`, `permission:<id>`
+ * granted, `computer.paired`, each optionally prefixed with `not `.
+ */
+data class DeclaredSetting(
+    val id: String,
+    val kind: Kind,
+    val label: String,
+    val sub: String? = null,
+    val input: String? = null,
+    val choices: List<Pair<String, String>> = emptyList(),
+    val default: Any? = null,
+    val op: String? = null,
+    val whenCondition: String? = null,
+) {
+    enum class Kind(val id: String) { INPUT("input"), ACTION("action"), INFO("info") }
+
+    fun toJson(): JSONObject = JSONObject().put("id", id).put("kind", kind.id).put("label", label).apply {
+        sub?.let { put("sub", it) }
+        input?.let { put("input", it) }
+        if (choices.isNotEmpty()) put("choices", JSONArray(choices.map { (v, l) -> JSONObject().put("value", v).put("label", l) }))
+        default?.let { put("default", it) }
+        op?.let { put("op", it) }
+        whenCondition?.let { put("when", it) }
+    }
+
+    companion object {
+        const val MAX_ROWS = 40
+        val ID = Regex("^[a-z][a-z0-9_.]{0,63}$")
+        val INPUTS = setOf("toggle", "choice", "text")
+        val CONDITION = Regex("^(not )?(web\\.session\\.signed_in|computer\\.paired|permission:[a-z][a-z0-9_.]{0,63})$")
+
+        fun fromJson(json: JSONObject): DeclaredSetting? {
+            val id = json.optString("id").takeIf { ID.matches(it) } ?: return null
+            val kind = Kind.entries.firstOrNull { it.id == json.optString("kind") } ?: return null
+            val label = json.optString("label").trim().takeIf { it.isNotEmpty() && it.length <= 80 } ?: return null
+            val sub = json.optNullable("sub")?.take(200)
+            val condition = json.optNullable("when")?.takeIf { CONDITION.matches(it) }
+            if (json.has("when") && condition == null) return null
+            return when (kind) {
+                Kind.INPUT -> {
+                    val input = json.optString("input").takeIf { it in INPUTS } ?: return null
+                    val choices = json.optJSONArray("choices")?.let { a ->
+                        (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { c -> c.optString("value").takeIf { it.isNotBlank() }?.let { it to c.optString("label").ifBlank { it } } } }
+                    }.orEmpty()
+                    if (input == "choice" && choices.isEmpty()) return null
+                    val default: Any? = when (input) {
+                        "toggle" -> json.optBoolean("default", false)
+                        "choice" -> json.optString("default").takeIf { d -> choices.any { it.first == d } } ?: choices.first().first
+                        else -> json.optString("default", "").take(MAX_TEXT)
+                    }
+                    DeclaredSetting(id, kind, label, sub, input, choices, default, whenCondition = condition)
+                }
+                Kind.ACTION -> {
+                    val op = json.optString("op").takeIf { HostOpNames.check(it) == null } ?: return null
+                    DeclaredSetting(id, kind, label, sub, op = op, whenCondition = condition)
+                }
+                Kind.INFO -> DeclaredSetting(id, kind, label, sub, whenCondition = condition)
+            }
+        }
+
+        /** A text setting's longest value. */
+        const val MAX_TEXT = 1000
     }
 }
 

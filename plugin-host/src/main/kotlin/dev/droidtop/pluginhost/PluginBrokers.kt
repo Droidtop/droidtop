@@ -474,7 +474,11 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     private val contextStore by lazy { PluginContexts(appContext) }
 
+    private val settingsStore by lazy { PluginSettings(appContext) }
+
     override fun contexts(): PluginContexts = contextStore
+
+    override fun settings(): PluginSettings = settingsStore
 
     private val tokens by lazy { PluginFileTokens.forPluginsRoot(PluginStore.root(appContext)) }
 

@@ -200,6 +200,9 @@ interface BrokerEnvironment {
     /** Plugin contexts kept in step with the person's paired computers (docs/plugin-api.md 3 F8); null in a host without them. */
     fun contexts(): PluginContexts? = null
 
+    /** The declared settings' store (Droidtop/tracker#880); null where there is none (a test environment). */
+    fun settings(): PluginSettings? = null
+
     /** D4: the tokens of the documents each plugin was handed. */
     fun fileTokens(): PluginFileTokens? = null
 
@@ -672,7 +675,7 @@ object HostApis {
     }
 
     /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
-    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPowerApis.ops + HostSourcesApis.ops }
+    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostSettingsApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPowerApis.ops + HostSourcesApis.ops }
 
     const val MAX_ENGINES = 50
     const val MAX_PATH = 4096

@@ -230,6 +230,7 @@ object PluginStore {
         PluginBrokers.forget(pluginId)
         PluginRecording.clear(pluginId)
         ProviderLevels.forContext(context).forget(pluginId)
+        runCatching { PluginSettings(context).forget(pluginId) }
         // What it announced to the paired devices is withdrawn there too (docs/plugin-api.md D21): network, so on its own thread.
         val appContext = context.applicationContext
         Thread({ runCatching { dev.droidtop.net.peer.PairedDevices.forget(appContext, pluginId) } }, "devices-forget").start()
