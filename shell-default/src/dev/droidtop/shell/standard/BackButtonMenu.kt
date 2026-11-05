@@ -153,7 +153,13 @@ object BackButtonMenu {
      */
     fun openHome(context: Context, implementation: HomeRolePrefs.HomeImplementation) {
         Modes.setLastMode(context, Mode.LAUNCHER)
-        context.startActivity(homeIntent(context, implementation))
+        val home = homeIntent(context, implementation)
+        context.startActivity(home)
+        // Straight to droidtop's own launcher skips the trampoline, the one place Standard put its second-screen
+        // surface back (HomeEntry.enterStandard), so the add-on display kept the last mode's page: a switch from
+        // Gaming left Gaming Home there, with no companion tabs (Droidtop/tracker#347, RP5 3061). The Alternative
+        // forwarder and the trampoline do this themselves.
+        if (home.component?.className == StandardComponents.LAUNCHER) reassertSecondaryDisplays(context)
     }
 
     /** What [openHome] starts, without recording the mode: for a notification that returns to the Android home screen. */

@@ -6905,7 +6905,10 @@ Fixed by reusing the SAME pattern at the one remaining place it was missing:
 not already show it (`SecondaryCover.resumedDisplayId`, in `:runtime-common` so both modules
 read the one value; a start that fails is logged, Droidtop/tracker#771), called
 from both `HomeTrampolineActivity.forwardToStandard` and `AlternativeLauncherActivity`'s
-forward path, right alongside the `Modes.setLastMode(LAUNCHER)` call each already makes. A
+forward path, right alongside the `Modes.setLastMode(LAUNCHER)` call each already makes. The mode
+switcher's Mobile choice (`BackButtonMenu.openHome`) starts droidtop's own launcher directly, past the
+trampoline, so it calls it too (Droidtop/tracker#347: on the console a switch from Gaming to Mobile left the
+add-on display on Gaming Home, with no companion tabs, build 3061). A
 string component name (`Intent().setClassName(...)`), not a class reference: `:shell-default`
 does not depend on `:display`, the same reason `HomeTrampolineActivity` already names
 `dev.droidtop.app.MainActivity` as a string rather than importing it.
