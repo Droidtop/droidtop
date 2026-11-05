@@ -7,6 +7,7 @@ import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
@@ -131,12 +132,29 @@ object KdeConnectCatalog {
             subtitle = if (d.reachable) "Connected. ${place(d)}. Press to ping it" else "Not reachable now",
             run = { _, _ -> if (d.reachable) KdeConnect.ping(d.id) ?: "Ping sent" else "${d.name} is not reachable now" },
         ),
+    ) + (if (d.reachable) sendRows(d) else emptyList()) + listOf(
         AsyncActionItem(
             id = "kdeconnect_unpair_${d.id}",
             title = "Unpair ${d.name}",
             confirmTitle = "Unpair ${d.name}? It has to be paired again before it can reach this device.",
             confirmKeep = "Keep it paired",
             run = { _, _ -> KdeConnect.unpair(d.id) ?: "Unpaired ${d.name}" },
+        ),
+    )
+
+    /** Send a file (the system's document picker; the file is read where it is, never copied) and send a text. */
+    private fun sendRows(d: KdcDevice): List<CatalogItem> = listOf(
+        DocumentPickItem(
+            id = "kdeconnect_send_file_${d.id}",
+            title = "Send a file to ${d.name}",
+            mimeType = "*/*",
+            onPicked = { ctx, uri -> KdeConnect.shareFile(ctx, d.id, uri) ?: "Sending to ${d.name}" },
+        ),
+        TextInputItem(
+            id = "kdeconnect_send_text_${d.id}",
+            title = "Send text to ${d.name}",
+            value = "",
+            onChange = { _, text -> if (text.isNotBlank()) KdeConnect.shareText(d.id, text) },
         ),
     )
 
