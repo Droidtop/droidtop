@@ -22622,7 +22622,8 @@ client." The plan and its slices are on #645.
   to the same address list through the host API `peers.set_addresses` (docs/plugin-api.md D22, `peers.addresses`,
   dangerous): KDE Connect announces this device to the person's addresses and every VPN plugin's, once each
   (`KdeConnect.allAddresses`). A plugin's list lives for the process (plugins send it again when they start); the
-  person's own list is kept. Slice 5 of #645; the plugin itself is `droidtop-plugin-tailscale`.
+  person's own list is kept. A device reached at a plugin's address is shown "over <plugin's name>" ("Phone, over
+  Tailscale") instead of its address. Slice 5 of #645; the plugin itself is `droidtop-plugin-tailscale`.
 
 ## 8. Licensing
 

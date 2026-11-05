@@ -51,6 +51,9 @@ object KdeConnectCatalog {
     private suspend fun groups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val on = KdeConnect.isOn(context)
         val devices = KdeConnect.devices()
+        if (devices.any { KdeConnect.viaPlugin(it.address) != null }) {
+            pluginNames = dev.droidtop.pluginhost.PluginStore.installed(context).associate { it.manifest.id to it.manifest.label }
+        }
         buildList {
             add(CatalogGroup(id = "kdeconnect_switch", title = null, items = switchRows(context, on)))
             if (!on || !KdeConnect.running.value) return@buildList
@@ -113,7 +116,15 @@ object KdeConnectCatalog {
         )
     }
 
-    private fun place(d: KdcDevice) = listOfNotNull(d.type.replaceFirstChar { it.uppercase() }, d.address).joinToString(", ")
+    /** Installed plugins' names by id, read once per build of the screen (on its IO thread). */
+    @Volatile
+    private var pluginNames: Map<String, String> = emptyMap()
+
+    /** "Phone, 192.168.1.9", or with a VPN plugin's address "Phone, over Tailscale" (docs/SPEC.md 7p, Tailscale). */
+    private fun place(d: KdcDevice): String {
+        val via = KdeConnect.viaPlugin(d.address)?.let { id -> "over " + (pluginNames[id] ?: "your VPN") }
+        return listOfNotNull(d.type.replaceFirstChar { it.uppercase() }, via ?: d.address).joinToString(", ")
+    }
 
     private fun requestRows(d: KdcDevice): List<CatalogItem> = listOf(
         AsyncActionItem(
