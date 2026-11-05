@@ -516,7 +516,9 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   there is one control panel, not two.
 - **The bar says which buttons.** With a pad attached (`ShellWindow.padPresent`) a strip beside the bar
   (`PadLegend`, not tappable) names Start, R2, L1 and R1; it is a strip of its own so the bar keeps its
-  width for the window list on a 768 dp console. The bar's buttons stay for touch and a mouse. The Start
+  width for the window list on a 768 dp console. The bar's buttons stay for touch and a mouse, so they are a
+  finger's size whatever drives the rest (`ShellWindow.touchOnlyTarget`, Droidtop/tracker#690): sized as the pad's
+  48dp of the canvas they were 65 px on the console, about 29dp of its own (release 2967). The Start
   button only opens now: the menu is modal, so the "Close" label it wore while the menu floated over the
   bar is gone.
 - **Desktop is immersive, one layout** (Droidtop/tracker#555 D4, 2026-10-15). Android's status and
@@ -19512,9 +19514,12 @@ change, only how many a dp is: a Retroid Pocket 5's 5.5" 1080p panel reports 360
 it and a 1080p phone are drawn at 1.5, as the 1080p DP screen is, and show the same layout and proportions instead of
 1.5 times the text and spacing. A window already at the canvas keeps its own density. Touch targets do not shrink with
 it where touch comes first: `touchTargetDp` makes them 0.3 inch on the panel from the dpi the display reports
-(Android's 48dp where it reports none believable), never under 48dp of the canvas. Where the pad drives, a press target
+(Android's 48dp where it reports none believable), never under Android's own 48dp of the display nor 48dp of the
+canvas. Where the pad drives, a press target
 is the shell's 48dp of the canvas (`Measure.padTarget`), as through 2026-10-28. `ShellWindow.pressTarget` is the one
 place that choice is made, and `check-ui-rules.sh` (press-target) fails a screen that reads the finger size directly.
+What the pad never presses (Desktop's bar) takes `ShellWindow.touchOnlyTarget`, a finger's size with or without the
+pad (Droidtop/tracker#690).
 **The Quick Menu stays dense** (owner, 2026-10-30, Droidtop/tracker#740: "the QAM redesign made it significantly less
 dense, which is a terrible decision"; "something REALLY wants it to be heavily padded or scaled"). Two things
 together made it sparse. Since 2026-10-29 a finger is 0.3 inch of the panel: about 80dp of the console's canvas, and

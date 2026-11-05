@@ -71,6 +71,14 @@ data class ShellWindow(
     val pressTarget: Dp get() = if (touchFirst) minTouchTarget else Measure.padTarget
 
     /**
+     * The least size of something only touch or a mouse presses, never the pad: a finger's ([minTouchTarget]) whatever
+     * drives the rest of the window. Desktop's bar is one (docs/SPEC.md 2b, "The bar's buttons stay for touch and a
+     * mouse"): sized by [pressTarget], a console with its pad got the pad's 48dp of the canvas, 65 px on the Retroid
+     * Pocket 5's panel, about 29dp of its own, under a finger (Droidtop/tracker#690, release 2967).
+     */
+    val touchOnlyTarget: Dp get() = minTouchTarget
+
+    /**
      * A pane of a larger window ([pane]): the Quick Menu's catalog tabs. Its rows and section labels are compact
      * (DroidDeck's compact settings rows, Droidtop/tracker#363): a one-line row is [pressTarget] tall and no taller, and
      * a section label sits closer above its rows on a hairline.
@@ -373,11 +381,12 @@ const val TOUCH_TARGET_INCHES = 0.3f
  * The touch target, in dp at [layoutDensity], that is [TOUCH_TARGET_INCHES] on a panel the display reports at [xdpi]
  * pixels per inch, so it is a finger's size whatever density the layout is drawn at. A display that reports no
  * believable dpi (outside 80 to 1000, as some external screens do) falls back to Android's 48dp at [systemDensity].
- * Never under 48dp of the layout. Pure.
+ * Never under Android's own 48dp at [systemDensity] (DESIGN-LANGUAGE's minimum, what accessibility tools measure, and
+ * more than 0.3 inch where a panel reports a lower dpi than its density), nor under 48dp of the layout. Pure.
  */
 fun touchTargetDp(xdpi: Float, systemDensity: Float, layoutDensity: Float): Float {
-    val px = if (xdpi in 80f..1000f) xdpi * TOUCH_TARGET_INCHES else 48f * systemDensity
-    return maxOf(48f, px / layoutDensity)
+    val panelPx = if (xdpi in 80f..1000f) xdpi * TOUCH_TARGET_INCHES else 0f
+    return maxOf(48f, maxOf(panelPx, 48f * systemDensity) / layoutDensity)
 }
 
 /** The live [touchTargetDp], provided by [ProvideShellCanvas] and read into [ShellWindow.minTouchTarget]. */
@@ -410,7 +419,8 @@ fun ProvideShellCanvas(content: @Composable () -> Unit) {
         displaySystemDensity(context, displayId, configDensity) to dev.droidtop.runtime.InterfaceSize.factorFor(context, displayId)
     }
     val target = scaledCanvasDensity(systemDensity, widthPx, heightPx, xdpi, factor)
-    val touchTarget = touchTargetDp(xdpi, configDensity, target).dp
+    // The display's own density, not the configuration's: droidtop's activities have already moved that to the canvas.
+    val touchTarget = touchTargetDp(xdpi, systemDensity, target).dp
     if (kotlin.math.abs(target - configDensity) < 0.01f && kotlin.math.abs(target - density.density) < 0.01f) {
         CompositionLocalProvider(LocalTouchTarget provides touchTarget, content = content)
         return

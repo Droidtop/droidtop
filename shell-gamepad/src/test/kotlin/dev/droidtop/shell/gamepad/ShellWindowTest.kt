@@ -81,6 +81,20 @@ class ShellWindowTest {
         assertEquals(72f, touchTargetDp(xdpi = 0f, systemDensity = 2.25f, layoutDensity = 1.5f), 0.1f)
         // Never under 48dp of the layout.
         assertEquals(48f, touchTargetDp(xdpi = 100f, systemDensity = 1f, layoutDensity = 1f), 0.1f)
+        // Never under Android's own 48dp of the display: a panel reporting 300 ppi at 2.25x is 90px at 0.3 inch, but 108px
+        // is Android's 48dp there, what the rig measures (Droidtop/tracker#690).
+        assertEquals(72f, touchTargetDp(xdpi = 300f, systemDensity = 2.25f, layoutDensity = 1.5f), 0.1f)
+    }
+
+    @Test
+    fun `what only touch presses is a finger's even with the pad`() {
+        // Desktop's bar on the console (Droidtop/tracker#690): the pad never presses it, so the pad's 48dp of the canvas,
+        // 65 px on release 2967, about 29dp of the panel's own, was under a finger.
+        val console = ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true, minTouchTarget = consoleFinger)
+        assertEquals(consoleFinger, console.touchOnlyTarget)
+        assertTrue(console.touchOnlyTarget.value * 1.5f >= 48f * 2.25f)
+        // The pad-driven press target is unchanged (#740).
+        assertEquals(Measure.padTarget, console.pressTarget)
     }
 
     // The console's panel (5.5" 1080p, 400dpi) on the 1280x720dp canvas: a finger is 0.3 inch, 80dp of it.
