@@ -811,9 +811,6 @@ internal fun PcGamePage(
                                 }
                             }
                         } else {
-                            // A tab whose rows have no second line keeps no room for one: a lone "Times played 14"
-                            // was a four-line box with one line in it (Droidtop/tracker#662).
-                            val summaryLines = if (current.any { it.subtitle != null }) 2 else 0
                             itemsIndexed(current, key = { index, fact -> "$tab:$index:${fact.title}" }) { index, fact ->
                                 Box(
                                     modifier = Modifier
@@ -829,7 +826,11 @@ internal fun PcGamePage(
                                         chevron = fact.onActivate != null,
                                         selected = zone == PageZone.CONTENT && row == index,
                                         uniformHeight = true,
-                                        uniformSummaryLines = summaryLines,
+                                        // A row with no second line keeps no room for one, row by row as Settings'
+                                        // rows do (CatalogNavigator): decided per tab, one subtitled row (Runner)
+                                        // left every Details row a four-line box with one line in it
+                                        // (Droidtop/tracker#662, rig 2775). One-line rows still share one height.
+                                        uniformSummaryLines = if (fact.subtitle != null) 2 else 0,
                                         ownScrollKeeping = true,
                                         onClick = {
                                             zone = PageZone.CONTENT

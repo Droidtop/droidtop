@@ -17876,10 +17876,13 @@ structure, top to bottom, drawn only from theme tokens:
   Rollback is not offered: droidtop keeps no backup of a replaced version.
   A tab with no
   row says so (`PageTab.emptyLine`) instead of drawing nothing.
-- **The rows** are Settings' rows, as before (one uniform height per tab, one
-  content-sized value column, the selected row's full text in the detail
-  strip while the cursor is in them). A tab none of whose rows has a second
-  line keeps no room for one (`uniformSummaryLines = 0`, Droidtop/tracker#662).
+- **The rows** are Settings' rows, as before (one content-sized value
+  column, the selected row's full text in the detail strip while the cursor
+  is in them). Height is decided row by row, as Settings decides it: a row
+  with no second line keeps no room for one (`uniformSummaryLines = 0`), so
+  one-line rows share one short height and a row with a subtitle is taller.
+  Decided per tab, one subtitled row (Runner) left every Details row four
+  lines tall (Droidtop/tracker#662, rig 2775).
 
 **The controls.** The page is a window of its own, so its one `onPad` handler
 (through `GatePadInThisDialog`) is what every press reaches, and it OWNS
