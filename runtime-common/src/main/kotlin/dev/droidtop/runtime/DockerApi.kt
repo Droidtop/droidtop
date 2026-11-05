@@ -272,8 +272,14 @@ object DockerApi {
         listOf("CapAdd", "Devices", "SecurityOpt", "Links", "VolumesFrom").forEach { key ->
             strings(host?.get(key))?.takeIf { it.isNotEmpty() }?.let { return notYet(key) }
         }
-        (host?.get("Mounts") as? JsonArray)?.takeIf { it.isNotEmpty() }?.let {
-            return notYet("Mounts (volumes and bind mounts by path; Binds takes a folder you mapped in Containers)")
+        // Mounts, Docker's newer form of Binds (Droidtop/tracker#715): a bind mount of a folder mapped in Containers,
+        // named or given by where it appears in the container, goes through the same rule as Binds and -v
+        // ([EngineCli.volume]); volumes and tmpfs stay not built.
+        val mountBinds = (host?.get("Mounts") as? JsonArray).orEmpty().map { el ->
+            val m = el as? JsonObject ?: return refuse(400, "a Mounts entry is not an object")
+            val type = string(m, "Type") ?: "volume"
+            if (type != "bind") return notYet("Mounts of type $type (only a bind mount of a folder you mapped in Containers is taken)")
+            EngineCli.DOCKER.mountSpec(string(m, "Source").orEmpty(), string(m, "Target").orEmpty(), bool(m, "ReadOnly"))
         }
         val limits = mapOf(
             "Memory" to "--memory", "MemorySwap" to "--memory-swap", "MemoryReservation" to "--memory-reservation",
@@ -288,10 +294,10 @@ object DockerApi {
             join(ref, strings((endpoint as? JsonObject)?.get("Aliases")).orEmpty())?.let { return null to it }
         }
 
-        val volumes = strings(host?.get("Binds")).orEmpty().map { spec ->
+        val volumes = (strings(host?.get("Binds")).orEmpty() + mountBinds).map { spec ->
             EngineCli.DOCKER.volume(spec) ?: return refuse(
                 400,
-                "Binds takes the name of a folder you mapped in Containers (it appears at ${ContainerLayout.EXTRA_MOUNTS_DIR}/<name>); $spec is not one droidtop can mount",
+                "Binds and Mounts take a folder you mapped in Containers (it appears at ${ContainerLayout.EXTRA_MOUNTS_DIR}/<name>); $spec is not one droidtop can mount",
             )
         }
         val restart = (host?.get("RestartPolicy") as? JsonObject)?.let { policy ->

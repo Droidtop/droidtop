@@ -3250,7 +3250,11 @@ the `ContainerRuntime` interface that already exists (§3):
     `Hostname`, and port bindings on another number.
   - Taken since Droidtop/tracker#715: `Entrypoint` (`[""]` clears it) and `WorkingDir` (an absolute
     folder; another is refused 400), as `--entrypoint` and `-w` are; libpod's `entrypoint` and `work_dir` alike.
-  - Answered 501, not built: a `User` other than root, `Volumes`, `Mounts`, a network
+  - Taken since Droidtop/tracker#715, 2026-11-05: `HostConfig.Mounts` entries of type `bind` whose source is
+    a folder mapped in Containers, by its name or by where it appears in the container
+    (`/run/droidtop-mounts/<name>`), read by the same rule as `Binds` and `-v` (`EngineCli.mountSpec`, then
+    `volume`); `User`, as `-u` is (Users, above).
+  - Answered 501, not built: `Volumes`, `Mounts` of type `volume` or `tmpfs`, a network
     of the container's own other than a network droidtop has (below), `CapAdd`,
     `Devices`, `SecurityOpt`.
   - Refused 400: `Privileged`, which droidtop's containers never are.

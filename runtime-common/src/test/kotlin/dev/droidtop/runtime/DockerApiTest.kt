@@ -210,6 +210,17 @@ class DockerApiTest {
         assertEquals("postgres:70", create("""{"Image":"alpine","User":"postgres:70"}""").first!!.user)
         assertEquals(400, answer("""{"Image":"alpine","User":"a b"}""").first)
         assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"Mounts":[{"Type":"volume","Source":"data","Target":"/data"}]}}""").first)
+        // A bind mount of a mapped folder is taken as Binds is (#715), by name or by where it appears in the container.
+        assertEquals(
+            listOf("Saves"),
+            create("""{"Image":"alpine","HostConfig":{"Mounts":[{"Type":"bind","Source":"/run/droidtop-mounts/Saves","Target":"/run/droidtop-mounts/Saves","ReadOnly":true}]}}""").first!!.volumes,
+        )
+        assertEquals(
+            listOf("Music", "Saves"),
+            create("""{"Image":"alpine","HostConfig":{"Binds":["Music"],"Mounts":[{"Type":"bind","Source":"Saves","Target":"/run/droidtop-mounts/Saves"}]}}""").first!!.volumes,
+        )
+        assertTrue(answer("""{"Image":"alpine","HostConfig":{"Mounts":[{"Type":"bind","Source":"/etc","Target":"/host-etc"}]}}""").second.contains("a folder you mapped"))
+        assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"Mounts":[{"Type":"tmpfs","Target":"/tmp"}]}}""").first)
         assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"CapAdd":["NET_ADMIN"]}}""").first)
         assertNull(create("""{"Image":"alpine","User":"root"}""").second)
     }

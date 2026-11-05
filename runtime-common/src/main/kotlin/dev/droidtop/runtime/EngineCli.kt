@@ -508,6 +508,17 @@ class EngineCli private constructor(val front: Front) {
      * The folder name a `-v` names: `NAME`, or `NAME:<where droidtop mounts it>` (`ContainerLayout.EXTRA_MOUNTS_DIR`/NAME,
      * with an optional `:ro` or `:rw`). Null for a host path or another target, which droidtop does not do. Pure.
      */
+    /**
+     * A bind mount given as Docker's `Mounts` gives it ([source], [target], [readOnly]) as the `-v` spec [volume]
+     * reads (Droidtop/tracker#715). The source is the folder's name or where it appears in the container
+     * (`<EXTRA_MOUNTS_DIR>/<name>`, what a client inside the container sees); anything else is passed on as it came,
+     * so [volume] refuses it with the same words as `-v`. Pure.
+     */
+    internal fun mountSpec(source: String, target: String, readOnly: Boolean): String {
+        val name = source.removePrefix("${ContainerLayout.EXTRA_MOUNTS_DIR}/")
+        return name + ":" + target + if (readOnly) ":ro" else ""
+    }
+
     internal fun volume(spec: String): String? {
         val parts = spec.split(':')
         val name = parts[0]
