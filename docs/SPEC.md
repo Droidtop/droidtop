@@ -5337,7 +5337,10 @@ droidtop 0.2.0-dev.1931).
   their pages can be a tab of its own, stored as `page:<parent>/<page>` (`CompanionPrefs.pageId`), whose panel is
   its parent's, so a mode that denies the panel denies the page. **Since S3** (Droidtop/tracker#786) each is a tab
   whose content is its list of pages (level 0), and a page opens in place under a Back row (level 1;
-  `CompanionAreaTab`). Device's pages: System, Network and Apps (the tabs they were, drawn as before) and
+  `CompanionAreaTab`). Device's pages: System, Display, Sound, Network, Battery, Storage, Apps, Privacy and Accessibility
+  (Network and Apps the tabs they were; Display, Sound, Battery, Storage, Privacy and Accessibility the System tab's
+  cards of those names, each a page of its own, open, while System keeps the Quick Menu's System section and
+  Connections; each later slice rebuilds its page) and
   **Android's pages**, Android's own Settings pages droidtop has no page for yet, folded under one row, each labelled
   as the exit it is ("Android's Display", "Opens Android's Settings on this screen. Back returns here"; NFC and
   Printing only where the device has them); the System page's "Android settings" row is left out on the companion,

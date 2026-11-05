@@ -42,7 +42,7 @@ import kotlinx.coroutines.withContext
  * after each change or a return from another screen (a grant), and nothing reads while the tab is not composed.
  */
 @Composable
-internal fun CompanionSystemTab() {
+internal fun CompanionSystemTab(only: Set<String>? = null) {
     val context = LocalContext.current
     val uiMode by UiModeRefresh.mode.collectAsState()
     var version by remember { mutableIntStateOf(0) }
@@ -65,10 +65,12 @@ internal fun CompanionSystemTab() {
             CompanionNote("Reading…")
             return@Column
         }
-        list.forEach { card ->
-            val isFolded = folded[card.id] ?: card.folded
+        // A Device page draws only its own cards, open, without the card's header: the page names it
+        // (Droidtop/tracker#786); the System page draws the cards no page of their own holds.
+        list.filter { only == null || it.id in only }.forEach { card ->
+            val isFolded = if (only != null) false else folded[card.id] ?: card.folded
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                CompanionSectionHeader(card.title, open = !isFolded) { folded[card.id] = !isFolded }
+                if (only == null || only.size > 1) CompanionSectionHeader(card.title, open = !isFolded) { folded[card.id] = !isFolded }
                 if (!isFolded) {
                     Column(
                         modifier = Modifier

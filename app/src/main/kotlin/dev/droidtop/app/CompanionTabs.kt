@@ -104,6 +104,20 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
         val DROIDTOP = of(ControlPanel.DROIDTOP, "droidtop", QuickGlyph.DISPLAY)
         val SYSTEM = CompanionTab(CompanionPrefs.DEVICE_SYSTEM, "System", QuickGlyph.POWER)
         val APPS = CompanionTab(CompanionPrefs.DEVICE_APPS, "Apps", QuickGlyph.APPS)
+        // Device's areas as pages of their own (plan 4.2), each one of the System tab's cards until its slice rebuilds it.
+        val DISPLAY = CompanionTab(CompanionPrefs.pageId(ControlPanel.DEVICE, "display"), "Display", QuickGlyph.BRIGHTNESS)
+        val SOUND = CompanionTab(CompanionPrefs.pageId(ControlPanel.DEVICE, "sound"), "Sound", QuickGlyph.VOLUME)
+        val BATTERY = CompanionTab(CompanionPrefs.pageId(ControlPanel.DEVICE, "battery"), "Battery", QuickGlyph.BATTERY)
+        val STORAGE = CompanionTab(CompanionPrefs.pageId(ControlPanel.DEVICE, "storage"), "Storage", QuickGlyph.DOWNLOAD)
+        val PRIVACY = CompanionTab(CompanionPrefs.pageId(ControlPanel.DEVICE, "privacy"), "Privacy", QuickGlyph.PROFILE)
+        val ACCESSIBILITY = CompanionTab(CompanionPrefs.pageId(ControlPanel.DEVICE, "accessibility"), "Accessibility", QuickGlyph.PEOPLE)
+
+        /** Which System-tab card each of those pages draws. */
+        val CARD_OF_PAGE = mapOf(
+            DISPLAY.id to "display", SOUND.id to "sound", BATTERY.id to "power",
+            STORAGE.id to "storage", PRIVACY.id to "privacy", ACCESSIBILITY.id to "accessibility",
+        )
+
         /** Android's own pages, folded under one row until each has its own page (plan 4.1 rule 1). */
         val ANDROID_PAGES = CompanionTab(CompanionPrefs.DEVICE_ANDROID, "Android's pages", QuickGlyph.ANDROID)
         val COMPANION_SETTINGS = CompanionTab(CompanionPrefs.DROIDTOP_COMPANION, "Companion", QuickGlyph.SECOND_SCREEN)
@@ -121,7 +135,7 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
         val CHOOSABLE = listOf(HOME, DEVICE, DROIDTOP, PERFORMANCE, INPUT, SOCIAL)
 
         /** Device's pages and droidtop's, in the order their tab lists them. */
-        val DEVICE_PAGES = listOf(SYSTEM, NETWORK, APPS, ANDROID_PAGES)
+        val DEVICE_PAGES = listOf(SYSTEM, DISPLAY, SOUND, NETWORK, BATTERY, STORAGE, APPS, PRIVACY, ACCESSIBILITY, ANDROID_PAGES)
         val DROIDTOP_PAGES = listOf(COMPANION_SETTINGS, DOWNLOADS)
 
         /** Pages a person can choose as a tab of its own; they are never listed under More, their tab lists them. */
@@ -699,9 +713,11 @@ private fun areaTitle(pages: List<CompanionTab>): String =
 @Composable
 private fun CompanionPage(id: String) {
     when (id) {
-        CompanionTab.SYSTEM.id -> CompanionSystemTab()
+        // System keeps the cards no page holds (the Quick Menu's System section and Connections).
+        CompanionTab.SYSTEM.id -> CompanionSystemTab(only = setOf("system", "connections"))
         CompanionTab.NETWORK.id -> CompanionNetworkTab()
         CompanionTab.APPS.id -> CompanionTasksTab()
+        in CompanionTab.CARD_OF_PAGE -> CompanionSystemTab(only = setOf(CompanionTab.CARD_OF_PAGE.getValue(id)))
         CompanionTab.ANDROID_PAGES.id -> CompanionCatalogPage { context -> androidPagesScreen(context) }
         CompanionTab.COMPANION_SETTINGS.id -> CompanionCatalogPage { context ->
             dev.droidtop.library.settings.GamingSettingsCatalog.companionScreen(context)
