@@ -25,6 +25,11 @@ import java.io.File
  *   Proton's GStreamer has no asfdemux. The base system's does (gst-plugins-ugly) but has no WMV decoder, so asfdemux
  *   took the file, found no decoder ("not-negotiated") and the game waited for its video for good. [GST_FEATURE_RANK]
  *   takes asfdemux out of autoplugging, so the converter gets ASF as it does under Proton and plays the blank video.
+ * - The blank video itself: Proton's blank.mkv is AV1, which this Wine's winegstreamer has no mapping for
+ *   ("wg_format_from_caps: Unhandled caps video/x-av1") and the image no decoder, so Media Foundation's source reader
+ *   never produced a sample and Unity asked for one forever (main 3061). droidtop's blank.mkv is the same 4 s with
+ *   Proton's Opus audio, but its video is uncompressed I420 (64x48, 5 fps, V_UNCOMPRESSED), which matroskademux
+ *   hands over as video/x-raw and winegstreamer maps today.
  */
 internal object WineMediaConverter {
     private val BLANKS = listOf("blank.mkv", "blank.mka", "blank.ptna")
@@ -58,8 +63,11 @@ internal object WineMediaConverter {
         val blankDir = File(context.filesDir, "mediaconv").apply { mkdirs() }
         for (name in BLANKS) {
             val out = File(blankDir, name)
-            if (out.isFile && out.length() > 0) continue
-            context.assets.open("mediaconv/$name").use { input -> out.outputStream().use { input.copyTo(it) } }
+            // Replaced when it differs from the asset in size: an install that unpacked Proton's AV1 blank.mkv gets
+            // droidtop's uncompressed one (#897). The assets are small, so reading one to compare costs little.
+            val bytes = context.assets.open("mediaconv/$name").use { it.readBytes() }
+            if (out.isFile && out.length() == bytes.size.toLong()) continue
+            out.writeBytes(bytes)
         }
         val dir = File(prefixRoot, "mediaconv").apply { mkdirs() }
         resetDumps(dir)
