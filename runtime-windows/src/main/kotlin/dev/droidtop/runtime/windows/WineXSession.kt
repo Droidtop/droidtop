@@ -158,6 +158,11 @@ class WineXSession(
             // so the same game keeps the same prefix no matter which
             // container was activated last.
             put("WINEPREFIX", File(prefix.rootDir, ".wine").absolutePath)
+            // Proton's media converter, which Media Foundation decodes through, needs its files named
+            // (WineMediaConverter, Droidtop/tracker#897); set before the prefix's own variables, which win.
+            runCatching { WineMediaConverter.prepare(context, prefix.rootDir) }
+                .onSuccess { it.forEach { (name, value) -> put(name, value) } }
+                .onFailure { Log.w("droidtop.wine", "Couldn't prepare the media converter's files: ${it.message}") }
             // Errors only, from every channel: what a failed launch needs to be read afterwards (console,
             // 2026-10-17), bounded where the full trace would flood the output tail; a prefix's own WINEDEBUG,
             // set below, still wins.
