@@ -86,4 +86,27 @@
     <string name="your_play_all_time">All time</string>
     <string name="your_play_most_played">Most played</string>
     <string name="your_play_by_system">By system</string>
+    <!-- Requirements (Droidtop/tracker#830, SPEC "Permissions", One wording): what does not work yet, and the granted thing as a noun. -->
+    <string name="requirement_action_allow">Allow</string>
+    <string name="requirement_action_set_up">Set up</string>
+    <string name="requirement_all_files_missing">Game folders can\'t be read yet</string>
+    <string name="requirement_all_files_allowed">Your game folders</string>
+    <string name="requirement_notifications_missing">Notifications can\'t show here yet</string>
+    <string name="requirement_notifications_allowed">Your notifications</string>
+    <string name="requirement_usage_missing">Recent apps can\'t show all yet</string>
+    <string name="requirement_usage_allowed">Which apps you used</string>
+    <string name="requirement_install_missing">droidtop can\'t update itself yet</string>
+    <string name="requirement_install_allowed">Installing droidtop\'s updates</string>
+    <string name="requirement_write_settings_missing">Brightness can\'t change yet</string>
+    <string name="requirement_write_settings_allowed">Brightness and screen settings</string>
+    <string name="requirement_dnd_missing">Do Not Disturb can\'t switch yet</string>
+    <string name="requirement_dnd_allowed">Do Not Disturb</string>
+    <string name="requirement_post_notifications_missing">Download progress can\'t show yet</string>
+    <string name="requirement_post_notifications_allowed">droidtop\'s notifications</string>
+    <string name="requirement_overlay_missing">The overlay can\'t show over games yet</string>
+    <string name="requirement_overlay_allowed">Showing over other apps</string>
+    <string name="requirement_wifi_name_missing">This Wi-Fi can\'t be named yet</string>
+    <string name="requirement_wifi_name_allowed">The Wi-Fi\'s name</string>
+    <string name="requirement_home_missing">Home can\'t open droidtop yet</string>
+    <string name="requirement_home_allowed">droidtop as your Home</string>
 </resources>
