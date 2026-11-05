@@ -11529,7 +11529,11 @@ validate-before-replace:
   anyFileNameIn/dirNamePrefixCount/fileHeadRegex, plus `builtin` naming
   a code probe for byte-magic checks JSON can't express — Godot's GDPC
   trailer, Unity's depth-limited player search, the HTML row's
-  root-page probe),
+  root-page probe; a loose `.pck` counts for Godot only when it starts
+  with `GDPC`, as Enginehost's `GodotPack` checks, not for its extension
+  alone (2026-11-05, Droidtop/tracker#873; `swf` stays Enginehost-only on
+  purpose: droidtop skips the `flash-swf` row and a `.swf` keeps the
+  players-database path),
   `strategies` (launch priority, as before — availability stays code so
   a bad download can never make an unlaunchable strategy launch), and
   `enginehost` (the family/context/extras/versionSelectorFallback

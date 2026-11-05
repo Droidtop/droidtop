@@ -14,7 +14,7 @@ class LoveAndLooseGodotTest {
 
     private val defs = EngineRegistryParser.parse(SeedAssets.read("engines-database.json"))
 
-    private fun file(path: String, text: String = "x") {
+    private fun file(path: String, text: String = if (path.endsWith(".pck")) "GDPC" else "x") {
         val f = File(tmp.root, path)
         f.parentFile?.mkdirs()
         f.writeText(text)
