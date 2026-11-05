@@ -17,6 +17,16 @@ class SourceFailuresTest {
     }
 
     @Test
+    fun `droidtop's own browser-check refusal handed back in a failure is the check, not a link`() {
+        // Droidtop/tracker#881: F95zone 0.4.0 wrapped the broker's refusal in FAILED, and the host name read as a link.
+        assertEquals(SourceFailures.NEEDS_BROWSER_CHECK, SourceFailures.plain(SiteChecks.refusal("f95zone.to")))
+        assertEquals(SourceFailures.NEEDS_BROWSER_CHECK, SourceFailures.forCode(PluginErrorCode.FAILED, "Request failed: " + SiteChecks.refusal("f95zone.to")))
+        assertEquals(SourceFailures.NEEDS_BROWSER_CHECK, SourceFailures.plain("BROWSER_CHECK_REQUIRED"))
+        // A site name alone is still a link, and droidtop does not show it as the sentence.
+        assertEquals(SourceFailures.SEE_DETAILS, SourceFailures.plain("See f95zone.to for more"))
+    }
+
+    @Test
     fun `a platform exception becomes not ready, not its text`() {
         val text = "PlatformException(channel-error, Unable to establish connection on channel: dev.flutter.pigeon.path_provider_android.PathProviderApi.getApplicationDocumentsPath, null, null)"
         assertEquals(SourceFailures.NOT_READY, SourceFailures.plain(text))

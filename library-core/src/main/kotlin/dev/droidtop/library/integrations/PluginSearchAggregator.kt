@@ -129,7 +129,10 @@ object PluginSearchAggregator {
         val access = when (reply?.code) {
             PluginErrorCode.SIGN_IN_REQUIRED -> PluginWebAccount.Need.SIGN_IN
             PluginErrorCode.BROWSER_CHECK_REQUIRED -> PluginWebAccount.Need.BROWSER_CHECK
-            else -> null
+            // droidtop's own browser-check refusal, handed back inside the source's own failure (Droidtop/tracker#881).
+            else -> PluginWebAccount.Need.BROWSER_CHECK.takeIf {
+                SourceFailures.plain(reply?.message ?: said) == SourceFailures.NEEDS_BROWSER_CHECK
+            }
         }
         val permission = if (access == null) SourceFailures.permissionOff(reply?.message ?: said, reply?.code) else null
         val sentence = when (access) {

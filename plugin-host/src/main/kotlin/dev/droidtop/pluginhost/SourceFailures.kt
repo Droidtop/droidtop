@@ -74,6 +74,7 @@ object SourceFailures {
     private const val PLAIN_MAX_CHARS = 140
     private const val TECHNICAL_MAX_CHARS = 400
 
+    private val BROWSER_CHECK = Regex("\\bbrowser[ _-]?check")
     private val STATUS_CODE = Regex("\\b(401|403)\\b")
     private val TOO_MANY = Regex("\\b429\\b")
     private val LOG_IN = Regex("\\b(log ?in|sign ?in)\\b")
@@ -99,6 +100,10 @@ object SourceFailures {
         if (text.isEmpty()) return GENERIC
         val lower = text.lowercase()
         return when {
+            // droidtop's own browser-check refusal (SiteChecks.refusal), handed back by a plugin inside a failure of its
+            // own: the check is what to do, never "It could not do that" because the sentence names the site
+            // (Droidtop/tracker#881: F95zone's settings page on BlueStacks).
+            SiteChecks.REFUSAL_MARK in lower || BROWSER_CHECK.containsMatchIn(lower) -> NEEDS_BROWSER_CHECK
             SIGN_IN_WORDS.any { it in lower } || STATUS_CODE.containsMatchIn(lower) || LOG_IN.containsMatchIn(lower) -> SIGN_IN
             "too many requests" in lower || "rate limit" in lower || TOO_MANY.containsMatchIn(lower) -> SLOW_DOWN
             "did not answer in time" in lower || "timed out" in lower || "timeout" in lower -> TIMED_OUT

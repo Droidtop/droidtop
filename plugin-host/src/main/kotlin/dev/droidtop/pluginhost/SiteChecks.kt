@@ -72,5 +72,11 @@ object SiteChecks {
     }
 
     /** The plain sentence a plugin gets for a check on [host]: never the page. */
-    fun refusal(host: String): String = "$host checks the browser first; open it in droidtop to continue"
+    fun refusal(host: String): String = "$host $REFUSAL_MARK; open it in droidtop to continue"
+
+    /**
+     * The words every [refusal] carries, so droidtop knows its own sentence when a plugin hands it back inside a
+     * failure of its own (a plugin built before the shared codes passed through, Droidtop/tracker#881).
+     */
+    const val REFUSAL_MARK = "checks the browser first"
 }

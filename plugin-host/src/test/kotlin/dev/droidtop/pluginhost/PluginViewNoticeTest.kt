@@ -164,4 +164,14 @@ class PluginViewNoticeTest {
         assertEquals(PluginViewLimits.tones, setOf("info", "caution", "danger"))
         assertTrue("has full access" in PluginViewLimits.reservedTitles)
     }
+
+    @Test
+    fun `a failure carrying droidtop's browser-check refusal offers Open the site`() {
+        // Droidtop/tracker#881: the plugin's own FAILED around SiteChecks.refusal, on F95zone's settings page.
+        val n = PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.FAILED, SiteChecks.refusal("f95zone.to")), emptySet(), "Couldn't finish")
+        assertEquals(SourceFailures.NEEDS_BROWSER_CHECK, n.subtitle)
+        assertEquals(PluginWebAccount.Need.BROWSER_CHECK, n.opensAccount)
+        val coded = PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.BROWSER_CHECK_REQUIRED, "x"), emptySet(), "Couldn't finish")
+        assertEquals(PluginWebAccount.Need.BROWSER_CHECK, coded.opensAccount)
+    }
 }

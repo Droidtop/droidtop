@@ -402,7 +402,12 @@ object PluginViewCall {
                 action = ViewAction.parse(reply.action)?.copy(title = "Sign in")
             }
             PluginErrorCode.BROWSER_CHECK_REQUIRED -> opensAccount = PluginWebAccount.Need.BROWSER_CHECK
-            else -> if (sentence == SourceFailures.SIGN_IN) opensAccount = PluginWebAccount.Need.SIGN_IN
+            // A failure whose words are a sign-in or a browser check offers that, whatever code the plugin gave it: a
+            // plugin that wraps droidtop's own refusal in FAILED still gets Open the site (Droidtop/tracker#881).
+            else -> when (sentence) {
+                SourceFailures.SIGN_IN -> opensAccount = PluginWebAccount.Need.SIGN_IN
+                SourceFailures.NEEDS_BROWSER_CHECK -> opensAccount = PluginWebAccount.Need.BROWSER_CHECK
+            }
         }
         val said = (reply.detail ?: reply.message)?.takeIf { it.isNotBlank() }
         val details = listOfNotNull(reply.code?.name, said).joinToString(": ")

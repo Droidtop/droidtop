@@ -20188,6 +20188,15 @@ A condition the person should know about (an unofficial plugin, a feature that i
 **What droidtop draws instead of every plugin (Droidtop/tracker#544, decided 2026-10-15).** The rule: the plugin API is the only boundary between droidtop and anything outside it, and the person never has to learn the plugin machinery, so each thing every plugin hand-made is droidtop's job, in droidtop's words. A plugin reports a state; droidtop says it and acts on it.
 - **A site that checks the browser (2026-10-23, Droidtop/tracker#600).** The owner: "f95 has gotten more aggressive with cloudflare filtering. F95checker has gotten better at allowing users to solve the captcha. we need to do the same. Requiring user interaction breaks automated/bot workflows, but this is an application a user is using, so we don't really have to care about that". Generic, for every plugin, the way F95Checker does it (its forum requests carry its web view's user agent and cookies; a challenge opens its web view on the site, and the request is made again after):
   - **Found by droidtop, not the plugin** (`SiteChecks`): a `net.request` or `web.session fetch` answer that is a challenge (a 403, 429 or 503 with Cloudflare's or DDoS-Guard's challenge page, or Cloudflare's `cf-mitigated: challenge`) reaches the plugin as `BROWSER_CHECK_REQUIRED` with one plain sentence, never the page, and droidtop remembers where the check was met (in memory). It is logged under `droidtop.SiteChecks`.
+  - **droidtop knows its own sentence when a plugin hands it back (2026-11-05, Droidtop/tracker#881).** On BlueStacks
+    F95zone's settings page said "It could not do that. What it said is under Technical details" while the log had
+    `f95zone.to answered with a browser check (403)`: the plugin (0.4.0) wrapped the broker's `BROWSER_CHECK_REQUIRED`
+    in a `FAILED` of its own, and the sentence, which names the site, read as a link. Every refusal now carries one
+    mark (`SiteChecks.REFUSAL_MARK`, "checks the browser first"), and a failure whose words carry it, or say "browser
+    check", is the check whatever its code (`SourceFailures.plain`): a page's notice says "The site checks the browser
+    first" with Open the site, which opens it in droidtop's web view with the source's session and reads the page
+    again (`PluginViewCall.errorNotice`, `PluginViews.accountNotice`); a source's row in the one search does the same
+    (`PluginSearchAggregator.failureOutcome`). For every source, whatever its age.
   - **Recognition is shared (2026-10-29, Droidtop/tracker#751 slice 1).** Telling a check from a page, the clearance
     cookies, `mergeCookies`, the web view's pass test and the `Clearance` model are droidtop-shared's `:sitecheck`
     (`SiteCheck`, `Clearance`), compiled into `:runtime-common` beside the other shared modules, so Enginehost tells a check
