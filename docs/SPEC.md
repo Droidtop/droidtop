@@ -5169,15 +5169,17 @@ droidtop 0.2.0-dev.1931).
   only while that tile is on a Home that is on screen); a stat tile is not a live region. A pin for a control that needs the helper app is not
   drawn without it; a pin whose grant is missing shows its grant row. Kid and Kiosk keep volume and brightness,
   cannot edit, and Home shows nothing past the pins there (`ControlAccess`). Then the sections:
-  1. **Now**: the running game (`LaunchDisplay.running`, the same parked launch the running game's L2 sheet
-     uses, now an observable flow carrying when the session started): art, name, this session's time, Resume
+  1. **Now**, headed by the game's name in place of "Now" (the card does not repeat it; folded, the heading's line
+     reads "Now playing" or the system): the running game (`LaunchDisplay.running`, the same parked launch the running game's L2 sheet
+     uses, now an observable flow carrying when the session started): art, this session's time, Resume
      (a relaunch of the entry, the Quick Menu's resume), Quit (`Library.quitRunning`, the one quit path both
      surfaces call, which clears the running state only on a confirmed end) and Controls (the System tab).
      It follows `LaunchDisplay.running`, so a session `SessionMonitor` ends disappears from it with no check of its
      own. With nothing running it is the game focused
      in the shell: system, title, developer, publisher, year, genre, playtime, last played, the player that
-     will run it (`resolvePlayer`, read off the main thread), PC store facts, an available update, three lines
-     of description, and Play. Achievements are on a game's own detail screen (7h, "RetroAchievements"), not here.
+     will run it (`resolvePlayer`, read off the main thread), PC store facts, an available update, and Play. The
+     store description is not on this card: it stays on the game's page (Droidtop/tracker#786 addendum 2, from the
+     RP5 capture: "The NOW card prints the store description on a control surface"). Achievements are on a game's own detail screen (7h, "RetroAchievements"), not here.
   2. **Continue playing** and **Recently added**: `CompanionRail`, ten 80dp 2:3 capsules each, tap or A
      launches through the one launch path; Recently added uses the library's first-seen time, an app's install
      time as the fallback, and leaves out rows with neither. Both rails draw from the list the shell's own Home

@@ -102,21 +102,34 @@ internal fun CompanionTile(
 
 /**
  * A section's heading: the label in small tracked capitals, a one-line [summary] beside it, and the fold
- * mark. The whole row is the fold control (48dp tall).
+ * mark. The whole row is the fold control (48dp tall). A heading that is a [name] (Home's game card is headed by
+ * the game, Droidtop/tracker#786 addendum 2) is drawn as a title, in the name's own case.
  */
 @Composable
-internal fun CompanionSectionHeader(label: String, open: Boolean, summary: String? = null, onToggle: () -> Unit) {
+internal fun CompanionSectionHeader(label: String, open: Boolean, summary: String? = null, name: Boolean = false, onToggle: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     CompanionTile(onClick = onToggle, shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 4.dp),
         ) {
-            Text(
-                label.labelCase(),
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp),
-                color = if (open) colors.onBackground else colors.onSurfaceVariant,
-            )
+            if (name) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            } else {
+                Text(
+                    label.labelCase(),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp),
+                    color = if (open) colors.onBackground else colors.onSurfaceVariant,
+                )
+            }
             if (summary != null) {
                 Spacer(Modifier.width(12.dp))
                 Text(
@@ -135,18 +148,22 @@ internal fun CompanionSectionHeader(label: String, open: Boolean, summary: Strin
     }
 }
 
-/** One Home section: its heading (tap to fold, the fold remembered) over its content while open. */
+/**
+ * One Home section: its heading (tap to fold, the fold remembered) over its content while open. [name] heads the
+ * section with a name in place of the section's label.
+ */
 @Composable
 internal fun CompanionHomeSectionFrame(
     section: CompanionHomeSection,
     layout: CompanionHomeLayout,
     summary: String? = null,
+    name: String? = null,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val open = layout.isOpen(section)
     Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-        CompanionSectionHeader(section.label, open, summary.takeIf { !open }) {
+        CompanionSectionHeader(name ?: section.label, open, summary.takeIf { !open }, name = name != null) {
             CompanionHomePrefs.setOpen(context, section, !open)
         }
         if (open) content()
@@ -195,8 +212,10 @@ internal fun CompanionCapsuleArt(entry: LibraryEntry, width: androidx.compose.ui
 }
 
 /**
- * Now: the game running on the other screen (art, name, this session's time, Resume, Quit and the device
- * controls), else the game focused in the Gaming shell (its facts and Play). Nothing to show, no section.
+ * Now: the game running on the other screen (art, this session's time, Resume, Quit and the device controls), else
+ * the game focused in the Gaming shell (its facts and Play). The section is headed by the game's name, so the card
+ * does not say it again (Droidtop/tracker#786 addendum 2: "The section header "NOW" becomes the game's name").
+ * Nothing to show, no section.
  */
 @Composable
 internal fun CompanionNowSection(focused: LibraryEntry?, layout: CompanionHomeLayout) {
@@ -207,9 +226,15 @@ internal fun CompanionNowSection(focused: LibraryEntry?, layout: CompanionHomeLa
     // A game that ended unseen ends the session in SessionMonitor, which `running` already follows.
     val session = running
     val entry = runningEntry ?: focused ?: return
-    CompanionHomeSectionFrame(CompanionHomeSection.NOW, layout, summary = entry.title) {
-        if (runningEntry != null && session != null) {
-            NowRunningCard(runningEntry, session.sinceEpochMs)
+    val playing = runningEntry != null && session != null
+    CompanionHomeSectionFrame(
+        CompanionHomeSection.NOW,
+        layout,
+        summary = if (playing) "Now playing" else systemName(entry),
+        name = entry.title,
+    ) {
+        if (playing) {
+            NowRunningCard(runningEntry!!, session!!.sinceEpochMs)
         } else {
             FocusedGameCard(entry)
         }
@@ -259,7 +284,6 @@ internal fun NowRunningCard(entry: LibraryEntry, sinceEpochMs: Long) {
     }
     NowCardFrame(entry) {
         Eyebrow("Now playing · $played")
-        Text(entry.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(systemName(entry), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         PillRow {
             // Resume is a relaunch of the entry, the Quick Menu's own resume (the one launch path).
@@ -327,7 +351,6 @@ private fun FocusedGameCard(entry: LibraryEntry) {
     }
     NowCardFrame(entry) {
         Eyebrow(systemName(entry))
-        Text(entry.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.onBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
         // The publisher is named only when it is not the developer, which for most PC and engine games it is.
         val details = listOfNotNull(
             entry.developer,
@@ -365,9 +388,6 @@ private fun FocusedGameCard(entry: LibraryEntry) {
                 color = colors.tertiary,
                 modifier = Modifier.clickable { openUpdates(context) },
             )
-        }
-        entry.description?.let { description ->
-            Text(description, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         PillRow {
             CompanionPill("Play", selected = true) { CompanionState.onLaunchEntry?.invoke(entry) }
