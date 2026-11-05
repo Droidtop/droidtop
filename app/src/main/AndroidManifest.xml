@@ -675,6 +675,13 @@
           front, so Settings opened from Desktop was gone after HOME and could
           not be on the bar (Droidtop/tracker#750, rig 2638).
         -->
+        <!-- The image picker for the desktop's background picture (DesktopBackgroundPicture, Droidtop/tracker#694). -->
+        <activity
+            android:name="dev.droidtop.app.DesktopPictureActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name="dev.droidtop.app.CatalogScreenActivity"
             android:exported="false"

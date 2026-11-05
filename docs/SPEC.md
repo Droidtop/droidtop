@@ -599,8 +599,13 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   own look. Desktop settings > "Desktop background" sets the colour droidtop's sway config gives the output
   (`output * bg #RRGGBB solid_color`). "Match droidtop", the default, is droidtop's ground in light or dark;
   Black, Slate, Deep blue and Forest are the others. Only a `#RRGGBB` value is written. Both apply from the next
-  desktop start, which Restart desktop gives at once. A picture as the background, from a game's art or a file,
-  is not built yet: it needs a picker and a copy the container can read, and stays open on #694. Sway's own bar
+  desktop start, which Restart desktop gives at once. "A picture…" (built 2026-11-05, the part of #694 left
+  open after the 2026-11-04 rig run) opens the system's image picker (`DesktopPictureActivity`, on Standard's one
+  `DocumentPickActivity`). droidtop reads the image once, off the main thread, scales it to at most 3840 px on its
+  longer side and keeps it as a PNG beside the panel's config (`DesktopPanel.BACKGROUND_PICTURE_FILE`, which the
+  container reads at `BACKGROUND_PICTURE`); a PNG because sway's `swaybg` draws PNG in every build. The setting
+  moves to the picture only once it is saved, and the config gives `output * bg <picture> fill <droidtop's
+  ground>`, falling back to the colour when the file is gone. A game's art as the background is not built. Sway's own bar
   (the person's own config) and labwc keep their own background.
 - **Start's order and density** (Droidtop/tracker#555 D4, 2026-10-15). Top to bottom: the search row,
   Pinned, Linux apps (what the desktop runs, right after the pins), System, droidtop's places, plugin shelves,

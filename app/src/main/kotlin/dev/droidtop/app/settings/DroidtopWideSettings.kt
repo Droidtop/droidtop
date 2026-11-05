@@ -384,12 +384,18 @@ object DroidtopWideSettings {
                         ChoiceItem(
                             id = "pref_desktop_background",
                             title = "Desktop background",
-                            subtitle = "The colour behind the Linux desktop's windows. Its apps follow droidtop's Light or dark. " +
-                                "Applies when the desktop next starts",
+                            subtitle = "The colour or picture behind the Linux desktop's windows. Its apps follow droidtop's " +
+                                "Light or dark. Applies when the desktop next starts",
                             options = dev.droidtop.runtime.DesktopAppearance.Background.entries.map { ChoiceOption(it.id, it.label) },
                             current = dev.droidtop.app.DesktopSetupPrefs.background(context).id,
                             onSelect = { ctx, value ->
-                                dev.droidtop.app.DesktopSetupPrefs.setBackground(ctx, dev.droidtop.runtime.DesktopAppearance.Background.fromId(value))
+                                val choice = dev.droidtop.runtime.DesktopAppearance.Background.fromId(value)
+                                // A picture is chosen in the system's picker; the setting moves once it is saved.
+                                if (choice == dev.droidtop.runtime.DesktopAppearance.Background.PICTURE) {
+                                    dev.droidtop.app.DesktopBackgroundPicture.choose(ctx)
+                                } else {
+                                    dev.droidtop.app.DesktopSetupPrefs.setBackground(ctx, choice)
+                                }
                             },
                         ),
                         // The rows above that apply "when the desktop next starts" can apply now (Droidtop/tracker#687).
