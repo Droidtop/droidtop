@@ -238,7 +238,7 @@ object DroidtopWideSettings {
                                 "collections and scraped details with the backup's",
                             onPicked = ::readBackup,
                         ),
-                    ),
+                    ) + shareBackupRows(context),
                 ),
                 // Which droidtop this is; seven taps on it turn on the Developer menu, where it then opens from.
                 CatalogGroup(
@@ -768,10 +768,13 @@ object DroidtopWideSettings {
         "Backup failed. Check there is space left on the storage you chose and try again."
     }
 
-    /** The settings file as JSON, with the credentials only when the person chose to back them up (encoded). */
-    private fun settingsJson(context: Context): JSONObject {
+    /**
+     * The settings file as JSON, with the credentials only when the person chose to back them up (encoded) and
+     * [mayCarryCredentials]: a backup sent to a share the person trusts in plain never carries them (SPEC 7p).
+     */
+    private fun settingsJson(context: Context, mayCarryCredentials: Boolean = true): JSONObject {
         val json = JSONObject()
-        val includeCredentials = CatalogPrefs.prefs(context).getBoolean(KEY_BACKUP_CREDENTIALS, false)
+        val includeCredentials = mayCarryCredentials && CatalogPrefs.prefs(context).getBoolean(KEY_BACKUP_CREDENTIALS, false)
         val credentials = JSONObject()
         for ((key, value) in CatalogPrefs.prefs(context).all) {
             if (key == KEY_BACKUP_CREDENTIALS) continue
@@ -803,18 +806,21 @@ object DroidtopWideSettings {
      * A droidtop backup archive (a zip), or a settings file from before the archive (JSON): the settings apply now,
      * and an archive's files wait for the next start ([DroidtopBackup.finishPendingRestore]).
      */
-    private fun readBackup(context: Context, uri: Uri): String = runCatching {
-        val head = context.contentResolver.openInputStream(uri)?.use { stream -> ByteArray(2).also { stream.read(it) } }
+    private fun readBackup(context: Context, uri: Uri): String = readBackupFrom(context) { context.contentResolver.openInputStream(uri) }
+
+    /** [readBackup] from whatever [open] opens anew each time it is called: a picked file, or a file fetched from a share. */
+    private fun readBackupFrom(context: Context, open: () -> java.io.InputStream?): String = runCatching {
+        val head = open()?.use { stream -> ByteArray(2).also { stream.read(it) } }
             ?: error("the file could not be opened")
         if (head[0] == 'P'.code.toByte() && head[1] == 'K'.code.toByte()) {
-            val staged = DroidtopBackup.stage(context, uri)
+            val staged = open()?.use { DroidtopBackup.stage(context, it) } ?: error("the file could not be opened")
             staged.settings?.let { applySettings(context, it) }
             val plugins = if (staged.plugins.isEmpty()) "" else
                 " Reinstall these plugins from Plugins: ${staged.plugins.joinToString(", ")}."
             return@runCatching "Restored the settings. The rest (${staged.files} files) is put in place the next time droidtop " +
                 "starts: restart droidtop now.$plugins"
         }
-        val text = context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }
+        val text = open()?.use { it.bufferedReader().readText() }
             ?: error("the file could not be opened")
         applySettings(context, JSONObject(text))
         "Restored. Restart droidtop for every setting to apply."
@@ -822,6 +828,75 @@ object DroidtopWideSettings {
         android.util.Log.w("droidtop.settings", "Restore failed", it)
         "Restore failed. Check that the file is a droidtop backup and try again."
     }
+
+    /**
+     * Back up droidtop to one of the person's shares, and restore from one (docs/SPEC.md 7p, Droidtop/tracker#573): one
+     * row per share under Restore droidtop. Nothing is shown until a share is added. Preferences: off the main thread.
+     */
+    private fun shareBackupRows(context: Context): List<dev.droidtop.library.settings.CatalogItem> =
+        dev.droidtop.library.storage.StorageShares.all(context).map { share ->
+            val id = "pref_global_share_backup_${share.id}"
+            dev.droidtop.library.settings.NestedScreenItem(
+                id = id,
+                title = "Back up to ${share.name}",
+                subtitle = if (share.trusted) "In plain on your share; sign-ins are never included" else "Locked: only this device can open it",
+                inline = dev.droidtop.library.settings.CatalogScreen(
+                    id = "${id}_screen",
+                    title = share.name,
+                    groups = { ctx ->
+                        val backups = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ShareBackups.list(ctx, share) }
+                        listOf(
+                            CatalogGroup(
+                                id = "${id}_now",
+                                title = null,
+                                items = listOf(
+                                    AsyncActionItem(
+                                        id = "${id}_run",
+                                        title = "Back up now",
+                                        subtitle = "Settings, game records, play history, favourites, collections, scraped details and the " +
+                                            "list of plugins. Earlier backups on the share are kept",
+                                        run = { c, onStatus ->
+                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                onStatus("Backing up...")
+                                                ShareBackups.backUp(c, share) { out -> DroidtopBackup.write(c, out, settingsJson(c, mayCarryCredentials = !share.trusted)) }
+                                            }
+                                        },
+                                    ),
+                                ),
+                            ),
+                            CatalogGroup(
+                                id = "${id}_list",
+                                title = "Restore",
+                                items = when (backups) {
+                                    is ShareBackups.Listed.Failed -> listOf(
+                                        dev.droidtop.library.settings.TextBlockItem(id = "${id}_failed", text = backups.line),
+                                    )
+                                    is ShareBackups.Listed.Found -> if (backups.backups.isEmpty()) {
+                                        listOf(dev.droidtop.library.settings.TextBlockItem(id = "${id}_none", text = "No droidtop backups on ${share.name} yet"))
+                                    } else {
+                                        backups.backups.map { backup ->
+                                            AsyncActionItem(
+                                                id = "${id}_restore_${backup.path.hashCode()}",
+                                                title = backup.label,
+                                                subtitle = backup.device + if (backup.locked) ", locked" else "",
+                                                confirmTitle = "Restoring replaces this device's game records, play history, favourites, " +
+                                                    "collections and scraped details with the backup's",
+                                                run = { c, onStatus ->
+                                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                        onStatus("Fetching the backup...")
+                                                        ShareBackups.fetch(c, share, backup) { file -> readBackupFrom(c) { file.inputStream() } }
+                                                    }
+                                                },
+                                            )
+                                        }
+                                    }
+                                },
+                            ),
+                        )
+                    },
+                ),
+            )
+        }
 
     /** Writes a backup's settings into the settings file; credentials only from the backup's encoded section. */
     private fun applySettings(context: Context, json: JSONObject) {

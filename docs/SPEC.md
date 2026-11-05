@@ -22588,7 +22588,16 @@ scripts), and the check is recorded in its commit.
 - the computer's Cloud folder as a share (store and forward with no mirrored folder; it waits for droidtop's
   sync-core pin to move to lib-sync 0.1.3 with droidtop-agent's);
 - saves to a share, as a save sync engine using lib-sync's save rule, plain or locked;
-- Back up droidtop to a share;
+- **Back up droidtop to a share (built):** Settings > System > Data gets one "Back up to <share>" row per share,
+  under Restore droidtop (`ShareBackups`).
+  - Back up now writes `DroidtopBackup`'s archive, unchanged, to droidtop's cache and sends it to
+    `droidtop/backups/<device>/droidtop-backup-<UTC stamp>.zip` on the share. `<device>` is the model plus the
+    start of this device's id. The local copy is then removed.
+  - On a Locked share the archive is sealed with this device's own key first (`.zip.locked`).
+  - Sign-ins never go to a Trusted share: "Back up credentials" applies only to picked files and Locked shares.
+  - Every backup is a new file. droidtop never deletes one from a share; the person removes old ones there.
+  - Restore lists every device's backups, newest first, and restores one the same way as Restore droidtop.
+  - A backup locked by another device says so and is not opened.
 - a share in the system file picker and as a games root, through a documents provider;
 - root mounts only through the enhanced privileges provider, as an enhancement.
 
