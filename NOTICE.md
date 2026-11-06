@@ -103,11 +103,11 @@ This project is distributed under the GNU General Public License v3.0 (see
   with its submodules hev-task-system, hev-socks5-core and yaml (MIT) and lwIP
   (BSD-3-Clause). Built into `libhev-socks5-tunnel.so`, the userspace IP
   stack behind droidtop's device VPN.
-- **PulseAudio** — `vendor/pulseaudio` (v13.0), https://github.com/pulseaudio/pulseaudio —
-  LGPL-2.1-or-later (the libraries and modules built here). Built for both ABIs by
-  `build-scripts/build-vendor-deps.sh` with Termux's Android patches and its
-  `module-aaudio-sink.c` (termux-packages, https://github.com/termux/termux-packages,
-  `packages/pulseaudio` at 39437706663c), kept in `build-scripts/pulseaudio-patches/`.
+- **PulseAudio** — `vendor/pulseaudio` (v13.0), https://github.com/Droidtop/pulseaudio (branch `droidtop`, a fork
+  of https://github.com/pulseaudio/pulseaudio) — LGPL-2.1-or-later (the libraries and modules built here). Built for
+  both ABIs by `build-scripts/build-vendor-deps.sh`. The branch carries, as commits, Termux's Android changes and its
+  `module-aaudio-sink.c` (termux-packages, https://github.com/termux/termux-packages, `packages/pulseaudio` at
+  39437706663c), and upstream's atomic.h fix backported to 13.0.
 - **libsndfile** — `vendor/libsndfile` (1.0.28), https://github.com/libsndfile/libsndfile — LGPL-2.1-or-later.
 - **libltdl** — GNU libtool's libltdl, from the build host's `libltdl-dev` — LGPL-2.1-or-later.
 - **dxbc** — DXVK's DXBC compiler as PancakeTAS/dxbc carried it for

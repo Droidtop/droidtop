@@ -269,7 +269,7 @@ internal class HostAudioServer(private val context: Context) {
          * container that has the shared socket directory bound, same
          * trust boundary as the Wayland and CUPS sockets beside it), and
          * the AAudio sink module module-aaudio-sink.c
-         * (build-scripts/pulseaudio-patches) exists for. Pure so it is
+         * (Droidtop/pulseaudio's droidtop branch) exists for. Pure so it is
          * testable without touching a filesystem.
          */
         internal fun defaultPaConfig(socketPath: String, micPipePath: String? = null): String =

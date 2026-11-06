@@ -386,10 +386,11 @@ echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
 #   libltdl      the standalone libltdl tree libltdl-dev installs under
 #                /usr/share/libtool (already on the apt list).
 #   libsndfile   vendor/libsndfile at 1.0.28, the version in the arm64 set.
-#   PulseAudio   vendor/pulseaudio at v13.0; the file names carry 13.0.
-#                Termux's Android patches of its 13.0 package and its
-#                module-aaudio-sink.c (build-scripts/pulseaudio-patches,
-#                the sink extended with the arguments GameNative passes).
+#   PulseAudio   vendor/pulseaudio: Droidtop/pulseaudio's droidtop branch,
+#                v13.0 with Termux's Android changes of its 13.0 package
+#                and its module-aaudio-sink.c (the sink extended with the
+#                arguments GameNative passes) as commits
+#                (Droidtop/tracker#921); the file names carry 13.0.
 #                Configured as GameNative's arm64 set was: no speex or
 #                soxr (its libpulsecore has no speex resampler), no memfd.
 #                ac_cv_header_glob_h=no: bionic has glob() only from
@@ -434,10 +435,6 @@ echo "=== PulseAudio 13.0, libsndfile, libltdl ($ABI) ==="
     rm -f .git
     # A shallow submodule has no tags for git-version-gen to describe.
     echo -n 13.0 > .tarball-version
-    PA_PATCHES="$REPO_ROOT/build-scripts/pulseaudio-patches"
-    for pa_patch in "$PA_PATCHES"/*.patch; do patch -p1 --forward < "$pa_patch"; done
-    mkdir -p src/modules/aaudio
-    cp "$PA_PATCHES/module-aaudio-sink.c" src/modules/aaudio/
     autoreconf --force --install
     PKG_CONFIG_LIBDIR="$PA_PREFIX/lib/pkgconfig" \
     CPPFLAGS="-I$PA_PREFIX/include" LDFLAGS="-L$PA_PREFIX/lib" \

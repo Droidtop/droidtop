@@ -25332,8 +25332,10 @@ gamenative's code actually calls:
   `vendor/SDL2`'s headers; it dlopens SDL at run time), and PulseAudio 13.0 (`libpulse`, `libpulseaudio`,
   `libpulsecommon-13.0`, `libpulsecore-13.0`) with libsndfile 1.0.28 and
   libltdl, built by `build-scripts/build-vendor-deps.sh` from
-  `vendor/pulseaudio` and `vendor/libsndfile` with Termux's 13.0-era
-  Android patches. The AAudio sink is Termux's `module-aaudio-sink.c`
+  `vendor/pulseaudio` and `vendor/libsndfile`. `vendor/pulseaudio` is
+  Droidtop/pulseaudio's `droidtop` branch: 13.0 with Termux's 13.0-era
+  Android changes as commits, never patched at build time
+  (Droidtop/tracker#921). The AAudio sink is Termux's `module-aaudio-sink.c`
   extended with the `volume`, `performance_mode` and `low_latency`
   arguments GameNative's `default.pa` passes; its modules and `pactl` go
   in `pulseaudio-gamenative-x86_64.tzst`, the x86_64 counterpart of the

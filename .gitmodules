@@ -35,8 +35,9 @@
 	shallow = true
 [submodule "vendor/pulseaudio"]
 	path = vendor/pulseaudio
-	url = https://github.com/pulseaudio/pulseaudio
+	url = https://github.com/Droidtop/pulseaudio
 	shallow = true
+	branch = droidtop
 [submodule "vendor/libsndfile"]
 	path = vendor/libsndfile
 	url = https://github.com/libsndfile/libsndfile
