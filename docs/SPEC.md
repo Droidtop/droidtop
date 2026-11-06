@@ -9471,7 +9471,8 @@ proposal) is not built; these helpers are in the one settings tree that already 
 
 - **Four shapes, one setting per orientation.** "Key grid shape" (`KeyboardForm`, JVM tested): full width, split, or
   one-handed at the left or right edge. The Layout button on the tool strip cycles the current orientation's shape (in a
-  keyboard droidtop embeds; in the input method the strip's Mode button replaces it, "Modes" below, H12c).
+  keyboard droidtop embeds; in the input method the strip's Mode button replaces it and offers the same shapes, and the
+  input method draws a one-handed shape as H12c's resizable one-handed mode, "Modes" below).
   Since 2026-11-05 (Droidtop/tracker#903 H1) portrait and landscape each have their own, as Hacker's Keyboard's height
   and mode settings always have ("Key grid shape, portrait" and "Key grid shape, landscape"). Each defaults to
   Automatic: full width, except landscape on a handheld, which is split, so on the console each thumb reaches its half
@@ -9709,18 +9710,29 @@ remembered per orientation; a thumb-split mode on wide screens, beyond H1's land
 add-on screen; a number and calculator pad mode. "Each mode is reachable from the tool strip and by the pad." The modes
 are in addition to Hacker's own layouts (4-row, 5-row, full), never replacing them.
 
-- **A mode is a presentation of the same keyboard** (`KeyboardModes`, JVM tested). The input method keeps one per
-  orientation (`pref_keyboard_view_mode`, `pref_keyboard_view_mode_landscape`): Normal (the default), One-handed left,
-  One-handed right, Floating, Thumb split, Number pad. Normal is the keyboard as it was: Hacker's layout mode, height,
-  every key and setting, and the key grid shape setting above (H1), none of which a mode writes. So choosing Normal
-  again gives back exactly what was there. A mode only changes where and how big the keys are drawn (a `KeyboardForm`
-  the same `Keyboard.applyForm` lays out, so every layout, locale and Fn layer has it), or, for the number pad, which
-  keys. A change rebuilds the keys and the view, as a shape change does (`GlobalKeyboardSettings`).
+- **A mode is a presentation of the same keyboard** (`KeyboardModes`, JVM tested), one per orientation: Normal (the
+  default), Split, One-handed left, One-handed right, Floating, Thumb split, Number pad. Hacker's layout mode (4-row,
+  5-row, full), height, keys and settings are never written by a mode. A mode only changes where and how big the keys
+  are drawn (a `KeyboardForm` the same `Keyboard.applyForm` lays out, so every layout, locale and Fn layer has it), or,
+  for the number pad, which keys. A change rebuilds the keys and the view, as a shape change does
+  (`GlobalKeyboardSettings`).
+- **One store per job (decided 2026-11-06, the coordinator's review of the first H12c build: the Modes chooser had
+  replaced the Layout button with no plain Split on a handheld, so H1's split lost its strip route in the input method,
+  and there were two one-handed widths).** Normal, Split and One-handed left or right are the key grid shape setting's
+  own values (`pref_keyboard_form[_landscape]`: full, split, left, right), and the chooser writes them exactly as the
+  Layout button does (`KeyboardModes.writes`): Normal stores "full", Split "split", one-handed "left" or "right". The
+  mode setting (`pref_keyboard_view_mode[_landscape]`) holds only what a shape cannot say: floating, the thumb split
+  and the number pad (choosing one leaves the shape as it is; choosing Normal or a shape sets the mode back to normal).
+  What the input method draws and the chooser lights is read from both (`KeyboardModes.chosen`), with H1's automatic
+  default applied first, so on a handheld held sideways with nothing chosen the chooser lights Split. The chooser, the
+  settings and an embedded keyboard's Layout button therefore always agree. Split is offered on every screen, as H1's
+  split is; the thumb split stays the wide-screen extra.
 - **Reached from the tool strip and by the pad.** In the input method the strip's Layout button becomes **Mode: Normal**
-  (or the mode's name), which opens a chooser over the keys listing the modes, the current one lit; the thumb split is
-  listed only where the screen is wide enough. The pad reaches it through the strip ("A pad on the keyboard" above). The
-  keyboard's settings also list both orientations' modes (Editing helpers; on the short screen too), so a mode is
-  reachable with the strip switched off. Keyboards droidtop embeds (`KeyboardPanel`) have no modes and keep the Layout
+  (or the mode's name), which opens a chooser over the keys listing the modes, the current one lit; it holds every
+  shape the Layout button cycled (full as Normal, split, left, right), and the thumb split is listed only where the
+  screen is wide enough. The pad reaches it through the strip ("A pad on the keyboard" above). The
+  keyboard's settings also list both orientations' modes (Editing helpers; on the short screen too: Normal, which is
+  the key grid shape above, Floating, Thumb split, Number pad), so every mode is reachable with the strip switched off. Keyboards droidtop embeds (`KeyboardPanel`) have no modes and keep the Layout
   button; there `KeyboardModes.current` always answers Normal.
 - **One-handed** (`OneHandedFrame`, ported from HeliBoard's `KeyboardWrapperView`, GPL-3.0): the keys at the left or
   right edge at a stored share of the width (80% by default, held between 50% and 90%,
@@ -9728,8 +9740,14 @@ are in addition to Hacker's own layouts (4-row, 5-row, full), never replacing th
   keys' height: back to the full keyboard (Normal), switch side, and a resize handle. The handle is dragged sideways;
   it follows the finger and shows the width it would give, and on release the width is kept for this orientation and
   the keys are built at it (HeliBoard rebuilds on every move; Hacker's keys are heavier to build). The strip, when on,
-  stays full width above. With the strip off the controls still show. The key grid shape setting's own one-handed
-  choices stay as they were, a fixed 70%, as Normal's shape and in droidtop's embedded keyboards.
+  stays full width above. With the strip off the controls still show. In the input method this is the only
+  one-handed: the shape setting's "One-handed, left/right" is the same choice and draws this, at the kept width, with
+  these controls; back to full stores "full" and switch side stores the other edge, both in the shape setting. The
+  keyboards droidtop embeds keep the shape's fixed 70% and their Layout button unchanged.
+  - **Migration** (`KeyboardModes.migrate`, once, after H1's): a "left" or "right" the first H12c build kept in the mode
+    setting moves to the shape setting (the mode back to normal; its width kept); a one-handed shape chosen before H12c
+    keeps its 70% as the one-handed width, unless a width is already kept. Nothing else is touched: Hacker's and H1's
+    stored values read as before.
 - **Floating** (`FloatingKeyboardFrame`, after FlorisBoard's floating window, Apache-2.0): the keys and their strip in a
   rounded frame over the app, with a bar along its top (drag to move; Dock goes back to Normal) and a footer under the
   keys whose corner is dragged to resize (an outline shows the new size; on release the keys are built at it). The

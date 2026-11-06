@@ -413,6 +413,7 @@ public class LatinIME extends InputMethodService implements
         mVolUpAction = prefs.getString(PREF_VOL_UP, res.getString(R.string.default_vol_up));
         mVolDownAction = prefs.getString(PREF_VOL_DOWN, res.getString(R.string.default_vol_down));
         KeyboardForm.migrate(prefs); // droidtop patch (Droidtop/tracker#903 H1): shapes per orientation
+        KeyboardModes.migrate(prefs); // droidtop patch (Droidtop/tracker#903 H12c): one store for shapes and modes
         KeyHapticsPlayer.migrate(prefs); // droidtop patch (#903 H12a): Vibrate on keypress becomes Vibration strength
         sKeyboardSettings.initPrefs(prefs, res);
 
