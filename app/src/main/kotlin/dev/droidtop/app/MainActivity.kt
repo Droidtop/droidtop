@@ -831,13 +831,17 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             DesktopSessionService.state.collectLatest { state ->
                 val hostBridge = (state as? DesktopSessionState.Connected)?.hostBridge
                 if (hostBridge == null) {
+                    DesktopPluginClipboard.withdraw(clipboardBridge)
                     clipboardBridge?.stop()
                     clipboardBridge = null
                     return@collectLatest
                 }
+                DesktopPluginClipboard.withdraw(clipboardBridge)
                 clipboardBridge?.stop()
                 clipboardBridge = ClipboardBridge(applicationContext, hostBridge).also {
                     it.start()
+                    // Plugins reach the clipboard through this bridge only (docs/plugin-api.md 1.12).
+                    DesktopPluginClipboard.publish(applicationContext, it)
                     // The Activity is already focused by the time a session
                     // connects, and nothing will tell the new bridge that
                     // unless it is told here -- without this its first read
@@ -1039,6 +1043,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         if (CompanionState.onLaunchEntry === companionLaunchSeam) {
             CompanionState.onLaunchEntry = null
         }
+        DesktopPluginClipboard.withdraw(clipboardBridge)
         clipboardBridge?.stop()
         clipboardBridge = null
         // A shell moved to the other screen has already reported from its new instance.

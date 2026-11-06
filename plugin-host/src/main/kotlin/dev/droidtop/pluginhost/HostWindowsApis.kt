@@ -24,10 +24,14 @@ interface DesktopWindowControl {
     fun close(id: Long): Boolean
 }
 
-/** The one place the Desktop session hands its windows to the plugin API. Null while no desktop runs. */
+/** The one place the Desktop session hands its windows and its clipboard to the plugin API. Null while none runs. */
 object DesktopPluginBridge {
     @Volatile
     var windows: DesktopWindowControl? = null
+
+    /** The clipboard bridge's, while it runs ([HostClipboardApis]). */
+    @Volatile
+    var clipboard: DesktopClipboard? = null
 }
 
 /**

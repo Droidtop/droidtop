@@ -961,6 +961,10 @@ functionality". The contract is docs/plugin-api.md 1.12; what it decides for Des
 - Slice 4 (2026-11-06) is Open with: "Open with droidtop" (4b) lists, after droidtop's own choices, the plugins whose
   `files.handler` associations take the file; picking one hands it a read-only token for the file (D4), never a path,
   and is in its activity log. Only the five kinds 4b's filters take are offered (plugin-api.md 10, Q6).
+- Slice 5 (2026-11-06) is the clipboard and notification bridges: a plugin reads (only on the person's press, as D6
+  decided) and sets the desktop clipboard through 6d's bridge and its one `ClipboardSync`, and is told when it
+  changes; a sensitive copy is never given to a plugin. A plugin's notification also shows as droidtop's notice on
+  the desktop while a session runs.
 
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 
@@ -10119,6 +10123,11 @@ nothing about "the container has no selection" implies they wanted it.
 The middle-click primary selection is not bridged either — Android has no
 counterpart to bridge it to. Both directions cap at 1 MiB and drop rather
 than truncate, so nothing silently lies about what was copied.
+
+**Plugins use the same bridge (Droidtop/tracker#221, 2026-11-06).** `clipboard.get_text` and `clipboard.set_text`
+(docs/plugin-api.md 1.12) go through this bridge (`textForPlugins`, `setFromPlugin`) and its `ClipboardSync`, so a
+plugin's text is echo-checked like the two sides' and capped the same. A copy Android marks sensitive is still
+bridged to the container but never given to a plugin.
 
 **Echo suppression is one object, not two flags.** Pushing to the
 container makes the compositor announce "a new selection"; setting

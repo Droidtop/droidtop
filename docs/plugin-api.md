@@ -1914,7 +1914,8 @@ and one audit log for every plugin, and adds nothing to the images droidtop neve
 - **Open with** (catalogue E4): manifest `associations: [{mime, ext, label}]` lists the plugin in droidtop's Open
   with; its `files.action` facets are about the picked file (`{type: "file", token, mime}`);
 - **the clipboard bridge**: `clipboard.read`, `clipboard.write` and the event `clipboard.changed`, text only, through
-  `ClipboardSync`'s cap and echo suppression, so a plugin cannot loop with the container;
+  `ClipboardSync`'s cap and echo suppression, so a plugin cannot loop with the container. A read is only during a
+  call the person started, as D6 and threat T5 already decided;
 - **the notification bridge**: a plugin's `notify.post` shows in Desktop's own notification area. Reading Linux
   apps' own notifications (`org.freedesktop.Notifications`) would need a listener in the container and is not in
   this design: it is a question for the owner (§10);
@@ -1961,18 +1962,32 @@ cannot make Android offer droidtop for other files, since an app's intent filter
 Whether droidtop should take every file while Desktop is on, so plugins can open any type, is a question for the
 owner (§10, Q6).
 
+**The clipboard and notification bridges, as built (slice 5, 2026-11-06).**
+- `clipboard.get_text` → `{text}` (null with nothing on it) under `clipboard.read`, only during a call the person
+  started (D6, T5: a plugin cannot watch what is copied); `clipboard.set_text {text}` → `{set}` under
+  `clipboard.write`, always audited, at most 1 MiB, refused rather than cut. Both act on the desktop's clipboard
+  through droidtop's own bridge (docs/SPEC.md 6d, `ClipboardBridge.textForPlugins` and `setFromPlugin`), so a
+  plugin's text reaches Android and the container through the one `ClipboardSync` and its echo is dropped there.
+  With no Desktop session both are `UNSUPPORTED`. A copy Android marks sensitive (a password manager's,
+  `ClipDescription.EXTRA_IS_SENSITIVE`) still reaches the container as before, but a plugin reads null.
+- `clipboard.changed` goes to a plugin that subscribed and holds `clipboard.read` as granted, with no args, each
+  counted on its day: it can offer something to press ("Send what you copied"), and the press reads.
+- **Notifications:** while a Desktop session runs, a plugin's `notify.post` (its own permission and hourly cap) is
+  also droidtop's notice on the desktop, led by the plugin's name and kept in Recent, for a plugin that is on in
+  Desktop (its mode switch, §1.9) (`AppBrokerEnvironment.desktopNotice`). Linux apps' own notifications are §10, Q5.
+
 **Not offered:** input into another application's window (a keylogger's and an autoclicker's tool; a `shortcut` on
 an action, below, covers the legitimate uses), and capturing a window's picture (windowcast's, by the standing rule).
 
 **What the person approves.** Each permission above, each target (`facets:desktop.tray`, `facets:desktop.window`,
 `facets:files.action`) and each association is its own row on the plugin's approval list (§4.2, Droidtop/tracker#164).
-`windows.read`, `windows.control`, `clipboard.read` and `clipboard.write` are dangerous and start unticked. Every
-use of them is in the audit log (§4.6, Droidtop/tracker#61); window events delivered are counted per day.
+`windows.read`, `windows.control` and `clipboard.read` are dangerous and start unticked; `clipboard.write` is normal
+(D6) and every write is audited all the same. Every use of them is in the audit log (§4.6, Droidtop/tracker#61); window events delivered are counted per day.
 
 **Slices.** 1, the contract (this section, the `window` and `file` subjects, `desktop.window`, icons; built
 2026-11-06). 2, the host side over host-bridge (`windows.*` and the window events; built 2026-11-06, below). 3, the taskbar drawing
 `desktop.tray` and `desktop.window` (built 2026-11-06, below). 4, Open with (built 2026-11-06, below). 5, the clipboard and notification bridges, each behind its own
-approval. 6, a test fixture plugin exercising each.
+approval (built 2026-11-06, below). 6, a test fixture plugin exercising each.
 
 **The facet vocabulary grows (owner, 2026-11-06).** The owner: "I think the current vocabularity is too limited". He
 agreed to these, which are proposed on Droidtop/tracker#602 and not yet built ("I agree with 5-8"):
@@ -3700,7 +3715,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | D3 | Storage and volumes | free space, removable media, where a library folder lives | `storage.volumes()` → [{id, label, removable, freeBytes}]; events `storage.mounted` / `unmounted` | data | `storage.volumes` (normal) | low | built (2026-10-08, `storage` `volumes`, with `primary`, `state`, `totalBytes`); the mount events are not built |
 | D4 | File picker (SAF) | let the user choose a file or folder for the plugin | `files.pick {mode, mime}` → a grant token; `files.open {token}` → fd | the system picker | `files.picker` (normal; the user's pick is the consent) | low | built (2026-10-08): `files.pick {mode: open \| create, mime, name}` → {picked, token, name, writable}, only during a call the person started; `files.open {token, mode}` → fd; `files.forget {token}`; folders are not offered |
 | D5 | Shared files | broad access to shared storage | `files.shared` `list`, `read`, `write`, `mkdir`, `delete`, `open` `{path, volume?}`, `path` inside one of the folders the permission entry declares (`paths`, `"*"` for all) | data | `files.shared.read` / `files.shared.write` (dangerous; droidtop holds MANAGE_EXTERNAL_STORAGE) | high | built (2026-10-08): never `Android/data` or `Android/obb`, checked again after links are followed, and only while droidtop itself has all-files access |
-| D6 | Clipboard | copy a code or link; read for paste-to-search | `clipboard.write {text}`; `clipboard.read()` only during a user-initiated call | data | `clipboard.write` (normal) / `clipboard.read` (dangerous) | low / high | not built |
+| D6 | Clipboard | copy a code or link; read for paste-to-search | `clipboard.write {text}`; `clipboard.read()` only during a user-initiated call | data | `clipboard.write` (normal) / `clipboard.read` (dangerous) | low / high | built 2026-11-06 for Desktop (§1.12, Droidtop/tracker#221): `clipboard.get_text` (user-initiated only), `clipboard.set_text {text}` and the event `clipboard.changed`, on the desktop clipboard bridge; with no desktop running both are UNSUPPORTED |
 | D7 | Power and battery | defer work on low battery; power profiles | `power.get_state()` → {level (0 to 100, null without a battery), charging, saver}; `power.keep_awake {≤10 min}` (only while a job runs); events `power.low`, `power.charging` | data | `power.state` (normal) / `power.keep_awake` (normal, quota) | low | `power.get_state` built (2026-10-16, Droidtop/tracker#553: read from the battery broadcast and Battery Saver; a plugin reads it instead of `/sys/class/power_supply`); `keep_awake` and the events not built |
 | D8 | Display | know the displays (internal, companion, external) to place content | `display.list()` → [{id, role, size, density, hdr}]; events `display.added` / `removed`; `display.set {brightness}` | data; C15 renders | `display.info` (normal) / `display.control` (dangerous) | low / medium | not built |
 | D9 | Audio routing | route or duck audio per session | `audio.routes()`, `audio.set_route {id}`, `audio.volume {stream, level}`; event `audio.route_changed` | G Quick Menu | `audio.control` (normal); **no microphone API** (P2 decision: `audio.record` would be critical and needs a real use) | medium | not built |
@@ -5870,3 +5885,7 @@ answer.
   Open with is offered for the files droidtop already takes (`.exe`, `.msi`, `.deb`, `.rpm`, `.AppImage`). For a
   plugin to open other files, droidtop would declare a filter for any file, and appear in every app's Open with list
   while Desktop is on. The recommendation is to wait for a real plugin that needs it.
+- **Q7. May a plugin read the clipboard in the background?** (Droidtop/tracker#221, 2026-11-06.) D6 and T5 allow a
+  read only during a call the person started, and §1.12's bridge keeps that. A clipboard history or a sync to
+  another device would need reads on `clipboard.changed` with nobody pressing anything. The recommendation is no,
+  or a separate critical permission for it, if a real plugin asks.

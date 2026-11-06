@@ -230,3 +230,32 @@ fun notifyWindowEvents(context: Context, events: List<dev.droidtop.pluginhost.Wi
         }
     }
 }
+
+/**
+ * Fires `clipboard.changed` (docs/plugin-api.md 1.12, Droidtop/tracker#221) at every runnable plugin that subscribed
+ * to it and holds `clipboard.read` as granted. No args: a plugin reads the text with `clipboard.get_text`, which is
+ * audited. Called by the clipboard bridge on each change; returns at once.
+ */
+fun notifyClipboardChanged(context: Context) {
+    val app = context.applicationContext
+    CoroutineScope(Dispatchers.IO).launch {
+        val grants = dev.droidtop.pluginhost.PluginGrants.forContext(app)
+        val candidates = PluginStore.installed(app)
+            .filter { it.runnable() && it.manifest.subscribesTo(PluginEvent.CLIPBOARD_CHANGED) }
+            .filter {
+                dev.droidtop.pluginhost.PluginGrants.stateOf(it, grants.read(it.manifest.id), dev.droidtop.pluginhost.HostClipboardApis.READ) ==
+                    dev.droidtop.pluginhost.GrantState.GRANTED
+            }
+        if (candidates.isEmpty()) return@launch
+        val counts = dev.droidtop.pluginhost.PluginAudit.countsForContext(app)
+        val policy = PluginCrashPolicy(app)
+        try {
+            candidates.forEach {
+                runCatching { policy.notifyEvent(it, PluginEvent.CLIPBOARD_CHANGED, emptyMap()) }
+                counts.count(it.manifest.id, PluginEvent.CLIPBOARD_CHANGED.id)
+            }
+        } finally {
+            policy.shutdown()
+        }
+    }
+}

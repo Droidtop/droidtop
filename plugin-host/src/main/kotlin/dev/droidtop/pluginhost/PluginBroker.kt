@@ -180,6 +180,9 @@ interface BrokerEnvironment {
     /** E5 (`windows.*`, docs/plugin-api.md 1.12): the running Desktop session's windows, or null with no desktop. */
     fun desktopWindows(): DesktopWindowControl? = DesktopPluginBridge.windows
 
+    /** The clipboard bridge for plugins (`clipboard.*`, docs/plugin-api.md 1.12), or null while it is not running. */
+    fun desktopClipboard(): DesktopClipboard? = DesktopPluginBridge.clipboard
+
     /** D7 (`power.state`): the battery now. */
     fun powerState(): PowerState = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop reports no battery state")
 
@@ -688,7 +691,7 @@ object HostApis {
     }
 
     /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
-    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostSettingsApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPeersApis.ops + HostPowerApis.ops + HostWindowsApis.ops + HostSourcesApis.ops + HostMediaApis.ops + HostSteamApis.ops }
+    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostSettingsApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPeersApis.ops + HostPowerApis.ops + HostWindowsApis.ops + HostClipboardApis.ops + HostSourcesApis.ops + HostMediaApis.ops + HostSteamApis.ops }
 
     const val MAX_ENGINES = 50
     const val MAX_PATH = 4096

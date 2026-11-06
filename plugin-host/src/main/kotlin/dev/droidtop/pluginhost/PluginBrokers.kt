@@ -301,8 +301,24 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
             .setAutoCancel(true)
             .build()
         manager.notify(channel, "$title|$text".hashCode(), notification)
+        desktopNotice(pluginId, pluginLabel, title, text)
         true
     }.getOrDefault(false)
+
+    /**
+     * The notification bridge into Desktop (docs/plugin-api.md 1.12, Droidtop/tracker#221): while a Desktop session runs,
+     * a plugin's notification is also droidtop's own notice on the desktop, led by the plugin's name, so it is seen
+     * where the person is working, and kept in Recent. Only for a plugin that is on in Desktop (its mode switch).
+     */
+    private fun desktopNotice(pluginId: String, pluginLabel: String, title: String, text: String) {
+        if (DesktopPluginBridge.windows == null) return
+        if (!PluginModes.allowed(grants(pluginId), PluginModes.DESKTOP)) return
+        dev.droidtop.library.settings.Notices.flash(
+            text = if (text.isBlank()) title else "$title: $text",
+            source = pluginLabel,
+            context = appContext,
+        )
+    }
 
     // ---- RetroArch's network commands (docs/plugin-api.md 3 B) ----
 

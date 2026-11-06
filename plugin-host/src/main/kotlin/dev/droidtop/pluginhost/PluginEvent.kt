@@ -101,6 +101,12 @@ enum class PluginEvent(val id: String, val version: Int, val display: String) {
     WINDOW_OPENED("window.opened", 1, "A desktop window opened"),
     WINDOW_CLOSED("window.closed", 1, "A desktop window closed"),
     WINDOW_FOCUSED("window.focused", 1, "A desktop window took the focus"),
+
+    /**
+     * The desktop's clipboard changed, in Android or the container (docs/plugin-api.md 1.12, Droidtop/tracker#221). Only
+     * to a plugin holding `clipboard.read`. No args: the text is read with `clipboard.get_text`, so each read is audited.
+     */
+    CLIPBOARD_CHANGED("clipboard.changed", 1, "The clipboard changed"),
     ;
 
     companion object {

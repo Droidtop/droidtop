@@ -59,6 +59,41 @@ class ClipboardBridge(
     private var started = false
     private var hasWindowFocus = false
 
+    /**
+     * The text last synced either way, and whether Android marked it sensitive (a password manager's copy), for
+     * plugins (docs/plugin-api.md 1.12, Droidtop/tracker#221). Written on the main thread, read from a binder thread.
+     */
+    @Volatile
+    private var current: Pair<String, Boolean>? = null
+
+    /** Told on the main thread each time the synced text changes, either way or from [setFromPlugin]. */
+    var onChanged: (() -> Unit)? = null
+
+    /** The text a plugin may read: what was last synced, unless Android marked it sensitive. */
+    fun textForPlugins(): String? = current?.takeUnless { it.second }?.first
+
+    /**
+     * Puts a plugin's [text] on both clipboards through the same [ClipboardSync] as everything else, so its echo from
+     * either side is recognised and dropped. False when it is over the cap or the bridge is not running.
+     */
+    fun setFromPlugin(text: String): Boolean {
+        if (!started || text.toByteArray(Charsets.UTF_8).size > ClipboardSync.MAX_BYTES) return false
+        mainHandler.post {
+            if (!started) return@post
+            val decision = sync.accept(text) as? ClipboardSync.Decision.Forward ?: return@post
+            hostBridge.offerClipboardText(decision.text)
+            runCatching { clipboard?.setPrimaryClip(ClipData.newPlainText(CLIP_LABEL, decision.text)) }
+                .onFailure { Log.w(TAG, "Setting the Android clipboard for a plugin failed", it) }
+            changed(decision.text, sensitive = false)
+        }
+        return true
+    }
+
+    private fun changed(text: String, sensitive: Boolean) {
+        current = text to sensitive
+        onChanged?.invoke()
+    }
+
     private val androidClipListener = ClipboardManager.OnPrimaryClipChangedListener {
         pushAndroidSelectionToContainer("Android clipboard changed")
     }
@@ -87,6 +122,7 @@ class ClipboardBridge(
         hostBridge.containerClipboardListener = null
         clipboard?.removePrimaryClipChangedListener(androidClipListener)
         sync.reset()
+        current = null
         _androidReadsLive.value = true
         Log.i(TAG, "Clipboard bridge stopped")
     }
@@ -135,19 +171,17 @@ class ClipboardBridge(
         // and coercing would make a ContentResolver call for a content:// URI
         // item — real work, possibly a permission failure, for something we
         // would then have nothing to do with.
-        val text = runCatching {
-            manager.primaryClip
-                ?.takeIf { it.itemCount > 0 }
-                ?.getItemAt(0)
-                ?.text
-                ?.toString()
-        }.getOrElse {
+        val clip = runCatching { manager.primaryClip }.getOrElse {
             Log.w(TAG, "Reading the Android clipboard failed", it)
             null
         }
+        val text = runCatching { clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString() }.getOrNull()
+        // A password manager marks its copy sensitive (ClipDescription.EXTRA_IS_SENSITIVE, Android 13): it still
+        // reaches the container, as before, but no plugin is given it.
+        val sensitive = runCatching { clip?.description?.extras?.getBoolean(EXTRA_IS_SENSITIVE) == true }.getOrDefault(false)
 
         when (val decision = sync.accept(text)) {
-            is ClipboardSync.Decision.Forward ->
+            is ClipboardSync.Decision.Forward -> {
                 if (!hostBridge.offerClipboardText(decision.text)) {
                     Log.w(
                         TAG,
@@ -155,6 +189,8 @@ class ClipboardBridge(
                             "ext_data_control_manager_v1",
                     )
                 }
+                changed(decision.text, sensitive)
+            }
             ClipboardSync.Decision.AlreadyInSync -> Unit
             ClipboardSync.Decision.NothingToCopy -> Unit
             ClipboardSync.Decision.TooLarge ->
@@ -167,7 +203,7 @@ class ClipboardBridge(
         val manager = clipboard ?: return
 
         when (val decision = sync.accept(text)) {
-            is ClipboardSync.Decision.Forward ->
+            is ClipboardSync.Decision.Forward -> {
                 // Writing is not focus-restricted the way reading is, but it
                 // can still fail on OEM builds that police background
                 // clipboard writes — an attributable warning beats a silent
@@ -177,6 +213,8 @@ class ClipboardBridge(
                 }.onFailure {
                     Log.w(TAG, "Setting the Android clipboard from the container failed", it)
                 }
+                changed(decision.text, sensitive = false)
+            }
             ClipboardSync.Decision.AlreadyInSync -> Unit
             ClipboardSync.Decision.NothingToCopy -> Unit
             ClipboardSync.Decision.TooLarge ->
@@ -187,6 +225,9 @@ class ClipboardBridge(
     companion object {
         private const val TAG = "droidtop.Clipboard"
         private const val CLIP_LABEL = "droidtop desktop"
+
+        // ClipDescription.EXTRA_IS_SENSITIVE, by its value: the constant is API 33, the key is read on any version.
+        private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
 
         private val _androidReadsLive = MutableStateFlow(true)
 

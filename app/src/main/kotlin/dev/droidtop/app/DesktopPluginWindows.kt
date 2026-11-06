@@ -60,3 +60,27 @@ class DesktopPluginWindows(
 
     private fun toWindow(toplevel: Toplevel) = DesktopWindow(toplevel.id, toplevel.appId, toplevel.title, toplevel.output, toplevel.activated)
 }
+
+/**
+ * The clipboard bridge's text for plugins (docs/plugin-api.md 1.12, Droidtop/tracker#221): the one place a running
+ * [dev.droidtop.hostbridge.ClipboardBridge] is handed to the plugin API, and its changes become `clipboard.changed`.
+ * A plugin reads and sets the clipboard through the bridge's own sync, so it can never loop with the container.
+ */
+object DesktopPluginClipboard {
+    /** Publishes [bridge] to plugins; call it after the bridge starts. */
+    fun publish(context: Context, bridge: dev.droidtop.hostbridge.ClipboardBridge) {
+        val app = context.applicationContext
+        bridge.onChanged = { dev.droidtop.library.integrations.notifyClipboardChanged(app) }
+        DesktopPluginBridge.clipboard = object : dev.droidtop.pluginhost.DesktopClipboard {
+            override fun text(): String? = bridge.textForPlugins()
+
+            override fun setText(text: String): Boolean = bridge.setFromPlugin(text)
+        }
+    }
+
+    /** Takes the clipboard away from plugins; call it before the bridge stops. */
+    fun withdraw(bridge: dev.droidtop.hostbridge.ClipboardBridge?) {
+        bridge?.onChanged = null
+        DesktopPluginBridge.clipboard = null
+    }
+}
