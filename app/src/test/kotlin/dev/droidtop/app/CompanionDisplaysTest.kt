@@ -25,6 +25,12 @@ class CompanionDisplaysTest {
         assertEquals(emptyList<BrightnessRow>(), brightnessRows(11, ownDisplay = 9, builtInId = 0))
     }
 
+    @Test fun `only a second screen in its safe mode shows the fault`() {
+        assertEquals("480\u00D7640 of 1080\u00D71920", lowModeOf(true, true, "480\u00D7640 of 1080\u00D71920"))
+        assertEquals(null, lowModeOf(true, false, "1080\u00D71920 of 1080\u00D71920"))
+        assertEquals(null, lowModeOf(false, true, "480\u00D7640 of 1080\u00D71920"))
+    }
+
     @Test fun `refresh rates are offered only when there is a choice`() {
         assertEquals(emptyList<Float>(), offeredRates(listOf(60f, 60.0001f)))
         assertEquals(listOf(120f, 90f, 60f), offeredRates(listOf(60f, 120f, 90f, 59.99f)))

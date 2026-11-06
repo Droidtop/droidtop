@@ -59,6 +59,8 @@ internal data class DisplayCard(
     val role: DisplayRole,
     val rates: List<Float>,
     val rate: Float?,
+    /** "480×640 of 1080×1920" while a second screen is stuck in its low safe mode, else null. */
+    val lowMode: String? = null,
 )
 
 internal enum class DisplayRole(val label: String) { MAIN("Main screen"), COMPANION("Companion"), OTHER("Other screen") }
@@ -77,6 +79,13 @@ internal fun displayFacts(card: DisplayCard): String =
 /** The refresh rates worth offering: distinct, rounded to a tenth, highest first; none when there is only one. Pure. */
 internal fun offeredRates(rates: List<Float>): List<Float> =
     rates.map { Math.round(it * 10) / 10f }.distinct().sortedDescending().takeIf { it.size > 1 }.orEmpty()
+
+/**
+ * The low safe mode the catalog's Reinitialize row names (`GamingSettingsCatalog.ID_DISPLAY_REINIT`): only a second
+ * screen counts, so the card that shows the fault is the one that offers the fix (Droidtop/tracker#786 S7). Pure.
+ */
+internal fun lowModeOf(isSecondScreen: Boolean, inFallback: Boolean, summary: String): String? =
+    summary.takeIf { isSecondScreen && inFallback }
 
 internal enum class BrightnessRow { ANDROID, WINDOW }
 
@@ -131,6 +140,14 @@ internal fun CompanionDisplayCards() {
                                 }
                             }
                         }
+                    }
+                }
+                // Reinitialize where the fault shows; the catalog's row below stays for faults no card sees (mirroring).
+                card.lowMode?.let { mode ->
+                    CompanionNote(stringResource(R.string.companion_displays_low_mode, mode))
+                    CompanionPill(stringResource(dev.droidtop.runtime.R.string.gaming_reinitialize_displays)) {
+                        status[card.id] = dev.droidtop.runtime.DisplayArrangement.reinitialize()
+                        version++
                     }
                 }
                 status[card.id]?.let { CompanionNote(it) }
@@ -216,6 +233,11 @@ private fun readCards(context: Context): List<DisplayCard> {
                 ?.filter { it.physicalWidth == mode?.physicalWidth && it.physicalHeight == mode.physicalHeight }
                 ?.map { it.refreshRate }.orEmpty(),
             rate = mode?.refreshRate,
+            lowMode = lowModeOf(
+                output.kind == dev.droidtop.runtime.DisplayOutputKind.SECOND_SCREEN,
+                output.isInFallbackMode,
+                output.modeSummary(),
+            ),
         )
     }
 }

@@ -55,6 +55,7 @@
     <string name="companion_power_gpu_mhz">GPU: %1$s MHz</string>
     <string name="companion_displays_brightness">Brightness</string>
     <string name="companion_displays_dim_further">Dim further</string>
+    <string name="companion_displays_low_mode">Low resolution: %1$s</string>
     <string name="companion_not_allowed_yet">Not allowed yet</string>
     <string name="pair_computer_pair_a">Pair a %1$s</string>
     <string name="pair_computer_getting_a_code">Getting a code…</string>

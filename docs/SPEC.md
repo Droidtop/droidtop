@@ -6093,7 +6093,9 @@ droidtop 0.2.0-dev.1931).
   companion's own brightness ("Dim further" when the companion is on the built-in screen too) and "Turn this screen
   off"; the refresh rate where the screen lists more than one
   (`cmd display set-user-preferred-display-mode` through the helper app, behind the new Risky actions class "Change
-  display settings"); and "This screen controls its own brightness" where droidtop has no brightness for it.
+  display settings"); "Low resolution: 480×640 of 1080×1920" and Reinitialize displays on a second screen stuck in
+  its safe mode (the catalog's Reinitialize row stays for faults no card shows, such as mirroring); and "This screen
+  controls its own brightness" where droidtop has no brightness for it.
   Identify screens shows a large number and name on each screen for five seconds (a Presentation; a message on
   Android's default screen) and TalkBack reads the list.
 - **Screenshots (slice C15).** `Capture` (`:runtime-common`) is the one entry point: the helper app's shell runs
