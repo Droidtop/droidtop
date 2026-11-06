@@ -5,11 +5,11 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import app.murinelauncher.widget.DocumentPickActivity
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notices
 import dev.droidtop.runtime.DesktopAppearance
 import dev.droidtop.runtime.DesktopPanel
-import dev.droidtop.shell.standard.DocumentPickActivity
 import java.io.File
 
 /**

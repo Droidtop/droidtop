@@ -25,7 +25,7 @@ object WidgetStackTable {
     private val json = Json { ignoreUnknownKeys = true }
     private val serializer = ListSerializer(WidgetStack.serializer())
 
-    /** Throws on a damaged table: the store ([CachedPref]) keeps the text before anything is saved over it. */
+    /** Throws on a damaged table: the launcher's store (CachedPref, app.murinelauncher.prefs) keeps the text before anything is saved over it. */
     fun decode(text: String): List<WidgetStack> = json.decodeFromString(serializer, text)
 
     fun encode(stacks: List<WidgetStack>): String = json.encodeToString(serializer, stacks)
