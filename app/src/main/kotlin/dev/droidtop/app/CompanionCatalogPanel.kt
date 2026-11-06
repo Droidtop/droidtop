@@ -95,11 +95,14 @@ internal fun companionSystemCards(
         folded = false,
     ),
     // Font and display size have one place on the companion, Accessibility, when that card has them
-    // (Droidtop/tracker#786 S7, plan 4.5); they were drawn on both cards.
+    // (Droidtop/tracker#786 S7, plan 4.5); they were drawn on both cards. Brightness is the built-in screen's card,
+    // drawn above these rows in every arrangement (`brightnessRows`), so the catalog's copy is not drawn again.
     SystemCard(
         "display",
         "Display",
-        section(QuickSection.DISPLAY).filter { item -> item.id !in ON_ACCESSIBILITY || accessibility.none { it.id == item.id } },
+        section(QuickSection.DISPLAY).filter { item ->
+            item.id !in ON_SCREEN_CARD && (item.id !in ON_ACCESSIBILITY || accessibility.none { it.id == item.id })
+        },
         folded = true,
     ),
     SystemCard("sound", "Sound", section(QuickSection.AUDIO), folded = true),
@@ -114,6 +117,12 @@ internal fun companionSystemCards(
 
 /** Cards that draw rows of their own beside any catalog items, so they show even with none. */
 private val DRAWN_CARDS = setOf("display", "sound", "connections", "power", "privacy")
+
+/** Rows the built-in screen's card draws itself (`CompanionDisplayCards`), Allow included. */
+internal val ON_SCREEN_CARD = setOf(
+    dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
+    dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS_GRANT,
+)
 
 /** Rows whose one place on the companion is Accessibility (plan 4.5). */
 private val ON_ACCESSIBILITY = setOf(

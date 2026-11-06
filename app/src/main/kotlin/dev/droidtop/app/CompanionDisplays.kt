@@ -78,6 +78,19 @@ internal fun displayFacts(card: DisplayCard): String =
 internal fun offeredRates(rates: List<Float>): List<Float> =
     rates.map { Math.round(it * 10) / 10f }.distinct().sortedDescending().takeIf { it.size > 1 }.orEmpty()
 
+internal enum class BrightnessRow { ANDROID, WINDOW }
+
+/**
+ * The brightness rows a screen's card draws (Droidtop/tracker#786 S7: one brightness for every arrangement). The
+ * built-in screen always gets Android's brightness, whatever its role, so it is never lost when the companion sits
+ * there; the companion's own screen gets its window level too, which can dim below Android's lowest. Pure.
+ */
+internal fun brightnessRows(cardId: Int, ownDisplay: Int?, builtInId: Int = Display.DEFAULT_DISPLAY): List<BrightnessRow> =
+    listOfNotNull(
+        BrightnessRow.ANDROID.takeIf { cardId == builtInId },
+        BrightnessRow.WINDOW.takeIf { cardId == ownDisplay },
+    )
+
 @Composable
 internal fun CompanionDisplayCards() {
     val context = LocalContext.current
@@ -97,11 +110,14 @@ internal fun CompanionDisplayCards() {
         list.forEach { card ->
             CompanionCard(card.name) {
                 Text("${displayFacts(card)} · ${card.role.label}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                when {
-                    card.role == DisplayRole.MAIN && card.id == Display.DEFAULT_DISPLAY -> MainBrightness()
-                    card.id == ownDisplay -> CompanionBrightness()
-                    else -> CompanionNote("This screen controls its own brightness")
+                val rows = brightnessRows(card.id, ownDisplay)
+                rows.forEach { row ->
+                    when (row) {
+                        BrightnessRow.ANDROID -> MainBrightness()
+                        BrightnessRow.WINDOW -> CompanionBrightness(further = BrightnessRow.ANDROID in rows)
+                    }
                 }
+                if (rows.isEmpty()) CompanionNote("This screen controls its own brightness")
                 val rates = offeredRates(card.rates)
                 if (rates.isNotEmpty()) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -127,7 +143,7 @@ internal fun CompanionDisplayCards() {
     }
 }
 
-/** The main screen's brightness: Android's own setting, with Modify system settings. */
+/** The built-in screen's brightness: Android's own setting, with Modify system settings. */
 @Composable
 private fun MainBrightness() {
     val context = LocalContext.current
@@ -165,12 +181,12 @@ private fun MainBrightness() {
     )
 }
 
-/** The companion's own brightness: its window's, 10% at the lowest; Off goes lower. */
+/** The companion's own brightness: its window's, 10% at the lowest; Off goes lower. [further]: under Android's row. */
 @Composable
-private fun CompanionBrightness() {
+private fun CompanionBrightness(further: Boolean = false) {
     val level by DisplayControls.companionLevel.collectAsState()
     CompanionSliderRow(
-        title = stringResource(R.string.companion_displays_brightness),
+        title = stringResource(if (further) R.string.companion_displays_dim_further else R.string.companion_displays_brightness),
         value = level,
         range = DisplayControls.FLOOR..1f,
         step = 0.1f,
