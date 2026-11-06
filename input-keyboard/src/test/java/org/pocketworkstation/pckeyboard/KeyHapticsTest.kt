@@ -1,6 +1,7 @@
 package org.pocketworkstation.pckeyboard
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -27,22 +28,46 @@ class KeyHapticsTest {
         assertEquals(VibrationStrength.LIGHT, VibrationStrength.of("light"))
         assertEquals(VibrationStrength.MEDIUM, VibrationStrength.of("medium"))
         assertEquals(VibrationStrength.STRONG, VibrationStrength.of("strong"))
+        assertEquals(VibrationStrength.CUSTOM, VibrationStrength.of("custom"))
         assertEquals(VibrationStrength.OFF, VibrationStrength.of("off"))
         assertEquals(VibrationStrength.OFF, VibrationStrength.of(null))
         assertEquals(VibrationStrength.OFF, VibrationStrength.of("loud"))
     }
 
-    @Test fun vibrateOnKeypressMigratesToAStrengthByItsDuration() {
+    @Test fun vibrateOnKeypressMigratesToMediumOrToCustomKeepingItsDuration() {
+        // Off stays off, whatever the duration.
         assertEquals(VibrationStrength.OFF, KeyHaptics.migrated(false, 40))
+        assertEquals(VibrationStrength.OFF, KeyHaptics.migrated(false, 120))
         assertEquals(VibrationStrength.OFF, KeyHaptics.migrated(null, 200))
         // On with Hacker's default of 40 ms, or no duration stored: medium.
         assertEquals(VibrationStrength.MEDIUM, KeyHaptics.migrated(true, 40))
         assertEquals(VibrationStrength.MEDIUM, KeyHaptics.migrated(true, null))
-        assertEquals(VibrationStrength.LIGHT, KeyHaptics.migrated(true, 5))
-        assertEquals(VibrationStrength.LIGHT, KeyHaptics.migrated(true, 20))
-        assertEquals(VibrationStrength.MEDIUM, KeyHaptics.migrated(true, 60))
-        assertEquals(VibrationStrength.STRONG, KeyHaptics.migrated(true, 61))
-        assertEquals(VibrationStrength.STRONG, KeyHaptics.migrated(true, 200))
+        // On with any other duration: Custom, which plays that duration.
+        for (len in intArrayOf(5, 20, 39, 41, 60, 200)) {
+            assertEquals("$len ms", VibrationStrength.CUSTOM, KeyHaptics.migrated(true, len))
+        }
+    }
+
+    @Test fun customPlaysTheStoredDurationWithinTheSlidersRange() {
+        assertEquals(40L, KeyHaptics.customLengthMs(40))
+        assertEquals(120L, KeyHaptics.customLengthMs(120))
+        assertEquals(40L, KeyHaptics.customLengthMs(null))
+        assertEquals(40L, KeyHaptics.customLengthMs(0))
+        assertEquals(5L, KeyHaptics.customLengthMs(2))
+        assertEquals(200L, KeyHaptics.customLengthMs(900))
+        // Custom has no class effects: the player plays one-shots of the duration for every class.
+        for (cls in HapticClass.entries) {
+            assertNull(KeyHaptics.predefined(cls, VibrationStrength.CUSTOM))
+            assertNull(KeyHaptics.waveform(cls, VibrationStrength.CUSTOM, amplitudeControl = true))
+        }
+    }
+
+    @Test fun vibrateDurationIsShownInProModeOrUnderCustom() {
+        for (s in VibrationStrength.entries) assertTrue(KeyHaptics.showsDuration(s, pro = true))
+        assertTrue(KeyHaptics.showsDuration(VibrationStrength.CUSTOM, pro = false))
+        for (s in listOf(VibrationStrength.OFF, VibrationStrength.LIGHT, VibrationStrength.MEDIUM, VibrationStrength.STRONG)) {
+            assertFalse(KeyHaptics.showsDuration(s, pro = false))
+        }
     }
 
     @Test fun offPlaysNothingOnAnyAndroid() {

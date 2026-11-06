@@ -3300,8 +3300,8 @@ public class LatinIME extends InputMethodService implements
             mVolUpAction = sharedPreferences.getString(PREF_VOL_UP, res.getString(R.string.default_vol_up));
         } else if (PREF_VOL_DOWN.equals(key)) {
             mVolDownAction = sharedPreferences.getString(PREF_VOL_DOWN, res.getString(R.string.default_vol_down));
-        } else if (KeyHaptics.PREF.equals(key)) {
-            mHaptics.setStrength(VibrationStrength.of(sharedPreferences.getString(KeyHaptics.PREF, null)));
+        } else if (KeyHaptics.PREF.equals(key) || KeyHaptics.LEN_PREF.equals(key)) {
+            mHaptics.load(sharedPreferences);
         }
 
         updateKeyboardOptions();
@@ -3626,7 +3626,7 @@ public class LatinIME extends InputMethodService implements
         // Get the settings preferences
         SharedPreferences sp = PreferenceManager
                 .getDefaultSharedPreferences(this);
-        mHaptics.setStrength(VibrationStrength.of(sp.getString(KeyHaptics.PREF, null)));
+        mHaptics.load(sp);
         mSoundOn = sp.getBoolean(PREF_SOUND_ON, false);
         mPopupOn = sp.getBoolean(PREF_POPUP_ON, mResources
                 .getBoolean(R.bool.default_popup_preview));
@@ -3754,7 +3754,7 @@ public class LatinIME extends InputMethodService implements
         p.println("  mCompletionOn=" + mCompletionOn);
         p.println("  TextEntryState.state=" + TextEntryState.getState());
         p.println("  mSoundOn=" + mSoundOn);
-        p.println("  vibrationStrength=" + mHaptics.getStrength());
+        p.println("  vibrationStrength=" + mHaptics.getStrength() + " customMs=" + mHaptics.getCustomMs());
         p.println("  mPopupOn=" + mPopupOn);
     }
 

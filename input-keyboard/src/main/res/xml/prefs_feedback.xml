@@ -19,14 +19,25 @@
         android:title="@string/pref_screen_feedback_title"
         android:key="feedback_settings">
 
-    <!-- droidtop patch (Droidtop/tracker#903 H12a): one setting in place of Vibrate on keypress and Vibrate
-         duration, whose value KeyHapticsPlayer.migrate moves in. -->
-    <org.pocketworkstation.pckeyboard.VibratePreference
+    <!-- droidtop patch (Droidtop/tracker#903 H12a): in place of Vibrate on keypress, whose value
+         KeyHapticsPlayer.migrate moves in. Hacker's Vibrate duration stays below it, used by Custom. -->
+    <org.pocketworkstation.pckeyboard.VibrationStrengthPreference
             android:key="vibrate_strength"
             android:title="@string/title_vibrate_strength"
             android:entries="@array/vibrate_strength_entries"
             android:entryValues="@array/vibrate_strength_values"
             android:defaultValue="off"
+            android:persistent="true"
+            />
+
+    <org.pocketworkstation.pckeyboard.VibratePreference
+            android:defaultValue="40"
+            hk:minValue="5"
+            hk:maxValue="200"
+            hk:logScale="true"
+            hk:displayFormat="%.0f ms"
+            android:key="vibrate_len"
+            android:title="@string/title_vibrate_len"
             android:persistent="true"
             />
 

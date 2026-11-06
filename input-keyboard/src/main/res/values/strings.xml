@@ -527,20 +527,25 @@
     <string name="title_label_scale">Key label scaling</string>
     <string name="title_candidate_scale">Suggestion label scaling</string>
 
-    <!-- droidtop patch (Droidtop/tracker#903 H12a): one setting in place of Vibrate on keypress and Vibrate duration;
-         each key class (letter, modifier, delete, space and enter) gets its own haptic at the strength chosen. -->
+    <string name="title_vibrate_len">Vibrate duration</string>
+
+    <!-- droidtop patch (Droidtop/tracker#903 H12a): in place of Vibrate on keypress. Light, Medium and Strong give each
+         key class (letter, modifier, delete, space and enter) its own haptic; Custom buzzes every key for the Vibrate
+         duration, as Hacker's Keyboard did. -->
     <string name="title_vibrate_strength">Vibration strength</string>
     <string-array name="vibrate_strength_entries">
         <item>Off</item>
         <item>Light</item>
         <item>Medium</item>
         <item>Strong</item>
+        <item>Custom (Vibrate duration)</item>
     </string-array>
     <string-array name="vibrate_strength_values" translatable="false">
         <item>off</item>
         <item>light</item>
         <item>medium</item>
         <item>strong</item>
+        <item>custom</item>
     </string-array>
 
     <string name="title_click_volume">Key click volume</string>

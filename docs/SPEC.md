@@ -9518,12 +9518,18 @@ JVM tested); `KeyboardMotion` and `KeyHapticsPlayer` apply them on the device.
   Android 8 and 9 each class is a buzz of its own (`createOneShot`, or a two-pulse `createWaveform` for a modifier),
   longer and, where the vibrator can vary it, firmer with the strength. Each effect is built once when the strength is
   set, never per press.
-- **"Vibration strength"** (Off, Light, Medium or Strong; `vibrate_strength`, in "Key feedback settings") replaces
-  Hacker's "Vibrate on keypress" and "Vibrate duration": on Android 10 and later the effects are the device's own, so
-  a length in milliseconds no longer had a meaning. The old values move in once (`KeyHapticsPlayer.migrate`, from the
-  input method and from the settings screen): off stays off, and on becomes Light up to 20 ms, Medium up to 60 ms
-  (Hacker's default was 40 ms) and Strong beyond; the two old keys are then removed, so there is one setting, not two.
-  A fresh install starts at Off, as Hacker's did. Picking a strength plays a letter's haptic at it.
+- **"Vibration strength"** (Off, Light, Medium, Strong or Custom; `vibrate_strength`, in "Key feedback settings")
+  replaces Hacker's "Vibrate on keypress" switch. **"Vibrate duration" is kept** (`vibrate_len`, its own key and
+  Hacker's 40 ms default, so a stored value survives): the owner's rule for HKR (#903, relayed by the coordinator
+  2026-11-06) is "Hacker's Keyboard is our foundation. If we can rebuild it while keeping ALL of hacker's
+  functionality...", and this slice keeps every Hacker's key, mode and setting. Custom is Hacker's own behaviour: every
+  key one buzz of the duration (`createOneShot`, on every Android); Light, Medium and Strong keep the per-class effects
+  above, which a length in ms cannot describe on Android 10 and later. The duration row shows in pro mode, and outside
+  it only while the strength is Custom (`KeyHaptics.showsDuration`; hidden the way `KeyboardProMode` hides a pro row,
+  taken off the screen with its value kept). The old switch moves in once (`KeyHapticsPlayer.migrate`, from the input
+  method and from the settings screen): off stays Off; on with the default 40 ms becomes Medium; on with any other
+  duration becomes Custom, keeping that duration. Only the old switch is then removed; nothing else read it. A fresh
+  install starts at Off, as Hacker's did. Picking a strength, or moving the duration slider, plays a sample.
 - **The keyboard droidtop embeds** (`KeyboardPanel` and its sinks) draws the same `LatinKeyboardView` and wraps the
   same `ToolsDeck`, so it has all the motion above. droidtop has no vibration setting of its own; its text-entry slab
   follows Android's touch feedback (`performHapticFeedback`). The embedded keys do the same, with a constant per class
