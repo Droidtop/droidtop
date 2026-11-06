@@ -445,6 +445,21 @@ object GamingSettingsCatalog {
             category = "Controls and keyboard",
             icon = CatalogIcon.INPUT,
             items = buildList {
+                // The controllers connected now, each with its battery where Android reports one (Droidtop/tracker#723).
+                val pads = runCatching { dev.droidtop.runtime.ConnectedPads.read(context) }.getOrDefault(emptyList())
+                if (pads.isEmpty()) {
+                    add(ActionItem(id = ID_PADS_NONE, title = words(R.string.gaming_no_controller_connected)))
+                } else {
+                    pads.forEachIndexed { index, pad ->
+                        add(
+                            ActionItem(
+                                id = "${ID_PADS_PREFIX}$index",
+                                title = pad.name,
+                                value = pad.percent?.let { words(R.string.gaming_pad_battery, it) } ?: words(R.string.gaming_pad_connected),
+                            ),
+                        )
+                    }
+                }
                 // Onboarding's own Controller step, re-entered (docs/SPEC.md
                 // 7b: every step is re-enterable from the Settings row that
                 // owns it). Not a second screen asking the same question.
@@ -1056,6 +1071,10 @@ object GamingSettingsCatalog {
     }
 
     const val NAVIGATION_SOUNDS_MAX = 100
+
+    /** Settings > Controls' rows for the connected pads (Droidtop/tracker#723): facts, not actions. */
+    const val ID_PADS_PREFIX = "controls_pad_"
+    const val ID_PADS_NONE = "controls_pad_none"
     // 40, not 70 (owner on the console, dev.2778: "the nav noises are VERY harsh"): the bundled samples peak at
     // about -1 dBFS, and SoundPool's linear gain at 0.4 brings them to about -9 dBFS under game audio.
     private const val NAVIGATION_SOUNDS_DEFAULT = 40
