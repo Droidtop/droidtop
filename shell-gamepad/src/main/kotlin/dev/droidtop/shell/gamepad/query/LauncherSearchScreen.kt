@@ -72,6 +72,9 @@ fun LauncherSearchScreen(
     settingsRoot: dev.droidtop.library.settings.CatalogScreen? = null,
     // A web search for the text, as one row of the list (Standard's search bar, Droidtop/tracker#564); null: none.
     webSearch: ((String) -> Unit)? = null,
+    // The providers the person left on (Settings > Search bar, Droidtop/tracker#704).
+    calculator: Boolean = true,
+    androidPages: Boolean = true,
 ) {
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         val context = LocalContext.current
@@ -90,8 +93,8 @@ fun LauncherSearchScreen(
         }
         // Android's own Settings pages by title (Droidtop/tracker#704): which resolve on this device, read once off the
         // main thread; typing only filters them in memory.
-        val androidPages by produceState(emptyList<dev.droidtop.runtime.systemstatus.SystemControls.SettingsLink>()) {
-            value = withContext(Dispatchers.IO) {
+        val androidPageLinks by produceState(emptyList<dev.droidtop.runtime.systemstatus.SystemControls.SettingsLink>(), androidPages) {
+            value = if (!androidPages) emptyList() else withContext(Dispatchers.IO) {
                 runCatching { dev.droidtop.runtime.systemstatus.SystemControls.settingsLinks(context) }.getOrDefault(emptyList())
             }
         }
@@ -140,7 +143,7 @@ fun LauncherSearchScreen(
                 }
                 // A sum answers first (Droidtop/tracker#704): its title starts with the text, so it ranks with the best
                 // matches, and CALC sorts ahead of them; picking it copies the answer.
-                val sum = dev.droidtop.library.integrations.SearchCalculator.answer(text)?.let { value ->
+                val sum = dev.droidtop.library.integrations.SearchCalculator.answer(text)?.takeIf { calculator }?.let { value ->
                     LocalSearchRow("calc", SearchRowKind.CALC, "${text.trim()} = $value", CALC_DETAIL) {
                         val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
                         clipboard?.setPrimaryClip(android.content.ClipData.newPlainText(CALC_DETAIL, value))
@@ -148,7 +151,7 @@ fun LauncherSearchScreen(
                     }
                 }
                 // An Android Settings page whose title matches, said to be Android's; picking it opens it and closes this.
-                val pages = androidPages.takeIf { text.isNotBlank() }.orEmpty()
+                val pages = androidPageLinks.takeIf { text.isNotBlank() }.orEmpty()
                     .filter { dev.droidtop.library.integrations.SearchRank.score(it.label, text) < dev.droidtop.library.integrations.SearchRank.OTHER }
                     .map { link ->
                         LocalSearchRow("android:${link.id}", SearchRowKind.APP, link.label, ANDROID_PAGE_DETAIL) {
