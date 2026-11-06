@@ -241,6 +241,8 @@
     <string name="gaming_no_controller_connected">No controller connected</string>
     <string name="gaming_pad_connected">Connected</string>
     <string name="gaming_pad_battery">Battery %1$d%%</string>
+    <string name="gaming_stick_dead_zone">Stick dead zone</string>
+    <string name="gaming_stick_dead_zone_subtitle">How far the stick leans before it moves in the menus; raise it if a worn stick drifts</string>
     <string name="gaming_screensaver_page_subtitle">When it shows, and what: covers, screenshots, a clock or black</string>
     <string name="gaming_screensaver_when">When</string>
     <string name="gaming_screensaver_when_subtitle">After the shell sits idle this long; Android\'s screen timeout still turns the panel off</string>

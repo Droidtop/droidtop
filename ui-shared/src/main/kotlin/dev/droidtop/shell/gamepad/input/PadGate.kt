@@ -169,7 +169,10 @@ class PadGateCore(
     }
 
     private fun update(axis: Axis, deviceId: Int, value: Float, now: Long, repeats: Boolean) {
-        val target = axisTargetKey(value, axis.key, axis.negativeKey, axis.positiveKey) { key ->
+        // The stick's D-pad directions (the repeating axes) follow the dead zone in Settings > Controls
+        // (Droidtop/tracker#723); the hat sends whole steps, and the triggers keep the fixed band.
+        val (enter, exit) = if (repeats) dev.droidtop.runtime.StickDeadZone.thresholds() else ENTER_THRESHOLD to EXIT_THRESHOLD
+        val target = axisTargetKeyWithin(value, axis.key, axis.negativeKey, axis.positiveKey, enter, exit) { key ->
             key == 0 || pair(deviceId, key) in realKeys
         }
         if (target == axis.key) return
@@ -266,11 +269,22 @@ fun axisTargetKey(
     negativeKey: Int,
     positiveKey: Int,
     suppressed: (keyCode: Int) -> Boolean,
+): Int? = axisTargetKeyWithin(value, currentKey, negativeKey, positiveKey, PadGateCore.ENTER_THRESHOLD, PadGateCore.EXIT_THRESHOLD, suppressed)
+
+/** [axisTargetKey] with its own band: press past [enter], release under [exit] (the stick's dead zone, #723). */
+fun axisTargetKeyWithin(
+    value: Float,
+    currentKey: Int?,
+    negativeKey: Int,
+    positiveKey: Int,
+    enter: Float,
+    exit: Float,
+    suppressed: (keyCode: Int) -> Boolean,
 ): Int? {
     val rawKey = when {
-        value <= -PadGateCore.ENTER_THRESHOLD -> negativeKey
-        value >= PadGateCore.ENTER_THRESHOLD -> positiveKey
-        currentKey != null && kotlin.math.abs(value) > PadGateCore.EXIT_THRESHOLD -> currentKey
+        value <= -enter -> negativeKey
+        value >= enter -> positiveKey
+        currentKey != null && kotlin.math.abs(value) > exit -> currentKey
         else -> null
     }
     return rawKey?.takeUnless(suppressed)
