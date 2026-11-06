@@ -2,6 +2,7 @@ package dev.droidtop.app
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
@@ -76,7 +77,7 @@ internal fun CompanionConnections() {
     val context = LocalContext.current
     val view = LocalView.current
     var version by remember { mutableIntStateOf(0) }
-    val devices by produceState<List<String>?>(null, version) { value = withContext(Dispatchers.IO) { bondedDevices(context.applicationContext) } }
+    val devices by produceState<List<PairedDevice>?>(null, version) { value = withContext(Dispatchers.IO) { bondedDevices(context.applicationContext) } }
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         LocalCompanionNav.current?.let { nav -> CompanionPill("Network") { nav.openTab(CompanionTab.NETWORK) } }
@@ -96,7 +97,15 @@ internal fun CompanionConnections() {
                 }
             }
             list.isEmpty() -> CompanionNote("None paired")
-            else -> list.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) }
+            // Connected ones first, each saying so (Droidtop/tracker#786 S9); Android lets no app connect one.
+            else -> pairedInOrder(list).forEach { device ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(device.name, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface, modifier = Modifier.weight(1f))
+                    device.connected?.let {
+                        Text(if (it) "Connected" else "Not connected", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                    }
+                }
+            }
         }
         CompanionPill("Bluetooth settings") { SettingsLaunch.start(context, Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
@@ -125,10 +134,24 @@ internal fun CompanionControllerList() {
 
 /** Paired Bluetooth devices by name, or null while droidtop lacks Bluetooth access (Android 12 and later). */
 @SuppressLint("MissingPermission")
-private fun bondedDevices(context: Context): List<String>? {
+/** A paired Bluetooth device: its name and whether it is connected now, null where Android does not say. */
+internal data class PairedDevice(val name: String, val connected: Boolean?)
+
+/** Connected devices first, then by name. Pure. */
+internal fun pairedInOrder(devices: List<PairedDevice>): List<PairedDevice> =
+    devices.sortedWith(compareByDescending<PairedDevice> { it.connected == true }.thenBy { it.name.lowercase() })
+
+private fun bondedDevices(context: Context): List<PairedDevice>? {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
         context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
     ) return null
     val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter ?: return emptyList()
-    return runCatching { adapter.bondedDevices.map { it.name ?: it.address } }.getOrDefault(emptyList())
+    return runCatching {
+        adapter.bondedDevices.map { device ->
+            // BluetoothDevice.isConnected is hidden but readable by apps (hidden-API unsupported list), as
+            // DisplayOutputRepository reads Display.getType; any failure reads as unknown.
+            val connected = runCatching { BluetoothDevice::class.java.getMethod("isConnected").invoke(device) as? Boolean }.getOrNull()
+            PairedDevice(device.name ?: device.address, connected)
+        }
+    }.getOrDefault(emptyList())
 }
