@@ -25082,8 +25082,9 @@ device's Vulkan qualifies (1.1+, external memory fd, timeline semaphores), read 
 recipes built in droidtop's CI (the `mesa-xlib-gl` precedent), because Termux's binaries fix the vtest socket under
 Termux's prefix:
 - **Built (slice 1):** `build-scripts/x86_64-venus/mesa-venus`, Mesa 26.2.4 with `-Dvulkan-drivers=virtio` and X11
-  WSI only, Termux's patches except 0005, which droidtop's `0005-vtest-socket-from-env.patch` replaces: the socket is
-  `VTEST_SOCKET_NAME`, else `/tmp/.virgl_test`.
+  WSI only, from `vendor/mesa-venus` (Droidtop/mesa, branch `droidtop-venus`): Termux's patches except 0005 as commits,
+  with droidtop's own 0005 in its place: the socket is `VTEST_SOCKET_NAME`, else `/tmp/.virgl_test`. Nothing is
+  patched at build time (Droidtop/tracker#921).
 - **Built (slice 2):** the vtest server, `build-scripts/x86_64-venus/vtest-server`: Termux's
   `virglrenderer-android` 1.3.0 recipe and patches (Venus, replayed on Android's own Vulkan by its 0011) with three
   changes: no ANGLE (libepoxy opens Android's `libEGL.so` and `libGLESv2.so`), virglrenderer and libepoxy static so the
@@ -25217,10 +25218,11 @@ app gets it too:
     now also carries Mesa's **xlib** `libGL.so.1` (llvmpipe): the app's X
     server has no GLX extension, so Termux's own DRI/glvnd libGL cannot start
     there, while the xlib target does GLX on the client side and presents
-    with XPutImage. It is built in the same workflow from Termux's mesa
-    recipe and patches (pinned termux-packages commit, Termux's package
-    builder, `build-scripts/x86_64-lavapipe/mesa-gl`), except the patch
-    that pins llvmpipe to one thread: upstream's threads are kept and
+    with XPutImage. It is built in the same workflow with Termux's package
+    builder (pinned termux-packages commit, `build-scripts/x86_64-lavapipe/mesa-gl`)
+    from `vendor/mesa-lavapipe` (Droidtop/mesa, branch `droidtop-lavapipe`):
+    Termux's Mesa patches as commits, except the one that pins llvmpipe to
+    one thread: upstream's threads are kept and
     `LP_NUM_THREADS` still sets them. At launch, with that library present,
     `WINE_X11FORCEGLX=1` (the Android patch to winex11 that skips the
     server GLX check) and `XLIB_NO_SHM=1` (the same SysV reason as
