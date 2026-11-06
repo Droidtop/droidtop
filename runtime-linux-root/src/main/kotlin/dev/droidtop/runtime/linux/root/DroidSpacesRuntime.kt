@@ -298,6 +298,19 @@ class DroidSpacesRuntime(
     override val usageUnavailableReason: String? = null
 
     /**
+     * The tree is root's (closed folders such as /root included), so the app's own walk would leave part of it out.
+     * It is measured as root through the same root shell [usage] and [exec] use (Shizuku or Sui): `du -sxk` of the
+     * rootfs on the device's side, staying on its filesystem, whether or not the container runs (docs/SPEC.md 3d
+     * "Storage used"; Droidtop/tracker#911). Without the root shell this throws, and the page says why.
+     */
+    override suspend fun diskUsage(container: Container): dev.droidtop.runtime.DiskUsage {
+        val result = RootProcess.run("/system/bin/du", "-sxk", container.rootfsPath)
+        check(result.launched) { NO_ROOT_SIZE }
+        return dev.droidtop.runtime.ContainerDiskUsage.fromDu(result.stdout, result.succeeded)
+            ?: error("du gave no size: ${result.stderr.lineSequence().firstOrNull { it.isNotBlank() } ?: "no answer"}")
+    }
+
+    /**
      * A droidspaces container's processes are root's, so they are read through the root shell (Shizuku or Sui): its
      * init's PID from droidspaces' own `pid` command, then every process in that PID namespace, twice [sampleMs]
      * apart ([ProcUsage.namespaceScript]). Without the root shell this throws, and the row says why.
@@ -726,5 +739,6 @@ class DroidSpacesRuntime(
 
         private const val PRIMARY_NAME = "droidtop-primary"
         private const val NO_ROOT_SHELL = "Reading this container's use needs Shizuku or Sui, which droidtop can't reach right now"
+        private const val NO_ROOT_SIZE = "Measuring this container needs Shizuku or Sui, which droidtop can't reach right now"
     }
 }

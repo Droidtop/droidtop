@@ -116,15 +116,9 @@ object ContainersCatalog {
         groups = { context -> rootGroups(context) },
         // Read again as each container's size becomes known (Droidtop/tracker#911).
         live = ContainerSizes.changes,
-        // Settings search finds these rows without listing, or measuring, every container (per-container rows belong to
-        // the screen, CatalogScreen.indexGroups).
-        indexGroups = { context ->
-            listOf(
-                CatalogGroup(id = "create", title = null, items = listOf(createItem())),
-                CatalogGroup(id = "images", title = null, items = listOf(imagesItem(null, null))),
-                CatalogGroup(id = "image_cache", title = "Downloaded images", items = imageCacheItems(context, null)),
-            )
-        },
+        // Settings search reads the same rows, each container's page included, with nothing measured: no size, no
+        // memory and processor reading, no image store walk (Droidtop/tracker#911).
+        indexGroups = { context -> rootGroups(context, measure = false) },
     )
 
     /**
@@ -166,19 +160,20 @@ object ContainersCatalog {
         inline = createScreen(),
     )
 
-    private suspend fun rootGroups(context: Context): List<CatalogGroup> {
+    /** The list. [measure] false is the settings search index's reading: the same rows, with no size measured. */
+    private suspend fun rootGroups(context: Context, measure: Boolean = true): List<CatalogGroup> {
         val runtime = ContainerRuntimeFactory.select(context)
         val containers = runCatching { runtime.listContainers() }
         val create = createItem()
         val rows: List<CatalogItem> = containers.fold(
             onSuccess = { list ->
-                ContainerSizes.keepOnly(list.map { it.container.id }.toSet())
+                if (measure) ContainerSizes.keepOnly(list.map { it.container.id }.toSet())
                 list.sortedWith(compareBy({ it.container.role != ContainerRole.PRIMARY }, { it.displayName.lowercase() }))
                     .map { info ->
                         // Its size on disk beside its state: kept until it changes, measured off the main thread
                         // (docs/SPEC.md 3d "The surface, precisely"; Droidtop/tracker#911).
-                        val state = listOfNotNull(stateLabel(info, runtime), ContainerSizes.label(runtime, info, isRunning(info)))
-                            .joinToString(" · ")
+                        val size = if (measure) ContainerSizes.label(runtime, info, isRunning(info)) else null
+                        val state = listOfNotNull(stateLabel(info, runtime), size).joinToString(" · ")
                         NestedScreenItem(
                             id = "container:${info.container.id}",
                             title = info.displayName,
@@ -205,8 +200,8 @@ object ContainersCatalog {
             },
         )
         val store = OciImageStore.of(context)
-        val count = runCatching { store.entries().size }.getOrNull()
-        val bytes = runCatching { store.diskBytes() }.getOrNull()
+        val count = if (measure) runCatching { store.entries().size }.getOrNull() else null
+        val bytes = if (measure) runCatching { store.diskBytes() }.getOrNull() else null
         return listOf(
             CatalogGroup(id = "create", title = null, items = listOf(create)),
             CatalogGroup(id = "containers", title = "Containers", items = rows),
@@ -380,9 +375,11 @@ object ContainersCatalog {
         id = "container:$id",
         title = name,
         groups = { context -> containerGroups(context, id) },
+        // Settings search: the page's rows, with nothing measured (Droidtop/tracker#911).
+        indexGroups = { context -> containerGroups(context, id, measure = false) },
     )
 
-    private suspend fun containerGroups(context: Context, id: String): List<CatalogGroup> {
+    private suspend fun containerGroups(context: Context, id: String, measure: Boolean = true): List<CatalogGroup> {
         val runtime = ContainerRuntimeFactory.select(context)
         val info = runtime.listContainers().firstOrNull { it.container.id == id }
             ?: return listOf(
@@ -399,10 +396,12 @@ object ContainersCatalog {
 
         // buildList's block below isn't suspend, so anything that needs a
         // suspend call (the real disk-usage walk) is computed up front.
-        val diskUsageBytes = runCatching { runtime.diskUsageBytes(container) }.getOrNull()
+        // The settings search index reads this page with [measure] false:
+        // its rows, nothing measured (Droidtop/tracker#911).
+        val diskUsage = if (measure) runCatching { runtime.diskUsage(container) } else null
         // The list shows this answer too, so it does not walk the tree again (Droidtop/tracker#911).
-        ContainerSizes.record(info, running, diskUsageBytes)
-        val usage = if (running) readUsage(runtime, container, PAGE_USAGE_SAMPLE_MS) else null
+        diskUsage?.let { ContainerSizes.record(info, running, it.getOrNull()) }
+        val usage = if (running && measure) readUsage(runtime, container, PAGE_USAGE_SAMPLE_MS) else null
         val main = buildList<CatalogItem> {
             // The state, and the one action that changes it.
             when {
@@ -470,7 +469,7 @@ object ContainersCatalog {
             }
             if (running) add(restartItem(info, runtime))
             add(recreateItem(info, runtime))
-            add(storageItem(diskUsageBytes))
+            add(storageItem(diskUsage))
             if (running) add(usageItem(runtime, container, usage))
             add(terminalItem(info, runtime, desktopUp))
             add(updateSoftwareItem(info, runtime))
@@ -682,12 +681,25 @@ object ContainersCatalog {
         )
     }
 
-    /** Real size on disk (docs/SPEC.md 3d "Storage used"), computed fresh every time the page opens. */
-    private fun storageItem(bytes: Long?): CatalogItem = ActionItem(
-        id = "container_storage",
-        title = "Storage used",
-        value = bytes?.let { dev.droidtop.library.format.ValueFormat.size(it) } ?: "Unknown",
-    )
+    /**
+     * Real size on disk (docs/SPEC.md 3d "Storage used"), computed fresh every time the page opens. When it could not
+     * be measured the row says why, as "Memory and processor" does; "at least" when part of it could not be read.
+     * [reading] null is the settings search index's reading, which measures nothing.
+     */
+    private fun storageItem(reading: Result<dev.droidtop.runtime.DiskUsage>?): CatalogItem {
+        val usage = reading?.getOrNull()
+        val problem = reading?.exceptionOrNull()?.let { FailureText.of("Containers", it) }
+        return ActionItem(
+            id = "container_storage",
+            title = "Storage used",
+            subtitle = when {
+                problem != null -> problem
+                usage != null && !usage.complete -> "Some of its folders could not be read, so it may take more"
+                else -> null
+            },
+            value = usage?.label,
+        )
+    }
 
     /**
      * What the container can reach of the device, a line a kind (docs/SPEC.md 3d, "What it can reach";

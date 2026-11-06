@@ -5,4 +5,5 @@
   (2 GB, 5 GB, 10 GB or no limit), and clear them. Clearing never touches your containers.
 
 ### Changed
-- When a container's size can't be read in full, droidtop now shows no size instead of a smaller, wrong one.
+- On a rooted device a container's size is now measured in full, folders closed to droidtop included. Elsewhere, a
+  size that misses folders droidtop can't read says "at least". When it can't be measured, its page says why.
