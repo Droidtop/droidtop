@@ -27,6 +27,9 @@ android {
             // How a browser check is recognised and what passing one earns, shared with Enginehost (vendor/lib-net,
             // docs/SPEC.md 12a, Droidtop/tracker#751): here and not in :runtime-common, which depends on this module.
             java.srcDir("../vendor/lib-net/sitecheck/src/main/kotlin")
+            // The GitHub client droidtop and Enginehost share (vendor/lib-net :net, Droidtop/tracker#194): GitHubAuth, which
+            // decides per hop where the person's token may go, is that module's; dev.droidtop.net.GitHubAuth calls it.
+            java.srcDir("../vendor/lib-net/net/src/main/kotlin")
         }
     }
 }
