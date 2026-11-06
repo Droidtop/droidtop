@@ -951,6 +951,10 @@ functionality". The contract is docs/plugin-api.md 1.12; what it decides for Des
 - Built in slices, each on its own `ci/` branch; slice 1 (2026-11-06) is the contract and the guards: the `window` and
   `file` subjects, the `desktop.window` target (three facets per plugin), `files.action` about a file (it took only
   the plugin as subject before), and `icon` from droidtop's set on `status`, `badge` and `toggle` as on `action`.
+- Slice 2 (2026-11-06) is the host side: `windows.list`, `windows.focus` and `windows.close`, and the events
+  `window.opened`, `window.closed` and `window.focused`, from host-bridge's window list. The session publishes its
+  windows to plugins when it connects and withdraws them when it ends (`DesktopPluginWindows`, started beside
+  `DesktopWindows` in `DesktopSessionService.connect`); focus is the bar's own raise, so the two never disagree.
 
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 

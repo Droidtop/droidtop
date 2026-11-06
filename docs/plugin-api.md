@@ -1921,6 +1921,20 @@ and one audit log for every plugin, and adds nothing to the images droidtop neve
 - **widgets**: `desktop.tray` (the taskbar's tray) and `desktop.window` (a window's bar menu, about that window), in
   §1.10's Targets.
 
+**The host side, as built (slice 2, 2026-11-06).** `windows.list` → `{windows: [{id, appId, title, output,
+focused}]}` under `windows.read`; `windows.focus {id}` and `windows.close {id}` → `{done}` under `windows.control`
+(`HostWindowsApis`). With no Desktop session running every op is `UNSUPPORTED`; an id that is gone, or of an app the
+permission does not reach, is `NOT_FOUND`, so a narrowed plugin cannot even learn that another app's window exists.
+Focus is the bar's own raise (`DesktopWindows.raise`): a window the bar put away comes back first, as a tap on its
+row does. Close asks the app to close (the protocol's close), so an app may still ask to save. The session hands
+its windows over when it connects and takes them back when it ends (`DesktopPluginWindows`, the one place, through
+`DesktopPluginBridge`). Each change of host-bridge's window list (`toplevelChanges`) is compared with the last one
+(`WindowEvents.between`): a window gone is `window.closed`, a new one `window.opened`, one newly activated
+`window.focused`, and a change of title alone is no event. Events go only to a plugin that subscribed and holds
+`windows.read` as granted, never asked for from an event, and only for apps that permission reaches
+(`notifyWindowEvents`); each one told is counted on the plugin's day of activity. Both permissions are dangerous, so
+every call is in the activity log.
+
 **Not offered:** input into another application's window (a keylogger's and an autoclicker's tool; a `shortcut` on
 an action, below, covers the legitimate uses), and capturing a window's picture (windowcast's, by the standing rule).
 
@@ -1930,7 +1944,7 @@ an action, below, covers the legitimate uses), and capturing a window's picture 
 use of them is in the audit log (§4.6, Droidtop/tracker#61); window events delivered are counted per day.
 
 **Slices.** 1, the contract (this section, the `window` and `file` subjects, `desktop.window`, icons; built
-2026-11-06). 2, the host side over host-bridge (`windows.*` and the window events). 3, the taskbar drawing
+2026-11-06). 2, the host side over host-bridge (`windows.*` and the window events; built 2026-11-06, below). 3, the taskbar drawing
 `desktop.tray` and `desktop.window`. 4, Open with. 5, the clipboard and notification bridges, each behind its own
 approval. 6, a test fixture plugin exercising each.
 
@@ -3687,7 +3701,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | E2 | Container exec | run a command inside a container as the container user | `containers.exec {id, argv, env, cwd}` → a job with streamed stdout/stderr | data | `containers.exec` (critical: full access to the user's container home) | critical | not built |
 | E3 | Terminal | open a terminal for the user at a place (a container, a game's folder) | `terminal.open {container, cwd}`: the host opens its own terminal; the plugin never reads it | D: terminal window; A/G: a context action (C4) | `terminal.open` (normal: the user sees it and types) | low | not built |
 | E4 | File associations | declare that a container app or a plugin handles a MIME type | manifest static `associations: [{mime, ext, label}]` + EP C9 | D: the file manager's defaults; A: droidtop's file actions | `provide:files.handler` | medium | designed 2026-11-06 (§1.12, Droidtop/tracker#221); not built |
-| E5 | Windowing (through windowcast) | list, focus, move or close app windows; know which window a game runs in | `windows.list()` → [{id, app, title}]; `windows.focus/close {id}`; events `window.opened` / `closed`. **Streaming, capture and remote display are never in droidtop**: they are windowcast's (standing rule), and this API only manages windows droidtop already knows | D: taskbar menus (C8) | `windows.read` (dangerous: window titles leak content; narrowed by the manifest's `apps`) / `windows.control` (dangerous) | high | designed 2026-11-06 (§1.12, Droidtop/tracker#221): served from host-bridge's window list and sway IPC, nothing in the container; not built |
+| E5 | Windowing (through windowcast) | list, focus, move or close app windows; know which window a game runs in | `windows.list()` → [{id, app, title}]; `windows.focus/close {id}`; events `window.opened` / `closed`. **Streaming, capture and remote display are never in droidtop**: they are windowcast's (standing rule), and this API only manages windows droidtop already knows | D: taskbar menus (C8) | `windows.read` (dangerous: window titles leak content; narrowed by the manifest's `apps`) / `windows.control` (dangerous) | high | built 2026-11-06 (§1.12, Droidtop/tracker#221): `windows.list`, `windows.focus`, `windows.close` and the events `window.opened`, `window.closed`, `window.focused`, served from host-bridge's window list, nothing in the container; moving a window is not offered yet |
 | E6 | Printing bridge | print from a plugin, or add a printer (the CUPS bridge, §4b) | `print.submit {fd, mime, options}` → the host shows its own print dialog; `print.printers()` | D/A: the print dialog | `print.submit` (normal: the dialog is the consent) / `print.admin` (dangerous) | low / high | not built |
 | E7 | Container package bridge | an "app store" for containers: search and install packages (apt, pacman, Flathub-style) | EP `containers.packages@1`: `search`, `install` (**job**), `remove` (**job**), `updates`; the host runs the package manager through E2 on the provider's behalf | D: the app store or Start menu; G: the PC section's "Get apps" | `provide:containers.packages` + `containers.exec` | critical | not built |
 | E8 | Background services and daemons | a long-running plugin task (a sync daemon, a server) | EP `jobs.service@1` entries `{id, label, restart: never\|on_failure}` (default `on_failure`); droidtop starts each as a job (`run {serviceId}`) while the point is allowed and the entry's own switch is on, under one silent foreground notification, and restarts a failed one after 30 s, 2, 10 and 30 min, then leaves it stopped. **One row (2026-10-30, Droidtop/tracker#790):** a failing service keeps one row in Downloads, its last failed run, with Retry, which starts it at once with no failures counted; each new run takes that row's place. A plugin job's failure line is one plain sentence: a message that is a runtime's own words (a class name, an exception, a stack trace, over 200 characters or several lines) becomes "<plugin> couldn't load its native code on this device" or "<plugin> ran into a problem it didn't explain", and its words are the job's Details (`JobFailureLine`); a plugin's own plain sentence stays the line | all modes: Jobs, the notification; switches on the plugin's Permissions screen | `provide:jobs.service` (dangerous: battery and network while you are away; starts unticked) | high | built (2026-10-08, `PluginBackground`, `PluginServicesService`) |

@@ -117,6 +117,9 @@ class DesktopSessionService : Service() {
     @Volatile
     private var libraryEntries: DesktopLibraryEntries? = null
 
+    /** The session's windows for plugins (docs/plugin-api.md 1.12, Droidtop/tracker#221), while it is connected. */
+    private var pluginWindows: DesktopPluginWindows? = null
+
     /** Why the session is ending on its own (its compositor went away), for the page shown after it; null when it was stopped. */
     @Volatile
     private var endedBecause: String? = null
@@ -157,6 +160,8 @@ class DesktopSessionService : Service() {
         swayOutputs = null
         libraryEntries?.stop()
         libraryEntries = null
+        pluginWindows?.stop()
+        pluginWindows = null
         EngineApiServer.stop(applicationContext)
         val connected = _stateHolder.value as? DesktopSessionState.Connected
         connected?.hostBridge?.disconnect()
@@ -276,13 +281,15 @@ class DesktopSessionService : Service() {
         }
         android.util.Log.i(TAG, "HostBridge connected to $socketPath — desktop session up")
 
+        val windows = DesktopWindows(hostBridge, provisioning.compositorCommand, runtime.hostSocketDir())
         _stateHolder.value = DesktopSessionState.Connected(
             hostBridge,
             listOf(DesktopOutput(primaryDisplayOutput(), hostBridge.outputNames().firstOrNull().orEmpty())),
-            DesktopWindows(hostBridge, provisioning.compositorCommand, runtime.hostSocketDir()),
+            windows,
             runtime,
             primary,
         )
+        pluginWindows = DesktopPluginWindows(applicationContext, hostBridge, windows).also { it.start(scope) }
         scope.launch { watchCompositor(hostBridge) }
         // Outputs for other displays (Droidtop/tracker#908, step D2): sway alone can make a headless output on demand.
         if (provisioning.compositorCommand.substringBefore(' ') == "sway") {

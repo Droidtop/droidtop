@@ -197,3 +197,36 @@ fun notifyContextReceived(context: Context, pluginId: String, contextId: String,
         }
     }
 }
+
+/**
+ * Fires the window events (`window.opened`, `window.closed`, `window.focused`; docs/plugin-api.md 1.12,
+ * Droidtop/tracker#221) at every runnable plugin that subscribed to one and holds `windows.read`, for the windows of
+ * apps that permission reaches only. Each event a plugin is told is counted on its day's activity (Droidtop/tracker#61).
+ * Called by the Desktop session with each change of its window list; returns at once.
+ */
+fun notifyWindowEvents(context: Context, events: List<dev.droidtop.pluginhost.WindowEvents.Event>) {
+    if (events.isEmpty()) return
+    val app = context.applicationContext
+    CoroutineScope(Dispatchers.IO).launch {
+        val grants = dev.droidtop.pluginhost.PluginGrants.forContext(app)
+        val read = dev.droidtop.pluginhost.HostWindowsApis.READ
+        val candidates = PluginStore.installed(app)
+            .filter { record -> record.runnable() && events.any { record.manifest.subscribesTo(it.event) } }
+            .filter { dev.droidtop.pluginhost.PluginGrants.stateOf(it, grants.read(it.manifest.id), read) == dev.droidtop.pluginhost.GrantState.GRANTED }
+        if (candidates.isEmpty()) return@launch
+        val counts = dev.droidtop.pluginhost.PluginAudit.countsForContext(app)
+        val policy = PluginCrashPolicy(app)
+        try {
+            for (record in candidates) {
+                for (event in events) {
+                    if (!record.manifest.subscribesTo(event.event)) continue
+                    if (!dev.droidtop.pluginhost.HostWindowsApis.allowed(record, read, event.window.appId)) continue
+                    runCatching { policy.notifyEvent(record, event.event, dev.droidtop.pluginhost.WindowEvents.args(event.window)) }
+                    counts.count(record.manifest.id, event.event.id)
+                }
+            }
+        } finally {
+            policy.shutdown()
+        }
+    }
+}

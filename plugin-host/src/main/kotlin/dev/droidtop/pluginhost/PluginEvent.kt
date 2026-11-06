@@ -92,6 +92,15 @@ enum class PluginEvent(val id: String, val version: Int, val display: String) {
      * changed settings, comma-separated.
      */
     SETTINGS_CHANGED("settings.changed", 1, "Its settings changed"),
+
+    /**
+     * A Desktop window opened, closed or took the focus (docs/plugin-api.md 1.12, Droidtop/tracker#221), from
+     * host-bridge's window list ([WindowEvents]). Only to a plugin holding `windows.read`, and only for windows of the
+     * apps that permission reaches. Args: `id` (droidtop's window id), `appId`, `title`, `output`.
+     */
+    WINDOW_OPENED("window.opened", 1, "A desktop window opened"),
+    WINDOW_CLOSED("window.closed", 1, "A desktop window closed"),
+    WINDOW_FOCUSED("window.focused", 1, "A desktop window took the focus"),
     ;
 
     companion object {
