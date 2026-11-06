@@ -9,6 +9,7 @@ import android.util.Log
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.runtime.CompanionScreenGuard
 import dev.droidtop.runtime.DisplayArrangement
+import dev.droidtop.runtime.DesktopExtension
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
 import dev.droidtop.runtime.DualScreenOrchestration
@@ -226,7 +227,7 @@ class SecondScreenOrchestrator(
         if (presentation != null && presentationDisplayId != null &&
             (presentationDisplayId == parked || modeDeparted)
         ) {
-            runCatching {
+            if (SecondScreenPlan.mayCover(presentationDisplayId, DesktopExtension.displays.value)) runCatching {
                 context.startActivity(
                     Intent(context, SecondaryDisplayActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -255,7 +256,7 @@ class SecondScreenOrchestrator(
      */
     fun coverVacatedDisplays(launchTargetDisplayId: Int?) {
         val outputs = displayOutputs.currentOutputsSnapshot()
-        val secondaryIds = SecondScreenPlan.coverCandidates(outputs, mirroredIds, companionDisplayId)
+        val secondaryIds = SecondScreenPlan.coverCandidates(outputs, mirroredIds, companionDisplayId, DesktopExtension.displays.value)
         DualScreenOrchestration
             .displaysNeedingIdleCover(
                 secondaryDisplayIds = secondaryIds,
@@ -286,8 +287,9 @@ class SecondScreenOrchestrator(
             roleRefresh,
             DisplayArrangement.refresh,
             dev.droidtop.runtime.ScreenNaming.changes,
-        ) { outputs, _, arrangement, _ -> outputs to arrangement }
-            .collectLatest { (outputs, arrangementSeq) ->
+            DesktopExtension.displays,
+        ) { outputs, _, arrangement, _, desktopOn -> Triple(outputs, arrangement, desktopOn) }
+            .collectLatest { (outputs, arrangementSeq, desktopOn) ->
                 if (arrangementSeq != lastArrangementSeq) {
                     lastArrangementSeq = arrangementSeq
                     host.clearParkedDisplayId()
@@ -384,13 +386,17 @@ class SecondScreenOrchestrator(
                     mainId = arrangement.mainId, companionId = arrangement.companionId,
                 )
 
+                // Never over the desktop where it is drawn on this screen too (SecondScreenPlan.companionPresentation).
                 showCompanionPresentation(
-                    if (showCompanion) DualScreenOrchestration.companionPresentationDisplayId(
-                        shellDisplayId = currentDisplay,
-                        secondDisplayId = second?.androidDisplayId,
-                        secondParked = !secondAvailable,
-                        move = move,
-                    ) else null,
+                    SecondScreenPlan.companionPresentation(
+                        if (showCompanion) DualScreenOrchestration.companionPresentationDisplayId(
+                            shellDisplayId = currentDisplay,
+                            secondDisplayId = second?.androidDisplayId,
+                            secondParked = !secondAvailable,
+                            move = move,
+                        ) else null,
+                        desktopOn,
+                    ),
                 )
 
                 if (currentDisplay == second?.androidDisplayId &&
@@ -399,7 +405,7 @@ class SecondScreenOrchestrator(
                     relocationAttempts = 0
                 }
                 val now = android.os.SystemClock.elapsedRealtime()
-                val step = SecondScreenPlan.relocation(
+                val step = SecondScreenPlan.aroundDesktop(SecondScreenPlan.relocation(
                     move = move,
                     currentDisplay = currentDisplay,
                     secondId = second?.androidDisplayId,
@@ -408,19 +414,23 @@ class SecondScreenOrchestrator(
                     companionVisible = host.companionVisible(),
                     appOnCompanionScreen = appOnCompanionScreen,
                     cooledDown = now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS,
-                )
+                ), desktopOn)
                 relocate(step, second?.androidDisplayId, now)
                 // The placement's word that the shell stays where it is: what What's new waits for before it opens,
                 // so no move covers it (Droidtop/tracker#824).
                 dev.droidtop.runtime.ShellPlacement.settle(stays = move == DualScreenOrchestration.ShellMove.NONE)
 
                 host.setDualScreenBroken(
-                    DualScreenOrchestration.secondScreenNeedsReinit(
-                        secondDisplayId = second?.androidDisplayId,
-                        parkedDisplayId = parked,
-                        shellOnSecond = shellOnSecond,
-                        presentationDisplayId = secondScreenPresentation?.display?.displayId,
-                        idleCoverDisplayId = SecondaryDisplayActivity.resumedDisplayId,
+                    SecondScreenPlan.reinitOffered(
+                        DualScreenOrchestration.secondScreenNeedsReinit(
+                            secondDisplayId = second?.androidDisplayId,
+                            parkedDisplayId = parked,
+                            shellOnSecond = shellOnSecond,
+                            presentationDisplayId = secondScreenPresentation?.display?.displayId,
+                            idleCoverDisplayId = SecondaryDisplayActivity.resumedDisplayId,
+                        ),
+                        second?.androidDisplayId,
+                        desktopOn,
                     ),
                 )
             }

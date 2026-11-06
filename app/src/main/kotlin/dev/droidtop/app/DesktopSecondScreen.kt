@@ -26,8 +26,8 @@ import java.lang.ref.WeakReference
  * draws that output with a bar of its own and takes touch for it; [hide] closes it and removes the output
  * ([DesktopSessionService.retract]).
  *
- * Nothing calls [show] on its own yet: step D5 asks the person once per display. A debug build has a Developer menu
- * row for it ([DroidtopWideSettings][dev.droidtop.app.settings.DroidtopWideSettings]). Main thread.
+ * [DesktopScreens] calls them (step D5): the person is asked once per display whether the desktop extends to it, and
+ * the answer, changeable in Settings > Displays, decides. Main thread.
  */
 object DesktopSecondScreen {
     private const val TAG = "droidtop.DesktopSecond"

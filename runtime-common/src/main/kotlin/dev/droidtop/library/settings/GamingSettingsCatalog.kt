@@ -155,6 +155,9 @@ object GamingSettingsCatalog {
 
     /** A screen's role row ([screenRoleItems]): this prefix and the screen's stable id. */
     const val ID_SCREEN_ROLE_PREFIX = "screen_role:"
+
+    /** A screen's Desktop row ([desktopScreenItems]): this prefix and the screen's stable id. */
+    const val ID_SCREEN_DESKTOP_PREFIX = "screen_desktop:"
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
     const val ID_DISPLAY_SWAP = "action_display_swap"
     const val ID_DISPLAY_REINIT = "action_display_reinit"
@@ -397,6 +400,7 @@ object GamingSettingsCatalog {
                     onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(ID_ORIENTATION, value).apply() },
                 ))
                 addAll(screenRoleItems(context))
+                addAll(desktopScreenItems(context))
                 add(displayGameLaunchTargetItem(context))
                 add(interfaceSizeItem(context, dev.droidtop.runtime.DisplayRole.MAIN))
                 add(interfaceSizeItem(context, dev.droidtop.runtime.DisplayRole.COMPANION))
@@ -1080,6 +1084,37 @@ object GamingSettingsCatalog {
                 onSelect = { ctx, value ->
                     dev.droidtop.runtime.ScreenRole.entries.firstOrNull { it.name == value }
                         ?.let { dev.droidtop.runtime.ScreenRoles.set(ctx, facts.uniqueId, it) }
+                },
+            )
+        }
+    }
+
+    /**
+     * Whether the desktop extends to each screen (docs/SPEC.md 2b, "The desktop on a second screen", Droidtop/tracker#908
+     * step D5): one row per screen other than the main one, where the desktop runs, beside the role rows. Desktop asks
+     * once per screen the first time it runs with it, and this is where the answer is changed. Only with Desktop mode
+     * on. Reads the display list and preferences: built off the main thread like the rest of this catalog.
+     */
+    private fun desktopScreenItems(context: Context): List<CatalogItem> {
+        if (!Modes.isEnabled(Mode.DESKTOP)) return emptyList()
+        val outputs = dev.droidtop.runtime.DisplayOutputRepository(context).currentOutputsSnapshot()
+        val names = dev.droidtop.runtime.ScreenNaming.names(context, outputs)
+        val mainId = dev.droidtop.runtime.ScreenRoles.arrangement(context, outputs).mainId
+        val saved = dev.droidtop.runtime.ScreenRoles.desktopSaved(context)
+        return outputs.filter { it.androidDisplayId != mainId }.sortedBy { it.androidDisplayId }.map { output ->
+            val uniqueId = output.uniqueId
+            val answered = saved[uniqueId]
+            val name = names[output.androidDisplayId] ?: output.name.ifBlank { dev.droidtop.runtime.ScreenNames.EXTERNAL }
+            ChoiceItem(
+                id = ID_SCREEN_DESKTOP_PREFIX + uniqueId,
+                title = words(R.string.gaming_desktop_on_x, name),
+                subtitle = words(R.string.gaming_desktop_on_x_line),
+                options = listOfNotNull(ChoiceOption("", words(R.string.gaming_not_answered_yet)).takeIf { answered == null }) +
+                    dev.droidtop.runtime.DesktopScreenChoice.entries.map { ChoiceOption(it.name, it.label) },
+                current = answered?.name.orEmpty(),
+                onSelect = { ctx, value ->
+                    dev.droidtop.runtime.DesktopScreenChoice.entries.firstOrNull { it.name == value }
+                        ?.let { dev.droidtop.runtime.ScreenRoles.setDesktop(ctx, uniqueId, it) }
                 },
             )
         }

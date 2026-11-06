@@ -12,6 +12,7 @@ import android.os.Looper
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import dev.droidtop.runtime.DesktopScreenChoice
 import dev.droidtop.runtime.DisplayOutputRepository
 import dev.droidtop.shell.standard.OnboardingGate
 import dev.droidtop.runtime.ScreenNames
@@ -31,6 +32,11 @@ import java.util.concurrent.Executors
  * without the answer. One question at a time, every mode, main process only. A question closed without an answer is
  * not asked again while droidtop runs; the screen keeps nothing of droidtop's until it is answered here or in
  * Settings > Displays. Not while setup runs: its Your screens step asks the same.
+ *
+ * Desktop's question goes through the same flow and the same sheet (docs/SPEC.md 2b, "The desktop on a second screen",
+ * Droidtop/tracker#908 step D5): while the desktop runs, a screen other than its own with a role but no Desktop answer
+ * is asked once, on the desktop's screen, whether the desktop extends to it or it keeps what it has
+ * ([ScreenRoles.desktopToAsk], [ScreenRoles.suggestDesktop]). Role questions come first; still one at a time.
  */
 internal object ScreenRoleAsk {
     private const val TAG = "droidtop.ScreenRoles"
@@ -39,6 +45,9 @@ internal object ScreenRoleAsk {
 
     /** Screens asked about while droidtop runs (by stable id), answered or not. Touched on [worker] only. */
     private val asked = mutableSetOf<String>()
+
+    /** Screens Desktop asked about while droidtop runs (by stable id), answered or not. Touched on [worker] only. */
+    private val askedDesktop = mutableSetOf<String>()
 
     @Volatile
     private var showing = false
@@ -59,7 +68,7 @@ internal object ScreenRoleAsk {
         check()
     }
 
-    /** Asks about the next unanswered screen, if no question is open. Off the main thread. */
+    /** Asks about the next unanswered screen, if no question is open: its role first, then Desktop's. Off the main thread. */
     fun check() {
         worker.execute {
             if (showing || !OnboardingGate.isComplete(app)) return@execute
@@ -67,21 +76,58 @@ internal object ScreenRoleAsk {
             val arrangement = ScreenRoles.arrangement(app, outputs)
             val next = arrangement.unanswered.asSequence()
                 .mapNotNull { id -> outputs.firstOrNull { it.androidDisplayId == id } }
-                .firstOrNull { it.uniqueId !in asked } ?: return@execute
+                .firstOrNull { it.uniqueId !in asked }
+            if (next == null) {
+                askDesktop(outputs, arrangement)
+                return@execute
+            }
             val main = outputs.firstOrNull { it.androidDisplayId == arrangement.mainId } ?: return@execute
             asked += next.uniqueId
-            val name = ScreenNaming.names(app, outputs)[next.androidDisplayId] ?: next.name.ifBlank { ScreenNames.EXTERNAL }
             val suggested = ScreenRoles.suggest(ScreenRoles.sizeOf(next), ScreenRoles.sizeOf(main))
-            showing = true
-            runCatching {
-                app.startActivity(
-                    ScreenRoleActivity.intent(app, next.uniqueId, "$name, ${next.nativeWidthPx}x${next.nativeHeightPx}", suggested),
-                    ActivityOptions.makeBasic().setLaunchDisplayId(arrangement.mainId).toBundle(),
-                )
-            }.onFailure {
-                showing = false
-                Log.w(TAG, "could not ask about display ${next.androidDisplayId}", it)
-            }
+            ask(
+                ScreenRoleActivity.intent(app, next.uniqueId, label(outputs, next), suggested),
+                arrangement.mainId,
+                next.androidDisplayId,
+            )
+        }
+    }
+
+    /**
+     * Desktop's question, on [worker]: while the desktop runs in Desktop mode, the next screen other than its own with
+     * no Desktop answer ([ScreenRoles.desktopToAsk]) is asked about on the desktop's screen.
+     */
+    private fun askDesktop(outputs: List<dev.droidtop.runtime.DisplayOutput>, arrangement: dev.droidtop.runtime.ScreenArrangement) {
+        val desktopId = DesktopScreens.desktopDisplayId() ?: return
+        val facts = outputs.map(ScreenNaming::facts)
+        val choices = ScreenRoles.desktopSaved(app)
+        val nextFacts = ScreenRoles.desktopToAsk(facts, desktopId, choices, arrangement.unanswered, askedDesktop) ?: return
+        val next = outputs.firstOrNull { it.androidDisplayId == nextFacts.displayId } ?: return
+        val desktop = outputs.firstOrNull { it.androidDisplayId == desktopId } ?: return
+        askedDesktop += next.uniqueId
+        val suggested = ScreenRoles.suggestDesktop(ScreenRoles.sizeOf(next), ScreenRoles.sizeOf(desktop))
+        ask(
+            ScreenRoleActivity.desktopIntent(
+                app, next.uniqueId, label(outputs, next), suggested,
+                companionThere = arrangement.companionId == next.androidDisplayId,
+            ),
+            desktopId,
+            next.androidDisplayId,
+        )
+    }
+
+    /** "<name>, <width>x<height>", as the role question names a screen. */
+    private fun label(outputs: List<dev.droidtop.runtime.DisplayOutput>, screen: dev.droidtop.runtime.DisplayOutput): String {
+        val name = ScreenNaming.names(app, outputs)[screen.androidDisplayId] ?: screen.name.ifBlank { ScreenNames.EXTERNAL }
+        return "$name, ${screen.nativeWidthPx}x${screen.nativeHeightPx}"
+    }
+
+    private fun ask(intent: Intent, onDisplay: Int, aboutDisplay: Int) {
+        showing = true
+        runCatching {
+            app.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(onDisplay).toBundle())
+        }.onFailure {
+            showing = false
+            Log.w(TAG, "could not ask about display $aboutDisplay", it)
         }
     }
 
@@ -89,6 +135,15 @@ internal object ScreenRoleAsk {
     fun closed(context: Context, uniqueId: String, role: ScreenRole?) {
         worker.execute {
             if (role != null) ScreenRoles.set(context, uniqueId, role)
+            showing = false
+            check()
+        }
+    }
+
+    /** Desktop's question closed, answered ([choice]) or not; the next question, if any, is asked. */
+    fun desktopClosed(context: Context, uniqueId: String, choice: DesktopScreenChoice?) {
+        worker.execute {
+            if (choice != null) ScreenRoles.setDesktop(context, uniqueId, choice)
             showing = false
             check()
         }
@@ -107,26 +162,14 @@ class ScreenRoleActivity : ComponentActivity() {
             return
         }
         val label = intent.getStringExtra(EXTRA_LABEL).orEmpty()
-        val suggested = ScreenRole.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_SUGGESTED) }
-        val roles = ScreenRole.entries
-        val cursor = HostedCursor().apply { index = roles.indexOf(suggested).coerceAtLeast(0) }
+        val desktop = intent.getBooleanExtra(EXTRA_DESKTOP, false)
+        val rows = if (desktop) desktopRows(uniqueId) else roleRows(uniqueId)
+        val cursor = HostedCursor().apply { index = rows.indexOfFirst { it.value != null }.coerceAtLeast(0) }
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 HostedListSheet(
-                    title = "$label connected. Use it as",
-                    rows = roles.map { role ->
-                        HostedRow(
-                            key = role.name,
-                            title = role.label,
-                            subtitle = whatItDoes(role),
-                            value = if (role == suggested) "Suggested" else null,
-                            onSelect = {
-                                answered = true
-                                ScreenRoleAsk.closed(applicationContext, uniqueId, role)
-                                finish()
-                            },
-                        )
-                    },
+                    title = if (desktop) "The desktop can use $label too" else "$label connected. Use it as",
+                    rows = rows,
                     onClose = { finish() },
                     selectLabel = "Choose",
                     cursor = cursor,
@@ -135,9 +178,57 @@ class ScreenRoleActivity : ComponentActivity() {
         }
     }
 
+    private fun roleRows(uniqueId: String): List<HostedRow> {
+        val suggested = ScreenRole.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_SUGGESTED) }
+        return ScreenRole.entries.map { role ->
+            HostedRow(
+                key = role.name,
+                title = role.label,
+                subtitle = whatItDoes(role),
+                value = if (role == suggested) "Suggested" else null,
+                onSelect = {
+                    answered = true
+                    ScreenRoleAsk.closed(applicationContext, uniqueId, role)
+                    finish()
+                },
+            )
+        }
+    }
+
+    // Desktop's question (Droidtop/tracker#908 step D5): the same sheet, two answers, the suggestion marked.
+    private fun desktopRows(uniqueId: String): List<HostedRow> {
+        val suggested = DesktopScreenChoice.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_SUGGESTED) }
+        val companionThere = intent.getBooleanExtra(EXTRA_COMPANION_THERE, false)
+        return DesktopScreenChoice.entries.map { choice ->
+            HostedRow(
+                key = choice.name,
+                title = when (choice) {
+                    DesktopScreenChoice.EXTEND -> "Use this screen for the desktop"
+                    DesktopScreenChoice.COMPANION -> if (companionThere) "Keep the companion here" else "Keep it as it is"
+                },
+                subtitle = when (choice) {
+                    DesktopScreenChoice.EXTEND -> "Windows move across to it, with a bar of its own"
+                    DesktopScreenChoice.COMPANION -> "The desktop stays on this screen only"
+                },
+                value = if (choice == suggested) "Suggested" else null,
+                onSelect = {
+                    answered = true
+                    ScreenRoleAsk.desktopClosed(applicationContext, uniqueId, choice)
+                    finish()
+                },
+            )
+        }
+    }
+
     override fun onDestroy() {
         // Closed without an answer: the next screen, if any, is asked about; this one waits for Settings > Displays.
-        if (!answered && isFinishing) intent.getStringExtra(EXTRA_ID)?.let { ScreenRoleAsk.closed(applicationContext, it, null) }
+        if (!answered && isFinishing) intent.getStringExtra(EXTRA_ID)?.let {
+            if (intent.getBooleanExtra(EXTRA_DESKTOP, false)) {
+                ScreenRoleAsk.desktopClosed(applicationContext, it, null)
+            } else {
+                ScreenRoleAsk.closed(applicationContext, it, null)
+            }
+        }
         super.onDestroy()
     }
 
@@ -145,12 +236,24 @@ class ScreenRoleActivity : ComponentActivity() {
         private const val EXTRA_ID = "dev.droidtop.app.extra.SCREEN_ID"
         private const val EXTRA_LABEL = "dev.droidtop.app.extra.SCREEN_LABEL"
         private const val EXTRA_SUGGESTED = "dev.droidtop.app.extra.SCREEN_SUGGESTED"
+        private const val EXTRA_DESKTOP = "dev.droidtop.app.extra.SCREEN_DESKTOP"
+        private const val EXTRA_COMPANION_THERE = "dev.droidtop.app.extra.SCREEN_COMPANION_THERE"
 
         fun intent(context: Context, uniqueId: String, label: String, suggested: ScreenRole): Intent =
             Intent(context, ScreenRoleActivity::class.java)
                 .putExtra(EXTRA_ID, uniqueId)
                 .putExtra(EXTRA_LABEL, label)
                 .putExtra(EXTRA_SUGGESTED, suggested.name)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        /** Desktop's question about the screen [uniqueId]; [companionThere]: the companion is what it keeps. */
+        fun desktopIntent(context: Context, uniqueId: String, label: String, suggested: DesktopScreenChoice, companionThere: Boolean): Intent =
+            Intent(context, ScreenRoleActivity::class.java)
+                .putExtra(EXTRA_ID, uniqueId)
+                .putExtra(EXTRA_LABEL, label)
+                .putExtra(EXTRA_SUGGESTED, suggested.name)
+                .putExtra(EXTRA_DESKTOP, true)
+                .putExtra(EXTRA_COMPANION_THERE, companionThere)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         private fun whatItDoes(role: ScreenRole): String = when (role) {

@@ -77,3 +77,44 @@ class SecondScreenPairingTest {
         assertEquals(emptyList<Int>(), SecondScreenPlan.coverCandidates(listOf(builtIn), emptySet(), null))
     }
 }
+
+/** The desktop on a second screen (Droidtop/tracker#908 step D5): nothing of the companion's covers it there. */
+class SecondScreenDesktopTest {
+    private fun output(id: Int, kind: dev.droidtop.runtime.DisplayOutputKind = dev.droidtop.runtime.DisplayOutputKind.SECOND_SCREEN) =
+        dev.droidtop.runtime.DisplayOutput(id = "d$id", androidDisplayId = id, kind = kind, widthPx = 1920, heightPx = 1080)
+
+    @Test
+    fun `the companion's Presentation never goes where the desktop is drawn`() {
+        assertNull(SecondScreenPlan.companionPresentation(2, desktopOn = setOf(2)))
+        assertEquals(2, SecondScreenPlan.companionPresentation(2, desktopOn = setOf(3)))
+        assertEquals(2, SecondScreenPlan.companionPresentation(2, desktopOn = emptySet()))
+        assertNull(SecondScreenPlan.companionPresentation(null, desktopOn = setOf(2)))
+    }
+
+    @Test
+    fun `the idle cover never goes where the desktop is drawn`() {
+        val outputs = listOf(output(0, dev.droidtop.runtime.DisplayOutputKind.PRIMARY_SCREEN), output(2), output(3))
+        assertEquals(listOf(3), SecondScreenPlan.coverCandidates(outputs, emptySet(), companionDisplayId = 2, desktopOn = setOf(2)))
+        assertEquals(listOf(2, 3), SecondScreenPlan.coverCandidates(outputs, emptySet(), companionDisplayId = 2, desktopOn = emptySet()))
+        assertEquals(false, SecondScreenPlan.mayCover(2, setOf(2)))
+        assertEquals(true, SecondScreenPlan.mayCover(2, setOf(3)))
+    }
+
+    @Test
+    fun `with the desktop on the built-in screen the shell still moves, but the companion is not put there`() {
+        val onBuiltIn = setOf(android.view.Display.DEFAULT_DISPLAY)
+        assertEquals(Relocation.TO_SECOND, SecondScreenPlan.aroundDesktop(Relocation.TO_SECOND_WITH_COMPANION, onBuiltIn))
+        assertEquals(Relocation.NONE, SecondScreenPlan.aroundDesktop(Relocation.COMPANION_ON_BUILT_IN, onBuiltIn))
+        assertEquals(Relocation.TO_BUILT_IN, SecondScreenPlan.aroundDesktop(Relocation.TO_BUILT_IN, onBuiltIn))
+        // Elsewhere, or nowhere, the step is unchanged.
+        Relocation.entries.forEach { assertEquals(it, SecondScreenPlan.aroundDesktop(it, setOf(2))) }
+        Relocation.entries.forEach { assertEquals(it, SecondScreenPlan.aroundDesktop(it, emptySet())) }
+    }
+
+    @Test
+    fun `a second screen the desktop is drawn on is in use, not broken`() {
+        assertEquals(false, SecondScreenPlan.reinitOffered(true, secondId = 2, desktopOn = setOf(2)))
+        assertEquals(true, SecondScreenPlan.reinitOffered(true, secondId = 2, desktopOn = emptySet()))
+        assertEquals(false, SecondScreenPlan.reinitOffered(false, secondId = 2, desktopOn = emptySet()))
+    }
+}

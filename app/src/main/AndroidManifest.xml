@@ -641,7 +641,8 @@
 
         <!--
           The one question a new screen gets (ScreenRoleAsk; docs/SPEC.md 4c, "What each screen is for"), over
-          whatever is on the main screen.
+          whatever is on the main screen; and, while the desktop runs, Desktop's question whether it extends to that
+          screen (docs/SPEC.md 2b, "The desktop on a second screen").
         -->
         <activity
             android:name="dev.droidtop.app.ScreenRoleActivity"

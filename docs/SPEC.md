@@ -777,7 +777,7 @@ proposal issue in the tracker". This fills the first direction above.
   windowcast exactly as an Android app is. Never Android's freeform windows
   (2b "Launching from Desktop").
 
-### The desktop on a second screen (Droidtop/tracker#908, step D3, built 2026-11-05)
+### The desktop on a second screen (Droidtop/tracker#908, step D3, built 2026-11-05; asked per screen since D5, 2026-11-06)
 
 The Linux desktop can be drawn across two Android screens: the primary's
 output where Desktop runs, and a second output of the same compositor on
@@ -789,11 +789,53 @@ monitors; moving them from the bar is D4). How it is put there:
   §4) and opens **`DesktopSecondScreenActivity`** on it
   (`ActivityOptions.setLaunchDisplayId`, a task of its own per display, the
   way the companion's activity is put on a screen). `hide(displayId)` closes
-  it and removes the output (`retract`). Nothing calls `show` on its own:
-  D5 asks the person once per screen. A debug build has Developer menu >
-  "Debug: desktop on the other screen" to show and hide it for a rig check.
-  It is an ordinary fullscreen window on that display, never an Android
-  freeform window.
+  it and removes the output (`retract`). `DesktopScreens` (`:app`, D5,
+  below) calls them, from the person's answer for each screen. A debug
+  build has Developer menu > "Debug: desktop on the other screen", which
+  flips the first other screen's answer between Extend and Keep it as it
+  is, so a rig check goes through the same path. It is an ordinary
+  fullscreen window on that display, never an Android freeform window.
+- **Asked once per screen (D5; the owner's rule from #776, "ask once per
+  new display, remember per display").** While the desktop is up in
+  Desktop mode, a screen other than the desktop's own that has a role
+  (4c, "What each screen is for") but no Desktop answer is asked about
+  once, on the desktop's screen, through the same question and sheet a
+  new screen gets (`ScreenRoleAsk`, `ScreenRoleActivity`): "The desktop
+  can use <name, size> too": **Use this screen for the desktop** or
+  **Keep the companion here** ("Keep it as it is" when the companion is
+  not what that screen shows). The cursor starts on the suggestion from
+  what the screens report (`ScreenRoles.suggestDesktop`, the role
+  question's rule): a screen markedly larger than the desktop's suggests
+  extending, a smaller or similar one keeping it. There is no default
+  answer and nothing is decided from a device model; a screen still
+  waiting for its role is asked that first, and one closed without an
+  answer is not asked again while droidtop runs. The answer is kept per
+  screen by the same stable id as its role (`ScreenRoles.desktopSaved`,
+  `setDesktop`, `DesktopScreenChoice`; its own preferences file beside
+  the roles), so a reconnected screen is not asked again and a new one is.
+  Settings > Displays has a row per screen other than the main one,
+  "Desktop on <name>": Extend the desktop or Keep it as it is ("Not
+  answered yet" until there is one), shown while Desktop mode is on.
+- **Applied by `DesktopScreens`** (`:app`, installed with the
+  application, main process): while the session is Connected and Desktop
+  is the mode, every screen answered Extend
+  (`ScreenRoles.desktopExtends`, pure and tested) gets the desktop
+  (`show`, once per screen while it stays wanted, since a second `show`
+  would size the output to the whole screen over its window's size); a
+  changed answer, the desktop stopping, or a switch to another mode with
+  the desktop kept running takes it off again (`hide`). Preferences and
+  the display list are read on the IO dispatcher.
+- **The companion and the idle cover keep off it.** `DesktopScreens`
+  publishes the displays the desktop is on (`DesktopExtension`,
+  `:runtime-common`) before it opens the desktop on one and only after it
+  closed it there, and the second-screen orchestration plans around them
+  (`SecondScreenPlan`, pure and tested): the companion's Presentation is
+  never put on such a display (`companionPresentation`), the idle cover
+  is not (`coverCandidates`, `mayCover`, also at the shell's `onStop`),
+  the companion activity is not started or put back on the built-in
+  screen while the desktop is drawn there (`aroundDesktop`; the shell
+  still moves), and "Reinitialize displays" is not offered for a second
+  screen the desktop is on (`reinitOffered`).
 - **What it draws** (`DesktopSecondOutput`, `:shell-desktop`): a surface
   showing that output (`HostBridge.presentOutput(name, surface)`, stopped
   with `stopPresenting(name)` before the surface goes, as the primary's is),
@@ -838,11 +880,9 @@ monitors; moving them from the bar is D4). How it is put there:
   display), and when the display goes (`CompanionSurfaceLifetime`, which
   also closes it if Android moves it to the built-in screen). Back does
   nothing on it.
-- **Not yet:** the screen's role (Settings > Displays, "Extended desktop
-  output") and the question a new screen gets (D5), so the companion's
-  Presentation or idle cover can still be put on the same screen by the
-  second-screen orchestration and cover it; per-output window lists and
-  "move to the other screen" (D4).
+- **Not yet:** per-output window lists and "move to the other screen"
+  (D4). Under labwc no second output is made (D2), so a screen answered
+  Extend shows the second screen's window with nothing in it.
 
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 
@@ -4066,9 +4106,20 @@ the `ContainerRuntime` interface that already exists (§3):
   (`DesktopSessionService.primaryResized`). The surface's own size is
   passed back to `extendTo`, so the output matches the surface beside its
   bar. The window is touch-only like the companion's, so the pad and keys
-  stay with the primary. `hide(displayId)` closes it and retracts. Nothing
-  calls `show` until D5, except a debug build's Developer menu row. The
+  stay with the primary. `hide(displayId)` closes it and retracts. The
   whole of it is in 2b, "The desktop on a second screen".
+- **Asked once per screen (2026-11-06, Droidtop/tracker#908, step D5).**
+  The first time the desktop runs with a screen other than its own, the
+  person is asked once, through the question a new screen already gets
+  (`ScreenRoleAsk`, 4c), whether the desktop extends to it or it keeps the
+  companion; the cursor starts on `ScreenRoles.suggestDesktop` (a markedly
+  larger screen suggests extending), never a fixed or device default. The
+  answer is kept per screen by its stable id beside its role
+  (`ScreenRoles.desktopSaved`), changed in Settings > Displays ("Desktop on
+  <name>"), and applied by `DesktopScreens`, which shows and hides the
+  desktop there and publishes `DesktopExtension`; `SecondScreenPlan` keeps
+  the companion's Presentation, the companion activity and the idle cover
+  off those displays. The whole of it is in 2b.
 - **Per-window placement is not built (corrected 2026-10-29,
   Droidtop/tracker#695).** This section used to promise that any window could
   be reassigned to a different `DisplayOutput` at runtime, sway moving a
@@ -4101,8 +4152,9 @@ the `ContainerRuntime` interface that already exists (§3):
   `:host-bridge` tracks and captures every output and can place pointer
   input on any of them since #908's D1a and D1b, the session can add
   and remove that output since D2, and `DesktopSecondScreen` shows it on
-  its display since D3; the role row itself and the question a new screen
-  gets are D5, and a taskbar "move to" action D4), or
+  its display since D3; since D5 it is a Desktop answer per screen
+  beside the role, "Desktop on <name>", asked once per screen while the
+  desktop runs, and a taskbar "move to" action is D4), or
   **Mirror** (Android's
   own mirroring, chosen rather than fallen into). The per-mode
   second-screen role rows are these same rows filtered to the mode. A
@@ -6274,6 +6326,10 @@ while playing on the handheld, the dual-screen AVD (two external displays: the s
   lowest id), else on the screen droidtop started on when the menus moved elsewhere, else nowhere. Gaming and Desktop
   follow it; Mobile is Launcher3's own. Swap screens (Quick Menu) swaps the menus and the companion between their
   screens and remembers it (`ScreenRoles.swap`). The interface size of each screen follows the same roles.
+- **Desktop asks once more, per screen** (Droidtop/tracker#908, step D5, 2b "The desktop on a second screen"): while
+  the desktop runs, a screen with a role and no Desktop answer is asked, through this same question flow and sheet,
+  whether the desktop extends to it or it keeps the companion; the suggestion follows `ScreenRoles.suggestDesktop`
+  (the same size rule), and the answer is kept per screen beside its role and changed in Settings > Displays.
 - **The launch chooser orders screens by role**: the main screen first, then the companion's, then the rest by id
   (`DualScreenOrchestration.chooserCandidates`, tested). No screen is first for being an add-on.
 - **The owner's console:** the first time its add-on is connected after this change, it asks once; answering Main

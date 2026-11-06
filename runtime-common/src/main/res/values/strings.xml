@@ -123,6 +123,9 @@
     <string name="gaming_accounts_and_sources">Accounts and sources</string>
     <string name="gaming_accounts_and_plugins">Accounts and plugins</string>
     <string name="gaming_displays">Displays</string>
+    <string name="gaming_desktop_on_x">Desktop on %1$s</string>
+    <string name="gaming_desktop_on_x_line">Whether the desktop uses this screen too while it runs</string>
+    <string name="gaming_not_answered_yet">Not answered yet</string>
     <string name="gaming_keyboard_on_the_screens">Keyboard on the screens</string>
     <string name="gaming_android">Android</string>
     <string name="gaming_android_settings">Android settings</string>

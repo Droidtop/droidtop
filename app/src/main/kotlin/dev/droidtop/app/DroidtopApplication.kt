@@ -167,6 +167,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // A screen connected for the first time is asked about once (docs/SPEC.md 4c, "What each screen is for",
         // Droidtop/tracker#776). Main process only.
         ScreenRoleAsk.install(this)
+        // The desktop on the screens the person said it extends to, asked once per screen (docs/SPEC.md 2b, "The
+        // desktop on a second screen", Droidtop/tracker#908 step D5). Main process only.
+        DesktopScreens.install(this)
         // The download policy (docs/SPEC.md "Download rules", tracker#226): every download job is held or let run by
         // the person's rules, and games set to keep themselves up to date are checked a little after start.
         // Main process only: the jobs registry lives there.

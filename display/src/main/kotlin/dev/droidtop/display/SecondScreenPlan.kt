@@ -77,11 +77,40 @@ internal object SecondScreenPlan {
 
     /**
      * The second screens a launch may leave empty, for the idle cover (4c, the mirroring fix): every second screen
-     * that is not mirrored, the companion's first.
+     * that is not mirrored and does not show the desktop ([desktopOn]), the companion's first.
      */
-    fun coverCandidates(outputs: List<DisplayOutput>, mirroredIds: Set<Int>, companionDisplayId: Int?): List<Int> =
+    fun coverCandidates(
+        outputs: List<DisplayOutput>,
+        mirroredIds: Set<Int>,
+        companionDisplayId: Int?,
+        desktopOn: Set<Int> = emptySet(),
+    ): List<Int> =
         outputs
-            .filter { it.kind == DisplayOutputKind.SECOND_SCREEN && it.androidDisplayId !in mirroredIds }
+            .filter { it.kind == DisplayOutputKind.SECOND_SCREEN && it.androidDisplayId !in mirroredIds && it.androidDisplayId !in desktopOn }
             .map { it.androidDisplayId }
             .sortedBy { if (it == companionDisplayId) 0 else 1 }
+
+    // The desktop on a second screen (docs/SPEC.md 2b, Droidtop/tracker#908 step D5): while the desktop is drawn on a
+    // display ([desktopOn], DesktopExtension), nothing of the companion's and no idle cover is put there.
+
+    /** The display the companion's Presentation goes on: [candidate] (DualScreenOrchestration's), unless the desktop is drawn there. */
+    fun companionPresentation(candidate: Int?, desktopOn: Set<Int>): Int? = candidate?.takeIf { it !in desktopOn }
+
+    /**
+     * [step] with the companion kept off the built-in screen while the desktop is drawn there: the shell still moves,
+     * but the companion is not started under it ([Relocation.TO_SECOND] for [Relocation.TO_SECOND_WITH_COMPANION]) or
+     * put back over it ([Relocation.NONE] for [Relocation.COMPANION_ON_BUILT_IN]).
+     */
+    fun aroundDesktop(step: Relocation, desktopOn: Set<Int>): Relocation = when {
+        Display.DEFAULT_DISPLAY !in desktopOn -> step
+        step == Relocation.TO_SECOND_WITH_COMPANION -> Relocation.TO_SECOND
+        step == Relocation.COMPANION_ON_BUILT_IN -> Relocation.NONE
+        else -> step
+    }
+
+    /** Whether droidtop may put its idle cover on [displayId]: not while the desktop is drawn there. */
+    fun mayCover(displayId: Int, desktopOn: Set<Int>): Boolean = displayId !in desktopOn
+
+    /** "Reinitialize displays" ([broken], DualScreenOrchestration's) is not offered for a second screen the desktop is drawn on: it is in use. */
+    fun reinitOffered(broken: Boolean, secondId: Int?, desktopOn: Set<Int>): Boolean = broken && secondId !in desktopOn
 }
