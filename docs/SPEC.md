@@ -6088,8 +6088,10 @@ droidtop 0.2.0-dev.1931).
   Droidtop/tracker#776: the companion's screen is the one answered Companion in Settings > Displays or in the
   question a new screen gets, else the screen droidtop started on when the menus moved to another; "Show the
   companion on", `CompanionScreens` and its built-in-first default are gone, "What each screen is for" in 4c.) **System > Display** has
-  one card per screen: name, built-in or external, size, orientation and role; the main screen's brightness, the
-  companion's own brightness and "Turn this screen off"; the refresh rate where the screen lists more than one
+  one card per screen: name, built-in or external, size, orientation and role; the built-in screen's brightness
+  (Android's setting, whatever the screen's role, so the catalog's Brightness row is not drawn again on Display), the
+  companion's own brightness ("Dim further" when the companion is on the built-in screen too) and "Turn this screen
+  off"; the refresh rate where the screen lists more than one
   (`cmd display set-user-preferred-display-mode` through the helper app, behind the new Risky actions class "Change
   display settings"); and "This screen controls its own brightness" where droidtop has no brightness for it.
   Identify screens shows a large number and name on each screen for five seconds (a Presentation; a message on

@@ -40,12 +40,13 @@ class CompanionCatalogPanelTest {
             quick(QuickSection.SYSTEM).map { it.id } - GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS,
             cards.first { it.id == "system" }.items.map { it.id },
         )
-        assertEquals(quick(QuickSection.DISPLAY).map { it.id }, cards.first { it.id == "display" }.items.map { it.id })
+        // Brightness is drawn by the built-in screen's card above Display's rows (Droidtop/tracker#786 S7).
+        assertEquals(quick(QuickSection.DISPLAY).map { it.id } - ON_SCREEN_CARD, cards.first { it.id == "display" }.items.map { it.id })
         assertEquals(quick(QuickSection.AUDIO).map { it.id }, cards.first { it.id == "sound" }.items.map { it.id })
         // Every Quick Menu item is on the companion exactly once.
         val all = cards.flatMap { card -> card.items.map { it.id } }
         assertEquals(all.size, all.toSet().size)
-        assertTrue(all.containsAll(ids))
+        assertTrue((all + ON_SCREEN_CARD).containsAll(ids))
     }
 
     @Test fun performanceModeIsOneCatalogIdOnPower() {

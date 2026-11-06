@@ -12,6 +12,19 @@ class CompanionDisplaysTest {
         assertEquals(DisplayRole.OTHER, displayRole(11, mainDisplayId = 0, companionDisplayId = 9))
     }
 
+    // Droidtop/tracker#786 S7: Android's brightness is on the built-in screen's card in every arrangement.
+    @Test fun `the built-in screen always has Android's brightness`() {
+        // Built-in is Main, companion on an add-on screen.
+        assertEquals(listOf(BrightnessRow.ANDROID), brightnessRows(0, ownDisplay = 9, builtInId = 0))
+        assertEquals(listOf(BrightnessRow.WINDOW), brightnessRows(9, ownDisplay = 9, builtInId = 0))
+        // Companion on the built-in screen: both, Android's first.
+        assertEquals(listOf(BrightnessRow.ANDROID, BrightnessRow.WINDOW), brightnessRows(0, ownDisplay = 0, builtInId = 0))
+        // Main and companion both on add-on screens: the built-in screen still has it.
+        assertEquals(listOf(BrightnessRow.ANDROID), brightnessRows(0, ownDisplay = 11, builtInId = 0))
+        // Another external screen has none of droidtop's.
+        assertEquals(emptyList<BrightnessRow>(), brightnessRows(11, ownDisplay = 9, builtInId = 0))
+    }
+
     @Test fun `refresh rates are offered only when there is a choice`() {
         assertEquals(emptyList<Float>(), offeredRates(listOf(60f, 60.0001f)))
         assertEquals(listOf(120f, 90f, 60f), offeredRates(listOf(60f, 120f, 90f, 59.99f)))
