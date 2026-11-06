@@ -1,10 +1,13 @@
-// Termux's terminal-emulator library (vendor/termux-terminal/README.md; Apache-2.0, see LICENSE beside it): the VT
-// parser, the screen buffer and TerminalSession, which runs a program on a pseudo-terminal through its own JNI
-// (src/main/jni/termux.c: open /dev/ptmx, fork, setsid, the slave as stdin/stdout/stderr and controlling terminal,
-// TIOCSWINSZ on resize). droidtop's container terminal uses it (docs/SPEC.md 3d, "A terminal on Android").
+// Termux's terminal-emulator library (termux-terminal/README.md; Apache-2.0): the VT parser, the screen buffer and
+// TerminalSession, which runs a program on a pseudo-terminal through its own JNI (jni/termux.c: open /dev/ptmx, fork,
+// setsid, the slave as stdin/stdout/stderr and controlling terminal, TIOCSWINSZ on resize). droidtop's container
+// terminal uses it (docs/SPEC.md 3d, "A terminal on Android").
 //
-// This build file is droidtop's: upstream's build.gradle reads properties of Termux's own root project and
-// publishes to Maven. The sources under src/main are upstream's, unchanged.
+// The sources are upstream's, unchanged, from the vendor/termux-app submodule (termux/termux-app v0.118.3). Only this
+// build file and droidtop/AndroidManifest.xml are droidtop's: upstream's build.gradle reads properties of Termux's own
+// root project and publishes to Maven.
+val UPSTREAM = "../../vendor/termux-app/terminal-emulator/src/main"
+
 plugins {
     alias(libs.plugins.android.library)
 }
@@ -30,12 +33,13 @@ android {
 
     externalNativeBuild {
         ndkBuild {
-            path = file("src/main/jni/Android.mk")
+            path = file("$UPSTREAM/jni/Android.mk")
         }
     }
 
     sourceSets {
         named("main") {
+            java.srcDir("$UPSTREAM/java")
             manifest.srcFile("droidtop/AndroidManifest.xml")
         }
     }
