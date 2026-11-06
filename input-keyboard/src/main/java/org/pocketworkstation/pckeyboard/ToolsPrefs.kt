@@ -21,6 +21,9 @@ object ToolsPrefs {
     /** Whether copied text is recorded into the clipboard history. */
     const val CLIPBOARD = "pref_clipboard_history"
 
+    /** "Keep clips for" ([ClipKeep]); unset is Until cleared, what the history did before it (Droidtop/tracker#903 H12d). */
+    const val CLIPBOARD_KEEP = "pref_clipboard_keep"
+
     /** Dragging a finger along the space bar moves the cursor. */
     const val SPACE_DRAG = "pref_space_drag"
 
@@ -50,6 +53,8 @@ object ToolsPrefs {
     fun incognito(context: Context): Boolean = prefs(context).getBoolean(INCOGNITO, false)
 
     fun clipboardHistory(context: Context): Boolean = prefs(context).getBoolean(CLIPBOARD, true)
+
+    fun clipboardKeep(context: Context): ClipKeep = ClipKeep.fromPref(prefs(context).getString(CLIPBOARD_KEEP, null))
 
     /**
      * The key grid's form for [context]'s screen and orientation: the shape setting's ([KeyboardForm.choose],

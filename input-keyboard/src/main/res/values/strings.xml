@@ -783,7 +783,21 @@
     <string name="title_incognito">Incognito mode</string>
     <string name="summary_incognito">Learn no words and record no clipboard history while on. Password fields and editors that ask for no personalised learning are always treated this way.</string>
     <string name="title_clipboard_history">Clipboard history</string>
-    <string name="summary_clipboard_history">Keep the text you copy so it can be pinned and pasted again. Clips marked sensitive are never kept.</string>
+    <string name="summary_clipboard_history">Keep the text you copy so it can be pinned and pasted again. Clips marked sensitive, and copies from password fields, are never kept.</string>
+    <!-- "Keep clips for" (Droidtop/tracker#903 H12d): pinned clips stay whatever it says. -->
+    <string name="title_clipboard_keep">Keep clips for</string>
+    <string-array name="clipboard_keep_entries">
+        <item>1 hour</item>
+        <item>1 day</item>
+        <item>1 week</item>
+        <item>Until cleared</item>
+    </string-array>
+    <string-array name="clipboard_keep_values" translatable="false">
+        <item>hour</item>
+        <item>day</item>
+        <item>week</item>
+        <item>forever</item>
+    </string-array>
     <string name="title_space_drag">Space bar moves the cursor</string>
     <string name="summary_space_drag">Drag a finger along the space bar to move the cursor; with Shift held on the keyboard it selects.</string>
     <string name="title_glide">Glide typing</string>
@@ -860,7 +874,6 @@
     <string name="tool_incognito_on">Incognito: on</string>
     <string name="tool_incognito_recording_nothing">Incognito: nothing new is recorded.</string>
     <string name="tool_back">Back</string>
-    <string name="tool_clear">Clear</string>
     <string name="tool_clipboard_empty">Nothing copied yet.</string>
     <!-- The strip a phone typing into this device shows above the tools (Droidtop/tracker#903). -->
     <string name="remote_typing">Phone connected · typing</string>
@@ -869,6 +882,30 @@
     <string name="tool_pin">Pin</string>
     <string name="tool_unpin">Unpin</string>
     <string name="tool_delete">Delete</string>
+    <!-- The clipboard panel (Droidtop/tracker#903 H12d). -->
+    <string name="clip_hint">Tap a clip to paste it; hold it, or press X on a pad, to pin or delete it.</string>
+    <string name="clip_clear_unpinned">Clear unpinned</string>
+    <plurals name="clip_clear_ask">
+        <item quantity="one">Clear %1$d unpinned clip? Pinned clips stay.</item>
+        <item quantity="other">Clear %1$d unpinned clips? Pinned clips stay.</item>
+    </plurals>
+    <string name="clip_cancel">Cancel</string>
+    <string name="clip_paste">Paste</string>
+    <string name="clip_pin_mark" translatable="false">📌</string>
+    <string name="clip_group_pinned">Pinned</string>
+    <string name="clip_group_recent">Recent</string>
+    <string name="clip_group_older">Earlier</string>
+    <string name="clip_search">Search</string>
+    <string name="clip_search_prompt">Search clips: type on the keyboard</string>
+    <string name="clip_search_query">Search clips: %1$s</string>
+    <string name="clip_no_match">No clip matches.</string>
+    <string name="clip_age_now">now</string>
+    <string name="clip_age_minutes">%1$d min</string>
+    <string name="clip_age_hours">%1$d h</string>
+    <string name="clip_age_yesterday">yesterday</string>
+    <string name="clip_age_days">%1$d days</string>
+    <string name="clip_age_weeks">%1$d wk</string>
+    <string name="clip_keep_status">Unpinned clips are kept for %1$s.</string>
     <string name="tool_macro_problems_more">" (and %1$d more)"</string>
     <string name="tool_macros_empty">None yet. In the keyboard settings, Editing helpers, write one per line: name = C-b c</string>
     <!-- The emoji panel (Droidtop/tracker#342, #772). -->

@@ -446,6 +446,17 @@
             android:summary="@string/summary_clipboard_history"
             />
 
+    <!-- How long unpinned clips stay (Droidtop/tracker#903 H12d). Until cleared is what the history did before. -->
+    <org.pocketworkstation.pckeyboard.AutoSummaryListPreference
+            android:key="pref_clipboard_keep"
+            android:title="@string/title_clipboard_keep"
+            android:entryValues="@array/clipboard_keep_values"
+            android:entries="@array/clipboard_keep_entries"
+            android:defaultValue="forever"
+            android:dependency="pref_clipboard_history"
+            android:persistent="true"
+            />
+
     <CheckBoxPreference
             android:key="pref_space_drag"
             android:title="@string/title_space_drag"

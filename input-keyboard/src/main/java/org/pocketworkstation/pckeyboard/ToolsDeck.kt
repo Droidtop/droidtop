@@ -1,7 +1,5 @@
 package org.pocketworkstation.pckeyboard
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
@@ -21,8 +19,8 @@ import org.pocketworkstation.pckeyboard.remote.RemoteTyping
 
 /**
  * The keyboard with its editing helpers (docs/SPEC.md 6a, "Editing helpers", Droidtop/tracker#340): a strip of tool
- * buttons above the key grid, and panels (clipboard history, macros) that take the grid's place while open. The one
- * wrapper both surfaces use: droidtop's input method wraps its input view in it ([wrap], from
+ * buttons above the key grid, and panels (clipboard history, [ClipboardPanel]; macros) that take the grid's place
+ * while open. The one wrapper both surfaces use: droidtop's input method wraps its input view in it ([wrap], from
  * `KeyboardSwitcher`), and [KeyboardPanel] (the companion, the overlays, droidtop's own fields) wraps its grid. What a
  * tool types goes to the [sink] the surface already types into, so the helpers work wherever the keys do.
  * Built from plain views, no layout resources; never a focus target.
@@ -148,9 +146,20 @@ class ToolsDeck private constructor(
      * is open, else the strip's tools then the mode's controls. A tool is pressed as a tap presses it.
      */
     fun padTargets(): List<View> {
-        overlay?.let { panel -> return clickables(panel) }
-        return (stripTools + modeControls).filter { it.isShown }
+        overlay?.let { panel -> return if (panel is ClipboardPanel) panel.padTargets() else clickables(panel) }
+        // An open search's matches come first: they sit between the strip and the keys.
+        val matches = searchBar?.let { clickables(it) }.orEmpty()
+        return matches + (stripTools + modeControls).filter { it.isShown }
     }
+
+    /** Whether the clipboard panel is the one open. */
+    val clipboardOpen: Boolean get() = overlay is ClipboardPanel
+
+    /** X on a pad over an open panel (Droidtop/tracker#903 H12d): the clip under the ring opens its menu. */
+    fun padMenu(target: View?): Boolean = (overlay as? ClipboardPanel)?.padMenu(target) ?: false
+
+    /** B on a pad over an open panel: a menu or question inside it closes first; false when the panel itself should. */
+    fun padBack(): Boolean = (overlay as? ClipboardPanel)?.padBack() ?: false
 
     private fun clickables(root: View): List<View> {
         val out = ArrayList<View>()
@@ -357,7 +366,7 @@ class ToolsDeck private constructor(
             sink.text(text)
             return true
         }
-        context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("", text))
+        ClipboardHistoryStore.putOnClipboard(context, text, typed = false)
         showNotice(context.getString(R.string.tool_copied_for_terminal))
         return false
     }
@@ -516,7 +525,7 @@ class ToolsDeck private constructor(
         setTextColor(colors.text)
     }
 
-    private fun panelFrame(title: String, status: TextView, vararg actions: Button): LinearLayout {
+    private fun panelFrame(title: String, status: TextView): LinearLayout {
         val root = LinearLayout(context).apply {
             orientation = VERTICAL
             setBackgroundColor(colors.panel)
@@ -528,7 +537,6 @@ class ToolsDeck private constructor(
             setPadding(dp(12), dp(2), dp(4), dp(2))
         }
         header.addView(label(title, 15f), LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-        actions.forEach { header.addView(it) }
         header.addView(tool(context.getString(R.string.tool_back)) { hidePanel() })
         root.addView(header)
         status.setPadding(dp(12), 0, dp(12), dp(4))
@@ -538,63 +546,31 @@ class ToolsDeck private constructor(
         return root
     }
 
-    private fun clipboardPanel(): View {
-        val status = TextView(context)
-        val rows = LinearLayout(context).apply { orientation = VERTICAL }
-        val root = panelFrame(context.getString(R.string.title_clipboard_history), status, tool(context.getString(R.string.tool_clear)) { ClipboardHistoryStore.clear() })
-        root.addView(
-            ScrollView(context).apply {
-                isFocusable = false
-                addView(rows)
-            },
-            LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f),
-        )
-        fun refresh() {
-            rows.removeAllViews()
-            val incognito = ToolsPrefs.incognito(context)
-            // Incognito keeps what was copied before out of sight; pinned entries are the user's own notes.
-            val entries = ClipboardHistoryStore.snapshot().filter { !incognito || it.pinned }
-            status.text = if (incognito) context.getString(R.string.tool_incognito_recording_nothing) else ""
-            if (entries.isEmpty()) rows.addView(label(context.getString(R.string.tool_clipboard_empty)).apply { setPadding(dp(12), dp(8), dp(12), dp(8)) })
-            entries.forEach { rows.addView(clipboardRow(it)) }
-        }
-        val listener: () -> Unit = { root.post { refresh() } }
-        root.addOnAttachStateChangeListener(
-            object : View.OnAttachStateChangeListener {
-                override fun onViewAttachedToWindow(v: View) {
-                    ClipboardHistoryStore.addListener(listener)
-                    refresh()
-                }
+    /**
+     * The clipboard history (Droidtop/tracker#903 H12d, [ClipboardPanel]): a tap pastes and closes the panel; into a
+     * container the clip goes onto the clipboard and the panel stays, saying to paste there.
+     */
+    private fun clipboardPanel(): View = ClipboardPanel(
+        context,
+        colors,
+        onPaste = { text -> if (insertText(text)) hidePanel() },
+        onSearch = {
+            hidePanel()
+            showClipSearch()
+        },
+        onBack = { hidePanel() },
+    )
 
-                override fun onViewDetachedFromWindow(v: View) {
-                    ClipboardHistoryStore.removeListener(listener)
-                }
-            },
+    /** The clipboard search above the keys, like the emoji search; the keys type its query while it is open. */
+    private fun showClipSearch() {
+        hideSearch()
+        val bar = ClipSearchBar(
+            context,
+            onPick = { text -> if (insertText(text)) hideSearch() },
+            onDone = { hideSearch() },
         )
-        refresh()
-        return root
-    }
-
-    private fun clipboardRow(entry: ClipboardHistory.Entry): View {
-        val row = LinearLayout(context).apply {
-            orientation = HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), 0, dp(4), 0)
-        }
-        row.addView(
-            label(entry.text.replace('\n', ' ')).apply {
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
-                setPadding(0, dp(8), dp(8), dp(8))
-                setOnClickListener {
-                    if (insertText(entry.text)) hidePanel()
-                }
-            },
-            LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f),
-        )
-        row.addView(tool(context.getString(if (entry.pinned) R.string.tool_unpin else R.string.tool_pin)) { ClipboardHistoryStore.setPinned(entry.text, !entry.pinned) })
-        row.addView(tool(context.getString(R.string.tool_delete)) { ClipboardHistoryStore.delete(entry.text) })
-        return row
+        searchBar = bar
+        addView(bar, indexOfChild(stack))
     }
 
     private fun macroPanel(): View {

@@ -220,6 +220,17 @@ object PanelMotion {
         keys.animate().alpha(1f).setDuration(KeyMotion.PANEL_MS).setInterpolator(ease)
     }
 
+    /** [view] fades to [alpha] (a list dimmed under a menu opened over it, and back), or goes there at once with no motion. */
+    @JvmStatic
+    fun dim(view: View, alpha: Float) {
+        view.animate().cancel()
+        if (!KeyboardMotion.enabled()) {
+            view.alpha = alpha
+            return
+        }
+        view.animate().alpha(alpha).setDuration(KeyMotion.PANEL_MS).setInterpolator(ease)
+    }
+
     /** A panel's content changed (another emoji group, the kaomoji tab): it slides in [distancePx] from that side. */
     @JvmStatic
     fun swap(content: View, distancePx: Float) {

@@ -792,6 +792,11 @@ public class LatinIME extends InputMethodService implements
         // showing its soft-input window. The second-screen keyboard uses
         // this connection even when Android declines to draw that window.
         SecondScreenKeyboard.onStartInput(getCurrentInputConnection(), attribute.inputType);
+        // droidtop patch (Droidtop/tracker#772, #903 H12d): the clipboard history keeps nothing copied while a password
+        // field, or an editor that asked for no personalised learning, has the keyboard. Noted here, as every field
+        // starts, and not in onStartInputView: with a hardware keyboard, or the keys on the add-on screen, Android
+        // starts the field without showing the input view, and a copy from a password field was then kept.
+        ClipboardHistoryStore.noteField(attribute.inputType, attribute.imeOptions);
     }
 
     @Override
@@ -850,10 +855,6 @@ public class LatinIME extends InputMethodService implements
                 mPasswordText = true;
             }
         }
-        // droidtop patch (Droidtop/tracker#772): the clipboard history keeps nothing copied while a password field,
-        // or an editor that asked for no personalised learning, has the keyboard.
-        ClipboardHistoryStore.noteField(attribute.inputType, attribute.imeOptions);
-
         mEnableVoiceButton = shouldShowVoiceButton(attribute);
         final boolean enableVoiceButton = mEnableVoiceButton && mEnableVoice;
 

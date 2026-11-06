@@ -4,8 +4,9 @@ package org.pocketworkstation.pckeyboard
  * The keyboard's clipboard history as a plain model (docs/SPEC.md 6a, "Editing helpers", Droidtop/tracker#340):
  * bounded, newest first, with pinned entries kept and listed first. Text only; a clip longer than [maxChars] is
  * dropped rather than truncated (the clipboard bridge does the same, SPEC 6d), a blank clip or one the source
- * flagged sensitive is never recorded, and nothing is recorded while incognito. No Android classes, so it is
- * tested on the JVM; [ClipboardHistoryStore] owns the file and the listener.
+ * flagged sensitive is never recorded, and nothing is recorded while incognito ([ClipIntake] decides for every source).
+ * Unpinned entries older than "Keep clips for" are removed by [expire]. No Android classes, so it is tested on the JVM;
+ * [ClipboardHistoryStore] owns the file and the listener.
  */
 class ClipboardHistory(private val maxUnpinned: Int = 50, private val maxChars: Int = 5000) {
     data class Entry(val text: String, val pinned: Boolean, val at: Long)
@@ -30,15 +31,37 @@ class ClipboardHistory(private val maxUnpinned: Int = 50, private val maxChars: 
         return true
     }
 
-    fun setPinned(text: String, pinned: Boolean): Boolean {
+    /**
+     * Pins or unpins [text]. An unpinned clip is given [now] as its time (HeliBoard's `togglePinned` does the same), so
+     * a clip pinned long ago and then unpinned gets the whole of "Keep clips for" again rather than vanishing the next
+     * time the panel opens.
+     */
+    fun setPinned(text: String, pinned: Boolean, now: Long? = null): Boolean {
         val index = items.indexOfFirst { it.text == text }
         if (index < 0 || items[index].pinned == pinned) return false
-        items[index] = items[index].copy(pinned = pinned)
+        val entry = items[index]
+        items[index] = entry.copy(pinned = pinned, at = if (!pinned && now != null) now else entry.at)
         if (!pinned) trim()
         return true
     }
 
     fun delete(text: String): Boolean = items.removeAll { it.text == text }
+
+    /** Forgets an unpinned entry with [text] (it was just seen marked sensitive); a pinned one is the person's own. */
+    fun forgetUnpinned(text: String): Boolean = items.removeAll { it.text == text && !it.pinned }
+
+    /**
+     * Removes the unpinned entries older than [keepMs] at [now] ("Keep clips for", [ClipKeep]); null keeps them all.
+     * Pinned entries always stay. True when anything went.
+     */
+    fun expire(now: Long, keepMs: Long?): Boolean {
+        if (keepMs == null) return false
+        val oldest = now - keepMs
+        return items.removeAll { !it.pinned && it.at < oldest }
+    }
+
+    /** How many entries [clear] would remove. */
+    val unpinnedCount: Int get() = items.count { !it.pinned }
 
     /** Clears the history; pinned entries stay unless [keepPinned] is false. */
     fun clear(keepPinned: Boolean = true) {

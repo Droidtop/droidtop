@@ -126,7 +126,7 @@ internal class AndroidClipboard(private val context: Context) : ConsoleClipboard
             val description = clip.description
             ClipRules.classify(
                 present = clip.itemCount > 0,
-                sensitive = description?.extras?.getBoolean(EXTRA_IS_SENSITIVE, false) == true,
+                sensitive = ClipboardHistoryStore.markedSensitive(description),
                 isText = description?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true ||
                     description?.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML) == true,
                 text = { clip.getItemAt(0).text },
@@ -134,9 +134,5 @@ internal class AndroidClipboard(private val context: Context) : ConsoleClipboard
         } catch (e: SecurityException) {
             ClipRead.Unavailable
         }
-    }
-
-    private companion object {
-        const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
     }
 }

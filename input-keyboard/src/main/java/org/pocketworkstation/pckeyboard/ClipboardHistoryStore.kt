@@ -1,8 +1,11 @@
 package org.pocketworkstation.pckeyboard
 
+import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.PersistableBundle
 import android.util.Log
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
@@ -18,8 +21,10 @@ import java.util.concurrent.CopyOnWriteArrayList
  * droidtop's keyboard is the selected one; a read Android refuses is skipped. Never recorded: a clip the source
  * flagged sensitive (`android.content.extra.IS_SENSITIVE`), a copy made while the keyboard serves a password field or
  * an editor that asked for no personalised learning ([IncognitoRules.sensitiveField], since apps before Android 13
- * never set the flag), and anything while incognito. Turning incognito on forgets everything but the pinned entries,
- * in memory and in the file.
+ * never set the flag), and anything while incognito ([ClipIntake], the one rule for the listener, the keyboard's own
+ * writes and a paired device). Turning incognito on forgets everything but the pinned entries, in memory and in the
+ * file. Unpinned entries older than "Keep clips for" ([ClipKeep]) are removed on this thread when the file is loaded,
+ * when the panel is about to open ([prepareForPanel]) and when the setting changes; pinned ones stay.
  */
 object ClipboardHistoryStore {
     private const val TAG = "HK/ClipboardHistory"
@@ -27,7 +32,15 @@ object ClipboardHistoryStore {
 
     /** The file before it was encrypted: read once into the history, then deleted ([load]). */
     private const val PLAINTEXT_FILE = "clipboard_history.txt"
-    private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
+
+    /**
+     * `ClipDescription.EXTRA_IS_SENSITIVE`, by its value: the constant is API 33, the key is read and written on every
+     * version (password managers set it before Android 13 too).
+     */
+    const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
+
+    /** The label of a clip the keyboard itself puts on the clipboard ([putOnClipboard]). */
+    const val KEYBOARD_LABEL = "droidtop keyboard"
 
     private val history = ClipboardHistory()
     private val io = KeyboardThreads.single("hk-clipboard-history")
@@ -57,6 +70,8 @@ object ClipboardHistoryStore {
             synchronized(history) { history.clear(keepPinned = true) }
             changed()
         }
+        // A shorter "Keep clips for" applies at once.
+        if (key == ToolsPrefs.CLIPBOARD_KEEP) io.execute { expire() }
     }
 
     /** Starts recording in this process; calling it again does nothing. Main thread. */
@@ -74,17 +89,53 @@ object ClipboardHistoryStore {
     fun snapshot(): List<ClipboardHistory.Entry> = synchronized(history) { history.entries }
 
     fun setPinned(text: String, pinned: Boolean) {
-        if (synchronized(history) { history.setPinned(text, pinned) }) changed()
+        if (synchronized(history) { history.setPinned(text, pinned, System.currentTimeMillis()) }) changed()
     }
 
     fun delete(text: String) {
         if (synchronized(history) { history.delete(text) }) changed()
     }
 
-    /** Forgets the unpinned entries. */
-    fun clear() {
+    /** Forgets the unpinned entries ("Clear unpinned"); pinned ones stay. */
+    fun clearUnpinned() {
         synchronized(history) { history.clear(keepPinned = true) }
         changed()
+    }
+
+    /**
+     * The panel is about to open: clips past "Keep clips for" go first, on this store's thread, and the listeners hear
+     * of it. Expiry waits for the panel to open rather than running while it is shown, so a row never vanishes under
+     * the finger (HeliBoard's `prepareClipboardHistory`). Main thread.
+     */
+    fun prepareForPanel(context: Context) {
+        start(context)
+        io.execute { expire() }
+    }
+
+    /** Whether [description] carries the sensitive mark ([EXTRA_IS_SENSITIVE]); readable on every version. */
+    @JvmStatic
+    fun markedSensitive(description: ClipDescription?): Boolean =
+        description?.extras?.getBoolean(EXTRA_IS_SENSITIVE, false) == true
+
+    /**
+     * The keyboard's own write to the clipboard: a clip or emoji for a container to paste ([ToolsDeck]), or text
+     * droidtop types into a field through the clipboard (`AccessibilityTyping`). [typed] text is not a copy the person
+     * made, so it is marked sensitive: the history never keeps it ([ClipIntake]), and Android 13's clipboard preview
+     * does not show it. Any other write is recorded by the listener under the same rules as any clip. Any thread: the
+     * typing route writes from its own worker.
+     */
+    @JvmStatic
+    fun putOnClipboard(context: Context, text: CharSequence, typed: Boolean): Boolean {
+        val clip = ClipData.newPlainText(KEYBOARD_LABEL, text)
+        if (typed) clip.description.extras = PersistableBundle().apply { putBoolean(EXTRA_IS_SENSITIVE, true) }
+        return try {
+            val manager = context.getSystemService(ClipboardManager::class.java) ?: return false
+            manager.setPrimaryClip(clip)
+            true
+        } catch (e: SecurityException) {
+            Log.i(TAG, "clipboard write refused")
+            false
+        }
     }
 
     /** [listener] runs, on any thread, whenever the entries change. */
@@ -97,7 +148,9 @@ object ClipboardHistoryStore {
     }
 
     /**
-     * A clip a paired device just put on the clipboard ([org.pocketworkstation.pckeyboard.remote.PairedClips]): kept
+     * A clip a paired device just put on the clipboard (the phone page's Send to console, a KDE Connect device's
+     * clipboard), under the history's one rule ([ClipIntake]; neither source can mark a clip sensitive today, so
+     * [markedSensitive] is false from both, kept so a source that can is never stored): kept
      * from the text that was written, so it reaches the panel even when Android would not let droidtop read the
      * clipboard back (droidtop not in front, its keyboard not the active one). Starts recording if nothing has yet.
      * Main thread; the settings are read on the history's own thread, since a first read loads them from disk.
@@ -108,8 +161,8 @@ object ClipboardHistoryStore {
         // Taken now: the field the keyboard serves when the clip arrives, not when the thread gets to it.
         val sensitiveNow = fieldSensitive
         io.execute {
-            val kept = synchronized(history) {
-                org.pocketworkstation.pckeyboard.remote.PairedClips.keep(
+            val outcome = synchronized(history) {
+                ClipIntake.keep(
                     history, text, System.currentTimeMillis(),
                     historyOn = ToolsPrefs.clipboardHistory(app),
                     incognito = ToolsPrefs.incognito(app),
@@ -117,12 +170,13 @@ object ClipboardHistoryStore {
                     markedSensitive = markedSensitive,
                 )
             }
-            if (kept) changed()
+            if (outcome.changed) changed()
         }
     }
 
     private fun record() {
         val context = appContext
+        // Not even read while nothing would be kept.
         if (!ToolsPrefs.clipboardHistory(context) || ToolsPrefs.incognito(context)) return
         val clip = try {
             context.getSystemService(ClipboardManager::class.java)?.primaryClip
@@ -131,11 +185,24 @@ object ClipboardHistoryStore {
             null
         } ?: return
         if (clip.itemCount == 0) return
-        val sensitive = fieldSensitive || clip.description?.extras?.getBoolean(EXTRA_IS_SENSITIVE, false) == true
         // Plain text only: coercing a URI or HTML item would query a content provider.
         val text = clip.getItemAt(0).text?.toString() ?: return
-        val added = synchronized(history) { history.add(text, System.currentTimeMillis(), sensitive = sensitive) }
-        if (added) changed()
+        val outcome = synchronized(history) {
+            ClipIntake.keep(
+                history, text, System.currentTimeMillis(),
+                historyOn = ToolsPrefs.clipboardHistory(context),
+                incognito = ToolsPrefs.incognito(context),
+                fieldSensitive = fieldSensitive,
+                markedSensitive = markedSensitive(clip.description),
+            )
+        }
+        if (outcome.changed) changed()
+    }
+
+    /** Unpinned clips past "Keep clips for" go ([ClipKeep]). On [io] only: the first read of the settings is a file read. */
+    private fun expire() {
+        val keep = ToolsPrefs.clipboardKeep(appContext)
+        if (synchronized(history) { history.expire(System.currentTimeMillis(), keep.millis) }) changed()
     }
 
     /** Tells the listeners, then saves a copy of the entries; the encoding and sealing happen on [io]. */
@@ -173,7 +240,12 @@ object ClipboardHistoryStore {
                 }
             }
         }
-        synchronized(history) { encoded.forEach { history.restore(it) } }
+        val expired = synchronized(history) {
+            encoded.forEach { history.restore(it) }
+            // Clips that outlived "Keep clips for" while the keyboard was not running go before anyone sees them.
+            history.expire(System.currentTimeMillis(), ToolsPrefs.clipboardKeep(appContext).millis)
+        }
+        if (expired && !plaintext.exists()) save(ClipboardHistory.encode(synchronized(history) { history.entries }))
         if (plaintext.exists()) {
             save(ClipboardHistory.encode(synchronized(history) { history.entries }))
             if (!plaintext.delete()) Log.w(TAG, "old plaintext history not deleted")

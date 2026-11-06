@@ -20,7 +20,9 @@ import android.view.View
  * own controls (one-handed's switch side and back to full, floating's Dock); Left and Right step along them, A presses
  * one, Down or B goes back to the keys. A panel a tool opens (the Modes chooser, clipboard, emoji, macros) takes the pad
  * while it is open: every direction steps through its buttons, A presses, B closes it. So every mode is reached by the
- * pad the way it is by touch, through the strip's Modes button, with no chord of its own.
+ * pad the way it is by touch, through the strip's Modes button, with no chord of its own. In the clipboard panel
+ * (Droidtop/tracker#903 H12d) the ring steps through the clips first, then the header's buttons: A pastes the clip,
+ * X opens its menu (Paste, Pin or Unpin, Delete), and B closes the menu, or the panel when no menu is open.
  */
 internal class PadKeys(private val ime: LatinIME) {
     /** The ring's point, in the keyboard's own coordinates; null while the pad has not driven since the last touch. */
@@ -162,7 +164,18 @@ internal class PadKeys(private val ime: LatinIME) {
                     view.post { afterPress() }
                 }
             }
+            // X is the clip's menu in the clipboard panel, never a Backspace into the field behind it.
+            Slab.PadButton.of(keyCode) == Slab.PadButton.X && deck.clipboardOpen -> if (first && deck.padMenu(targets[tool])) {
+                // The menu takes the ring at its first button.
+                view.post { afterPress() }
+            }
             Slab.PadButton.of(keyCode) == Slab.PadButton.B -> if (first) {
+                if (panel && deck.padBack()) {
+                    // A menu inside the panel closed: the ring goes back to the first clip.
+                    tool = 0
+                    light(deck.padTargets().firstOrNull())
+                    return true
+                }
                 if (panel) deck.hidePanel()
                 backToKeys(view, boxes, null)
             }

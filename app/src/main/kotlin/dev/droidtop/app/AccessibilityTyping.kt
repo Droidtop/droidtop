@@ -1,8 +1,6 @@
 package dev.droidtop.app
 
 import android.accessibilityservice.AccessibilityService
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.hardware.display.DisplayManager
@@ -25,6 +23,7 @@ import dev.droidtop.runtime.keyboard.FieldText
 import dev.droidtop.runtime.keyboard.OverlayOwner
 import dev.droidtop.runtime.keyboard.TextEdit
 import dev.droidtop.runtime.keyboard.TextSplice
+import org.pocketworkstation.pckeyboard.ClipboardHistoryStore
 import org.pocketworkstation.pckeyboard.KeyboardSink
 import org.pocketworkstation.pckeyboard.MetaTracker
 import org.pocketworkstation.pckeyboard.SecondScreenKeyboard
@@ -320,8 +319,10 @@ internal object AccessibilityTyping {
             return
         } else if (edit is TextEdit.Insert) {
             select(node, before.min, before.max)
-            val clipboard = service?.getSystemService(ClipboardManager::class.java) ?: return
-            clipboard.setPrimaryClip(ClipData.newPlainText("droidtop keyboard", edit.text))
+            val context = service ?: return
+            // Marked sensitive: what is typed is not a copy, so the keyboard's clipboard history never keeps it
+            // (Droidtop/tracker#903 H12d) and Android 13's clipboard preview does not show it.
+            if (!ClipboardHistoryStore.putOnClipboard(context, edit.text, typed = true)) return
             if (!node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) return
         } else {
             val removed = before.text.length - after.text.length

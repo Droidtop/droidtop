@@ -9328,7 +9328,9 @@ Removing the download (the same row) frees the 75 MB, and the voice key falls ba
 (Droidtop/tracker#903 H12c): Up from the top row takes the ring onto the tool strip and then a mode's own controls
 (one-handed's switch side and back to full, floating's Dock), Left and Right step along them, A presses one, Down or B
 returns to the keys; an open panel (Modes, clipboard, emoji, macros) takes the pad while it is open, every direction
-stepping through its buttons, A pressing, B closing it. No chord is added: none exists for the strip's other tools. A physical keyboard is not taken (lane default, 2026-10-28): it types, and its arrows move the app's caret, as before; its Ctrl, Alt and Fn keys already reach the app. The companion's and the second screen's keyboards are the slab, which a pad already drives.
+stepping through its buttons, A pressing, B closing it. In the clipboard panel (H12d, "Clipboard panel" below) the
+clips come first, A pastes, X opens the clip's menu and B closes the menu before the panel. No chord is added: none
+exists for the strip's other tools. A physical keyboard is not taken (lane default, 2026-10-28): it types, and its arrows move the app's caret, as before; its Ctrl, Alt and Fn keys already reach the app. The companion's and the second screen's keyboards are the slab, which a pad already drives.
 
 **Dictionaries (Droidtop/tracker#339).** The engine stays the one the keyboard has: AOSP's 2011 LatinIME dictionary reader (`src/main/cpp/dictionary.cpp`, Apache-2.0), which suggests, completes and answers bigrams for next-word; both repositories being GPL-3.0 (#344) settles the issue's licence gate, and porting a newer engine stays open for later (lane default, 2026-10-28). Its data are per-language wordlists in the open `.combined` text form, downloaded on request and never bundled (the issue's rule), each pack's licence checked before it is offered. The keyboard converts a wordlist on the device into the engine's binary format: `CombinedWordlist` reads it, `DictionaryWriter` writes version 200 with bigrams as the reader walks it (groups depth-first so its bigram search finds a word by address; a dictionary with a character past U+00FF is written without bigrams, since that search steps over characters as single bytes; at most 4 MB, the rarest words dropped until it fits). The layout was checked against the native reader itself, built on a host: 60,000 words and 8,000 bigrams all found again; `DictionaryWriterTest` holds that reader's verified bytes. A dictionary is kept per language in the keyboard's files (`keyboard-dictionaries/main_<language>.dict`) and, when the language's `Suggest` has no main dictionary of its own (the shipped one is a stub), loaded memory-mapped on a background thread and swapped in on the main thread (`KeyboardDictionaries.loadInto`); one added or removed is picked up on the next field. Until the download catalog is ready, a person adds one under Keyboard settings > Dictionaries > Add from a file (a `.combined` wordlist, plain or gzipped; its first line names the language), converted in the background with the result in a toast, and removes one there.
 
@@ -9417,12 +9419,15 @@ proposal) is not built; these helpers are in the one settings tree that already 
   Android refuses is skipped), never a clip flagged `android.content.extra.IS_SENSITIVE`, never while incognito,
   and never a copy made while the keyboard serves a password field (text, web, visible or numeric) or an editor
   that asked for no personalised learning, until the next field starts (`IncognitoRules.sensitiveField`, noted by
-  `LatinIME.onStartInputView`), since apps before Android 13 never set the flag. The file
+  `LatinIME.onStartInput` as every field starts, whether or not the keys are shown), since apps before Android 13
+  never set the flag. One rule decides for every source (`ClipIntake`, "Clipboard panel" below). The file
   (`clipboard_history.bin`, app-private) is encrypted at rest (Droidtop/tracker#772): AES-GCM under a key kept in
   the Android Keystore (`ClipboardVault`), so no copied text is on disk in the clear, and a file the key no longer
   opens (the key was reset) is dropped. The plaintext `clipboard_history.txt` an older build wrote is read once,
   saved sealed and deleted. Encoding, sealing and the file work run on one background thread; the main thread only
-  touches memory. Loading merges with what was recorded meanwhile, so a copy made before the file was read is kept. The panel lists entries with Pin, Delete and Clear (pinned stay). A tap on an entry types it at
+  touches memory. Loading merges with what was recorded meanwhile, so a copy made before the file was read is kept.
+  The panel ("Clipboard panel" below) lists the clips with their age and a pin mark, Pin, Unpin and Delete on a long
+  press, and Clear unpinned (pinned stay). A tap on an entry types it at
   the cursor where the sink takes text; into a container, which has no text channel, it sets the Android
   clipboard, which the clipboard bridge hands to the container, and the panel says to paste there.
 - **Incognito.** One preference, toggled from the strip. While on: no clipboard recording, turning it on forgets
@@ -9798,6 +9803,72 @@ are in addition to Hacker's own layouts (4-row, 5-row, full), never replacing th
 - **Ported where it fits** (NOTICE.md): HeliBoard's one-handed controls and per-orientation clamped scale (GPL-3.0),
   FlorisBoard's floating insets and offset clamp (Apache-2.0). Neither has a thumb split, a calculator or a compact
   layout picked by display, so those are droidtop's own. Both were cloned fresh for this.
+
+### Clipboard panel (Droidtop/tracker#903 H12d, built 2026-11-06)
+
+The owner, relayed by the coordinator for #903: "We want polish, new detailing, modern styling, extra modes, dynamic
+stuffs", and "Hacker's Keyboard is our foundation... keeping ALL of hacker's functionality". The approved H12 text for
+this slice: "a clipboard history panel: pinned items, sensitive clips never stored, and a time limit on keeping them."
+It extends the one history ("Editing helpers" above: `ClipboardHistory`, `ClipboardHistoryStore`, its sealed file);
+there is no second store. The rules are pure and JVM tested (`ClipboardRules.kt`: `ClipIntake`, `ClipKeep`,
+`ClipSearch`, `ClipAge`, `ClipGroups`); the panel is `ClipboardPanel`.
+
+- **Pinned clips.** The history already had pins (a repeat keeps its pin), and this is that pin. A long press on a
+  clip, or X on a pad, opens its menu: Paste, Pin or Unpin, Delete, Cancel. Pinned clips are listed first, are kept in
+  the file across restarts as before (`P` lines), and survive "Keep clips for" and Clear unpinned. Unpinning gives the
+  clip the current time (HeliBoard's `togglePinned` does the same), so a clip pinned long ago gets the whole limit
+  again rather than vanishing the next time the panel opens.
+- **Sensitive clips are never stored** (`ClipIntake.keep`, one rule for every source: the system clipboard's
+  listener, the keyboard's own writes to the clipboard, and a paired device, "Type from another device"). A clip is
+  sensitive when its source marked it (`android.content.extra.IS_SENSITIVE`, which Android 13's
+  `ClipDescription.EXTRA_IS_SENSITIVE` names; the key is read on every version, since password managers set it
+  before 13 too, so nothing API-33-only is loaded), or when the keyboard serves a password or no-learning field
+  (`IncognitoRules.sensitiveField`), on every version; nothing at all is kept while incognito or with the history off.
+  A sensitive clip whose text is already in the history unpinned also forgets that entry: the text is now known to
+  be a secret. A pinned one is the person's own and stays. Gaps found and closed in this slice:
+  - The field was noted in `onStartInputView`, which Android skips when it starts a field without showing the keys
+    (a hardware keyboard attached, the keys on the add-on screen): a copy from a password field was then judged by
+    the field before it and kept. It is now noted in `onStartInput`, which runs for every field.
+  - Text droidtop types into another app's field through the clipboard (`AccessibilityTyping`, a field with no
+    set-text action) was recorded as if the person had copied it. The keyboard's own writes now go through
+    `ClipboardHistoryStore.putOnClipboard`; typed text is marked sensitive there, so the history never keeps it and
+    Android 13's clipboard preview does not show it (it still reaches a container through the bridge, 6d, which never
+    hands a marked clip to a plugin).
+  - The sensitive mark was read in three places of droidtop's own; the history and the phone's clipboard read share
+    `ClipboardHistoryStore.markedSensitive` (the bridge, in another module, keeps its own).
+- **"Keep clips for"** (`pref_clipboard_keep`, in Editing helpers under Clipboard history, on the short screen too):
+  1 hour, 1 day, 1 week or **Until cleared, the default**, because the history kept clips forever before, so nothing
+  changes for anyone until they choose. Unpinned clips older than the limit are removed on the history's own thread
+  (`ClipboardHistory.expire`, HeliBoard's `clearOldClips` rule) when the file is loaded (and the file saved again),
+  when the panel is about to open (`ClipboardHistoryStore.prepareForPanel`; HeliBoard's rule that expiry waits for
+  the panel rather than running while it is shown, so a row never vanishes under the finger) and when the setting
+  changes; never on the main thread. **Clear unpinned** in the panel's header asks first ("Clear 3 unpinned clips?
+  Pinned clips stay."). It is the history's existing Clear, which always kept pinned clips, renamed for what it does;
+  there is no second clear.
+- **The panel** (`ClipboardPanel`, over the keys with H12a's slide, `PanelMotion`): a header (Clipboard history,
+  Search, Clear unpinned, Back), one status line (how to pin, the limit when one is set, or that incognito records
+  nothing), and the clips in sections, FlorisBoard's: Pinned, Recent (the last five minutes) and Earlier. Each clip is
+  a rounded plate (the keys' 6dp corners, in the key colour) with its text clipped to two lines, its age under it
+  ("now", "2 min", "3 h" earlier today, "yesterday", "4 days", "2 wk"; days on the local calendar, `ClipAge`) and a pin
+  mark when pinned. A tap pastes, as before. The menu and the clear question open as a card over the list, which dims
+  to 12% under it (FlorisBoard's), rising in as panels do; a tap outside the card closes it. While incognito only the
+  pinned clips show, as before.
+- **Search** (`ClipSearchBar`, like the emoji search): Search in the panel's header closes the panel and opens a line
+  above the keys whose query is typed on the keyboard itself (`KeyboardCapture`), with the matching clips in a row
+  (every word of the query, in any order, ignoring case and accents: `ClipSearch`). A tap pastes; Enter or Done
+  closes it.
+- **The pad** (`PadKeys`, "A pad on the keyboard"): in the panel the ring steps through the clips first, then the
+  header's buttons (Up and Down, as Left and Right do); A pastes the clip under it, X opens its menu (the ring moves
+  to the menu's first button), B closes the menu, or the panel when no menu is open. X no longer types a Backspace
+  into the field behind the clipboard panel. With a search line open (clips, emoji, GIFs), Up from the top row of keys
+  reaches its matches before the strip.
+- **Kept** (the owner's rule above): every clip already stored survives the upgrade, in the same file and format;
+  `pref_clipboard_history` and `pref_incognito` keep their keys and meaning; tap to paste, pins, the 50-clip and
+  5000-character bounds and the container route are unchanged.
+- **Ported where it fits** (NOTICE.md; both cloned fresh for this, at the commits H12a to H12c used): HeliBoard's
+  retention rule and its timing (GPL-3.0); FlorisBoard's pinned, recent and other grouping and its clip menu and
+  clear question over the dimmed history (Apache-2.0). Neither has a pad route or a search typed on the keys
+  themselves, so those are droidtop's own.
 
 ## 6b. Desktop surface input (built 2026-09-01)
 
@@ -17969,12 +18040,13 @@ again if a code is refused".
     what it refuses, are the rules above.
   - *Clips.* Text a paired device puts on the console's clipboard (Send to console on the phone page; a KDE Connect
     device's clip, 7q) is also kept in the keyboard's clipboard history, so it is on the clipboard panel
-    (`ClipboardHistoryStore.fromPairedDevice`, `PairedClips`), from the text written, so it arrives even when Android
+    (`ClipboardHistoryStore.fromPairedDevice`, `ClipIntake`), from the text written, so it arrives even when Android
     would not let droidtop read the clipboard back. The history's own rules hold and no others (6a, "Editing
     helpers"): nothing while the history is off or incognito, nothing while the keyboard serves a password or
     no-learning field (`IncognitoRules.sensitiveField`), nothing blank or over its 5000 character limit, and never a
     clip marked sensitive (neither the page nor KDE Connect can mark one today; the rule is there for a source that
-    can). The settings are read and the history written on the history's own thread.
+    can). The settings are read and the history written on the history's own thread. "Keep clips for" and pins apply
+    to these clips as to any (6a, "Clipboard panel", Droidtop/tracker#903 H12d).
 - **Ways in:** the **Type from another device** button on the companion's Keys screen (the Input tab, opened on the
   companion's own screen), the **Type from another device** row in the Quick Menu (a catalog item,
   `GamingSettingsCatalog.ID_TYPE_FROM_DEVICE`, in the Power and mode section), and the key setup screens (7h). All
@@ -23863,7 +23935,7 @@ client." The plan and its slices are on #645.
   - **clipboard (slice 3)**, both ways, under the shared clipboard's rules (`ClipRules`, "Type from another
     device"): a paired device's clip is written to this one's (64 KB at most; nothing is shown, as in the official
     apps), and kept in the keyboard's clipboard history under its rules ("Type from another device", "On the
-    keyboard"). This device's clip is sent when it changes while Android lets droidtop see it (droidtop in front, or its
+    keyboard"; 6a, "Clipboard panel": never when sensitive, and gone after "Keep clips for" unless pinned). This device's clip is sent when it changes while Android lets droidtop see it (droidtop in front, or its
     input method active: `addPrimaryClipChangedListener`), and by **Send clipboard** under Paired; a clip marked
     sensitive, one that is not plain text, or one over 64 KB never leaves. On connecting, each side sends its clip
     with the time it changed, and the newer one wins (kdeconnect-android's rule). A clip that just arrived is not

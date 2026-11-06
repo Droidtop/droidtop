@@ -182,6 +182,19 @@ This project is distributed under the GNU General Public License v3.0 (see
     visible insets at the window's bottom, touches taken only inside the window by `TOUCHABLE_INSETS_REGION`) and the
     clamp of `ime/window/ImeWindowProps.kt` (`Floating.constrained`: size between bounds, offsets kept inside the root),
     as `FloatingKeyboardFrame` and `KeyboardModes.clampFrame`, with its phone minimum widths.
+- **Keyboard clipboard panel, ported in part** (Droidtop/tracker#903 H12d; docs/SPEC.md 6a, "Clipboard panel").
+  `ClipboardRules.kt` and `ClipboardPanel.kt` in `input-keyboard` name both in their headers.
+  - HeliBoard, https://github.com/Helium314/HeliBoard at `2d9869b2` — GPL-3.0-only, Copyright (C) HeliBoard
+    contributors: the retention rule of `app/src/main/java/helium314/keyboard/latin/database/ClipboardDao.kt`
+    (`clearOldClips`: an unpinned clip older than the limit goes, a pinned one never does) and its timing in
+    `ClipboardHistoryManager.prepareClipboardHistory` (checked as the history is about to be shown, never while it is
+    on screen), and `togglePinned` giving a clip the current time, as `ClipboardHistory.expire`, `ClipKeep`,
+    `ClipboardHistory.setPinned` and `ClipboardHistoryStore.prepareForPanel`.
+  - FlorisBoard, https://github.com/florisboard/florisboard at `bac346e8` — Apache-2.0, Copyright (C) 2021-2025 The
+    FlorisBoard Contributors: the pinned, recent (five minutes) and other grouping of
+    `app/src/main/kotlin/dev/patrickgold/florisboard/ime/clipboard/ClipboardHistory.kt`, as `ClipGroups`; and from
+    `ime/clipboard/ClipboardInputLayout.kt`, the clip's menu (the whole clip and its time, Pin or Unpin, Delete, Paste)
+    and the clear question as a card over the history dimmed to 12%, closed by a tap outside it, as `ClipboardPanel`.
 - **Termux terminal-emulator and terminal-view** — `vendor/termux-terminal`, https://github.com/termux/termux-app
   at `v0.118.3` (`5b657c6a`) — Apache-2.0 (termux-app's own `LICENSE.md` names these two libraries, which carry
   Terminal Emulator for Android code, https://github.com/jackpal/Android-Terminal-Emulator, as Apache-2.0; the rest
