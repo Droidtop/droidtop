@@ -23,6 +23,11 @@ import android.view.View
  * pad the way it is by touch, through the strip's Modes button, with no chord of its own. In the clipboard panel
  * (Droidtop/tracker#903 H12d) the ring steps through the clips first, then the header's buttons: A pastes the clip,
  * X opens its menu (Paste, Pin or Unpin, Delete), and B closes the menu, or the panel when no menu is open.
+ *
+ * The candidate bar (Droidtop/tracker#903 H6): Up from the tool strip, or from the top row when there is no strip,
+ * takes the ring onto the candidates ([CandidateView], [CandidateBar]). Left and Right step along them and onto the
+ * expand button, A picks one as a tap does (or opens the grid), and in the grid every direction moves, Up and Down
+ * across pages; Down from the row goes back to the tools, B closes the grid and then goes back to the keys.
  */
 internal class PadKeys(private val ime: LatinIME) {
     /** The ring's point, in the keyboard's own coordinates; null while the pad has not driven since the last touch. */
@@ -38,12 +43,17 @@ internal class PadKeys(private val ime: LatinIME) {
     private var lit: View? = null
     private var litWas: Drawable? = null
 
+    /** Whether the ring is on the candidate bar (H6). */
+    private var onBar = false
+
     fun clear() {
         point = null
         held.clear()
         view()?.setPadFocus(null)
         tool = -1
         light(null)
+        onBar = false
+        ime.candidateStrip()?.padLeave()
     }
 
     fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
@@ -64,7 +74,14 @@ internal class PadKeys(private val ime: LatinIME) {
             else -> null
         }
         val deck = ime.toolsDeck
-        if (deck != null && (deck.panelOpen || tool >= 0)) {
+        // A touch on the bar took its ring away.
+        if (onBar && ime.candidateStrip()?.isPadActive != true) onBar = false
+        if (onBar) {
+            if (onCandidates(deck, view, boxes, keyCode, move, first)) {
+                held += keyCode
+                return true
+            }
+        } else if (deck != null && (deck.panelOpen || tool >= 0)) {
             if (onTools(deck, view, boxes, keyCode, move, first)) {
                 held += keyCode
                 return true
@@ -72,8 +89,12 @@ internal class PadKeys(private val ime: LatinIME) {
         } else if (move != null) {
             val at = point?.let { KeyFocus.nearest(boxes, it.first, it.second) }
             val next = if (at == null) KeyFocus.start(boxes) else KeyFocus.next(boxes, at, move)
-            // Up from the top row: onto the tool strip, at the tool nearest across.
+            // Up from the top row: onto the tool strip, at the tool nearest across; with no strip, onto the candidates.
             if (move == Slab.Move.UP && at != null && next == at && deck != null && enterTools(deck, view, boxes[at].cx)) {
+                held += keyCode
+                return true
+            }
+            if (move == Slab.Move.UP && at != null && next == at && enterBar(view)) {
                 held += keyCode
                 return true
             }
@@ -147,7 +168,10 @@ internal class PadKeys(private val ime: LatinIME) {
         when {
             move != null -> when {
                 move == Slab.Move.DOWN && !panel -> backToKeys(view, boxes, targets[tool])
-                move == Slab.Move.UP && !panel -> Unit
+                move == Slab.Move.UP && !panel -> if (enterBar(view)) {
+                    tool = -1
+                    light(null)
+                }
                 else -> {
                     val step = if (move == Slab.Move.LEFT || move == Slab.Move.UP) -1 else 1
                     tool = (tool + step + targets.size) % targets.size
@@ -177,6 +201,39 @@ internal class PadKeys(private val ime: LatinIME) {
                     return true
                 }
                 if (panel) deck.hidePanel()
+                backToKeys(view, boxes, null)
+            }
+            else -> return false
+        }
+        return true
+    }
+
+    /** The ring onto the candidate bar (H6): false when it is not shown or has nothing on it. */
+    private fun enterBar(view: LatinKeyboardView): Boolean {
+        val strip = ime.candidateStrip() ?: return false
+        if (!strip.padEnter()) return false
+        view.setPadFocus(null)
+        onBar = true
+        return true
+    }
+
+    /** A pad button while the ring is on the candidate bar: true when it was taken. X, Y and the rest type as on the keys. */
+    private fun onCandidates(deck: ToolsDeck?, view: LatinKeyboardView, boxes: List<KeyFocus.Box>, keyCode: Int, move: Slab.Move?, first: Boolean): Boolean {
+        val strip = ime.candidateStrip()
+        if (strip == null) {
+            onBar = false
+            backToKeys(view, boxes, null)
+            return move != null
+        }
+        when {
+            move != null -> if (!strip.padMove(CandidateBar.Move.valueOf(move.name))) {
+                // Down from the row: back to the tools, or the keys when there are none.
+                onBar = false
+                if (deck == null || !enterTools(deck, view, view.width / 2f)) backToKeys(view, boxes, null)
+            }
+            FaceKeys.roleOf(keyCode) == FaceKeys.Role.CONFIRM -> if (first) strip.padPress()
+            Slab.PadButton.of(keyCode) == Slab.PadButton.B -> if (first && !strip.padBack()) {
+                onBar = false
                 backToKeys(view, boxes, null)
             }
             else -> return false
