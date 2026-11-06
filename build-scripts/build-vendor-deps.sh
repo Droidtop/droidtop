@@ -95,11 +95,6 @@ echo "=== libffi ($ABI) ==="
     export CC CXX AR=llvm-ar AS="$CC" LD=ld RANLIB=llvm-ranlib STRIP=llvm-strip
     cd "$VENDOR/libffi"
     if [ ! -f configure ]; then
-        # libffi's Makefile.am ships ACLOCAL_AMFLAGS which conflicts with its
-        # own AC_CONFIG_MACRO_DIRS([m4]) under current autoconf/libtool —
-        # strip it. Known upstream autotools-version friction, not a bug here.
-        sed -i '/^ACLOCAL_AMFLAGS = -I m4$/d' Makefile.am
-
         # `-I m4` passed explicitly (not left to AC_CONFIG_MACRO_DIRS([m4])
         # auto-detection) — needed on some but not all environments.
         #
