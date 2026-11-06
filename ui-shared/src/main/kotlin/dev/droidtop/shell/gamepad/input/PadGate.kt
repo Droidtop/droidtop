@@ -148,6 +148,8 @@ class PadGateCore(
         rightTriggerValue: Float,
         now: Long,
     ) {
+        // The raw stick, for Settings > Controls' stick test (Droidtop/tracker#723); only read while that test shows.
+        lastStick.value = stickX to stickY
         update(vertical, deviceId, if (hatY != 0f) hatY else stickY, now, repeats = true)
         update(horizontal, deviceId, if (hatX != 0f) hatX else stickX, now, repeats = true)
         update(leftTrigger, deviceId, leftTriggerValue, now, repeats = false)
@@ -239,6 +241,9 @@ class PadGateCore(
     private fun pair(deviceId: Int, keyCode: Int): Long = (deviceId.toLong() shl 32) or (keyCode.toLong() and 0xffffffffL)
 
     companion object {
+        /** The last stick position any window's pad front saw, x and y in -1..1 (the stick test, #723). */
+        val lastStick = kotlinx.coroutines.flow.MutableStateFlow(0f to 0f)
+
         /** A press this soon after the same key's release is the switch bouncing, not a person. */
         const val DEBOUNCE_MS = 25L
 

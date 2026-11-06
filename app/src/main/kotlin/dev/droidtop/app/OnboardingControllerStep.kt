@@ -245,7 +245,35 @@ internal fun ControllerStep(
                 style = TypeRole.supporting,
             )
         }
+
+        // The stick, live (Droidtop/tracker#723): where it rests and how far it leans, against the dead zone set in
+        // Settings > Controls, so drift shows as a number that never settles at zero.
+        StepSectionLabel("Test your stick")
+        val stick by dev.droidtop.shell.gamepad.input.PadGateCore.lastStick.collectAsState()
+        val (press, release) = dev.droidtop.runtime.StickDeadZone.thresholds()
+        val lean = maxOf(kotlin.math.abs(stick.first), kotlin.math.abs(stick.second))
+        Text(
+            stickLine(stick.first, stick.second, lean, press, release),
+            color = if (lean >= press) MenuTokens.Accent else MenuTokens.OnSurfaceMuted,
+            style = TypeRole.supporting,
+            modifier = Modifier.padding(horizontal = Space.Lg),
+        )
     }
+}
+
+/**
+ * The stick test's line (Droidtop/tracker#723): the position, then whether that lean moves the menus at the dead zone
+ * set now ([press] and [release] from `StickDeadZone`). Pure.
+ */
+internal fun stickLine(x: Float, y: Float, lean: Float, press: Float, release: Float): String {
+    val position = "x %+.2f, y %+.2f".format(x, y)
+    val verdict = when {
+        lean >= press -> "moves the menus"
+        lean > release -> "inside the dead zone's margin"
+        lean > 0.02f -> "resting off centre: drift, inside the dead zone"
+        else -> "centred"
+    }
+    return "$position: $verdict"
 }
 
 /** What the resolver concluded, as the two facts a person acts on: "A (the bottom button) confirms and B goes back". */

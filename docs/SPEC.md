@@ -20974,7 +20974,10 @@ whole steps and the triggers keep the fixed band). It applies at once and from t
 **<pad>: button labels** (Automatic, Xbox, PlayStation or Nintendo) relabels its face buttons: it is kept by the
 pad's input-device descriptor (`GlyphOverrides`) and applied after the layout is resolved as `FaceLayout.copy(family
 =)`, so only the printed glyphs change and which key confirms stays the resolver's (`ControllerLayouts.recompute`,
-relabelled at once on change). A live button and stick test is still to build.
+relabelled at once on change). The live test is the Controller row's step (onboarding's, re-entered): "Test your
+buttons" reads each press by position, and **Test your stick** shows the stick's position live from the pad's front
+(`PadGateCore.lastStick`) and what that lean does at the dead zone set now: centred, drift inside the dead zone,
+inside its margin, or moves the menus.
 
 **Accessibility is part of the system.** droidtop's chrome is driven by a pad, a finger or a
 screen reader through one focus order: every focusable is reachable by D-pad and by linear
