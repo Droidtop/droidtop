@@ -43,9 +43,9 @@
 [submodule "vendor/sandbox"]
 	path = vendor/sandbox
 	url = https://github.com/bi0shacker001/fibrewall
-[submodule "vendor/notices"]
-	path = vendor/notices
-	url = https://github.com/Droidtop/notices
+[submodule "vendor/lib-ui"]
+	path = vendor/lib-ui
+	url = https://github.com/Droidtop/lib-ui
 [submodule "vendor/javasteam"]
 	path = vendor/javasteam
 	url = https://github.com/Droidtop/javasteam

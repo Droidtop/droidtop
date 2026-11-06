@@ -4,7 +4,7 @@ import dev.droidtop.notices.NoticeColors
 import dev.droidtop.notices.NoticeInputs
 
 /**
- * What the notice colours (the shared `vendor/notices` library, docs/SPEC.md 7k "Notices") are derived from: the
+ * What the notice colours (the shared notices library, `vendor/lib-ui`'s `notices/`, docs/SPEC.md 7k "Notices") are derived from: the
  * theme's own surfaces and roles.
  */
 fun GamingThemeColors.noticeInputs(): NoticeInputs = NoticeInputs(

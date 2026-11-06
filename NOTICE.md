@@ -96,7 +96,7 @@ This project is distributed under the GNU General Public License v3.0 (see
   The process sandbox library droidtop shares with Enginehost (seccomp lockdown
   and syscall broker), linked statically into `libdroidtoppy.so` for the plugin
   processes' system-call filter.
-- **notices** — `vendor/notices`, https://github.com/Droidtop/notices — GPL-3.0-or-later.
+- **notices** — `vendor/lib-ui` (its `notices/`), https://github.com/Droidtop/lib-ui — GPL-3.0-or-later.
   droidtop's own library, shared with Enginehost: the notice colours and the
   colour arithmetic, compiled into `runtime-common`.
 - **hev-socks5-tunnel** — `vendor/hev-socks5-tunnel`, https://github.com/heiher/hev-socks5-tunnel — MIT,
