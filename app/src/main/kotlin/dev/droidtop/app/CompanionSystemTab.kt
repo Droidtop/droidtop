@@ -57,6 +57,7 @@ internal fun CompanionSystemTab(only: Set<String>? = null) {
                 accessibility = dev.droidtop.runtime.systemstatus.AccessibilityControls.items(context.applicationContext),
                 dndCategories = dev.droidtop.runtime.systemstatus.DndCategories.items(context.applicationContext),
                 dndHeading = dev.droidtop.library.settings.words(dev.droidtop.runtime.R.string.dnd_lets_through),
+                controllers = dev.droidtop.shell.gamepad.ControllerLayoutTiles.items(),
             )
         }
     }
@@ -93,6 +94,8 @@ internal fun CompanionSystemTab(only: Set<String>? = null) {
                             // A slider per stream through the one volume path, and the network and Bluetooth (C19).
                             if (card.id == "sound") CompanionStreamVolumes()
                             if (card.id == "connections") CompanionConnections()
+                            // Each connected pad with its battery (Droidtop/tracker#786 S9).
+                            if (card.id == "controllers") CompanionControllerList()
                             CompanionCatalogItems(card.items, onChanged = { version++ }, headings = card.headings)
                         }
                     }

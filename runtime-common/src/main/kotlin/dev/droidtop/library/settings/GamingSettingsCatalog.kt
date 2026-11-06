@@ -1351,6 +1351,7 @@ object GamingSettingsCatalog {
         CompanionPrefs.pageId(ControlPanel.DEVICE, "privacy") to "Device: Privacy",
         CompanionPrefs.pageId(ControlPanel.DEVICE, "accessibility") to "Device: Accessibility",
         CompanionPrefs.DEVICE_NETWORK to "Device: Network",
+        CompanionPrefs.pageId(ControlPanel.DEVICE, "controllers") to "Device: Controllers",
         CompanionPrefs.DEVICE_APPS to "Device: Apps",
         CompanionPrefs.DROIDTOP_COMPANION to "droidtop: Companion",
         CompanionPrefs.DROIDTOP_DOWNLOADS to "droidtop: Downloads",

@@ -34,7 +34,7 @@ class CompanionCatalogPanelTest {
 
     @Test fun cardsCarryTheQuickMenusItemsInTheSameOrder() {
         val cards = companionSystemCards(::quick, performance, privacy)
-        assertEquals(listOf("system", "display", "sound", "connections", "power", "storage", "privacy"), cards.map { it.id })
+        assertEquals(listOf("system", "display", "sound", "connections", "controllers", "power", "storage", "privacy"), cards.map { it.id })
         // The Android settings row is Device's "Android's pages" on the companion (Droidtop/tracker#786 S3).
         assertEquals(
             quick(QuickSection.SYSTEM).map { it.id } - GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS,
@@ -89,6 +89,13 @@ class CompanionCatalogPanelTest {
         assertEquals(mapOf(alarms.id to "Lets through"), sound.headings)
         // Without the access there are none and no heading.
         assertTrue(companionSystemCards(::quick, performance, privacy).first { it.id == "sound" }.headings.isEmpty())
+    }
+
+    // Droidtop/tracker#786 S9: Controllers carries the pad rows and shows with no pad (it draws "None connected").
+    @Test fun controllersCardCarriesThePadRows() {
+        val swap = ActionItem(id = "pref_controller_swap_ab", title = "Swap A and B", run = {})
+        assertEquals(listOf(swap.id), companionSystemCards(::quick, performance, privacy, controllers = listOf(swap)).first { it.id == "controllers" }.items.map { it.id })
+        assertTrue(companionSystemCards(::quick, performance, privacy).any { it.id == "controllers" })
     }
 
     // Droidtop/tracker#786 S7: font and display size are on Accessibility, not twice.

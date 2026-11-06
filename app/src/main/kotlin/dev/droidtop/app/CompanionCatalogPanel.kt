@@ -89,6 +89,7 @@ internal fun companionSystemCards(
     accessibility: List<CatalogItem> = emptyList(),
     dndCategories: List<CatalogItem> = emptyList(),
     dndHeading: String = "",
+    controllers: List<CatalogItem> = emptyList(),
 ): List<SystemCard> = listOf(
     // Without the Android settings row: on the companion its links are Device's "Android's pages", labelled as exits,
     // and an exit is on one page only (Droidtop/tracker#786 S3, plan 4.1 rule 2).
@@ -123,6 +124,9 @@ internal fun companionSystemCards(
     ),
     // Network detail and Bluetooth devices, drawn by the card itself (slice C19).
     SystemCard("connections", "Connections", section(QuickSection.CONNECTIONS), folded = true),
+    // The connected pads, drawn by the card, then Controller buttons and Swap A and B, the Quick Menu's own pad rows
+    // (`ControllerLayoutTiles`), which no companion page had (Droidtop/tracker#786 S9).
+    SystemCard("controllers", "Controllers", controllers, folded = true),
     SystemCard("power", "Power", listOfNotNull(performanceMode), folded = true),
     SystemCard("storage", "Storage", emptyList(), folded = true, storage = true),
     SystemCard("privacy", "Privacy", listOfNotNull(privacy), folded = true),
@@ -131,7 +135,7 @@ internal fun companionSystemCards(
 ).filter { it.storage || it.id in DRAWN_CARDS || it.items.isNotEmpty() }
 
 /** Cards that draw rows of their own beside any catalog items, so they show even with none. */
-private val DRAWN_CARDS = setOf("display", "sound", "connections", "power", "privacy")
+private val DRAWN_CARDS = setOf("display", "sound", "connections", "controllers", "power", "privacy")
 
 /** Rows the built-in screen's card draws itself (`CompanionDisplayCards`), Allow included. */
 internal val ON_SCREEN_CARD = setOf(

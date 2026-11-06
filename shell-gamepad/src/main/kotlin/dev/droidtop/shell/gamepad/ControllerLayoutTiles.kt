@@ -20,7 +20,7 @@ import dev.droidtop.shell.gamepad.input.ControllerLayouts
  * Both write the same per-pad capture the prompt does, so there is one
  * place an answer lives.
  */
-internal object ControllerLayoutTiles {
+object ControllerLayoutTiles {
     const val ID_SET = "pref_controller_set_buttons"
     const val ID_SWAP = "pref_controller_swap_ab"
 
