@@ -5743,7 +5743,11 @@ droidtop 0.2.0-dev.1931).
   and the game's own battery mode) and the last launch or quit error, then the **pins** (slice C5, Droidtop/tracker#414):
   catalog items by id (`PinnedControls`, default volume, brightness, Wi-Fi (the network row), Do Not Disturb
   and Mute microphone), drawn with the Quick Menu's own tile model (`QuickTiles.tile`, pressed by
-  `QuickTiles.pressKind`); a slider pin has a step button each side. "Edit pins" lists every System, Display and
+  `QuickTiles.pressKind`); a slider pin has a step button each side. Every pin draws its glyph beside its name, never
+  text alone. The Network pin names the Wi-Fi network (with the helper app; else Wi-Fi, Ethernet, Mobile data, Wi-Fi
+  off or Offline), lights while Wi-Fi is on and gives the signal to a screen reader; a tap switches Wi-Fi with the
+  helper app (the Wi-Fi switch's own `switchRadio`), and otherwise, or when the switch did not take, opens the
+  Network page (Droidtop/tracker#786 S9). "Edit pins" lists every System, Display and
   Sound item with Pin or Unpin (no long-press needed), plugin tiles (slice C9, see Plugins), plus live stat tiles (slice C7): battery temperature and
   draw in watts (from the battery broadcast) and the fastest core's clock (from `PerformanceMonitor`, which runs
   only while that tile is on a Home that is on screen); a stat tile is not a live region. A pin for a control that needs the helper app is not

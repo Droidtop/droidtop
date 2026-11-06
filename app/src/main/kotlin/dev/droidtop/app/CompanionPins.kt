@@ -192,6 +192,10 @@ private fun PinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit
     val colors = MaterialTheme.colorScheme
     val lit = tile.on == true
     var status by remember(item) { mutableStateOf<String?>(null) }
+    if (item.id == GamingSettingsCatalog.ID_SYSTEM_NETWORK) {
+        NetworkPinTile(item, modifier, onChanged)
+        return
+    }
     if (item is SliderItem) {
         // A pinned slider is the one slider row, a drawn track with a step at each end (Droidtop/tracker#786 S2a).
         val app = context.applicationContext
@@ -207,54 +211,169 @@ private fun PinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit
         )
         return
     }
+    PinFace(
+        label = tile.label,
+        glyph = tile.glyph,
+        lit = lit,
+        on = tile.on,
+        value = status ?: tile.value,
+        role = if (item is ToggleItem) Role.Switch else Role.Button,
+        modifier = modifier,
+    ) {
+        when (QuickTiles.pressKind(item)) {
+            QuickPress.TOGGLE -> (item as? ToggleItem)?.let { toggle ->
+                scope.launch { toggle.onToggle(context, !toggle.current); onChanged() }
+            }
+            QuickPress.CYCLE, QuickPress.PICK -> (item as? ChoiceItem)?.let { choice ->
+                val options = choice.options
+                val next = options[(options.indexOfFirst { it.value == choice.current } + 1).mod(options.size)]
+                choice.onSelect(context, next.value)
+                onChanged()
+            }
+            QuickPress.RUN -> (item as? dev.droidtop.library.settings.ActionItem)?.let { it.run(context); onChanged() }
+            QuickPress.RUN_ASYNC -> (item as? dev.droidtop.library.settings.AsyncActionItem)?.let { action ->
+                scope.launch {
+                    status = withContext(Dispatchers.IO) { action.run(context) { line -> status = line } }.ifBlank { null }
+                    onChanged()
+                }
+            }
+            // A pinned link opens its screen (Updates, Social, Android settings); it did nothing
+            // (Droidtop/tracker#571 row 24). Only links with a screen id are offered for pinning.
+            QuickPress.OPEN -> (item as? dev.droidtop.library.settings.NestedScreenItem)?.registryId?.let { id ->
+                runCatching {
+                    context.startActivity(
+                        dev.droidtop.library.settings.CatalogScreenLink.intent(context, id)
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A pin's face: its glyph, name, switch where it has one, and value (Droidtop/tracker#786 S9: a pin never shows only
+ * text). [state] is what a screen reader hears after the name, the value when not given.
+ */
+@Composable
+private fun PinFace(
+    label: String,
+    glyph: dev.droidtop.shell.gamepad.QuickGlyph,
+    lit: Boolean,
+    on: Boolean?,
+    value: String?,
+    role: Role,
+    modifier: Modifier,
+    state: String? = null,
+    onClick: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val ink = if (lit) colors.onPrimaryContainer else colors.onSurface
     Column(
         modifier = modifier
             .heightIn(min = 72.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(if (lit) colors.primaryContainer else colors.surface)
-            .clickable(role = if (item is ToggleItem) Role.Switch else Role.Button) {
-                when (QuickTiles.pressKind(item)) {
-                    QuickPress.TOGGLE -> (item as? ToggleItem)?.let { toggle ->
-                        scope.launch { toggle.onToggle(context, !toggle.current); onChanged() }
-                    }
-                    QuickPress.CYCLE, QuickPress.PICK -> (item as? ChoiceItem)?.let { choice ->
-                        val options = choice.options
-                        val next = options[(options.indexOfFirst { it.value == choice.current } + 1).mod(options.size)]
-                        choice.onSelect(context, next.value)
-                        onChanged()
-                    }
-                    QuickPress.RUN -> (item as? dev.droidtop.library.settings.ActionItem)?.let { it.run(context); onChanged() }
-                    QuickPress.RUN_ASYNC -> (item as? dev.droidtop.library.settings.AsyncActionItem)?.let { action ->
-                        scope.launch {
-                            status = withContext(Dispatchers.IO) { action.run(context) { line -> status = line } }.ifBlank { null }
-                            onChanged()
-                        }
-                    }
-                    // A pinned link opens its screen (Updates, Social, Android settings); it did nothing
-                    // (Droidtop/tracker#571 row 24). Only links with a screen id are offered for pinning.
-                    QuickPress.OPEN -> (item as? dev.droidtop.library.settings.NestedScreenItem)?.registryId?.let { id ->
-                        runCatching {
-                            context.startActivity(
-                                dev.droidtop.library.settings.CatalogScreenLink.intent(context, id)
-                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        }
-                    }
-                }
-            }
+            .clickable(role = role, onClick = onClick)
             .semantics {
-                contentDescription = tile.label
-                stateDescription = listOfNotNull(tile.on?.let { if (it) "On" else "Off" }, status ?: tile.value).joinToString(", ")
+                contentDescription = label
+                stateDescription = state ?: listOfNotNull(on?.let { if (it) "On" else "Off" }, value).joinToString(", ")
             }
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(tile.label, style = MaterialTheme.typography.labelLarge, color = if (lit) colors.onPrimaryContainer else colors.onSurface, maxLines = 2)
+        androidx.compose.foundation.layout.Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            dev.droidtop.shell.gamepad.QuickGlyphIcon(glyph, ink, Modifier.size(20.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, color = ink, maxLines = 2)
+        }
         // An on/off tile shows its switch, as the Quick Menu's tile does (show, then say: Droidtop/tracker#738).
-        tile.on?.let { androidx.compose.material3.Switch(checked = it, onCheckedChange = null) }
-        val value = status ?: tile.value
+        on?.let { androidx.compose.material3.Switch(checked = it, onCheckedChange = null) }
         if (value != null) {
             Text(value, style = MaterialTheme.typography.bodySmall, color = if (lit) colors.onPrimaryContainer else colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** What the Network pin says: the Wi-Fi network's name where droidtop can read it, else the kind of network. Pure. */
+internal fun networkPinValue(kind: dev.droidtop.runtime.systemstatus.NetworkKind, name: String?, wifiOn: Boolean?): String = when (kind) {
+    dev.droidtop.runtime.systemstatus.NetworkKind.WIFI -> name?.takeIf { it.isNotBlank() } ?: "Wi-Fi"
+    dev.droidtop.runtime.systemstatus.NetworkKind.ETHERNET -> "Ethernet"
+    dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "Mobile data"
+    dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> if (wifiOn == false) "Wi-Fi off" else "Offline"
+}
+
+/** What a tap on the Network pin does: switch Wi-Fi where the helper app lets droidtop, else open the Network page. Pure. */
+internal fun networkPinSwitches(helper: Boolean): Boolean = helper
+
+private data class NetworkPinState(
+    val kind: dev.droidtop.runtime.systemstatus.NetworkKind,
+    val level: Int?,
+    val name: String?,
+    val wifiOn: Boolean?,
+    val helper: Boolean,
+)
+
+/**
+ * The Network pin (Droidtop/tracker#786 S9): its glyph and the network's name (with the helper app), lit while Wi-Fi
+ * is on; a tap switches Wi-Fi through the helper, the Wi-Fi switch's own path, and otherwise, or when the switch did
+ * not take, opens the Network page. Read off the main thread, again after each tap.
+ */
+@Composable
+private fun NetworkPinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    val app = context.applicationContext
+    val nav = LocalCompanionNav.current
+    val scope = rememberCoroutineScope()
+    var version by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var busy by remember { mutableStateOf(false) }
+    val read by produceState<NetworkPinState?>(null, version) {
+        value = withContext(Dispatchers.IO) {
+            val snapshot = dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(app)
+            val helper = runCatching { TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
+            NetworkPinState(
+                kind = snapshot.network,
+                level = snapshot.wifiLevel,
+                name = if (helper && snapshot.network == dev.droidtop.runtime.systemstatus.NetworkKind.WIFI) wifiNameWithHelper() else null,
+                wifiOn = dev.droidtop.runtime.systemstatus.SystemControls.radioOn(app, dev.droidtop.runtime.systemstatus.SystemControls.Radio.WIFI),
+                helper = helper,
+            )
+        }
+    }
+    val state = read
+    val tile = QuickTiles.tile(item)
+    val value = if (busy) "Switching…" else state?.let { networkPinValue(it.kind, it.name, it.wifiOn) } ?: tile.value
+    fun openPage() {
+        if (nav != null) nav.openTab(CompanionTab.NETWORK) else (item as? dev.droidtop.library.settings.ActionItem)?.run(context)
+    }
+    PinFace(
+        label = tile.label,
+        glyph = tile.glyph,
+        lit = state?.wifiOn == true,
+        on = null,
+        value = value,
+        role = if (state?.helper == true) Role.Switch else Role.Button,
+        modifier = modifier,
+        state = listOfNotNull(value, state?.level?.let { "Signal $it of 4" }).joinToString(", "),
+    ) {
+        if (busy) return@PinFace
+        if (state == null || !networkPinSwitches(state.helper)) {
+            openPage()
+            return@PinFace
+        }
+        busy = true
+        scope.launch {
+            val switched = withContext(Dispatchers.IO) {
+                dev.droidtop.runtime.systemstatus.SystemControls.switchRadio(
+                    app, TaskManager.shell, dev.droidtop.runtime.systemstatus.SystemControls.Radio.WIFI, state.wifiOn != true,
+                )
+            }
+            busy = false
+            if (!switched) openPage()
+            version++
+            onChanged()
         }
     }
 }
