@@ -31,6 +31,7 @@ import dev.droidtop.runtime.OciImageStore
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
 import dev.droidtop.runtime.SharedVolume
+import dev.droidtop.runtime.SiblingX11
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -47,6 +48,7 @@ import java.util.Locale
 import java.util.Properties
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
@@ -532,7 +534,10 @@ class ProotRuntime(
         val name = command.firstOrNull()?.substringAfterLast('/') ?: "exec"
         log.line("exec in ${container.id}: ${command.joinToString(" ")}")
         val sessionId = UUID.randomUUID().toString()
-        val process = withContext(Dispatchers.IO) { startSession(container.id, sessionId, command, env, mergeStderr = false, ids = ids) }
+        val process = withContext(Dispatchers.IO) {
+            val x11Display = if (SiblingX11.NO_SERVER_ENV in env) null else ensureX11Server(container.id)
+            startSession(container.id, sessionId, command, env, mergeStderr = false, ids = ids, x11Display = x11Display)
+        }
         val stdout = OutputTail(maxLines = CAPTURE_LINES)
         val stderr = OutputTail(maxLines = CAPTURE_LINES)
         val outThread = pump(process.inputStream, "${container.id}/$name") { stdout.add(it) }
@@ -676,6 +681,60 @@ class ProotRuntime(
     // ---- process plumbing ----
 
     /**
+     * A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", Droidtop/tracker#910): its display number
+     * once the server is running, started here when it is not; null for the primary (sway's own Xwayland serves it),
+     * with the desktop down or Wayland not shared, or without [SiblingX11.PACKAGE] in its tree. Under proot a sibling
+     * has no init, and `--kill-on-exit` ends whatever a program's session leaves behind, so the server is a session
+     * of its own ([xServers]), carrying the container's marker like any other: Stop ends it, and it ends by itself
+     * when the compositor goes. It is a session of this container, so with the clipboard off it gets the filtering
+     * socket as every program in it does. Blocking: IO only.
+     */
+    private fun ensureX11Server(containerId: String): Int? {
+        if (containerId == PRIMARY_NAME) return null
+        if (!readSocketsSync(containerId).waylandShared || ContainerLayout.findWaylandSocket(socketsDir) == null) return null
+        val rootfs = rootfsOf(containerId)
+        if (SiblingX11.BINARY_PATHS.none { File(rootfs, it).exists() }) return null
+        val ids = containersDir.listFiles().orEmpty().filter { configOf(it.name).isFile }.map { it.name }
+        val display = SiblingX11.displayNumber(containerId, ids)
+        val socket = File(rootfs, SiblingX11.socketPath(display).removePrefix("/"))
+        synchronized(xServers) {
+            val alive = xServers[containerId]?.isAlive == true
+            if (alive && socket.exists()) return display
+            val deadline = System.currentTimeMillis() + SiblingX11.READY_TIMEOUT_MS
+            if (!alive) {
+                log.line("$containerId: starting its X server on :$display")
+                val process = startSession(
+                    containerId, UUID.randomUUID().toString(),
+                    listOf("/bin/sh", "-c", SiblingX11.serverScript(display)), emptyMap(), mergeStderr = true,
+                )
+                xServers[containerId] = process
+                // The script says when it has removed a gone server's socket, so a stale one is not taken for the new.
+                val said = CountDownLatch(1)
+                pump(process.inputStream, "$containerId/x11") { if (it.startsWith(SiblingX11.STATE_LINE)) said.countDown() }
+                while (!said.await(X11_POLL_MS, TimeUnit.MILLISECONDS)) {
+                    if (!process.isAlive || System.currentTimeMillis() > deadline) {
+                        log.line("$containerId: its X server did not start")
+                        return null
+                    }
+                }
+            }
+            while (!socket.exists() && System.currentTimeMillis() < deadline) {
+                // The script exits at once when an earlier session's server is still running; its socket is the answer.
+                if (xServers[containerId]?.isAlive != true && !socket.exists()) {
+                    log.line("$containerId: its X server stopped before it was ready")
+                    return null
+                }
+                Thread.sleep(X11_POLL_MS)
+            }
+            if (!socket.exists()) {
+                log.line("$containerId: its X server made no socket in ${SiblingX11.READY_TIMEOUT_MS / 1000} s")
+                return null
+            }
+            return display
+        }
+    }
+
+    /**
      * One proot session: [guestCommand] inside [containerId]'s rootfs as
      * fake root, with [ContainerLayout]'s directories bound in and a clean
      * environment ([baseGuestEnvironment], the client environment, then
@@ -704,6 +763,7 @@ class ProotRuntime(
         env: Map<String, String>,
         mergeStderr: Boolean,
         ids: String? = null,
+        x11Display: Int? = null,
     ): Process {
         val (argv, hostEnvironment) = sessionCommand(containerId, sessionId, guestCommand, env, ids)
         val builder = ProcessBuilder(argv).directory(baseDir).redirectErrorStream(mergeStderr)
@@ -738,7 +798,7 @@ class ProotRuntime(
         val guestEnvironment = LinkedHashMap<String, String>().apply {
             putAll(baseGuestEnvironment)
             val swaySocketName = if (sessionSockets.waylandShared && !clipboardFiltered) swayIpc?.name else null
-            putAll(ContainerLayout.clientEnvironment(waylandSocketName, sessionSockets.audioShared, swaySocketName, readLookSync(containerId)))
+            putAll(ContainerLayout.clientEnvironment(waylandSocketName, sessionSockets.audioShared, swaySocketName, readLookSync(containerId), x11Display))
             putAll(env)
             putAll(marker)
         }
@@ -823,6 +883,8 @@ class ProotRuntime(
             unwatchNetwork()
         }
         val process = running.remove(name)
+        // Its X server carries its marker, so killContainer below ends it with the rest.
+        xServers.remove(name)
         val found = processes.ofContainer(name)
         if (process == null && found.isEmpty()) return@withContext
         val gone = processes.killContainer(name)
@@ -1020,6 +1082,7 @@ class ProotRuntime(
         private const val STALL_TIMEOUT_MS = 15L * 60L * 1000L
         private const val STOP_GRACE_S = 5L
         private const val PUMP_JOIN_MS = 2_000L
+        private const val X11_POLL_MS = 100L
         private const val PROGRESS_LINES = 40
         private const val CAPTURE_LINES = 2_000
         private const val MAX_LOG_BYTES = 4L * 1024L * 1024L
@@ -1062,5 +1125,8 @@ class ProotRuntime(
 
         /** The PRIMARY's boot process, by container id, shared by every instance in this app process. */
         private val running = ConcurrentHashMap<String, Process>()
+
+        /** Each sibling's X server session ([ensureX11Server]), by container id, shared like [running]. */
+        private val xServers = ConcurrentHashMap<String, Process>()
     }
 }

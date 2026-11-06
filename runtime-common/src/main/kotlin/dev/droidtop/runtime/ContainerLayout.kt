@@ -168,12 +168,18 @@ object ContainerLayout {
      * `TZ` is the device's time zone as a POSIX rule ([posixTimeZone]), so
      * clocks and file times inside the desktop are local time rather than
      * a stock image's UTC.
+     *
+     * [x11Display] is a sibling's own X server ([SiblingX11]), given only
+     * when it is running or the backend has just started it; null leaves
+     * `DISPLAY` unset, so an X program says it has no display rather than
+     * reaching another container's server.
      */
     fun clientEnvironment(
         waylandSocketName: String?,
         audioShared: Boolean = true,
         swaySocketName: String? = null,
         look: ContainerLook = ContainerLook(),
+        x11Display: Int? = null,
     ): Map<String, String> = buildMap {
         put("XDG_RUNTIME_DIR", SOCKET_DIR)
         put("TZ", posixTimeZone(ZoneId.systemDefault()))
@@ -188,6 +194,8 @@ object ContainerLayout {
         // listens there, which to a program is the same as no CUPS.
         put("CUPS_SERVER", "$SOCKET_DIR/$CUPS_SOCKET")
         waylandSocketName?.let { put("WAYLAND_DISPLAY", it) }
+        // A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", Droidtop/tracker#910), never the primary's.
+        x11Display?.let { putAll(SiblingX11.environment(it)) }
         // sway's IPC socket ([findSwayIpcSocket]), so `swaymsg` works from any program droidtop starts, as from
         // the ones sway starts itself (console 2026-10-29: "Unable to retrieve socket path" in Foot). It is in the
         // same shared folder as the Wayland socket, so it is passed with it and nothing more is reached.

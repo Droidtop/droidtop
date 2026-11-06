@@ -4072,10 +4072,79 @@ the `ContainerRuntime` interface that already exists (§3):
     the clipboard is.
   - **Everything else in the folder stays shared:** audio, CUPS, the
     session bus, Docker.
-  - **Xwayland.** A sibling's processes get no `DISPLAY`, and sway's
-    Xwayland socket is in the primary's own `/tmp`, so a sibling's X
-    programs reach no X server today. Any X server a sibling gets
-    connects through the same socket.
+  - **Xwayland (Droidtop/tracker#910 slice X1; the design posted on #910,
+    built to it, owner to confirm).** A sibling never gets the primary's
+    X server: X selections there are the desktop's own clipboard, so
+    binding sway's Xwayland socket into a sibling would go round the
+    filter. Each sibling runs an X server of its own instead,
+    xwayland-satellite (`SiblingX11`): rootless Xwayland with satellite as
+    its window manager, every X window an ordinary xdg toplevel on the
+    desktop. It runs inside the sibling as a client of the sibling's own
+    `WAYLAND_DISPLAY`, which with the clipboard off is already the
+    filtering socket, so X selections reach no further than that
+    container's Wayland clipboard does. The primary keeps sway's own
+    Xwayland, unchanged.
+    - **Its display number** is per container, `:100` to `:999`, from a
+      hash of the container's id, moved to the next free number when an
+      id sorting earlier has it (`SiblingX11.displayNumber`). Every
+      sibling has its own `/tmp` (proot: the rootfs's own, nothing binds
+      it; droidspaces: its own mount namespace), but abstract Unix sockets
+      belong to the network namespace, which every proot container and a
+      droidspaces container with the network on share with the device.
+      So the number is never shared, and the server listens on no
+      abstract socket at all (`-nolisten local`): its socket is only the
+      file in the sibling's own `/tmp/.X11-unix`.
+    - **satellite's own Wayland socket** for Xwayland would land in
+      `XDG_RUNTIME_DIR`, the shared `/run/droidtop-sockets`, where every
+      container could reach it. It gets a private folder in the sibling's
+      `/tmp` instead, with the compositor's socket named by its full path
+      (`SiblingX11.serverScript`).
+    - **When it starts:** lazily, the first time droidtop runs a program
+      in the sibling while the desktop is up, Wayland is shared with it,
+      and the package is installed. That is every route at once (menus,
+      Terminal, Open with, exported commands, its own program) with no
+      list to keep, and a sibling whose X programs nobody uses costs
+      nothing. Starting with the sibling was the other choice; a proot
+      sibling has no start. `DISPLAY` is set
+      (`ContainerLayout.clientEnvironment`'s `x11Display`) only once the
+      server's socket is there, else not at all, so an X program says it
+      has no display rather than reaching anything else.
+      - **proot:** `--kill-on-exit` ends whatever a program's session
+        leaves, so the server is a proot session of its own, kept per
+        container while droidtop runs (`ProotRuntime.ensureX11Server`). It
+        carries the container's marker: Stop ends it, and the container
+        shows as running while it runs. It ends by itself when the
+        compositor goes and starts again with the next program.
+      - **droidspaces:** the sibling's init keeps a detached process, so
+        the exec's own shell starts it detached when it is not running and
+        waits for its socket (`SiblingX11.detachedPrefix`); whether the
+        package is there is asked inside the container, whose tree is
+        root's.
+    - **Installing it** is a row on the sibling's page, "X11 programs":
+      Ready, Install, Off (Wayland is off for it) or Not available. Install
+      asks first, as "Update its software" does, then runs the container's
+      own package manager as root, found the same way
+      (`PackageUpgrade.FIND_SCRIPT`): `xwayland-satellite` and the
+      Xwayland package beside it (Alpine's package does not depend on
+      Xwayland). A distro whose repositories have no such package, or a
+      container with no package manager droidtop knows, says "Not
+      available for this distro"; nothing falls back to the primary's X
+      server. Programs started after the install get `DISPLAY`.
+    - **Where it is packaged** (checked 2026-11-06 as far as could be
+      from here): Alpine has it in community from 3.24 and in edge; 3.22
+      and 3.23 carry it only in testing, which a stable release does not
+      ship, so there it is Not available. Arch (extra) and Fedora package
+      it. Debian trixie does not appear to: Ubuntu, which takes Debian's
+      packages, has it only in personal archives. A Debian sibling then
+      says Not available until Debian packages it. openSUSE is not
+      checked. Satellite 0.6 or later is assumed (it passes
+      `-nolisten` through to Xwayland).
+    - **Not closed by this:** sway's own Xwayland in the primary still
+      listens on its abstract socket (wlroots opens one on Linux), which a
+      program in a proot sibling, or a droidspaces sibling with the
+      network on, can reach if it looks for it. The primary is unchanged here,
+      as the design says; owner to confirm whether to give it
+      `-nolisten local` too.
   - **The primary** runs the compositor itself, and sway's own children
     connect directly. Its row says "always shared" in place of the switch.
   - **droidspaces** binds at start, so the compositor must be up then. A
