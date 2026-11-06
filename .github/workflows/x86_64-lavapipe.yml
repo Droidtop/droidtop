@@ -34,8 +34,9 @@ env:
   # provide are left out of the archive (see build.sh).
   GUEST_LIBS_TAG: x86_64-guest-libs-20261008-8a05a54d
   GUEST_LIBS_REPO: Droidtop/droidtop
-  # termux-packages at the commit whose packages/mesa recipe and patches the
-  # xlib OpenGL build starts from (build-scripts/x86_64-lavapipe/mesa-gl).
+  # termux-packages at the commit whose package builder and x86_64 packages the
+  # Mesa builds use; their Mesa patches are commits on Droidtop/mesa since
+  # Droidtop/tracker#921 (vendor/mesa-lavapipe, vendor/mesa-venus).
   TERMUX_PACKAGES_COMMIT: 2e8fa6379b106caa4829407611410025a0973e02
   # termux-packages at the commit whose virglrenderer-android (1.3.0, Venus, 0011-use-Android-Vulkan) the vtest
   # server is built from (read 2026-11-05).
@@ -58,8 +59,19 @@ jobs:
           git fetch -q --depth 1 origin "$TERMUX_PACKAGES_COMMIT"
           git checkout -q FETCH_HEAD
 
+      - name: Source
+        # vendor/mesa-lavapipe is left out of every other checkout (update = none in .gitmodules): Mesa is large.
+        run: git -c submodule.vendor/mesa-lavapipe.update=checkout submodule update --init --depth 1 vendor/mesa-lavapipe
+
       - name: Recipe
-        run: bash build-scripts/x86_64-lavapipe/mesa-gl/prepare.sh "$RUNNER_TEMP/termux-packages"
+        # droidtop's recipe, Termux's cmake-wrapper.in beside it as Termux's own mesa recipe has it, and the source
+        # tree without its .git (Droidtop/tracker#921: the patches are commits there, nothing is patched here).
+        run: |
+          tp="$RUNNER_TEMP/termux-packages"
+          mkdir -p "$tp/packages/mesa-xlib-gl" "$tp/droidtop-src"
+          cp build-scripts/x86_64-lavapipe/mesa-gl/build.sh "$tp/packages/mesa-xlib-gl/"
+          cp "$tp/packages/mesa/cmake-wrapper.in" "$tp/packages/mesa-xlib-gl/"
+          git -C vendor/mesa-lavapipe archive --prefix=mesa-lavapipe/ HEAD | tar -x -C "$tp/droidtop-src"
 
       - name: Build
         # Termux's own package builder image, as termux-packages' CI runs it;
@@ -94,8 +106,17 @@ jobs:
           git fetch -q --depth 1 origin "$TERMUX_PACKAGES_COMMIT"
           git checkout -q FETCH_HEAD
 
+      - name: Source
+        # vendor/mesa-venus is left out of every other checkout (update = none in .gitmodules): Mesa is large.
+        run: git -c submodule.vendor/mesa-venus.update=checkout submodule update --init --depth 1 vendor/mesa-venus
+
       - name: Recipe
-        run: bash build-scripts/x86_64-venus/mesa-venus/prepare.sh "$RUNNER_TEMP/termux-packages"
+        # droidtop's recipe and the source tree without its .git (Droidtop/tracker#921).
+        run: |
+          tp="$RUNNER_TEMP/termux-packages"
+          mkdir -p "$tp/packages/mesa-venus" "$tp/droidtop-src"
+          cp build-scripts/x86_64-venus/mesa-venus/build.sh "$tp/packages/mesa-venus/"
+          git -C vendor/mesa-venus archive --prefix=mesa-venus/ HEAD | tar -x -C "$tp/droidtop-src"
 
       - name: Build
         # Termux's own package builder image, as termux-packages' CI runs it; -I takes every dependency from

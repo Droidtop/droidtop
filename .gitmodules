@@ -74,3 +74,15 @@
 	path = vendor/glib
 	url = https://gitlab.gnome.org/GNOME/glib.git
 	shallow = true
+[submodule "vendor/mesa-venus"]
+	path = vendor/mesa-venus
+	url = https://github.com/Droidtop/mesa
+	branch = droidtop-venus
+	shallow = true
+	update = none
+[submodule "vendor/mesa-lavapipe"]
+	path = vendor/mesa-lavapipe
+	url = https://github.com/Droidtop/mesa
+	branch = droidtop-lavapipe
+	shallow = true
+	update = none
