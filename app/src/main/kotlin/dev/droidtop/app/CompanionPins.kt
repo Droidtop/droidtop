@@ -474,7 +474,7 @@ internal fun rememberBattery(): Pair<dev.droidtop.runtime.systemstatus.BatteryRe
 
 /**
  * The optional low-battery line (Companion group "Low battery line", off by default): at or under the chosen level
- * and not charging, a line with Battery saver (Android's screen) and, with the helper app and a game in front, the
+ * and not charging, a line with Battery saver (on in place with the helper app, else Android's screen) and, with the helper app and a game in front, the
  * game's own battery mode.
  */
 @Composable
@@ -491,8 +491,12 @@ internal fun CompanionLowBatteryLine(reading: dev.droidtop.runtime.systemstatus.
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
         Text(note ?: "Battery ${r.percent}%", style = MaterialTheme.typography.bodyMedium, color = LocalNoticePalette.current.ink(NoticeTone.Caution), modifier = Modifier.weight(1f))
+        // The one battery saver path (Droidtop/tracker#786 S10): on in place where droidtop may, else Android's screen.
         CompanionPill("Battery saver") {
-            dev.droidtop.runtime.systemstatus.SettingsLaunch.start(context, dev.droidtop.runtime.systemstatus.SystemControls.batterySaverSettingsIntent())
+            scope.launch {
+                val on = withContext(Dispatchers.IO) { dev.droidtop.runtime.systemstatus.BatterySaver.turnOnOrOpen(context.applicationContext) }
+                if (on) note = "Battery saver on"
+            }
         }
         CompanionPill("Game on battery mode") {
             scope.launch {

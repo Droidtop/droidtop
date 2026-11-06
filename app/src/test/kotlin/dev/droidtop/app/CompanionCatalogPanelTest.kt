@@ -98,6 +98,16 @@ class CompanionCatalogPanelTest {
         assertTrue(companionSystemCards(::quick, performance, privacy).any { it.id == "controllers" })
     }
 
+    // Droidtop/tracker#786 S10: one battery saver, on the Battery page; System's Battery row goes there with it.
+    @Test fun batterySaverIsOnTheBatteryPageOnly() {
+        val saver = ActionItem(id = "pref_battery_saver", title = "Battery saver", run = {})
+        val cards = companionSystemCards(::quick, performance, privacy, batterySaver = saver)
+        assertEquals(listOf(saver.id, GamingSettingsCatalog.ID_PERFORMANCE_MODE), cards.first { it.id == "power" }.items.map { it.id })
+        assertFalse(cards.first { it.id == "system" }.items.any { it.id == GamingSettingsCatalog.ID_SYSTEM_BATTERY })
+        // Without the battery saver row, System keeps its Battery row: nothing leaves the companion.
+        assertTrue(companionSystemCards(::quick, performance, privacy).first { it.id == "system" }.items.any { it.id == GamingSettingsCatalog.ID_SYSTEM_BATTERY })
+    }
+
     // Droidtop/tracker#786 S7: font and display size are on Accessibility, not twice.
     @Test fun fontAndDisplaySizeAreOnAccessibilityOnly() {
         val font = ActionItem(id = dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_FONT, title = "Font size", run = {})
