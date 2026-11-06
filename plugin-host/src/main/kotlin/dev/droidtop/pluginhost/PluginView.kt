@@ -37,6 +37,30 @@ data class PluginView(
         }
     }
 
+    /**
+     * [initialValues] with the person's own choices kept: each input in [chosen] takes its value from [previous] when
+     * this view still has that input and the value still fits it (a choice still offered, a slider value in range, a
+     * toggle's true or false). Used when the same page is read again with nothing changed by the person's action (a
+     * failed action, Open the site, Sign in, Refresh), so a mirror the person picked is not put back to the plugin's
+     * first one (Droidtop/tracker#846). Pure.
+     */
+    fun valuesKeeping(previous: Map<String, String>, chosen: Set<String>): Map<String, String> {
+        val values = initialValues().toMutableMap()
+        sections.flatMap { it.nodes }.forEach { node ->
+            if (node.id !in chosen) return@forEach
+            val kept = previous[node.id] ?: return@forEach
+            val fits = when (node) {
+                is ViewNode.Toggle -> kept == "true" || kept == "false"
+                is ViewNode.Choice -> node.options.any { it.first == kept }
+                is ViewNode.Slider -> kept.toIntOrNull()?.let { it in node.min..node.max } == true
+                is ViewNode.Text -> true
+                else -> false
+            }
+            if (fits) values[node.id] = kept
+        }
+        return values
+    }
+
     companion object {
         const val VERSION = 1
 

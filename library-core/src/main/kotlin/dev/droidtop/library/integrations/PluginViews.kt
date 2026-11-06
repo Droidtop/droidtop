@@ -108,7 +108,8 @@ object PluginViews {
      * What running one view action came to: the sentence to show, a view the reply carried, whether the page should be
      * fetched again, and the notice to draw instead of the sentence (the reply's `data.notice`, or an error's notice).
      */
-    data class ActionOutcome(val message: String, val view: PluginView?, val refetch: Boolean, val notice: ViewNode.Notice? = null)
+    /** [failed]: the action did not do what it was for, so a page read again keeps the person's own choices. */
+    data class ActionOutcome(val message: String, val view: PluginView?, val refetch: Boolean, val notice: ViewNode.Notice? = null, val failed: Boolean = false)
 
     /** The permissions [record] declares: an error may only point at one of these (docs/plugin-api.md 1.3). */
     internal fun declared(record: PluginRecord): Set<String> = record.manifest.v2.permissions.map { it.id }.toSet()
@@ -172,7 +173,7 @@ object PluginViews {
                 when {
                     !reply.ok -> ActionOutcome(
                         "${record.manifest.label}: ${SourceFailures.forCode(reply.code, reply.message)}", null, refetch = false,
-                        notice = PluginViewCall.errorNotice(reply, declared(record), failedTitle(record, reply.code), messages),
+                        notice = PluginViewCall.errorNotice(reply, declared(record), failedTitle(record, reply.code), messages), failed = true,
                     )
                     value.isBlank() -> ActionOutcome("${record.manifest.label} gave nothing to show", null, refetch = false)
                     !dev.droidtop.pluginhost.PluginSecrets.show(record.manifest.label, label, value) -> ActionOutcome("It cannot be shown right now", null, refetch = false)
@@ -190,7 +191,7 @@ object PluginViews {
                 if (!reply.ok) {
                     ActionOutcome(
                         "${record.manifest.label}: ${SourceFailures.forCode(reply.code, reply.message)}", null, refetch = false,
-                        notice = PluginViewCall.errorNotice(reply, declared(record), failedTitle(record, reply.code), messages),
+                        notice = PluginViewCall.errorNotice(reply, declared(record), failedTitle(record, reply.code), messages), failed = true,
                     )
                 } else {
                     val view = PluginViewCall.replyView(reply.data, messages)
@@ -219,7 +220,7 @@ object PluginViews {
                 } else {
                     PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.FAILED, result.error ?: "failed"), emptySet(), failedTitle(record, PluginErrorCode.FAILED), messages)
                 }
-                ActionOutcome(message, replaced, refetch = replaced == null, notice = notice)
+                ActionOutcome(message, replaced, refetch = replaced == null, notice = notice, failed = !result.ok)
             }
         }
         withContext(Dispatchers.IO) { PluginMessages.record(context, record.manifest.id, "$point/${action.op}", messages) }
@@ -352,6 +353,17 @@ private class PluginPage(
     /** The last load failed on one declared permission droidtop refused (#518): asked again when drawn, as [denied] is. */
     @Volatile private var refusedOne: Boolean = false
     @Volatile private var stale: Boolean = initial == null
+
+    /**
+     * The next read of this page keeps the person's own choices ([chosen]): set when it is read again after an action
+     * that failed, Open the site, Sign in or Refresh, where nothing the person did changed the plugin's state, so a
+     * mirror picked before a browser check is still the one picked after it (Droidtop/tracker#846). A page read again
+     * after an action that worked shows the plugin's values: the plugin's state is what changed.
+     */
+    @Volatile private var keepChosen: Boolean = false
+
+    /** The inputs the person set on this page, by node id. */
+    private val chosen: MutableSet<String> = ConcurrentHashMap.newKeySet()
     @Volatile private var notice: String? = null
 
     /** The permissions this page's nodes name with `needs` that the person turned off (#521 item 5), read each time the page is drawn. */
@@ -409,6 +421,8 @@ private class PluginPage(
             )
         } ?: answered
         stale = false
+        val keep = keepChosen
+        keepChosen = false
         // Asked again each time it is drawn, like a denied page: the person may allow it on the Permissions page and come back.
         refusedOne = refused != null
         // An error naming a permission the plugin declared is about that grant, not the whole point.
@@ -431,7 +445,7 @@ private class PluginPage(
                 runCatching { android.util.Log.w("droidtop.plugin", "${record.manifest.id}: $point/$op returned a page droidtop cannot draw: ${messages.joinToString("; ")}") }
                 show(PluginView(title = null, subtitle = null, sections = emptyList()))
             } else {
-                show(parsed)
+                show(parsed, keep)
             }
         } else if (reply.code == PluginErrorCode.UNSUPPORTED && fallback != null) {
             show(fallback.invoke())
@@ -440,11 +454,14 @@ private class PluginPage(
         }
     }
 
-    private fun show(newView: PluginView) {
+    /** Draws [newView] with its own values, or with the person's own choices kept when [keep] (see [keepChosen]). */
+    private fun show(newView: PluginView, keep: Boolean = false) {
         view = newView
         error = null
+        val next = if (keep) newView.valuesKeeping(HashMap(values), chosen.toSet()) else newView.initialValues()
+        if (!keep) chosen.clear()
         values.clear()
-        values.putAll(newView.initialValues())
+        values.putAll(next)
     }
 
     private fun groups(screenId: String): List<CatalogGroup> {
@@ -491,7 +508,7 @@ private class PluginPage(
                             tone = NoticeTone.Info,
                             title = PluginViews.EMPTY_TITLE,
                             body = view?.empty,
-                            action = if (op != null) NoticeAction("Refresh") { stale = true } else null,
+                            action = if (op != null) NoticeAction("Refresh") { keepChosen = true; stale = true } else null,
                             source = record.manifest.label,
                         ),
                     ),
@@ -599,6 +616,7 @@ private class PluginPage(
                 value = values[node.id] ?: node.value,
                 onChange = { context, text ->
                     values[node.id] = text
+                    chosen.add(node.id)
                     node.action?.let { notice = perform(context, it, node.title) {} }
                 },
             )
@@ -663,7 +681,12 @@ private class PluginPage(
                 action = NoticeAction(label) { context ->
                     val kept = withContext(Dispatchers.IO) { PluginWebAccount.open(context, record, need) }
                     if (kept && need == PluginWebAccount.Need.SIGN_IN) notifyWebSignedIn(context, record)
-                    if (kept) stale = op != null else notice = PluginWebAccount.notKept(record.manifest.label, need)
+                    if (kept) {
+                        keepChosen = true
+                        stale = op != null
+                    } else {
+                        notice = PluginWebAccount.notKept(record.manifest.label, need)
+                    }
                 },
                 source = record.manifest.label,
             ),
@@ -703,6 +726,7 @@ private class PluginPage(
     /** An input's new value; its action, if any, runs in the background and the next [load] waits for it. */
     private fun commit(context: Context, id: String, value: String, action: ViewAction?) {
         values[id] = value
+        chosen.add(id)
         onCommit?.let { tell -> view?.sections?.flatMap { it.nodes }?.firstOrNull { it.id == id }?.let { node -> tell(context.applicationContext, node, value) } }
         if (action == null) return
         val appContext = context.applicationContext
@@ -715,7 +739,12 @@ private class PluginPage(
         replyNotice = null
         val outcome = PluginViews.runAction(context, record, point, action, HashMap(values), hostContext, label, onStatus, onJobDone)
         val replaced = outcome.view
-        if (replaced != null) show(replaced) else if (outcome.refetch) stale = op != null
+        if (replaced != null) {
+            show(replaced)
+        } else if (outcome.refetch) {
+            keepChosen = outcome.failed
+            stale = op != null
+        }
         replyNotice = outcome.notice
         // With a notice to draw, the sentence is not repeated beside it.
         return if (outcome.notice != null) "" else outcome.message
