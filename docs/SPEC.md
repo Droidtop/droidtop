@@ -955,6 +955,9 @@ functionality". The contract is docs/plugin-api.md 1.12; what it decides for Des
   `window.opened`, `window.closed` and `window.focused`, from host-bridge's window list. The session publishes its
   windows to plugins when it connects and withdraws them when it ends (`DesktopPluginWindows`, started beside
   `DesktopWindows` in `DesktopSessionService.connect`); focus is the bar's own raise, so the two never disagree.
+- Slice 3 (2026-11-06) is the bar: a tray button per plugin with tray facets (`PluginTrayItems`, beside Plugins), and
+  a row per plugin in a window's menu (`TaskbarWindowRow`), each opening the plugin's facets as a page drawn by the one
+  renderer. The bar draws from manifests and grants only and asks a plugin only when its entry is opened.
 
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 

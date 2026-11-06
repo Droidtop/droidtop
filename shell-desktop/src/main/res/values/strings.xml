@@ -27,6 +27,8 @@
     <string name="desktop_switch_keyboard">Switch keyboard…</string>
     <string name="desktop_companion">Companion</string>
     <string name="desktop_plugins">Plugins</string>
+    <!-- A window menu's row for a plugin's entries about that window (Droidtop/tracker#221): the plugin's name. -->
+    <string name="desktop_window_plugin">%1$s…</string>
     <string name="desktop_maximize">Maximize</string>
     <string name="desktop_snap_left">Snap left</string>
     <string name="desktop_snap_right">Snap right</string>

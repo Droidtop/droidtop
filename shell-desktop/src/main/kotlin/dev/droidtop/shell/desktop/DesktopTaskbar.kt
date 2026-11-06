@@ -260,6 +260,7 @@ internal fun BoxScope.Taskbar(
                         }
                         KeyboardTaskbarItem()
                         PluginTaskbarItems()
+                        PluginTrayItems()
                         CompanionTaskbarItem()
                         ClipboardNotice()
                     }
@@ -491,6 +492,13 @@ internal fun TaskbarWindowRow(
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
     val anchor = rememberAnchor()
+    // The plugins with entries for this window (docs/plugin-api.md 1.12, Droidtop/tracker#221), read when its menu opens:
+    // manifests and grants only, off the main thread, so the menu never waits on a plugin.
+    val windowPlugins by produceState(emptyList<dev.droidtop.pluginhost.PluginRecord>(), menuOpen, toplevel.appId) {
+        value = if (!menuOpen) emptyList() else withContext(Dispatchers.IO) {
+            runCatching { dev.droidtop.library.integrations.DesktopPluginFacets.windowPlugins(context, toplevel.appId) }.getOrDefault(emptyList())
+        }
+    }
     Box {
         // The app's icon ahead of the title, so windows of different programs tell apart at a glance (#689).
         Row(
@@ -559,6 +567,18 @@ internal fun TaskbarWindowRow(
                     moveTargets.forEach { target ->
                         add(ActionRow(context.getString(R.string.desktop_move_to, target.screenName), onSelect = { menuOpen = false; onMove(target) }))
                     }
+                }
+                // A plugin's entries for this window, one row per plugin, opening them drawn by droidtop.
+                windowPlugins.forEach { record ->
+                    add(
+                        ActionRow(context.getString(R.string.desktop_window_plugin, record.manifest.label), onSelect = {
+                            menuOpen = false
+                            PluginHub.open(
+                                context,
+                                dev.droidtop.library.integrations.DesktopPluginFacets.windowScreen(record, toplevel.id, toplevel.appId, windowTitle(toplevel)),
+                            )
+                        }),
+                    )
                 }
                 add(ActionRow(close, onSelect = { menuOpen = false; onClose() }))
             }
@@ -868,6 +888,30 @@ internal fun KeyboardTaskbarItem() {
     if (hardware) return
     TaskbarButton(onClick = { DesktopKeyboardTarget.surface?.get()?.toggleKeyboard() }) {
         Text(stringResource(R.string.desktop_keyboard))
+    }
+}
+
+/**
+ * The plugins' tray entries (`desktop.tray`, docs/plugin-api.md 1.12, Droidtop/tracker#221): one button per plugin, by
+ * its name from its manifest, opening its tray facets drawn by droidtop. The bar never waits on a plugin to draw: the
+ * plugin is asked only when its entry is opened. Rechecked as the Plugins button is.
+ */
+@Composable
+internal fun PluginTrayItems() {
+    val context = LocalContext.current
+    var plugins by remember { mutableStateOf(emptyList<dev.droidtop.pluginhost.PluginRecord>()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            plugins = withContext(Dispatchers.IO) {
+                runCatching { dev.droidtop.library.integrations.DesktopPluginFacets.trayPlugins(context) }.getOrDefault(emptyList())
+            }
+            delay(PLUGINS_RECHECK_MS)
+        }
+    }
+    plugins.forEach { record ->
+        TaskbarButton(onClick = { PluginHub.open(context, dev.droidtop.library.integrations.DesktopPluginFacets.trayScreen(record)) }) {
+            Text(record.manifest.label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 120.dp))
+        }
     }
 }
 

@@ -1935,6 +1935,17 @@ its windows over when it connects and takes them back when it ends (`DesktopPlug
 (`notifyWindowEvents`); each one told is counted on the plugin's day of activity. Both permissions are dangerous, so
 every call is in the activity log.
 
+**The bar, as built (slice 3, 2026-11-06).** Both targets are drawn by the one renderer, as a page opened from the
+bar (`DesktopPluginFacets`), so nothing on the bar waits on a plugin process to draw (Droidtop/tracker#852 part 2's
+rule): the bar shows what the manifest says, and the plugin is asked `get` only when the person opens its entry.
+- **The tray:** one button per plugin that declares `desktop.tray`, is on in Desktop and has the target switched on,
+  by the plugin's name, beside the Plugins button; it opens the plugin's tray facets about the device. Drawing a
+  status's icon on the bar itself, without opening, needs droidtop to keep a plugin's last tray facets and is not built.
+- **A window's menu:** under the window's own rows, one row "<plugin>…" per plugin that declares `desktop.window`,
+  holds `windows.read` as granted and reaches the window's app; it opens the plugin's facets about that window,
+  asked with `{type: "window", windowId, appId}` and admitted only about that window (`FacetGuards.admit`'s `asked`,
+  now passed by every facet page, `PluginFacets.view`).
+
 **Not offered:** input into another application's window (a keylogger's and an autoclicker's tool; a `shortcut` on
 an action, below, covers the legitimate uses), and capturing a window's picture (windowcast's, by the standing rule).
 
@@ -1945,7 +1956,7 @@ use of them is in the audit log (§4.6, Droidtop/tracker#61); window events deli
 
 **Slices.** 1, the contract (this section, the `window` and `file` subjects, `desktop.window`, icons; built
 2026-11-06). 2, the host side over host-bridge (`windows.*` and the window events; built 2026-11-06, below). 3, the taskbar drawing
-`desktop.tray` and `desktop.window`. 4, Open with. 5, the clipboard and notification bridges, each behind its own
+`desktop.tray` and `desktop.window` (built 2026-11-06, below). 4, Open with. 5, the clipboard and notification bridges, each behind its own
 approval. 6, a test fixture plugin exercising each.
 
 **The facet vocabulary grows (owner, 2026-11-06).** The owner: "I think the current vocabularity is too limited". He
