@@ -23,6 +23,7 @@ import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
 import dev.droidtop.runtime.SharedVolume
+import dev.droidtop.runtime.SiblingX11
 import dev.droidtop.runtime.RootfsPuller
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -392,7 +393,7 @@ class DroidSpacesRuntime(
             }
             name
         }
-        val result = RootProcess.run(*runArgv(container, command, runEnvironment(container, env, switchTo)).toTypedArray())
+        val result = RootProcess.run(*runArgv(container, command, runEnvironment(container, env, switchTo), siblingX11Display(container, env)).toTypedArray())
         return ContainerExecResult(exitCode = result.exitCode, stdout = result.stdout, stderr = result.stderr)
     }
 
@@ -416,12 +417,30 @@ class DroidSpacesRuntime(
     /**
      * The root argv that runs [command] in [container] with [environment] ([runEnvironment]): what [exec] collects and
      * what droidtop's own terminal relays ([interactiveShell]). The command and the values are quoted, never pasted.
+     * With [x11Display], a sibling's X server is started first ([siblingX11Display]).
      */
-    private fun runArgv(container: Container, command: List<String>, environment: Map<String, String>): List<String> {
+    private fun runArgv(container: Container, command: List<String>, environment: Map<String, String>, x11Display: Int? = null): List<String> {
         val envPrefix = environment.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
         val commandLine = command.joinToString(" ") { shellQuote(it) }
-        val shellScript = if (envPrefix.isEmpty()) commandLine else "$envPrefix $commandLine"
+        val x11Prefix = x11Display?.let { SiblingX11.detachedPrefix(it, envPrefix) }.orEmpty()
+        val shellScript = x11Prefix + if (envPrefix.isEmpty()) commandLine else "$envPrefix $commandLine"
         return listOf(binaryPath, "--name=${container.id}", "run", "sh", "-c", shellScript)
+    }
+
+    /**
+     * A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", Droidtop/tracker#910): the display [exec]
+     * starts it on, detached inside the container, where its init keeps it, when the package is there and it is not
+     * running; DISPLAY only once its socket is ([SiblingX11.detachedPrefix]). Only for a sibling sharing Wayland, and
+     * never when [env] asks for no server. The tree is root's, so whether the package is there is asked inside it.
+     */
+    private suspend fun siblingX11Display(container: Container, env: Map<String, String>): Int? {
+        if (container.id == PRIMARY_NAME || SiblingX11.NO_SERVER_ENV in env) return null
+        val waylandSocketName = if (readSockets(container.id).waylandShared) ContainerLayout.findWaylandSocket(socketsDir)?.name else null
+        if (waylandSocketName == null) return null
+        val ids = withContext(Dispatchers.IO) {
+            configsDir.listFiles { f -> f.isFile && f.name.endsWith(".config") }.orEmpty().map { it.name.removeSuffix(".config") }
+        }
+        return SiblingX11.displayNumber(container.id, ids)
     }
 
     override val interactiveShellUnavailableReason: String? = null
