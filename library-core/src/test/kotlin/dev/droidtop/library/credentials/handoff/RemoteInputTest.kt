@@ -11,11 +11,14 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.pocketworkstation.pckeyboard.remote.RemoteInputRouter
+import org.pocketworkstation.pckeyboard.remote.RemoteTarget
 
 /**
  * Typing from another device (docs/SPEC.md, "Type from another device", Droidtop/tracker#645): the token and code
  * checks, the code the console confirms, the one paired device, the reset on a refusal, the prompt timeout, the idle
- * limit, and which field a delivery lands in. Fakes for the clock, the listener and the fields; one test uses a real socket.
+ * limit, and what the session does with a delivery. Which field a delivery lands in is the router's, tested with it in
+ * `:input-keyboard` (RemoteInputRouterTest). Fakes for the clock, the listener and the fields; one test uses a real socket.
  */
 class RemoteInputTest {
     private var now = 1_000L
@@ -421,37 +424,7 @@ class RemoteInputTest {
         assertEquals("Phone connected: typing", input.state.value.consoleLine())
     }
 
-    // Where a delivery lands.
-
-    @Test
-    fun `a droidtop field is typed into first, even while droidtop's input method has an editor`() {
-        ownFocused = true
-        imeFocused = true
-        imeSelected = true
-        assertTrue(router.route() is Route.OwnField)
-        assertEquals(Delivery.Sent(false), router.deliver(0, "a", false))
-        assertEquals(listOf("text:a"), own.log)
-        assertEquals(emptyList<String>(), ime.log)
-    }
-
-    @Test
-    fun `otherwise droidtop's input method connection is used`() {
-        imeFocused = true
-        imeSelected = true
-        assertTrue(router.route() is Route.Ime)
-        router.deliver(1, "b", true)
-        assertEquals(listOf("back:1", "text:b", "enter"), ime.log)
-        assertEquals(emptyList<String>(), own.log)
-    }
-
-    @Test
-    fun `otherwise the console is told to switch keyboard`() {
-        assertEquals(Route.SwitchKeyboard, router.route())
-        assertEquals(Delivery.Refused("Switch to droidtop's keyboard to type from another device"), router.deliver(0, "c", false))
-        assertEquals(emptyList<String>(), own.log + ime.log)
-        imeSelected = true
-        assertEquals(Route.NoField, router.route())
-    }
+    // What the session does with a delivery the router refused.
 
     @Test
     fun `a refused delivery reaches the console and the phone and types nothing`() {
@@ -478,17 +451,6 @@ class RemoteInputTest {
         assertEquals(listOf("text:hunter2"), secretField.log)
         assertEquals(RemoteInputState.Paired("••••"), input.state.value)
         assertTrue(listeners.last().endpoint.handle("GET", "/r/${input.tokenOf()}/state", "", PHONE).body.contains("\"secret\":true"))
-    }
-
-    @Test
-    fun `password input types are recognised`() {
-        assertTrue(RemoteInputRouter.isPasswordInputType(0x81))
-        assertTrue(RemoteInputRouter.isPasswordInputType(0x91))
-        assertTrue(RemoteInputRouter.isPasswordInputType(0xe1))
-        assertTrue(RemoteInputRouter.isPasswordInputType(0x12))
-        assertFalse(RemoteInputRouter.isPasswordInputType(0x01))
-        assertFalse(RemoteInputRouter.isPasswordInputType(0x21))
-        assertFalse(RemoteInputRouter.isPasswordInputType(0x02))
     }
 
     // The shared clipboard.
@@ -1217,27 +1179,5 @@ class RemoteInputTest {
 
     private companion object {
         const val PHONE = "192.168.1.50"
-    }
-
-    @Test
-    fun `a named key is pressed in the field the route names, or refused without one`() {
-        val own = FakeTarget()
-        val router = RemoteInputRouter(ownField = { own }, ime = { null }, imeSelected = { true })
-        assertEquals(Delivery.Sent(false), router.press(RemoteKeys.keyCode("left")!!))
-        assertEquals(listOf("key:21"), own.log)
-        val none = RemoteInputRouter(ownField = { null }, ime = { null }, imeSelected = { true })
-        assertEquals(Delivery.Refused(RemoteInputRouter.NO_FIELD), none.press(61))
-    }
-
-    @Test
-    fun `kde connect's key names as android key codes`() {
-        assertEquals(61, RemoteKeys.keyCode("tab"))
-        assertEquals(112, RemoteKeys.keyCode("delete"))
-        assertEquals(111, RemoteKeys.keyCode("escape"))
-        assertEquals(131, RemoteKeys.keyCode("f1"))
-        assertEquals(142, RemoteKeys.keyCode("f12"))
-        // Backspace and Enter keep the text path; modifiers alone are not typed.
-        assertNull(RemoteKeys.keyCode("backspace"))
-        assertNull(RemoteKeys.keyCode("control"))
     }
 }

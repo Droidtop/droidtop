@@ -8,6 +8,8 @@ import java.security.SecureRandom
 import java.util.Base64
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.pocketworkstation.pckeyboard.remote.Delivery
+import org.pocketworkstation.pckeyboard.remote.RemoteInputRouter
 
 /** Why a [RemoteInput] ended. */
 enum class RemoteInputEnd(val text: String) {
@@ -73,9 +75,11 @@ fun RemoteInputState.consoleLine(): String = when (this) {
  * console offers ([offer]) is a download link on the phone's page for this session only. Both follow the pairing, code
  * and token rules of an edit, and neither is ever held in memory.
  *
- * The token and the code are compared in constant time. Typing is delivered by [router]; it is called outside this
- * class's lock, because it waits for the main thread. Time passes in [tick], which the server's own loop calls
- * every second ([HandoffEndpoint.isLive]); a test calls it with its own clock.
+ * The token and the code are compared in constant time. Typing is delivered by [router], which the keyboard and input
+ * module (`:input-keyboard`) owns: this class is the transport, the pairing and the confirm, and decides only whether a
+ * request may type at all. The router is called outside this class's lock, because it waits for the main thread.
+ * Time passes in [tick], which the server's own loop calls every second ([HandoffEndpoint.isLive]); a test calls it
+ * with its own clock.
  */
 class RemoteInput(
     private val clock: () -> Long,

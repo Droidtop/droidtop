@@ -9,10 +9,11 @@ import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.view.Window
 import android.widget.FrameLayout
-import dev.droidtop.library.credentials.handoff.RemoteInputRouter
-import dev.droidtop.library.credentials.handoff.RemoteTarget
 import org.pocketworkstation.pckeyboard.KeyboardPanel
 import org.pocketworkstation.pckeyboard.WindowKeySink
+import org.pocketworkstation.pckeyboard.remote.RemoteInputRouter
+import org.pocketworkstation.pckeyboard.remote.RemoteTarget
+import org.pocketworkstation.pckeyboard.remote.RemoteTyping
 import java.util.WeakHashMap
 
 /**
@@ -35,6 +36,13 @@ object InWindowKeyboard {
 
     /** Activities already watched. Weak keys, plain values: nothing here keeps an activity alive. */
     private val attached = WeakHashMap<Activity, Boolean>()
+
+    // Typing from another device finds droidtop's own field here (RemoteTyping, the keyboard and input module's router).
+    // Registered when this object is first used, which is the first attach: before it, no window is watched, so there
+    // is no field to find either way.
+    init {
+        RemoteTyping.ownFields { focusedOwnField() }
+    }
 
     /**
      * The text field of a droidtop window that droidtop's keyboard serves right now ([KeyboardTargets.servesField]),

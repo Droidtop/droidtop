@@ -17553,6 +17553,26 @@ Security (owner, 2026-10-24): "for security, it can display a 6 digit code on th
 on the console before it accepts input. It'll also only allow one connected device. It'll reset the server and try
 again if a code is refused".
 
+- **Who owns what (the owner, relayed by the coordinator on Droidtop/tracker#903: "can we integrate the remote
+  input stuff INTO the keyboard/input module in droidtop?"; the coordinator: "Move the router and the session's input side into the
+  keyboard and input module, so one module owns every input source ... The pairing, the six-digit confirm and
+  `HandoffServer`'s security stay exactly as SPEC has them; this changes where the code lives, not the rules").** The
+  keyboard and input module, `:input-keyboard`, owns the **input side**: where an edit lands and how it is typed
+  (`RemoteInputRouter`, `RemoteTarget`, `Route`, `Delivery`, `RemoteKeys`, `FieldThread`, in
+  `org.pocketworkstation.pckeyboard.remote`), the process's one router and its two Android targets (`RemoteTyping`:
+  droidtop's input method's editor, `ImeTarget`, and the main-thread hand-off, `RemoteTyping.MainThread`), what the
+  keyboard shows of a live session and where a clip from the phone is kept (both below). So one module owns every input
+  source: the on-screen keys, the pad, the companion keyboard, the phone page and KDE Connect's remote keyboard (7q), which
+  all ask `RemoteTyping.router()`. droidtop's own focused field is found by `InWindowKeyboard.focusedOwnField`
+  (`:shell-gamepad`, which depends on the keyboard module, so it registers itself with `RemoteTyping.ownFields`).
+  The **transport and the security** stay where they were, unchanged: `HandoffServer` (the listener, what it accepts),
+  `RemoteInput` (the token, the pairing, the six digit confirm, the one paired device, the reset on a refusal, the idle
+  limit, the clipboard and file rules), `RemoteInputPage` (the page, which shows the code) and `ClipRules`, all in
+  `:library-core`, which depends on `:input-keyboard` for the router (the keyboard module depends on no project, so there
+  is no cycle). The Android entry points stay in `:app` with their manifest entries: `RemoteInputActivity` (the console:
+  the QR code, Confirm and Refuse) and `RemoteInputService` (the foreground service that keeps the listener) are the
+  pairing's, not input, and they need `:library-core`'s session, which the keyboard module cannot depend on;
+  `RemoteInputs` (the session of this process, its console clipboard `AndroidClipboard` and folder) stays with them.
 - **The session (`RemoteInput`, `:library-core`, on `HandoffServer`).** `HandoffServer` is the one local-network
   listener, shared with nothing else now that the key form is gone: it binds the device's LAN address
   (`HandoffServer.lanAddress`, a site-local IPv4) on a random port in the dynamic range, answers loopback, site-local
@@ -17673,7 +17693,8 @@ again if a code is refused".
   - *Not done:* resuming an interrupted transfer, ranges, several files at once, a folder of files, a transfer progress
     bar on the console (the phone page shows a percentage), and a free-space check before a file starts (a full disk
     fails the write and the file is deleted).
-- **Where an edit lands (`RemoteInputRouter`, the one choice, with fakes in its tests).**
+- **Where an edit lands (`RemoteInputRouter`, `:input-keyboard`, the one choice, with fakes in its tests,
+  `RemoteInputRouterTest`).**
   (a) The focused field is droidtop's own and droidtop's keyboard serves it (`AddonKeyboardRules.droidtopServesField`,
   through `KeyboardTargets.servesField`): the window's own key path, `WindowKeySink`, the path droidtop's own keyboards
   type through (`InWindowKeyboard.focusedOwnField`: the droidtop window with focus, else any other on screen whose
@@ -17682,7 +17703,7 @@ again if a code is refused".
   replaced by nothing first) and the Enter key event. (c) Otherwise the console says "Switch to droidtop's keyboard to
   type from another device", or "Tap a text field on this device first" when droidtop's input method is active and no
   field has focus, and the phone is told nothing was typed. Delivery runs on the main thread (the server's thread
-  waits two seconds for it); the server's thread never touches a view.
+  waits two seconds for it, `RemoteTyping.MainThread`); the server's thread never touches a view.
 - **On the console while it is active:** "Phone connected: typing", with what was last sent. A password hides it:
   when the focused field is a password (`EditorInfo.inputType` for the input method's field,
   `RemoteInputRouter.isPasswordInputType`; a text view's input type or transformation for droidtop's own; a field
@@ -23571,7 +23592,7 @@ client." The plan and its slices are on #645.
     default, as in the official apps.
   - **remote input (slice 4)**, both directions:
     - *Controlled.* Typing from a paired device goes through "Type from another device"'s one router
-      (`RemoteInputRouter`): droidtop's own focused field, else droidtop's input method into any app's field, else
+      (`RemoteTyping.router()`, the keyboard and input module's, Droidtop/tracker#903): droidtop's own focused field, else droidtop's input method into any app's field, else
       the router's notice (once a minute at most). Text, Backspace and Enter are typed, and so are Tab, the arrows, Page Up and Down, Home, End, Delete, Escape and F1 to F12 (`RemoteKeys`, as key events into the same field). Modifiers alone, and keys held with Ctrl or Alt, are not yet.
       droidtop tells paired devices it takes typing (`keyboardstate` true) while KDE Connect is on, because the router
       always answers. **Not built:** moving droidtop's pointer from a paired device. That needs an accessibility

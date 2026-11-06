@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
+import org.pocketworkstation.pckeyboard.remote.Delivery
+import org.pocketworkstation.pckeyboard.remote.RemoteKeys
+import org.pocketworkstation.pckeyboard.remote.RemoteTyping
 
 /**
  * KDE Connect's notices and what arrives from paired devices (docs/SPEC.md 7q "KDE Connect"):
@@ -286,18 +289,18 @@ object KdeConnectNotification {
             e.specialKey == "backspace" -> Triple(1, "", false)
             e.specialKey == "enter" || e.specialKey == "linefeed" -> Triple(0, "", true)
             else -> {
-                val code = e.specialKey?.let { dev.droidtop.library.credentials.handoff.RemoteKeys.keyCode(it) } ?: return
-                runCatching { RemoteInputs.router().press(code) }.getOrNull()?.let { refused(context, it) }
+                val code = e.specialKey?.let { RemoteKeys.keyCode(it) } ?: return
+                runCatching { RemoteTyping.router().press(code) }.getOrNull()?.let { refused(context, it) }
                 return
             }
         }
-        val delivery = runCatching { RemoteInputs.router().deliver(back, text, enter) }.getOrNull() ?: return
+        val delivery = runCatching { RemoteTyping.router().deliver(back, text, enter) }.getOrNull() ?: return
         refused(context, delivery)
     }
 
     /** Says once a minute at most why typing from another device went nowhere. */
-    private fun refused(context: Context, delivery: dev.droidtop.library.credentials.handoff.Delivery) {
-        if (delivery is dev.droidtop.library.credentials.handoff.Delivery.Refused) {
+    private fun refused(context: Context, delivery: Delivery) {
+        if (delivery is Delivery.Refused) {
             val now = android.os.SystemClock.elapsedRealtime()
             if (now - lastTypingNotice > 60_000) {
                 lastTypingNotice = now

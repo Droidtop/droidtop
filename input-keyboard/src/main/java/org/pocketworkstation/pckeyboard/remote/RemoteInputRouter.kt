@@ -1,4 +1,4 @@
-package dev.droidtop.library.credentials.handoff
+package org.pocketworkstation.pckeyboard.remote
 
 /** Where one person-typed edit lands: a field that can take text, backspaces, Enter and other keys. */
 interface RemoteTarget {
@@ -74,7 +74,8 @@ sealed interface Delivery {
  * The one choice of where text from another device goes (docs/SPEC.md, "Type from another device"), with no Android
  * in it so it is unit-tested: droidtop's own field first, else droidtop's input method's connection, else a notice.
  * [fieldThread] puts a delivery on the thread the fields live on (the main thread); the server's own thread never touches a
- * view or a connection.
+ * view or a connection. The keyboard and input module owns it (Droidtop/tracker#903): [RemoteTyping.router] is the
+ * process's one, used by the phone page's session and by KDE Connect's remote keyboard alike.
  */
 class RemoteInputRouter(
     private val ownField: () -> RemoteTarget?,

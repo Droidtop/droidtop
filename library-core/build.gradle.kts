@@ -147,6 +147,10 @@ dependencies {
     // CI failure: "Cannot access class 'CacheLookupFlag'" until this was
     // added directly).
     implementation(project(":IconLoader"))
+    // "Type from another device"'s input side (where an edit lands: RemoteInputRouter, RemoteTarget, Delivery) is the
+    // keyboard and input module's (docs/SPEC.md, "Type from another device", Droidtop/tracker#903); the session here
+    // keeps the transport, the pairing and the confirm. Safe direction: :input-keyboard depends on no project.
+    implementation(project(":input-keyboard"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
     // RomDetectUtils/SerialScanner's own real Timber.d/i logging, forked
