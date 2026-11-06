@@ -996,6 +996,15 @@
             android:name=".KdeConnectTouchpadActivity"
             android:exported="false" />
 
+        <!-- The terminal into a container on Android (docs/SPEC.md 3d, "A terminal on Android"; Droidtop/tracker#909).
+             Turning the screen, a keyboard coming or going and the like resize the terminal rather than recreate the
+             screen, whose shell would end with it; the soft keyboard resizes it too. -->
+        <activity
+            android:name=".terminal.ContainerTerminalActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
         <!-- Pairing a computer running droidtop-agent, opened from Accounts and sources, Computers (docs/SPEC.md 7o). -->
         <activity
             android:name=".PairComputerActivity"

@@ -402,6 +402,21 @@ interface ContainerRuntime {
     ): ContainerExecResult
 
     /**
+     * Why this backend cannot open droidtop's own terminal into a container (docs/SPEC.md 3d, "A terminal on
+     * Android"); null when it can. Both backends can.
+     */
+    val interactiveShellUnavailableReason: String?
+        get() = "This kind of container can't open a terminal here"
+
+    /**
+     * How to run an interactive login shell in [container] on droidtop's own terminal ([InteractiveShell]),
+     * Droidtop/tracker#909. [container] must be running, as for [exec]; it runs as root, as [exec] does with no user.
+     * Prepares what [exec] prepares first, so disk work: never on the main thread.
+     */
+    suspend fun interactiveShell(container: Container): InteractiveShell =
+        error(interactiveShellUnavailableReason ?: "not supported")
+
+    /**
      * Why this backend cannot share a device node (a USB serial adapter, a
      * scanner) with a container, in words for the container manager's
      * Devices row; null when it can (docs/SPEC.md 4b).

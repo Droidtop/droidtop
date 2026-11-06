@@ -1,57 +1,29 @@
 package dev.droidtop.runtime
 
 /**
- * A real shell inside a container, reachable from desktop mode
- * (docs/SPEC.md §3d: "a computer the user can't open a shell on isn't a
- * computer").
+ * A real shell inside a container (docs/SPEC.md §3d: "a computer the user can't open a shell on isn't a computer"),
+ * two ways.
  *
- * ### Why a terminal *in* the container rather than a terminal view in Android
+ * ### On the desktop: foot in the container
  *
- * The two honest options were an Android-side terminal view driving
- * [ContainerRuntime.exec], and a real terminal application launched into the
- * compositor the desktop session is already running. This is the second, and
- * the argument is that the first is a much larger project pretending to be a
- * smaller one:
+ * With the desktop up, Settings > Containers > Terminal runs a real terminal application ([PACKAGE]) inside the
+ * container, through [ContainerRuntime.exec], as a window on the shared desktop. Everything a shell needs (a pty,
+ * curses, colour, resize, scrollback) comes from a program written to provide them, the keys reach it through
+ * `:input-seat` and `:host-bridge`'s virtual keyboard, and it is what distrobox (and BoxBuddy/DistroShelf over it,
+ * §7c) does. Siblings share the primary's Wayland socket, so a terminal launched in one appears on the same desktop
+ * as a window of its own; the primary gets [PACKAGE] with its compositor, and any other container gets it the first
+ * time a terminal is asked for ([ENSURE_COMMAND], run from the container manager's Terminal action before [open]).
  *
- *  - [ContainerRuntime.exec] is run-to-completion — it returns a
- *    [ContainerExecResult] with captured stdout/stderr. An interactive shell
- *    needs a pty and a live stream, so the Android-side option starts by
- *    adding a pty/streaming primitive to [ContainerRuntime], which every
- *    backend then owes an implementation of. That deepens the interface for a
- *    feature that does not need it.
- *  - Above that pty it still needs a VT parser and renderer, i.e. a terminal
- *    emulator, forked from Termux or Jackpal (§3d names both as candidates).
- *    A real terminal already exists in every distro's own package repository
- *    and is maintained by someone else.
- *  - droidtop already forked a keyboard *specifically* so that a terminal is
- *    drivable — Ctrl, Alt, Esc, Tab, arrows, function row (§6a). Those keys
- *    reach the container today through `:input-seat` → `:host-bridge`'s
- *    virtual keyboard. An Android-side terminal view would have to grow its
- *    own key handling and would not use that path at all.
- *  - It is also how the reference implementations work: distrobox (and
- *    BoxBuddy/DistroShelf over it, §7c) open a terminal by running one
- *    inside the container against the host's own display server.
+ * ### On Android: droidtop's own terminal (Droidtop/tracker#909)
  *
- * So this is one exec of one package, and everything a shell actually needs
- * — a pty, curses, colour, resize, scrollback — comes from a program written
- * to provide them.
- *
- * ### The limitation, stated plainly
- *
- * A terminal that lives in the compositor is unreachable when the compositor
- * is not running, which is exactly when a shell would be most useful for
- * debugging. That is a real cost of this choice. It is not paid for with a
- * second, non-interactive fallback path here, because two mechanisms for one
- * job is how a feature rots; a container that will not boot is the container
- * manager's problem (§3d), not the terminal's.
- *
- * ### Scope
- *
- * Any container. Siblings share the primary's Wayland socket, so a terminal
- * launched in one appears on the same desktop as a window of its own; the
- * primary gets [PACKAGE] with its compositor, and any other container gets
- * it the first time a terminal is asked for ([ENSURE_COMMAND], run from the
- * container manager's Terminal action before [open]).
+ * A terminal that lives in the compositor is unreachable when the compositor is not running, which is when a shell
+ * would help most. So droidtop also draws a terminal itself, on Android, desktop up or not: Termux's
+ * terminal-emulator and terminal-view (vendor/termux-terminal) over a real pseudo-terminal, running the backend's
+ * own enter command ([ContainerRuntime.interactiveShell], [InteractiveShell]) with [LOGIN_SHELL_COMMAND] and
+ * [SHELL_ENVIRONMENT]. The pieces that made this "a larger project pretending to be a smaller one" when foot was
+ * chosen are what Termux already wrote: the VT parser, the renderer and the pty. [ContainerRuntime.exec] stays
+ * run-to-completion; the interactive path is a separate method that returns how to start the shell rather than
+ * running it, so no backend owes a streaming primitive.
  */
 object ContainerTerminal {
 
@@ -109,6 +81,46 @@ object ContainerTerminal {
             append(") is in this container, so a terminal cannot be installed in it.' >&2; exit 2; fi")
         },
     )
+
+    /**
+     * What droidtop's own terminal runs in a container (Droidtop/tracker#909): the login shell of the user it runs as,
+     * from the container's /etc/passwd (`/bin/sh` when that names none or nothing executable), started as a login
+     * shell (`-l`, which every common shell takes) in that user's home. Read in the container, so a Custom image gets
+     * its own shell; nothing here is shell text from outside.
+     */
+    val LOGIN_SHELL_COMMAND: List<String> = listOf("/bin/sh", "-c", loginScript())
+
+    private fun loginScript(): String =
+        "u=\$(id -un 2>/dev/null || echo root); s=; h=; " +
+            "while IFS=: read -r n _ _ _ _ d sh; do if [ \"\$n\" = \"\$u\" ]; then s=\$sh; h=\$d; break; fi; done < /etc/passwd; " +
+            "{ [ -n \"\$s\" ] && [ -x \"\$s\" ]; } || s=/bin/sh; " +
+            "{ [ -n \"\$h\" ] && [ -d \"\$h\" ]; } && export HOME=\"\$h\"; " +
+            "cd \"\${HOME:-/}\" 2>/dev/null || cd /; export SHELL=\"\$s\"; exec \"\$s\" -l"
+
+    /**
+     * What droidtop's own terminal adds to the environment the backend gives a command: the terminal it emulates
+     * (xterm with 256 colours, which Termux's emulator answers to) and that it draws 24-bit colour.
+     */
+    val SHELL_ENVIRONMENT: Map<String, String> = linkedMapOf("TERM" to "xterm-256color", "COLORTERM" to "truecolor")
+
+    /**
+     * [LOGIN_SHELL_COMMAND] on a terminal made inside the container, for a backend whose command reaches the
+     * container over pipes ([InteractiveShell.Elevated]): `script(1)` (util-linux's or busybox's) makes the pty and
+     * runs the shell on it, sized [rows] by [columns] with `stty` first. A container without `script` gets the shell
+     * on the pipes, saying so: it runs commands, but an editor or `top` cannot draw.
+     */
+    fun onContainerTerminal(rows: Int, columns: Int): List<String> {
+        val inner = "stty rows $rows cols $columns 2>/dev/null; " + LOGIN_SHELL_COMMAND[2]
+        return listOf(
+            "/bin/sh",
+            "-c",
+            "if command -v script >/dev/null 2>&1; then exec script -qfc \"\$1\" /dev/null; fi; " +
+                "echo 'This container has no script program, so the shell has no terminal: editors and top will not " +
+                "draw. Installing util-linux adds one.' >&2; exec /bin/sh -c \"\$1\"",
+            "sh",
+            inner,
+        )
+    }
 
     /**
      * Makes sure [container] has a terminal ([ENSURE_COMMAND]); null when it

@@ -3132,44 +3132,80 @@ the `ContainerRuntime` interface that already exists (§3):
   the install and its outcome are logged under `droidtop.DesktopFonts`, so a desktop without
   the fonts can be told from one whose job is waiting for Wi-Fi.
 - **A real terminal into any container** — a computer the user can't
-  open a shell on isn't a computer. **Decided and built 2026-09-02, the
-  other way round from this section's original sketch**: droidtop does
-  NOT host a Compose terminal view of its own, and neither Termux's
-  terminal-view nor Jackpal's Android-Terminal-Emulator is forked in.
-  The terminal is a real terminal application (`foot`) running *inside*
-  the container, provisioned alongside the compositor and launched
-  through the `exec` this section already named, appearing as an ordinary
-  window on the shared desktop. See `runtime-common`'s
-  `ContainerTerminal` for the argument in full; in short:
-
-  - `ContainerRuntime.exec` is run-to-completion and returns captured
-    output. An Android-side terminal view needs a pty and a live stream,
-    so it would begin by widening `ContainerRuntime` with a streaming
-    primitive every backend then owes — including the one that is still
-    `TODO()`. The in-container terminal needs nothing new from that
-    interface at all.
-  - Above the pty it would still need a VT parser and renderer. A real
-    terminal already exists in every distro's package repository.
-  - §6a's whole justification for forking a keyboard in is that a
-    terminal needs Ctrl/Alt/Esc/Tab/arrows/function keys. Those already
-    reach the container through `:input-seat` → `:host-bridge`'s virtual
-    keyboard; an Android-side view would use none of that path.
-  - It is what distrobox — and BoxBuddy/DistroShelf over it, §7c — do.
-
-  The cost, stated rather than hidden: a terminal that lives in the
-  compositor is unreachable when the compositor is not running, which is
-  when a shell would help most for debugging. No second non-interactive
-  path is built to cover that, deliberately; a container that will not
-  boot is this section's container-manager problem, not the terminal's.
-  It opens in any container (built 2026-09-25). Siblings share the
-  Wayland socket, so a terminal in one is a window on the same desktop;
-  the container manager's Terminal installs `foot` and a font on first
-  use through whichever package manager the container has (apk, apt-get,
-  dnf, zypper, pacman, xbps-install; found in the container, so a Custom
-  image gets one too), starts a sibling first where the backend needs
-  that, runs the terminal in the desktop session and brings Desktop
-  forward to show it. Without a running desktop the row offers "Start the
-  desktop for a terminal" instead, since there is nowhere to show one.
+  open a shell on isn't a computer. Two terminals, one for each place a
+  person is (Droidtop/tracker#909 changed the 2026-09-02 decision below;
+  **the plan posted on #909 is built, owner to confirm**):
+  - **On the desktop: foot in the container (decided and built
+    2026-09-02).** A real terminal application (`foot`) runs *inside* the
+    container, provisioned alongside the compositor and launched through
+    `ContainerRuntime.exec`, as an ordinary window on the shared desktop;
+    its keys come through `:input-seat` and `:host-bridge`'s virtual
+    keyboard, as distrobox (and BoxBuddy/DistroShelf over it, §7c) does it.
+    It opens in any container (built 2026-09-25). Siblings share the
+    Wayland socket, so a terminal in one is a window on the same desktop;
+    the container manager's Terminal installs `foot` and a font on first
+    use through whichever package manager the container has (apk, apt-get,
+    dnf, zypper, pacman, xbps-install; found in the container, so a Custom
+    image gets one too), starts a sibling first where the backend needs
+    that, and runs the terminal in the desktop session.
+  - **A terminal on Android (Droidtop/tracker#909, built 2026-11-06, owner
+    to confirm).** The cost foot carried, stated when it was chosen ("a
+    terminal that lives in the compositor is unreachable when the
+    compositor is not running, which is when a shell would help most"), is
+    paid now: droidtop also draws a terminal itself, desktop up or not.
+    - *Where it lives:* `ContainerTerminalActivity` (`app/.../terminal/`),
+      a screen of its own in droidtop's look (`DroidtopTheme`, the ground
+      background, the shell's hint row: A Enter, X Keyboard, B Close). With
+      the desktop off, Settings > Containers > a container > **Terminal**
+      opens it (it replaced "The terminal opens on the desktop, which is
+      off"); with the desktop up, **Terminal** keeps opening foot on the
+      desktop exactly as before and a second row, **Terminal here**, opens
+      this one. A sibling that must be started is started first, as for
+      foot; a rooted primary whose desktop is off says to open Desktop
+      first, since its container runs only with the desktop. Windows games
+      have no container (§5b), so they have no row.
+    - *The emulator is Termux's, vendored, not written:* the
+      `terminal-emulator` and `terminal-view` library modules of
+      termux-app `v0.118.3` (`vendor/termux-terminal`, Apache-2.0 under
+      termux-app's own licence exception; NOTICE.md), their `src/main`
+      copied unchanged and built as `:terminal-emulator` and
+      `:terminal-view` with droidtop's own build files. droidtop hooks them
+      (a `TerminalViewClient`, a `TerminalSessionClient`) and edits none of
+      their files.
+    - *The pty is Termux's JNI* (`libtermux.so`, `JNI.createSubprocess`):
+      `/dev/ptmx`, fork, `setsid`, the slave as the controlling terminal,
+      `TIOCSWINSZ` when the view's size changes (turning the screen resizes
+      the terminal; the activity handles the configuration change instead
+      of being recreated).
+    - *What runs on it is the backends' own enter command:*
+      `ContainerRuntime.interactiveShell` returns how to start a login shell
+      (`ContainerTerminal.LOGIN_SHELL_COMMAND`, the user's passwd shell with
+      `-l` in their home) with `TERM=xterm-256color` and
+      `COLORTERM=truecolor`, built by the same code `exec` uses, so the two
+      cannot drift: proot (non-root, first) returns `startSession`'s own
+      argv and environment (`sessionCommand`), run on the pty as the app;
+      droidspaces (root) returns `exec`'s own `droidspaces run` argv
+      (`runArgv`, `runEnvironment`), which goes through the elevated helper
+      as every root command does and so arrives over pipes: the pty is made
+      in the container by `script(1)` (`ContainerTerminal.onContainerTerminal`,
+      sized with `stty` at the start; a later resize does not reach it) and
+      a relay on droidtop's pty carries the bytes through two FIFOs. A
+      container with no `script` gets the shell on the pipes and is told
+      so. `exec` itself stays run-to-completion.
+    - *Keys:* the on-screen keyboard (Hacker Keyboard Reborn or any other)
+      and a hardware keyboard through the view's own input connection and
+      key handling; the pad through `TerminalPad`, read from the one key
+      table (`GamepadKeyMap`, the face-button swap included): the D-pad is
+      the arrow keys, A is Enter, X shows or hides the keyboard, B (or
+      Back) leaves, and `PadModality` follows it. A keyboard's Enter, Esc
+      and arrows are never taken as the pad's.
+    - *Lifetime:* the shell belongs to the screen. Leaving takes a second
+      press within three seconds while the shell runs (once after it
+      ended); closing the screen hangs up the shell's process group, kills
+      it, and ends what the session left (proot: everything carrying the
+      session's marker; droidspaces: the root process). No service, no
+      background session, one session per screen; tabs and more sessions
+      are not in this slice.
 - The desktop session's PRIMARY container is listed like everything else
   but guarded (can't be deleted while it's the active desktop).
 - **What the screen is (built 2026-09-25).** The container manager is the
@@ -3187,7 +3223,8 @@ the `ContainerRuntime` interface that already exists (§3):
   for one that must be started, Ready for a proot sibling, which needs no
   start). A container's page: the primary action (Start the desktop, which
   opens Desktop; Stop the desktop, which ends the session; Start or Stop
-  for a sibling), Terminal, Name (a refused rename says why on the Name
+  for a sibling), Terminal (and Terminal here while the desktop is up, "A terminal on
+  Android" above), Name (a refused rename says why on the Name
   row itself), Printing (primary), VPN (carry the device's traffic, the
   apps it carries, Android's always-on settings), USB devices, Delete.
   "Create a container" lists the Recommended repositories and "Any OCI

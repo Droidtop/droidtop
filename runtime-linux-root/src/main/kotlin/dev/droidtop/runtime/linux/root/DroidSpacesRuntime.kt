@@ -12,6 +12,8 @@ import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.ContainerTerminal
+import dev.droidtop.runtime.InteractiveShell
 import dev.droidtop.runtime.ContainerLook
 import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerUser
@@ -390,6 +392,15 @@ class DroidSpacesRuntime(
             }
             name
         }
+        val result = RootProcess.run(*runArgv(container, command, runEnvironment(container, env, switchTo)).toTypedArray())
+        return ContainerExecResult(exitCode = result.exitCode, stdout = result.stdout, stderr = result.stderr)
+    }
+
+    /**
+     * The environment [exec] gives a command in [container]: the client environment, [env] and, with [switchTo], the
+     * user to become. Reads the container's socket settings: off the main thread.
+     */
+    private fun runEnvironment(container: Container, env: Map<String, String>, switchTo: String?): Map<String, String> {
         val sockets = readSockets(container.id)
         val waylandShared = sockets.waylandShared
         val waylandSocketName = if (waylandShared) ContainerLayout.findWaylandSocket(socketsDir)?.name else null
@@ -398,14 +409,34 @@ class DroidSpacesRuntime(
         val swaySocketName = if (waylandShared && !clipboardFiltered) ContainerLayout.findSwayIpcSocket(socketsDir)?.name else null
         // Same reasoning as writeConfig: PULSE_SERVER is droidspaces' own
         // to set, not ContainerLayout's.
-        val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName, audioShared = false, swaySocketName = swaySocketName, look = readLook(container.id)) + env +
+        return ContainerLayout.clientEnvironment(waylandSocketName, audioShared = false, swaySocketName = swaySocketName, look = readLook(container.id)) + env +
             (switchTo?.let { mapOf(ContainerUser.SWITCH_ENV to it) } ?: emptyMap())
-        val envPrefix = fullEnv.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
+    }
+
+    /**
+     * The root argv that runs [command] in [container] with [environment] ([runEnvironment]): what [exec] collects and
+     * what droidtop's own terminal relays ([interactiveShell]). The command and the values are quoted, never pasted.
+     */
+    private fun runArgv(container: Container, command: List<String>, environment: Map<String, String>): List<String> {
+        val envPrefix = environment.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
         val commandLine = command.joinToString(" ") { shellQuote(it) }
         val shellScript = if (envPrefix.isEmpty()) commandLine else "$envPrefix $commandLine"
+        return listOf(binaryPath, "--name=${container.id}", "run", "sh", "-c", shellScript)
+    }
 
-        val result = RootProcess.run(binaryPath, "--name=${container.id}", "run", "sh", "-c", shellScript)
-        return ContainerExecResult(exitCode = result.exitCode, stdout = result.stdout, stderr = result.stderr)
+    override val interactiveShellUnavailableReason: String? = null
+
+    /**
+     * droidtop's own terminal (docs/SPEC.md 3d, "A terminal on Android"; Droidtop/tracker#909): [exec]'s own command
+     * ([runArgv]), as root, run through the elevated helper. droidspaces' `run` makes a terminal only when its own
+     * input is one, and the helper's process has pipes, so the terminal is made in the container
+     * ([ContainerTerminal.onContainerTerminal]) and droidtop relays the bytes.
+     */
+    override suspend fun interactiveShell(container: Container): InteractiveShell {
+        val environment = withContext(Dispatchers.IO) { runEnvironment(container, ContainerTerminal.SHELL_ENVIRONMENT, switchTo = null) }
+        return InteractiveShell.Elevated { rows, columns ->
+            runArgv(container, ContainerTerminal.onContainerTerminal(rows, columns), environment)
+        }
     }
 
     private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"

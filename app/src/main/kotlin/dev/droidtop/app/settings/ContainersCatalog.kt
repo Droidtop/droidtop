@@ -12,6 +12,7 @@ import android.provider.Settings
 import dev.droidtop.app.ContainerPrograms
 import dev.droidtop.app.ContainerBackups
 import dev.droidtop.app.ContainerRuntimeFactory
+import dev.droidtop.app.terminal.ContainerTerminalActivity
 import dev.droidtop.app.DesktopSessionService
 import dev.droidtop.app.DesktopSessionState
 import dev.droidtop.app.DesktopSetupPrefs
@@ -404,7 +405,7 @@ object ContainersCatalog {
             add(recreateItem(info, runtime))
             add(storageItem(diskUsageBytes))
             if (running) add(usageItem(runtime, container, usage))
-            add(terminalItem(info, runtime, desktopUp))
+            addAll(terminalItems(info, runtime, desktopUp))
             add(updateSoftwareItem(info, runtime))
             add(
                 TextInputItem(
@@ -1214,14 +1215,19 @@ object ContainersCatalog {
         )
     }
 
-    private fun terminalItem(info: ContainerInfo, runtime: ContainerRuntime, desktopUp: Boolean): CatalogItem {
-        if (!desktopUp) {
-            return ActionItem(
-                id = "container_terminal",
-                title = "Terminal",
-                subtitle = "The terminal opens on the desktop, which is off. Open Desktop, then choose Terminal again",
-            )
+    /**
+     * A container's terminal rows (docs/SPEC.md 3d, "A terminal on Android"; Droidtop/tracker#909). With the desktop
+     * up, Terminal opens foot on the desktop as before and Terminal here opens droidtop's own terminal on this screen;
+     * with it off, Terminal opens droidtop's own.
+     */
+    private fun terminalItems(info: ContainerInfo, runtime: ContainerRuntime, desktopUp: Boolean): List<CatalogItem> =
+        if (desktopUp) {
+            listOf(desktopTerminalItem(info, runtime), terminalHereItem(info, runtime, id = "container_terminal_here", title = "Terminal here"))
+        } else {
+            listOf(terminalHereItem(info, runtime, id = "container_terminal", title = "Terminal"))
         }
+
+    private fun desktopTerminalItem(info: ContainerInfo, runtime: ContainerRuntime): CatalogItem {
         val container = info.container
         return AsyncActionItem(
             id = "container_terminal",
@@ -1237,6 +1243,35 @@ object ContainersCatalog {
                 check(started) { "the desktop stopped. Start it again, then open the terminal." }
                 // On the desktop, where it is; this row does not switch modes (Droidtop/tracker#639).
                 "Opened on the desktop. Switch to Desktop to use it."
+            },
+        )
+    }
+
+    /**
+     * droidtop's own terminal into the container, on this screen ([ContainerTerminalActivity]). A sibling that has to
+     * be started is started first, as for the desktop's terminal; a rooted primary only runs with the desktop, so its
+     * row says to open Desktop rather than start one here.
+     */
+    private fun terminalHereItem(info: ContainerInfo, runtime: ContainerRuntime, id: String, title: String): CatalogItem {
+        runtime.interactiveShellUnavailableReason?.let { return ActionItem(id = id, title = title, subtitle = it) }
+        val container = info.container
+        if (container.role == ContainerRole.PRIMARY && runtime.siblingsNeedStart && !isRunning(info)) {
+            return ActionItem(id = id, title = title, subtitle = "Its shell runs with the desktop. Open Desktop first")
+        }
+        return AsyncActionItem(
+            id = id,
+            title = title,
+            subtitle = "Opens a shell in it on this screen",
+            run = { ctx, onStatus ->
+                if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart && !info.running) {
+                    onStatus("Starting it")
+                    runtime.start(container)
+                }
+                // Over the screen it was opened from, so closing it goes back there; a new task only without one.
+                val open = ContainerTerminalActivity.intent(ctx, container.id, info.displayName)
+                if (ctx !is android.app.Activity) open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                ctx.startActivity(open)
+                "Opened."
             },
         )
     }

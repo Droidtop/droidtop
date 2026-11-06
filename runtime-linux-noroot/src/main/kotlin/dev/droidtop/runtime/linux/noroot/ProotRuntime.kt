@@ -22,6 +22,8 @@ import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.ContainerTerminal
+import dev.droidtop.runtime.InteractiveShell
 import dev.droidtop.runtime.Crane
 import dev.droidtop.runtime.CraneRootfsPuller
 import dev.droidtop.runtime.ImageCachePolicy
@@ -553,6 +555,36 @@ class ProotRuntime(
         )
     }
 
+    override val interactiveShellUnavailableReason: String? = null
+
+    /**
+     * droidtop's own terminal (docs/SPEC.md 3d, "A terminal on Android"; Droidtop/tracker#909): the same proot
+     * session [exec] starts ([sessionCommand]), as root, with the login shell and the terminal's environment, started
+     * by the terminal on its pseudo-terminal rather than here. The process gets the app's own environment plus proot's
+     * variables and the session marker, as [startSession]'s ProcessBuilder would. [InteractiveShell.OnTerminal.end]
+     * kills whatever still carries the session's marker ([ProotProcesses.killSession]): a program the shell left
+     * running in the background goes with the terminal.
+     */
+    override suspend fun interactiveShell(container: Container): InteractiveShell {
+        requireRootfs(container)
+        val sessionId = UUID.randomUUID().toString()
+        val (argv, hostEnvironment) = withContext(Dispatchers.IO) {
+            prepareSharedDirectories()
+            writeNetworkFiles()
+            sessionCommand(container.id, sessionId, ContainerTerminal.LOGIN_SHELL_COMMAND, ContainerTerminal.SHELL_ENVIRONMENT, ids = null)
+        }
+        log.line("terminal in ${container.id}: session $sessionId")
+        return InteractiveShell.OnTerminal(
+            argv = argv,
+            environment = System.getenv() + hostEnvironment,
+            workingDir = baseDir.absolutePath,
+            end = {
+                val gone = processes.killSession(sessionId)
+                log.line("terminal in ${container.id}: session $sessionId ended${if (gone) "" else ", processes still alive after SIGKILL"}")
+            },
+        )
+    }
+
     /**
      * Runs a trivial command through proot against the device's own root:
      * proves ptrace is allowed here and that the packaged loader can start
@@ -673,6 +705,24 @@ class ProotRuntime(
         mergeStderr: Boolean,
         ids: String? = null,
     ): Process {
+        val (argv, hostEnvironment) = sessionCommand(containerId, sessionId, guestCommand, env, ids)
+        val builder = ProcessBuilder(argv).directory(baseDir).redirectErrorStream(mergeStderr)
+        builder.environment().putAll(hostEnvironment)
+        return builder.start()
+    }
+
+    /**
+     * [startSession]'s command line and what it adds to the app's environment, for a caller that starts the process
+     * itself: droidtop's own terminal starts it on a pseudo-terminal ([interactiveShell]). One builder, so the
+     * terminal's shell sees exactly the binds and environment an exec does.
+     */
+    private fun sessionCommand(
+        containerId: String,
+        sessionId: String,
+        guestCommand: List<String>,
+        env: Map<String, String>,
+        ids: String?,
+    ): Pair<List<String>, Map<String, String>> {
         val rootfs = rootfsOf(containerId)
         val marker = ProotProcesses.sessionEnvironment(containerId, sessionId)
         val sessionSockets = readSocketsSync(containerId)
@@ -737,10 +787,7 @@ class ProotRuntime(
             guestEnvironment.forEach { (key, value) -> add("$key=$value") }
             addAll(guestCommand)
         }
-        val builder = ProcessBuilder(argv).directory(baseDir).redirectErrorStream(mergeStderr)
-        builder.environment().putAll(prootEnvironment())
-        builder.environment().putAll(marker)
-        return builder.start()
+        return argv to (prootEnvironment() + marker)
     }
 
     private fun prootEnvironment(): Map<String, String> = mapOf(

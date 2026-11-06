@@ -168,4 +168,77 @@ class ContainerTerminalTest {
         assertTrue(message!!.contains("droidtop-primary"))
         assertTrue(message.contains("No package manager"))
     }
+
+    // ---- droidtop's own terminal (Droidtop/tracker#909) ----
+
+    /** Runs [argv] with [input] on stdin and [path] as PATH, and returns its exit code, stdout and stderr. */
+    private fun run(argv: List<String>, input: String, path: String? = null): Triple<Int, String, String> {
+        val builder = ProcessBuilder(argv)
+        path?.let { builder.environment()["PATH"] = it }
+        val process = builder.start()
+        process.outputStream.use { it.write(input.toByteArray()) }
+        val out = process.inputStream.bufferedReader().readText()
+        val err = process.errorStream.bufferedReader().readText()
+        return Triple(process.waitFor(), out, err)
+    }
+
+    private fun assumeShell() = org.junit.Assume.assumeTrue(File("/bin/sh").canExecute() && File("/etc/passwd").isFile)
+
+    @Test
+    fun `the terminal adds xterm-256color and truecolor to the shell's environment`() {
+        assertEquals("xterm-256color", ContainerTerminal.SHELL_ENVIRONMENT["TERM"])
+        assertEquals("truecolor", ContainerTerminal.SHELL_ENVIRONMENT["COLORTERM"])
+    }
+
+    @Test
+    fun `the login shell is a constant script, not a command line built from outside`() {
+        val command = ContainerTerminal.LOGIN_SHELL_COMMAND
+        assertEquals(listOf("/bin/sh", "-c"), command.take(2))
+        assertEquals(3, command.size)
+        assertTrue(command[2].endsWith("exec \"\$s\" -l"))
+        assertTrue(command[2].contains("< /etc/passwd"))
+    }
+
+    @Test
+    fun `the login shell is the user's own from passwd, started in their home`() {
+        assumeShell()
+        val (code, out, _) = run(ContainerTerminal.LOGIN_SHELL_COMMAND, "echo \"[\$SHELL|\$HOME|\$(pwd)]\"\n")
+        assertEquals(0, code)
+        val line = Regex("\\[(.*)\\|(.*)\\|(.*)]").find(out)
+        assertNotNull("no answer from the shell: $out", line)
+        val (shell, home, cwd) = line!!.destructured
+        assertTrue("not executable: $shell", File(shell).canExecute())
+        if (File(home).isDirectory) assertEquals(File(home).canonicalPath, File(cwd).canonicalPath)
+    }
+
+    @Test
+    fun `a terminal made in the container is sized first and runs the login shell`() {
+        val argv = ContainerTerminal.onContainerTerminal(rows = 40, columns = 120)
+        assertEquals(listOf("/bin/sh", "-c"), argv.take(2))
+        assertTrue(argv[2].contains("exec script -qfc \"\$1\" /dev/null"))
+        assertEquals("sh", argv[3])
+        assertTrue(argv[4].startsWith("stty rows 40 cols 120 2>/dev/null; "))
+        assertTrue(argv[4].endsWith(ContainerTerminal.LOGIN_SHELL_COMMAND[2]))
+        assertEquals(5, argv.size)
+    }
+
+    @Test
+    fun `scripts the terminal runs parse as POSIX shell`() {
+        assumeShell()
+        val scripts = listOf(ContainerTerminal.LOGIN_SHELL_COMMAND[2]) + ContainerTerminal.onContainerTerminal(24, 80).let { listOf(it[2], it[4]) }
+        scripts.forEach { script ->
+            val (code, _, err) = run(listOf("/bin/sh", "-n", "-c", script), "")
+            assertEquals("does not parse: $script\n$err", 0, code)
+        }
+    }
+
+    @Test
+    fun `a container without script still gets the shell, and is told it has no terminal`() {
+        assumeShell()
+        // No PATH: neither script nor stty is found; the login shell is still the passwd one (or /bin/sh).
+        val (code, out, err) = run(ContainerTerminal.onContainerTerminal(24, 80), "echo reached\n", path = "/nonexistent")
+        assertEquals(0, code)
+        assertTrue("no shell ran: $out / $err", out.contains("reached"))
+        assertTrue(err.contains("no script program"))
+    }
 }

@@ -261,6 +261,8 @@ dependencies {
     implementation(project(":runtime-linux-noroot"))
     implementation(project(":input-seat"))
     implementation(project(":input-keyboard"))
+    // The terminal into a container on Android (docs/SPEC.md 3d, "A terminal on Android"): Termux's vendored view and emulator.
+    implementation(project(":terminal-view"))
     implementation(project(":library-core"))
     implementation(project(":stores"))
     implementation(project(":plugin-host"))
