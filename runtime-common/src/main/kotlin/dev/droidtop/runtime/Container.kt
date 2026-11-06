@@ -223,19 +223,19 @@ interface ContainerRuntime {
     suspend fun recreateFromImage(container: Container): Container
 
     /**
-     * Real size on disk, in bytes -- the container manager's "Storage
-     * used" row (docs/SPEC.md 3d). The rootfs tree is the overwhelming
-     * majority of it for every backend, so this is the one implementation
-     * every backend shares; a backend whose bookkeeping lives partly
-     * outside the rootfs (droidspaces' side files) is close enough that a
-     * second, backend-specific walk isn't worth the duplication. The
-     * Containers list's size per row is this same measurement, cached
-     * (`ContainerSizes` in :app). Throws [ContainerDiskUsage.Unreadable]
-     * when droidtop cannot read the whole tree (droidspaces' root-owned
-     * one), so no size is shown rather than a short one.
+     * Real size on disk -- the container manager's "Storage used" row
+     * (docs/SPEC.md 3d), and the Containers list's size per row, cached
+     * (`ContainerSizes` in :app; Droidtop/tracker#911). The rootfs tree is
+     * the overwhelming majority of it for every backend. The default is
+     * the app's own walk ([ContainerDiskUsage.measure]), which a tree the
+     * app owns (proot's) needs; a folder it cannot list makes the answer a
+     * floor ([DiskUsage.complete] false). droidspaces, whose tree is root's,
+     * measures through its root shell instead. Throws, with a sentence
+     * saying why, when it cannot measure at all; the row then shows no
+     * size and the page says why.
      */
-    suspend fun diskUsageBytes(container: Container): Long = withContext(Dispatchers.IO) {
-        ContainerDiskUsage.bytesUnder(File(container.rootfsPath))
+    suspend fun diskUsage(container: Container): DiskUsage = withContext(Dispatchers.IO) {
+        ContainerDiskUsage.measure(File(container.rootfsPath))
     }
 
     /** The sockets [container]'s processes currently see shared (docs/SPEC.md 3d Sockets row). */

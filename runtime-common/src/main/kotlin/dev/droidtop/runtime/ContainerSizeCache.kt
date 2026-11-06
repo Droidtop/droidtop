@@ -1,12 +1,10 @@
 package dev.droidtop.runtime
 
-import dev.droidtop.library.format.ValueFormat
-
 /**
  * Each container's size on disk as the Containers list shows it (docs/SPEC.md 3d "The surface, precisely";
  * Droidtop/tracker#911), kept per container until the container changes, so reopening the list does not walk every
  * rootfs again. The pure half: what is known, when it no longer holds, and whether a measurement's answer still
- * counts. `ContainerSizes` in :app measures ([ContainerRuntime.diskUsageBytes], the walk the page's "Storage used"
+ * counts. `ContainerSizes` in :app measures ([ContainerRuntime.diskUsage], the measurement the page's "Storage used"
  * does) off the main thread and feeds the answers in.
  *
  * A size holds while the container's [Stamp] is the same: started or stopped (anywhere, not only from the list) or
@@ -22,9 +20,9 @@ class ContainerSizeCache {
         /** Not known yet; a measurement is under way. */
         data object Measuring : Size
 
-        data class Known(val bytes: Long) : Size
+        data class Known(val usage: DiskUsage) : Size
 
-        /** The measurement could not read the tree (droidspaces' root-owned one): no size is shown. */
+        /** It could not be measured (droidspaces without its root shell): no size is shown; the page says why. */
         data object Unavailable : Size
     }
 
@@ -53,27 +51,27 @@ class ContainerSizeCache {
     }
 
     /**
-     * Records what the measurement begun with [token] found ([bytes], null when the tree could not be read) for
+     * Records what the measurement begun with [token] found ([usage], null when it could not measure) for
      * [stamp]. False, and nothing is recorded, when [forget] came in between.
      */
     @Synchronized
-    fun finish(id: String, token: Long, stamp: Stamp, bytes: Long?): Boolean {
+    fun finish(id: String, token: Long, stamp: Stamp, usage: DiskUsage?): Boolean {
         val slot = slots[id] ?: return false
         if (slot.generation != token) return false
         slot.measuring = false
         slot.stamp = stamp
-        slot.size = bytes?.let { Size.Known(it) } ?: Size.Unavailable
+        slot.size = usage?.let { Size.Known(it) } ?: Size.Unavailable
         return true
     }
 
     /** A size measured elsewhere (the container's own page, which measures each time it opens) replaces the kept one. */
     @Synchronized
-    fun record(id: String, stamp: Stamp, bytes: Long?) {
+    fun record(id: String, stamp: Stamp, usage: DiskUsage?) {
         val slot = slots.getOrPut(id) { Slot() }
         slot.generation++
         slot.measuring = false
         slot.stamp = stamp
-        slot.size = bytes?.let { Size.Known(it) } ?: Size.Unavailable
+        slot.size = usage?.let { Size.Known(it) } ?: Size.Unavailable
     }
 
     /** [id] changed: what is kept no longer holds, and a measurement under way is not recorded. */
@@ -95,10 +93,13 @@ class ContainerSizeCache {
     companion object {
         const val MEASURING = "Measuring…"
 
-        /** What the row says: "Measuring…" until known (null is about to be measured), the size, or nothing at all. */
+        /**
+         * What the row says: "Measuring…" until known (null is about to be measured), the size ("at least" when part
+         * of it could not be read), or nothing at all.
+         */
         fun label(size: Size?): String? = when (size) {
             null, Size.Measuring -> MEASURING
-            is Size.Known -> ValueFormat.size(size.bytes)
+            is Size.Known -> size.usage.label
             Size.Unavailable -> null
         }
     }

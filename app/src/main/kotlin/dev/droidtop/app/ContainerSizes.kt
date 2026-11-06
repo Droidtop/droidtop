@@ -3,6 +3,7 @@ package dev.droidtop.app
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerSizeCache
+import dev.droidtop.runtime.DiskUsage
 import dev.droidtop.runtime.util.AppScopes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,7 +14,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Each container's size in the Containers list (docs/SPEC.md 3d "The surface, precisely"; Droidtop/tracker#911): the
- * container page's own measurement ([ContainerRuntime.diskUsageBytes]), run off the main thread one container at a
+ * container page's own measurement ([ContainerRuntime.diskUsage]), run off the main thread one container at a
  * time and kept in [ContainerSizeCache] until the container changes. The list reads [label] while it is built; a size
  * not known yet says "Measuring…" and is measured in the background, and [changes] tells the screen to read itself
  * again when it is known.
@@ -38,19 +39,19 @@ internal object ContainerSizes {
         cache.get(id, stamp)?.let { return ContainerSizeCache.label(it) }
         val token = cache.begin(id) ?: return ContainerSizeCache.MEASURING
         AppScopes.io.launch {
-            var bytes: Long? = null
+            var usage: DiskUsage? = null
             try {
-                bytes = walking.withLock { runCatching { runtime.diskUsageBytes(info.container) }.getOrNull() }
+                usage = walking.withLock { runCatching { runtime.diskUsage(info.container) }.getOrNull() }
             } finally {
-                if (cache.finish(id, token, stamp, bytes)) changed.update { it + 1 }
+                if (cache.finish(id, token, stamp, usage)) changed.update { it + 1 }
             }
         }
         return ContainerSizeCache.MEASURING
     }
 
     /** The page measured [info] itself; the list shows that answer. */
-    fun record(info: ContainerInfo, running: Boolean, bytes: Long?) {
-        cache.record(info.container.id, stamp(info, running), bytes)
+    fun record(info: ContainerInfo, running: Boolean, usage: DiskUsage?) {
+        cache.record(info.container.id, stamp(info, running), usage)
         changed.update { it + 1 }
     }
 

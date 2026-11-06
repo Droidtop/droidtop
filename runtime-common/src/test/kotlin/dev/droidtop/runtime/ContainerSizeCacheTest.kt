@@ -16,7 +16,7 @@ class ContainerSizeCacheTest {
 
     private fun ContainerSizeCache.measure(id: String, stamp: Stamp, bytes: Long?) {
         val token = begin(id)!!
-        assertTrue(finish(id, token, stamp, bytes))
+        assertTrue(finish(id, token, stamp, bytes?.let { DiskUsage(it) }))
     }
 
     @Test
@@ -24,7 +24,7 @@ class ContainerSizeCacheTest {
         val cache = ContainerSizeCache()
         assertNull(cache.get("a", stopped))
         cache.measure("a", stopped, 2048)
-        assertEquals(Size.Known(2048), cache.get("a", stopped))
+        assertEquals(Size.Known(DiskUsage(2048)), cache.get("a", stopped))
     }
 
     @Test
@@ -50,7 +50,7 @@ class ContainerSizeCacheTest {
         val cache = ContainerSizeCache()
         val token = cache.begin("a")!!
         cache.forget("a") // "Update its software" ran meanwhile
-        assertFalse(cache.finish("a", token, stopped, 2048))
+        assertFalse(cache.finish("a", token, stopped, DiskUsage(2048)))
         assertNull(cache.get("a", stopped))
         // And a new measurement may start.
         assertNotNull(cache.begin("a"))
@@ -68,13 +68,13 @@ class ContainerSizeCacheTest {
     fun `the page's own measurement replaces the kept one and outlives an older walk`() {
         val cache = ContainerSizeCache()
         val token = cache.begin("a")!!
-        cache.record("a", stopped, 4096)
-        assertFalse(cache.finish("a", token, stopped, 1))
-        assertEquals(Size.Known(4096), cache.get("a", stopped))
+        cache.record("a", stopped, DiskUsage(4096))
+        assertFalse(cache.finish("a", token, stopped, DiskUsage(1)))
+        assertEquals(Size.Known(DiskUsage(4096)), cache.get("a", stopped))
     }
 
     @Test
-    fun `an unreadable tree is kept as unavailable, not measured on every visit`() {
+    fun `a size that could not be measured is kept as unavailable, not measured on every visit`() {
         val cache = ContainerSizeCache()
         cache.measure("a", stopped, null)
         assertEquals(Size.Unavailable, cache.get("a", stopped))
@@ -88,15 +88,17 @@ class ContainerSizeCacheTest {
         cache.measure("b", stopped, 1)
         cache.keepOnly(setOf("b"))
         assertNull(cache.get("a", stopped))
-        assertEquals(Size.Known(1), cache.get("b", stopped))
+        assertEquals(Size.Known(DiskUsage(1)), cache.get("b", stopped))
     }
 
     @Test
     fun `labels say measuring until known, then the size`() {
         assertEquals("Measuring…", ContainerSizeCache.label(null))
         assertEquals("Measuring…", ContainerSizeCache.label(Size.Measuring))
-        assertEquals("512 MB", ContainerSizeCache.label(Size.Known(512_000_000L)))
-        assertEquals("1.5 GB", ContainerSizeCache.label(Size.Known(1_500_000_000L)))
-        assertEquals("0 KB", ContainerSizeCache.label(Size.Known(0)))
+        assertEquals("512 MB", ContainerSizeCache.label(Size.Known(DiskUsage(512_000_000L))))
+        assertEquals("1.5 GB", ContainerSizeCache.label(Size.Known(DiskUsage(1_500_000_000L))))
+        assertEquals("0 KB", ContainerSizeCache.label(Size.Known(DiskUsage(0))))
+        // Part of the tree could not be read: a floor, said as one.
+        assertEquals("at least 1.5 GB", ContainerSizeCache.label(Size.Known(DiskUsage(1_500_000_000L, complete = false))))
     }
 }
