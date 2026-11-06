@@ -31,7 +31,7 @@ class StorageSharesTest {
         val refused = StorageShares.outcome(JSONObject().put("error", "the share refused the sign-in").put("code", "sign_in_refused"))
         assertEquals(StorageShares.SIGN_IN_REFUSED to "the share refused the sign-in", refused)
         assertEquals(StorageShares.NOT_ENCRYPTED, StorageShares.outcome(JSONObject().put("error", "x").put("code", "not_encrypted")).first)
-        assertEquals(StorageShares.REFUSED, StorageShares.outcome(JSONObject().put("error", "x").put("code", "not_found")).first)
+        assertEquals(StorageShares.NOT_FOUND, StorageShares.outcome(JSONObject().put("error", "x").put("code", "not_found")).first)
         assertEquals(StorageShares.REFUSED, StorageShares.outcome(JSONObject().put("error", "x")).first)
     }
 
