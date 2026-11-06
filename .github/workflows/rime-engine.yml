@@ -1,0 +1,322 @@
+name: RIME engine
+
+# Builds librime (RIME, BSD-3), the Chinese input engine, for the keyboard's
+# Chinese input (Droidtop/tracker#903 H8; docs/SPEC.md 6a, "The engine seam,
+# the candidate bar and the gesture seam"), with its pinyin data, and publishes
+# both as a prerelease of this repository, the mozc-engine.yml and
+# lsfg-vk-layer.yml precedent:
+#
+#  - rime-engine.tar.zst: librime.so for arm64-v8a and x86_64 (unstripped; the
+#    app's build strips it), include/rime_api.h for the keyboard's own JNI
+#    library, a licence file for each library inside it, and VERSION with
+#    every pin. The keyboard ships these in the APK (native code is never
+#    downloaded later); the build will fetch them by a pin (tag and SHA-256).
+#  - rime-data-luna.tar.gz: 朙月拼音 (luna_pinyin, with the 八股文 essay
+#    vocabulary) for 简化字, 傳統漢字 and 臺灣字形, already compiled by
+#    rime_deployer from the same librime commit, with OpenCC's conversion data.
+#    It is never in the APK: the keyboard downloads it the first time Chinese
+#    is used and checks it against the SHA-256 published here
+#    (rime-data-luna.files.sha256 lists every unpacked file).
+#    rime-data-luna-sources.tar.gz is the exact yaml and text it was compiled
+#    from (LGPL-3.0, so the source goes beside the compiled form).
+#    build-scripts/rime/build-data-luna.sh says how it is made.
+#
+# The recipe is Trime's (osfans/trime, GPL-3.0-or-later), checked out at its
+# pin and not copied here: app/src/main/jni/CMakeLists.txt and cmake/*.cmake
+# build Boost, glog, yaml-cpp, snappy, leveldb, marisa-trie, OpenCC and librime
+# with the lua, octagram and predict plugins for Android. Its last step, its
+# own JNI library, binds Trime's classes; build-scripts/rime takes that
+# directory's place and links one librime.so that exports only librime's C API
+# (its CMakeLists.txt says how). No maintained Android build of librime exists
+# elsewhere: librime's own releases are Linux, macOS and Windows, and
+# fcitx5-android/prebuilder has no licence and publishes only CI artifacts.
+#
+# The data is compiled by a host rime_deployer built from the same librime
+# checkout (the prism format changed after librime 1.17.0, 89b2fbd), and
+# OpenCC's .ocd2 by opencc_dict from the OpenCC commit librime pins, built on
+# the host, so the phone's library reads both as its own.
+#
+# NDK: droidtop's own, 27.0.12077973 (r27), not Trime's 30.0.16248370. Trime's
+# CMake needs nothing newer: its one NDK 30 note (glog's WITH_UNWIND=none) is
+# a workaround forced on whatever the NDK. NDK 27 links with 4 KB pages by
+# default, so librime.so is linked with 16 KB ones (checked below).
+# CMake and Ninja are the runner's.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/rime-engine.yml'
+      - 'build-scripts/rime/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # osfans/trime tag v3.3.13 (2026-11-01). It pins librime at
+  # 56737cd29a4d393a104a2098ece3697aa2810465 (master, 2026-10-27, after 1.17.0).
+  TRIME_TAG: v3.3.13
+  TRIME_REF: b5cad1a49095a3652e9188982de400ca3a653f37
+  LIBRIME_REF: 56737cd29a4d393a104a2098ece3697aa2810465
+  # What Trime's cmake/Boost.cmake downloads at that tag (checked against it).
+  BOOST_VERSION: 1.92.0
+  BOOST_SHA256: 9bed76128d4e46755dbe818487788c6fceb6f72b378f4daa49b7e1e600d9088d
+  NDK_RELEASE: r27
+  NDK_REVISION: 27.0.12077973
+  # The pinyin data (LGPL-3.0), each repository's HEAD on 2026-11-06.
+  PRELUDE_REF: 082425ea0684bca36474415d4a0e8db9b016487e
+  ESSAY_REF: 054920de4f54c9e5994276a96a4fc2a35cb51aa3
+  LUNA_REF: 56b934b099dfbeab842320f13aa8b461a6ab3e42
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout Trime
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: osfans/trime
+          ref: ${{ env.TRIME_REF }}
+          path: trime
+          submodules: false
+          persist-credentials: false
+
+      - name: Checkout rime-prelude
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: rime/rime-prelude
+          ref: ${{ env.PRELUDE_REF }}
+          path: data/prelude
+          persist-credentials: false
+
+      - name: Checkout rime-essay
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: rime/rime-essay
+          ref: ${{ env.ESSAY_REF }}
+          path: data/essay
+          persist-credentials: false
+
+      - name: Checkout rime-luna-pinyin
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: rime/rime-luna-pinyin
+          ref: ${{ env.LUNA_REF }}
+          path: data/luna
+          persist-credentials: false
+
+      - name: Sources
+        run: |
+          [ "$(git -C trime rev-parse HEAD)" = "$TRIME_REF" ] || { echo "Trime is not at $TRIME_REF"; exit 1; }
+          [ "$(git -C data/prelude rev-parse HEAD)" = "$PRELUDE_REF" ] || { echo "rime-prelude is not at $PRELUDE_REF"; exit 1; }
+          [ "$(git -C data/essay rev-parse HEAD)" = "$ESSAY_REF" ] || { echo "rime-essay is not at $ESSAY_REF"; exit 1; }
+          [ "$(git -C data/luna rev-parse HEAD)" = "$LUNA_REF" ] || { echo "rime-luna-pinyin is not at $LUNA_REF"; exit 1; }
+          jni=trime/app/src/main/jni
+          want=$(git -C trime ls-tree HEAD app/src/main/jni/librime | awk '{print $3}')
+          [ "$want" = "$LIBRIME_REF" ] || { echo "Trime pins librime $want, not $LIBRIME_REF"; exit 1; }
+          # The native submodules only, at Trime's pins; not the data ones (app/data/rime/*).
+          git -C trime submodule update --init --depth 1 \
+            app/src/main/jni/librime app/src/main/jni/librime-lua app/src/main/jni/librime-lua-deps \
+            app/src/main/jni/librime-octagram app/src/main/jni/librime-predict app/src/main/jni/snappy
+          # librime's own, at librime's pins; not googletest (tests only).
+          git -C "$jni/librime" submodule update --init --depth 1 \
+            deps/glog deps/leveldb deps/yaml-cpp deps/marisa-trie deps/opencc
+          [ "$(git -C "$jni/librime" rev-parse HEAD)" = "$LIBRIME_REF" ] || { echo "librime is not at $LIBRIME_REF"; exit 1; }
+          # Trime's last step is its JNI library, which build-scripts/rime replaces.
+          [ "$(grep -v '^[[:space:]]*$' "$jni/CMakeLists.txt" | tail -1)" = "add_subdirectory(librime_jni)" ] \
+            || { echo "Trime's CMakeLists.txt no longer ends with add_subdirectory(librime_jni)"; exit 1; }
+          # Boost as Trime pins it.
+          grep -qx "set(BOOST_VERSION $BOOST_VERSION)" "$jni/cmake/Boost.cmake" \
+            && grep -q "SHA256=$BOOST_SHA256" "$jni/cmake/Boost.cmake" \
+            || { echo "Trime's cmake/Boost.cmake pins another Boost"; exit 1; }
+          git -C trime submodule status --recursive
+          git -C "$jni/librime" submodule status
+
+      - name: Boost cache
+        id: cache-boost
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/boost/boost-${{ env.BOOST_VERSION }}-cmake.tar.xz
+          key: boost-cmake-${{ env.BOOST_VERSION }}
+
+      - name: Boost
+        run: |
+          # Trime's cmake/Boost.cmake downloads this at configure time; it is
+          # fetched once here instead, checked, and put where Boost.cmake finds
+          # it (the tarball, and the tree extracted to jni/boost), so neither ABI
+          # downloads or extracts it again.
+          tarball=~/boost/boost-$BOOST_VERSION-cmake.tar.xz
+          if [ ! -f "$tarball" ]; then
+            mkdir -p ~/boost
+            curl -fsSL --retry 5 --retry-delay 10 -o "$tarball" \
+              "https://github.com/boostorg/boost/releases/download/boost-$BOOST_VERSION/boost-$BOOST_VERSION-cmake.tar.xz"
+          fi
+          echo "$BOOST_SHA256  $tarball" | sha256sum -c -
+          jni=trime/app/src/main/jni
+          cp "$tarball" "$jni/boost-$BOOST_VERSION.tar.xz"
+          tar -C "$jni" -xJf "$tarball"
+          mv "$jni/boost-$BOOST_VERSION" "$jni/boost"
+          [ -f "$jni/boost/CMakeLists.txt" ] || { echo "no boost/CMakeLists.txt"; exit 1; }
+
+      - name: Cache Android NDK
+        id: cache-ndk
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/ndk/android-ndk-${{ env.NDK_RELEASE }}
+          key: android-ndk-${{ env.NDK_RELEASE }}
+
+      - name: Android NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/ndk && cd ~/ndk
+          curl -fsSL -o ndk.zip "https://dl.google.com/android/repository/android-ndk-$NDK_RELEASE-linux.zip"
+          unzip -q ndk.zip && rm ndk.zip
+
+      - name: Licences
+        # Gathered before building, so a missing one fails in seconds rather than after the build.
+        run: |
+          ndk=~/ndk/android-ndk-$NDK_RELEASE
+          grep -qx "Pkg.Revision = $NDK_REVISION" "$ndk/source.properties" || { echo "the NDK is not $NDK_REVISION"; cat "$ndk/source.properties"; exit 1; }
+          jni=trime/app/src/main/jni
+          stage=out/stage
+          mkdir -p "$stage/include"
+          lic() {
+            f=$(ls "$1" | grep -E '^(LICENSE|COPYING)' | head -1)
+            [ -n "$f" ] || { echo "no licence file in $1"; exit 1; }
+            cp "$1/$f" "$stage/LICENSE-$2"
+          }
+          lic "$jni/librime" librime
+          lic "$jni/librime/deps/glog" glog
+          lic "$jni/librime/deps/leveldb" leveldb
+          lic "$jni/librime/deps/yaml-cpp" yaml-cpp
+          lic "$jni/librime/deps/marisa-trie" marisa-trie
+          lic "$jni/librime/deps/opencc" opencc
+          lic "$jni/snappy" snappy
+          lic "$jni/librime-lua" librime-lua
+          lic "$jni/librime-octagram" librime-octagram
+          lic "$jni/librime-predict" librime-predict
+          boostlic=$(find "$jni/boost" -maxdepth 2 -name LICENSE_1_0.txt | head -1)
+          [ -n "$boostlic" ] || { echo "no LICENSE_1_0.txt in Boost"; exit 1; }
+          cp "$boostlic" "$stage/LICENSE-boost"
+          # Lua 5.4, which librime-lua compiles in from its thirdparty branch: its licence is at the end of lua.h.
+          sed -n '/^\* Copyright (C) 1994-/,$p' "$jni/librime-lua-deps/lua5.4/lua.h" > "$stage/LICENSE-lua"
+          [ -s "$stage/LICENSE-lua" ] || { echo "no licence in lua.h"; exit 1; }
+          # libc++, linked in statically (c++_static).
+          if [ -f "$ndk/NOTICE.toolchain" ]; then cp "$ndk/NOTICE.toolchain" "$stage/NOTICE-ndk-toolchain"; else cp "$ndk/NOTICE" "$stage/NOTICE-ndk-toolchain"; fi
+          cp "$jni/librime/src/rime_api.h" "$stage/include/rime_api.h"
+          ls -l "$stage" "$stage/include"
+
+      - name: Host tools
+        # rime_deployer and OpenCC's data, built on the host from the same
+        # checkouts. Done before the Android build, whose configure links
+        # Trime's plugins into librime/plugins (cmake/Rime.cmake).
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ninja-build zstd libboost-dev libboost-regex-dev \
+            libyaml-cpp-dev libleveldb-dev libgoogle-glog-dev libgflags-dev
+          cmake --version
+          jni=trime/app/src/main/jni
+          # OpenCC at librime's pin: opencc_dict compiles data/dictionary into
+          # .ocd2 as part of its own build (target Dictionaries); the install
+          # puts them with the configs (.json) in share/opencc.
+          cmake -S "$jni/librime/deps/opencc" -B host/opencc -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="$PWD/host/opencc-install"
+          cmake --build host/opencc
+          cmake --install host/opencc
+          ls host/opencc-install/share/opencc
+          # librime at the same commit, against that OpenCC; only rime_deployer is needed.
+          ls "$jni/librime/plugins"
+          cmake -S "$jni/librime" -B host/rime -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST=OFF \
+            -DCMAKE_PREFIX_PATH="$PWD/host/opencc-install"
+          cmake --build host/rime --target rime_deployer
+          host/rime/bin/rime_deployer 2>&1 | head -3 || true
+
+      - name: Data
+        run: |
+          build-scripts/rime/build-data-luna.sh host/rime/bin/rime_deployer host/opencc-install/share/opencc \
+            data/prelude data/essay data/luna out/data
+          (cd out/data && sha256sum rime-data-luna.tar.gz | tee rime-data-luna.tar.gz.sha256 \
+            && sha256sum rime-data-luna-sources.tar.gz | tee rime-data-luna-sources.tar.gz.sha256)
+
+      - name: Build
+        run: |
+          ndk=~/ndk/android-ndk-$NDK_RELEASE
+          llvm="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          jni=trime/app/src/main/jni
+          # build-scripts/rime in place of Trime's JNI library.
+          rm -rf -- "${jni:?}/librime_jni"
+          cp -a build-scripts/rime "$jni/librime_jni"
+          rm -f -- "$jni/librime_jni/build-data-luna.sh"
+          for abi in arm64-v8a x86_64; do
+            # Run from the jni directory: cmake/Boost.cmake looks for its tarball by a relative path.
+            (cd "$jni" && cmake -S . -B "$GITHUB_WORKSPACE/build-$abi" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_TOOLCHAIN_FILE="$ndk/build/cmake/android.toolchain.cmake" \
+              -DANDROID_ABI="$abi" -DANDROID_PLATFORM=android-26 -DANDROID_STL=c++_static \
+              -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON)
+            cmake --build "build-$abi" --target rime-shared
+            so=$(find "build-$abi" -name librime.so -type f | head -1)
+            [ -n "$so" ] || { echo "no librime.so for $abi"; exit 1; }
+            file "$so"
+            ls -l "$so"
+            echo "Exported:"
+            "$llvm/llvm-nm" -D --defined-only "$so"
+            "$llvm/llvm-nm" -D --defined-only "$so" | grep -w rime_get_api || { echo "$abi: rime_get_api is not exported"; exit 1; }
+            if "$llvm/llvm-nm" -D --defined-only "$so" | awk '{print $NF}' | grep '^_Z'; then
+              echo "$abi: C++ symbols are exported"; exit 1
+            fi
+            # The plugins are inside.
+            for m in lua octagram predict; do
+              "$llvm/llvm-nm" -C "$so" | grep -q "rime_require_module_$m()" || { echo "$abi: no $m plugin"; exit 1; }
+            done
+            "$llvm/llvm-readelf" -d "$so" | grep NEEDED
+            "$llvm/llvm-readelf" -lW "$so" | grep LOAD
+            if "$llvm/llvm-readelf" -lW "$so" | awk '$1 == "LOAD" {print $NF}' | grep -vx 0x4000; then
+              echo "$abi: a segment is not 16 KB aligned"; exit 1
+            fi
+            mkdir -p "out/stage/jniLibs/$abi"
+            cp "$so" "out/stage/jniLibs/$abi/librime.so"
+          done
+
+      - name: Stage
+        run: |
+          jni=trime/app/src/main/jni
+          {
+            echo "librime.so built by droidtop's rime-engine.yml with build-scripts/rime, on Trime's recipe."
+            echo "osfans/trime $TRIME_TAG $TRIME_REF (GPL-3.0-or-later; its CMake recipe, not shipped)"
+            echo "rime/librime $LIBRIME_REF"
+            git -C trime submodule status app/src/main/jni/librime-lua app/src/main/jni/librime-lua-deps \
+              app/src/main/jni/librime-octagram app/src/main/jni/librime-predict app/src/main/jni/snappy
+            git -C "$jni/librime" submodule status deps/glog deps/leveldb deps/yaml-cpp deps/marisa-trie deps/opencc
+            echo "boost $BOOST_VERSION sha256 $BOOST_SHA256"
+            echo "Android NDK $NDK_REVISION ($NDK_RELEASE), android-26, c++_static, 16 KB pages"
+            echo "$(cmake --version | head -1)"
+            echo "rime-data-luna: rime/rime-prelude $PRELUDE_REF, rime/rime-essay $ESSAY_REF, rime/rime-luna-pinyin $LUNA_REF"
+          } > out/stage/VERSION
+          cat out/stage/VERSION
+          tar --sort=name --owner=0 --group=0 --numeric-owner -C out/stage -cf - . | zstd -19 -T0 -q -o out/rime-engine.tar.zst
+          (cd out && sha256sum rime-engine.tar.zst | tee rime-engine.tar.zst.sha256)
+          cp out/data/rime-data-luna.tar.gz out/data/rime-data-luna.tar.gz.sha256 out/data/rime-data-luna.files.sha256 \
+            out/data/rime-data-luna-sources.tar.gz out/data/rime-data-luna-sources.tar.gz.sha256 out/
+          ls -l out
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="rime-engine-${LIBRIME_REF:0:8}"
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$tag already published; a pin's release is never replaced"
+            exit 0
+          fi
+          gh release create "$tag" -R "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
+            --title "RIME engine (rime/librime ${LIBRIME_REF:0:8}, Trime ${TRIME_TAG})" \
+            --notes "librime.so for arm64-v8a and x86_64 with the lua, octagram and predict plugins, exporting only librime's C API (rime-engine.tar.zst, with rime_api.h, every library's licence and VERSION), built by rime-engine.yml from rime/librime ${LIBRIME_REF} on osfans/trime ${TRIME_TAG}'s CMake recipe. rime-data-luna.tar.gz: luna_pinyin for 简化字, 傳統漢字 and 臺灣字形, compiled by rime_deployer from the same librime commit, with OpenCC's data; rime-data-luna.files.sha256 lists every unpacked file. Its sources (LGPL-3.0, the stroke reverse lookup removed) are rime-data-luna-sources.tar.gz. librime is BSD-3; the licences of Boost, glog, leveldb, snappy, yaml-cpp, marisa-trie, OpenCC, Lua and the plugins are in the archive." \
+            out/rime-engine.tar.zst out/rime-engine.tar.zst.sha256 \
+            out/rime-data-luna.tar.gz out/rime-data-luna.tar.gz.sha256 out/rime-data-luna.files.sha256 \
+            out/rime-data-luna-sources.tar.gz out/rime-data-luna-sources.tar.gz.sha256

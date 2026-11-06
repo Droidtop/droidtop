@@ -1,0 +1,9 @@
+/* librime.so (build-scripts/rime/CMakeLists.txt): only librime's C API is
+   exported. C++ symbols are mangled (_Z...), so these patterns match none. */
+{
+  global:
+    rime_*;
+    Rime*;
+  local:
+    *;
+};
