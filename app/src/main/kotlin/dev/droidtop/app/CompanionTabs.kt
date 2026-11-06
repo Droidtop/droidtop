@@ -514,6 +514,8 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                     }
                 }
             }
+            // A screen-shape change waiting for Keep, above every tab (Droidtop/tracker#786 S14).
+            CompanionKeepBar()
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 if (moreOpen) {
                     CompanionMoreList(bar.more, shown, badges, onSelect = { select(it.id) })
