@@ -445,9 +445,21 @@ internal fun PcGamePage(
     // How the person has played it, droidtop's own record, on Activity (Droidtop/tracker#845); play time counts the
     // person's other devices too (Droidtop/tracker#469).
     val activity = remember(entry, playedElsewhere) { activityRows(entry, System.currentTimeMillis(), playedElsewhere = playedElsewhere) }
-    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, driversFact?.value, infoFacts, copies, oldRows, activity, keptRows) {
+    // The person's own rating and status (Droidtop/tracker#722): read off the main thread, A turns each to its next
+    // value and it is saved at once, apart from the scraped fields.
+    var mark by remember(entry.id) { mutableStateOf(dev.droidtop.library.settings.GameMark()) }
+    androidx.compose.runtime.LaunchedEffect(entry.id) {
+        mark = withContext(Dispatchers.IO) { dev.droidtop.library.settings.GameMarks.of(context, entry.id) }
+    }
+    val markRows = remember(mark) {
+        gameMarkRows(mark) { next ->
+            mark = next
+            scope.launch { withContext(Dispatchers.IO) { dev.droidtop.library.settings.GameMarks.set(context, entry.id, next) } }
+        }
+    }
+    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, driversFact?.value, infoFacts, copies, oldRows, activity, keptRows, markRows) {
         groupRowsByTab(
-            rows + copies + oldRows + listOfNotNull(programFact, driversFact) + pluginRows.facts + keptRows + activity + infoFacts,
+            rows + copies + oldRows + listOfNotNull(programFact, driversFact) + pluginRows.facts + keptRows + activity + markRows + infoFacts,
             parts,
         )
     }
@@ -1377,3 +1389,25 @@ internal fun updateSourceOf(sources: List<UpdateSources.Source>, links: GameLink
     linked.firstOrNull { (_, link) -> link.answer?.version?.let(::plain) == wanted }?.let { (source, link) -> return source to link.externalId }
     return linked.singleOrNull()?.let { (source, link) -> source to link.externalId }
 }
+
+/**
+ * The Activity tab's own-marks rows (Droidtop/tracker#722): My rating (A adds a star, past five back to none) and
+ * Status (A turns to the next one), each calling [onChange] with the new marks. Pure.
+ */
+internal fun gameMarkRows(mark: dev.droidtop.library.settings.GameMark, onChange: (dev.droidtop.library.settings.GameMark) -> Unit): List<PageFact> = listOf(
+    PageFact(
+        MY_RATING_ROW,
+        dev.droidtop.library.settings.GameMarks.starsLine(mark.stars),
+        onActivate = { onChange(mark.copy(stars = (mark.stars + 1) % 6)) },
+        tab = PageTab.ACTIVITY,
+    ),
+    PageFact(
+        MY_STATUS_ROW,
+        mark.status.label,
+        onActivate = { onChange(mark.copy(status = mark.status.next())) },
+        tab = PageTab.ACTIVITY,
+    ),
+)
+
+internal const val MY_RATING_ROW = "My rating"
+internal const val MY_STATUS_ROW = "Status"

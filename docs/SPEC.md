@@ -14578,7 +14578,9 @@ scraped rating stays the scraped one; the backup carries the file (`DroidtopBack
 under "Yours" in Edit metadata, each press turning to the next value and saved at once. Slice 2: the PC, console and
 Standard game lists filter by **My status** (a facet) and sort by **My rating** (most stars first, unrated last),
 read from memory (`GameMarks.cached`, warmed off the main thread at start and kept current as marks are set), so a
-list never reads the file while it filters. On the game page with Left and Right is still to build.
+list never reads the file while it filters. Slice 3: a PC or engine game's page has both rows on its Activity tab, A turning each to its next value and saving
+at once (`gameMarkRows`). Left and Right on the stars (the page's rows have no adjust yet) and the console game page
+are still to build.
 
 **Your play (2026-10-29, Droidtop/tracker#597).** UI review 265: "There is no
 play-time summary anywhere: no total, no per-system, no 'this week'". Kid mode's
