@@ -168,16 +168,21 @@ class ToolsDeck private constructor(
         val panel = build()
         overlay = panel
         overlayId = id
-        keyboard.visibility = INVISIBLE
+        // The panel takes every tap while it is over the keys, so none reaches a key fading out underneath.
+        panel.isClickable = true
         stack.addView(panel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        // It slides up into place over the keys, which fade and are then hidden, keeping their size
+        // (Droidtop/tracker#903 H12a; PanelMotion, under the keyboard's reduce-motion rule).
+        PanelMotion.enter(panel, dp(PANEL_SLIDE_DP).toFloat())
+        PanelMotion.hide(keyboard, INVISIBLE)
     }
 
-    /** Closes the open panel and shows the keys again. */
+    /** Closes the open panel and shows the keys again: the panel sinks away as the keys fade back. */
     fun hidePanel() {
-        overlay?.let { stack.removeView(it) }
+        overlay?.let { PanelMotion.exit(stack, it, dp(PANEL_SLIDE_DP).toFloat()) }
         overlay = null
         overlayId = null
-        keyboard.visibility = VISIBLE
+        PanelMotion.show(keyboard)
     }
 
     /**
@@ -526,6 +531,9 @@ class ToolsDeck private constructor(
 
     companion object {
         private const val NOTICE_MS = 3000L
+
+        /** How far a tool panel slides as it opens or closes. */
+        private const val PANEL_SLIDE_DP = 24
 
         /**
          * [keyboard] wrapped with the tool strip, or [keyboard] itself when the strip is switched off. [typeText]

@@ -289,6 +289,14 @@ public class Keyboard {
         public int y;
         /** The current pressed state of this key */
         public boolean pressed;
+        /**
+         * droidtop patch (Droidtop/tracker#903 H12a): the press motion's state, kept by KeyPressMotion while the key
+         * is drawn: when {@link #pressed} last changed as drawn, and the scale and pressed tint it had then.
+         */
+        long motionAt;
+        boolean motionPressed;
+        float motionScaleFrom = 1f;
+        float motionTintFrom;
         /** If this is a sticky key, is it on or locked? */
         public boolean on;
         public boolean locked;

@@ -9558,6 +9558,65 @@ which clips each to the row every frame; a chip scrolled out of the row cannot c
 nothing is requested. Only the input method gets suggestions: the panels droidtop draws for the companion and
 over other apps type through other routes that autofill does not know.
 
+### Motion and haptics (Droidtop/tracker#903 H12a, built 2026-11-06)
+
+The owner, relayed by the coordinator for #903: "We want polish, new detailing, modern styling, extra modes, dynamic
+stuffs". #903's H12 is split into slices; H12a is detailing, motion and haptics only. Every Hacker's key, mode and
+setting stays, and the work is done in place in `:input-keyboard`. The rules are `KeyMotion` and `KeyHaptics` (pure,
+JVM tested); `KeyboardMotion` and `KeyHapticsPlayer` apply them on the device.
+
+- **Reduce motion is one rule.** `KeyboardMotion.refresh` reads Settings.Global's ANIMATOR_DURATION_SCALE and whether
+  the process's animators run (`ValueAnimator.areAnimatorsEnabled`, which battery saver can switch off) once each time
+  the keyboard is shown: the input method's `onStartInputView`, and a `KeyboardPanel` coming on screen. Never per frame.
+  A scale of 0 means nothing moves (`KeyMotion.durationScale`), and Android's accessibility "Remove animations" sets
+  that scale to 0, the rule HeliBoard and droidtop's own `Motion` already use. Every movement then goes straight to its
+  end state. Otherwise the keys' own timings are multiplied by the scale; view animators are scaled by Android itself.
+  Gaming's own Animations switch is droidtop's and is not read by the keyboard module, which depends on nothing of
+  droidtop's.
+- **A pressed key** shrinks to 92% about its centre over 50 ms (plate, label and icon together) and eases back over
+  120 ms when released. Its pressed colour is drawn on the frame of touch-down; with HKR's plates the colour fades back
+  over the release, while a classic theme's own pressed drawable changes at once. The state is kept on the key
+  (`Keyboard.Key.motionAt` and its neighbours) and in a fixed list of the keys still moving (`KeyPressMotion`), so a
+  frame allocates nothing and asks for no layout. The label sizes and the icon colour filters, which every draw used to
+  rebuild, are now worked out once per set of keys and once per colour.
+- **Popups grow from their key.** The key preview and the long-press popup lost their window fade
+  (`setAnimationStyle(0)`); their content grows out of the key's centre and size over 110 ms and shrinks back into it
+  over 80 ms before the window goes (`PopupMotion`). A popup shrinking away no longer counts as open, and a new long
+  press or a finger sliding on takes it back at once.
+- **Panels slide in place.** Opening the emoji panel (with its kaomoji tab), clipboard history or macros, the panel
+  rises 24 dp into place and fades in over 180 ms while the keys fade out under it and are then hidden, keeping their
+  size; closing reverses it, the panel drawn in its container's overlay where it takes no touches, so a tap straight
+  after reaches the keys (`PanelMotion`). Picking another emoji group slides its emoji in from that side. The GIF and
+  sticker tabs are not on main yet; when they land they are tabs of the same panel and move with it. The keyboard's
+  settings are an activity of their own, not a panel, and keep the system's transitions.
+- **The suggestion strip.** A list of suggestions that differs from the one shown fades in from 35% and rises 4 dp
+  over 130 ms (`CandidateView`), drawn by the strip itself.
+- **Haptics per key class** (`KeyHaptics.classOf`): letter (every key not below), modifier (Shift, Caps Lock, Ctrl,
+  Alt, Meta, Fn, the symbols switch), delete (Backspace, Forward Delete), and space and enter (with Done). On Android
+  10 and later each class plays a predefined effect (`PredefinedHaptics`, a class of its own behind the version check,
+  as `check_class_load_api.py` asks): a letter is a tick, click or heavy click with the strength, space and enter a
+  step heavier, delete a step lighter, a modifier always a double click. Four effects cannot give four classes three
+  steps each, so at Light a letter and delete share the tick and at Strong a letter and space share the heavy click. On
+  Android 8 and 9 each class is a buzz of its own (`createOneShot`, or a two-pulse `createWaveform` for a modifier),
+  longer and, where the vibrator can vary it, firmer with the strength. Each effect is built once when the strength is
+  set, never per press.
+- **"Vibration strength"** (Off, Light, Medium or Strong; `vibrate_strength`, in "Key feedback settings") replaces
+  Hacker's "Vibrate on keypress" and "Vibrate duration": on Android 10 and later the effects are the device's own, so
+  a length in milliseconds no longer had a meaning. The old values move in once (`KeyHapticsPlayer.migrate`, from the
+  input method and from the settings screen): off stays off, and on becomes Light up to 20 ms, Medium up to 60 ms
+  (Hacker's default was 40 ms) and Strong beyond; the two old keys are then removed, so there is one setting, not two.
+  A fresh install starts at Off, as Hacker's did. Picking a strength plays a letter's haptic at it.
+- **The keyboard droidtop embeds** (`KeyboardPanel` and its sinks) draws the same `LatinKeyboardView` and wraps the
+  same `ToolsDeck`, so it has all the motion above. droidtop has no vibration setting of its own; its text-entry slab
+  follows Android's touch feedback (`performHapticFeedback`). The embedded keys do the same, with a constant per class
+  (`KeyHapticsPlayer.viewFeedback`: keyboard tap, context click, clock tick, virtual key), rather than the input
+  method's "Vibration strength".
+- **Ported, not invented, where it fits** (NOTICE.md): the amplitude rule is FlorisBoard's (`Vibrator.kt`, Apache-2.0),
+  building each effect once and the predefined-or-timed split follow Unexpected Keyboard's `VibratorCompat` (GPL-3.0),
+  and the animator-scale rule is HeliBoard's (GPL-3.0). None of the three has a key-press scale or a popup that grows
+  from its key in the View system (HeliBoard dropped AOSP's preview animation, FlorisBoard draws with Compose), so
+  those are droidtop's own.
+
 ## 6b. Desktop surface input (built 2026-09-01)
 
 The seat in §6 was a primitive with no caller. `:shell-desktop`'s

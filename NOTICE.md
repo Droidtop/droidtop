@@ -154,6 +154,16 @@ This project is distributed under the GNU General Public License v3.0 (see
   compound-word fallback (`gif/GifDatabase.kt`), the commitContent insert (`KeyboardReceiver.kt`) and the thumbnail
   memory cap (`gif/GifGridView.kt`), in `input-keyboard`'s `GifLibrary.kt`, `GifLibraryStore.kt` and `GifPanel.kt`,
   each of which names its origin. No CleverKeys data, GIF packs or artwork are included.
+- **Keyboard motion and haptics, ported in part** (Droidtop/tracker#903 H12a; docs/SPEC.md 6a, "Motion and
+  haptics"). Each ported file names its origin.
+  - FlorisBoard, https://github.com/florisboard/florisboard at `bac346e8` — Apache-2.0, Copyright (C) 2022-2025 The
+    FlorisBoard Contributors: the vibration amplitude rule of `lib/android/.../Vibrator.kt` (a strength in percent
+    times a factor, as a share of 255, never below 1), as `KeyHaptics.amplitude` in `input-keyboard`.
+  - Unexpected Keyboard, https://github.com/Julow/Unexpected-Keyboard at `0695efdc` — GPL-3.0: from
+    `srcs/juloo.keyboard2/VibratorCompat.java`, a predefined effect on Android 10 and later and a timed buzz below
+    it, each effect built once and kept, in `KeyHaptics` and `KeyHapticsPlayer`.
+  - HeliBoard, https://github.com/Helium314/HeliBoard at `2d9869b2` — Apache-2.0 AND GPL-3.0-only: the rule that an
+    animator duration scale of 0 means no animation (`EmojiPalettesView.isAnimationsDisabled`), in `KeyMotion`.
 - **Termux terminal-emulator and terminal-view** — `vendor/termux-terminal`, https://github.com/termux/termux-app
   at `v0.118.3` (`5b657c6a`) — Apache-2.0 (termux-app's own `LICENSE.md` names these two libraries, which carry
   Terminal Emulator for Android code, https://github.com/jackpal/Android-Terminal-Emulator, as Apache-2.0; the rest
