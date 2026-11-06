@@ -1,2 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- droidtop's own components of the Standard launcher (moved from the Murine launcher's manifest, Droidtop/tracker#921). -->
+    <application>
+        <!--
+          droidtop's own HOME-role trampoline (built 2026-09-26,
+          docs/SPEC.md 2c): holds CATEGORY_HOME for "Standard" instead of
+          com.android.launcher3.Launcher itself, so a real Home press is
+          decided (Modes.homeTarget: a SharedPreferences read, no model,
+          no view inflation) before Launcher3's own heavy onCreate and
+          LauncherModel bind ever run. When the target is Standard it
+          forwards straight into com.android.launcher3.Launcher, explicit
+          component to explicit component, matching what BackButtonMenu's
+          own "Android" already does. Enabled by default (Standard is
+          droidtop's default Home implementation); HomeRolePrefs.
+          setActiveHomeImplementation toggles this and
+          AlternativeLauncherActivity below oppositely, so exactly one (or
+          neither) is ever an actual HOME candidate.
+        -->
+        <activity
+            android:name="dev.droidtop.shell.standard.HomeTrampolineActivity"
+            android:exported="true"
+            android:enabled="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          "Alternative" mode (docs/SPEC.md Onboarding section): droidtop
+          holds the HOME role but forwards to a different installed
+          launcher instead of rendering its own UI: verified against
+          farmerbb/Taskbar's real, shipping HSLActivity. Disabled by
+          default; HomeRolePrefs.setActiveHomeImplementation toggles this
+          and HomeTrampolineActivity above oppositely, so exactly
+          one (or neither) is ever an actual HOME candidate. Package
+          enumeration (PackageManager.queryIntentActivities on
+          ACTION_MAIN+CATEGORY_HOME) needs no separate queries block here:
+          android.permission.QUERY_ALL_PACKAGES is already declared
+          above for the app drawer's own real need to see every installed
+          app, and already covers this.
+        -->
+        <activity
+            android:name="dev.droidtop.shell.standard.AlternativeLauncherActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Standard's Clear all apps (ClearAllApps): reads what is running, asks first when
+          more than a few apps would close, and ends with a toast. Its own task and translucent,
+          like the mode switcher, so it shows over whatever was on screen.
+        -->
+        <activity
+            android:name="dev.droidtop.shell.standard.ClearAllAppsActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- droidtop: importing a Nova or Apex backup (LauncherImport), from Standard's settings. -->
+        <activity
+            android:name="dev.droidtop.shell.standard.LauncherImportActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </application>
+</manifest>

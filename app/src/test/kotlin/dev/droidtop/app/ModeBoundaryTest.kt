@@ -65,11 +65,11 @@ class ModeBoundaryTest {
         "shell-default/src/com/android/launcher3/dragndrop/AddItemActivity.java" to (1 to "upstream Launcher3's own home check"),
         "shell-default/src/com/android/launcher3/Launcher.java" to (1 to "Standard's launcher reading the drawer intent it was sent; starts nothing"),
         "shell-default/src/com/android/launcher3/views/OptionsPopupView.java" to (1 to "Standard's home-screen menu opens Standard's own drawer"),
-        "shell-default/src/dev/droidtop/shell/standard/BackButtonMenu.kt" to (7 to "the mode menu, the person's switch; and where Home goes by the person's choice"),
-        "shell-default/src/dev/droidtop/shell/standard/HomeEntry.kt" to (1 to "the Home press, which goes where the person's Home choice says"),
-        "shell-default/src/dev/droidtop/shell/standard/HomeRolePrefs.kt" to (1 to "asks Android which app opens on Home; starts nothing"),
-        "shell-default/src/dev/droidtop/shell/standard/HomeTrampolineActivity.kt" to (2 to "the Home press, which goes where the person's Home choice says"),
-        "shell-default/src/dev/droidtop/shell/standard/StandardTaskbar.kt" to (3 to "Standard's taskbar, drawn only while Standard is the mode in use (TaskbarPolicy.shown): its Home button and its Apps button, which opens the drawer only in Standard"),
+        "shell-default-hooks/src/main/kotlin/dev/droidtop/shell/standard/BackButtonMenu.kt" to (7 to "the mode menu, the person's switch; and where Home goes by the person's choice"),
+        "shell-default-hooks/src/main/kotlin/dev/droidtop/shell/standard/HomeEntry.kt" to (1 to "the Home press, which goes where the person's Home choice says"),
+        "shell-default-hooks/src/main/kotlin/dev/droidtop/shell/standard/HomeRolePrefs.kt" to (1 to "asks Android which app opens on Home; starts nothing"),
+        "shell-default-hooks/src/main/kotlin/dev/droidtop/shell/standard/HomeTrampolineActivity.kt" to (2 to "the Home press, which goes where the person's Home choice says"),
+        "shell-default-hooks/src/main/kotlin/dev/droidtop/shell/standard/StandardTaskbar.kt" to (3 to "Standard's taskbar, drawn only while Standard is the mode in use (TaskbarPolicy.shown): its Home button and its Apps button, which opens the drawer only in Standard"),
     )
 
     @Test
