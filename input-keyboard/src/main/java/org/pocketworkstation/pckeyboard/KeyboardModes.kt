@@ -7,17 +7,23 @@ import kotlin.math.roundToInt
 
 /**
  * The input method's modes (docs/SPEC.md 6a, "Modes", Droidtop/tracker#903 H12c): presentations of the same keyboard,
- * chosen from the tool strip's Modes button or by the pad, one per orientation. Normal is the keyboard as it was, with
- * the key grid shape setting ([KeyboardForm]) and every Hacker's layout (4-row, 5-row, full) as chosen; a mode changes
- * where and how big the keys are drawn, or, for the number pad, which keys, and choosing Normal again gives back exactly
- * what was there, since no other setting is touched. Only the input method has modes: the keyboards droidtop embeds
- * ([KeyboardPanel]) draw Normal, and pick the compact layout on their own ([compactPanel]).
+ * chosen from the tool strip's Modes button or by the pad, one per orientation. Every Hacker's layout (4-row, 5-row,
+ * full) and setting stays as chosen; a mode changes where and how big the keys are drawn, or, for the number pad, which
+ * keys. Only the input method has modes: the keyboards droidtop embeds ([KeyboardPanel]) keep the key grid shape and
+ * its Layout button, and pick the compact layout on their own ([compactPanel]).
+ *
+ * One store per job. Normal, Split and One-handed left or right are the key grid shape setting's own values
+ * ([KeyboardForm.PREF] and its landscape key: full, split, left, right), which the chooser writes exactly as the Layout
+ * button does ([writes]); the mode setting ([PREF_MODE]) holds only what the shape cannot say: floating, the thumb split
+ * and the number pad. So the chooser, the Layout button and the settings always agree ([chosen]), and in the input
+ * method one-handed is one thing, the resizable one, whichever way it was picked.
  *
  * The rules are pure and JVM tested; [current], [choose] and [formFor] read and write the keyboard's own settings.
  */
 object KeyboardModes {
     enum class Mode(val id: String) {
         NORMAL("normal"),
+        SPLIT("split"),
         LEFT("left"),
         RIGHT("right"),
         FLOATING("floating"),
@@ -178,7 +184,7 @@ object KeyboardModes {
     @JvmStatic
     fun form(mode: Mode, normal: KeyboardForm.Form, oneHandedWidth: Float, floatSize: FloatSize, thumb: KeyboardForm.Form?): KeyboardForm.Form =
         when (mode) {
-            Mode.NORMAL -> normal
+            Mode.NORMAL, Mode.SPLIT -> normal
             Mode.LEFT -> KeyboardForm.oneHanded(clampOneHanded(oneHandedWidth), atEnd = false)
             Mode.RIGHT -> KeyboardForm.oneHanded(clampOneHanded(oneHandedWidth), atEnd = true)
             Mode.FLOATING -> KeyboardForm.Form(Mode.FLOATING.id, floatSize.width, 0f, false, floatSize.heightScale)
@@ -186,9 +192,88 @@ object KeyboardModes {
             Mode.NUMBER_PAD -> KeyboardForm.FULL
         }
 
-    /** The modes the chooser lists, in its order: the thumb split only where the screen is wide enough for one. Pure. */
+    /**
+     * The modes the chooser lists, in its order: Normal, Split (H1's, on every screen), one-handed left and right,
+     * floating, the thumb split only where the screen is wide enough for one, the number pad. Pure.
+     */
     @JvmStatic
     fun offered(thumbAvailable: Boolean): List<Mode> = Mode.entries.filter { it != Mode.THUMB || thumbAvailable }
+
+    /** The modes the shape setting says, rather than the mode setting. */
+    private val SHAPES = setOf(Mode.NORMAL, Mode.SPLIT, Mode.LEFT, Mode.RIGHT)
+
+    /**
+     * What choosing [choice] stores: the mode setting's value and the shape setting's, or null to leave the shape as it
+     * is. Normal is the full width (normal mode, shape "full"); Split, left and right are the shape the Layout button
+     * would store; floating, thumb split and the number pad leave the shape for when Normal or a shape is chosen. Pure.
+     */
+    @JvmStatic
+    fun writes(choice: Mode): Pair<String, String?> = when (choice) {
+        Mode.NORMAL -> Mode.NORMAL.id to KeyboardForm.FULL.id
+        Mode.SPLIT -> Mode.NORMAL.id to KeyboardForm.SPLIT.id
+        Mode.LEFT -> Mode.NORMAL.id to KeyboardForm.LEFT.id
+        Mode.RIGHT -> Mode.NORMAL.id to KeyboardForm.RIGHT.id
+        else -> choice.id to null
+    }
+
+    /**
+     * The mode the input method draws, and the chooser lights, from the stored [mode] and the shape in use now
+     * ([shapeId], the key grid shape setting's choice for this orientation with H1's automatic default applied): floating,
+     * the thumb split and the number pad from the mode; otherwise the shape's split, left, right, or Normal for the full
+     * width. A stored "left" or "right" mode (H12c's first build kept them there; [migrated] moves them) still reads as
+     * one-handed. Pure.
+     */
+    @JvmStatic
+    fun chosen(mode: String?, shapeId: String?): Mode {
+        val stored = Mode.of(mode)
+        if (stored !in SHAPES || stored == Mode.LEFT || stored == Mode.RIGHT) return stored
+        return when (shapeId) {
+            KeyboardForm.SPLIT.id -> Mode.SPLIT
+            KeyboardForm.LEFT.id -> Mode.LEFT
+            KeyboardForm.RIGHT.id -> Mode.RIGHT
+            else -> Mode.NORMAL
+        }
+    }
+
+    /** The one-handed width a shape chosen before H12c had: the shape setting's fixed 70%. */
+    const val SHAPE_ONE_HANDED_WIDTH = 0.7f
+
+    /**
+     * One orientation's settings moved to one store, or null when nothing changes: a "left" or "right" kept in the mode
+     * setting by H12c's first build becomes the shape setting's ([mode] to "normal", the shape to it); and a one-handed
+     * shape chosen before H12c keeps its 70% as the one-handed width, unless a width is already kept ([widthSet]).
+     * Returns the mode, the shape and the width to store, each null when it stays. Pure.
+     */
+    @JvmStatic
+    fun migrated(mode: String?, shape: String?, widthSet: Boolean): Triple<String?, String?, String?>? {
+        val movedShape = mode?.takeIf { it == Mode.LEFT.id || it == Mode.RIGHT.id }
+        val newShape = movedShape ?: shape
+        val oneHanded = newShape == KeyboardForm.LEFT.id || newShape == KeyboardForm.RIGHT.id
+        val width = if (oneHanded && !widthSet && movedShape == null) String.format(Locale.ROOT, "%.4f", SHAPE_ONE_HANDED_WIDTH) else null
+        if (movedShape == null && width == null) return null
+        return Triple(movedShape?.let { Mode.NORMAL.id }, movedShape, width)
+    }
+
+    /** Set once [migrate] has run. */
+    const val PREF_MIGRATED = "pref_keyboard_modes_one_store"
+
+    /** [migrated] for both orientations, once ([PREF_MIGRATED]). Runs after [KeyboardForm.migrate]. */
+    @JvmStatic
+    fun migrate(prefs: android.content.SharedPreferences) {
+        if (prefs.getBoolean(PREF_MIGRATED, false)) return
+        val edit = prefs.edit().putBoolean(PREF_MIGRATED, true)
+        for (landscape in listOf(false, true)) {
+            val change = migrated(
+                prefs.getString(key(PREF_MODE, landscape), null),
+                prefs.getString(KeyboardForm.prefFor(landscape), null),
+                prefs.contains(key(PREF_ONE_HANDED_WIDTH, landscape)),
+            ) ?: continue
+            change.first?.let { edit.putString(key(PREF_MODE, landscape), it) }
+            change.second?.let { edit.putString(KeyboardForm.prefFor(landscape), it) }
+            change.third?.let { edit.putString(key(PREF_ONE_HANDED_WIDTH, landscape), it) }
+        }
+        edit.apply()
+    }
 
     // The compact keyboard of droidtop's add-on screen and companion (KeyboardPanel).
 
@@ -230,20 +315,31 @@ object KeyboardModes {
     @JvmStatic
     fun landscape(context: Context): Boolean = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    /** The mode for [context]'s orientation; Normal wherever the keyboard is not the input method's. */
+    /** The mode for [context]'s orientation ([chosen]); Normal wherever the keyboard is not the input method's. */
     @JvmStatic
     fun current(context: Context): Mode {
         if (!KeyboardAppearance.drawnByInputMethod(context)) return Mode.NORMAL
-        return Mode.of(ToolsPrefs.prefs(context).getString(key(PREF_MODE, landscape(context)), null))
+        val prefs = ToolsPrefs.prefs(context)
+        val shape = KeyboardForm.forScreen(prefs.getString(KeyboardForm.PREF, null), prefs.getString(KeyboardForm.PREF_LANDSCAPE, null), context)
+        return chosen(prefs.getString(key(PREF_MODE, landscape(context)), null), shape.id)
     }
 
     /**
-     * Keeps [mode] for the current orientation, and nothing else: Normal gives back the keyboard as it was. The input
-     * method builds itself again when it changes (GlobalKeyboardSettings). In memory at once; written in the background.
+     * Keeps [choice] for the current orientation ([writes]): the mode setting, and the shape setting as the Layout button
+     * stores it. The input method builds itself again when either changes (GlobalKeyboardSettings). In memory at once;
+     * written in the background.
      */
     @JvmStatic
-    fun choose(context: Context, mode: Mode) {
-        ToolsPrefs.prefs(context).edit().putString(key(PREF_MODE, landscape(context)), mode.id).apply()
+    fun choose(context: Context, choice: Mode) {
+        val landscape = landscape(context)
+        val (mode, shape) = writes(choice)
+        // The shape the keys are built with is read from the shared settings, which must hold it before the rebuild.
+        if (shape != null) {
+            if (landscape) LatinIME.sKeyboardSettings.formLandscapeChoice = shape else LatinIME.sKeyboardSettings.formChoice = shape
+        }
+        val edit = ToolsPrefs.prefs(context).edit()
+        shape?.let { edit.putString(KeyboardForm.prefFor(landscape), it) }
+        edit.putString(key(PREF_MODE, landscape), mode).apply()
     }
 
     /** The one-handed width for [context]'s orientation. */
@@ -278,7 +374,7 @@ object KeyboardModes {
     @JvmStatic
     fun formFor(context: Context, normal: KeyboardForm.Form): KeyboardForm.Form {
         val mode = current(context)
-        if (mode == Mode.NORMAL) return normal
+        if (mode == Mode.NORMAL || mode == Mode.SPLIT) return normal
         return form(mode, normal, oneHandedWidth(context), floatSize(context), if (mode == Mode.THUMB) KeyboardForm.thumbForScreen(context) else null)
     }
 }
