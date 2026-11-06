@@ -238,6 +238,8 @@ object GamingSettingsCatalog {
                 add(showHintsItem(context))
                 add(animationsItem(context))
                 add(navigationSoundsItem(context))
+                add(backgroundMusicItem(context))
+                add(backgroundMusicFolderItem(context))
                 add(screensaverItem(context))
                 add(gameAwakeItem(context))
             },
@@ -1056,6 +1058,40 @@ object GamingSettingsCatalog {
     }
 
     const val NAVIGATION_SOUNDS_MAX = 100
+
+    const val ID_BACKGROUND_MUSIC = "pref_gaming_background_music"
+    const val ID_BACKGROUND_MUSIC_FOLDER = "pref_gaming_background_music_folder"
+
+    /**
+     * Background music in Gaming (Droidtop/tracker#725): its volume, 0 to [NAVIGATION_SOUNDS_MAX], 0 (the default)
+     * being off. It plays the tracks of the folder below while the shell is in front and no game runs.
+     */
+    fun backgroundMusicItem(context: Context) = SliderItem(
+        id = ID_BACKGROUND_MUSIC,
+        title = words(R.string.gaming_background_music),
+        subtitle = words(R.string.gaming_background_music_subtitle),
+        min = 0,
+        max = NAVIGATION_SOUNDS_MAX,
+        current = backgroundMusicVolume(context),
+        onChange = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putInt(ID_BACKGROUND_MUSIC, value).apply() },
+    )
+
+    /** The folder the music comes from: picked through Android's picker, which keeps droidtop's read access to it. */
+    fun backgroundMusicFolderItem(context: Context) = FolderPickItem(
+        id = ID_BACKGROUND_MUSIC_FOLDER,
+        title = words(R.string.gaming_music_folder),
+        subtitle = backgroundMusicFolder(context)?.let { android.net.Uri.parse(it).lastPathSegment?.substringAfterLast(':') }
+            ?: words(R.string.gaming_music_folder_none),
+        onPicked = { ctx, uri ->
+            CatalogPrefs.prefs(ctx).edit().putString(ID_BACKGROUND_MUSIC_FOLDER, uri.toString()).apply()
+            null
+        },
+    )
+
+    fun backgroundMusicVolume(context: Context): Int = CatalogPrefs.prefs(context).getInt(ID_BACKGROUND_MUSIC, 0)
+
+    fun backgroundMusicFolder(context: Context): String? =
+        CatalogPrefs.prefs(context).getString(ID_BACKGROUND_MUSIC_FOLDER, null)?.takeIf { it.isNotBlank() }
     // 40, not 70 (owner on the console, dev.2778: "the nav noises are VERY harsh"): the bundled samples peak at
     // about -1 dBFS, and SoundPool's linear gain at 0.4 brings them to about -9 dBFS under game audio.
     private const val NAVIGATION_SOUNDS_DEFAULT = 40

@@ -14127,6 +14127,14 @@ minutes), Shows (Game covers, Screenshots, Clock or Black), Dim and Show the gam
 burn-in; Dim draws the whole screensaver at 35%. Still to build: video, a source of favourites or one
 collection, the interval, and A launching the game shown.
 
+**Background music (Droidtop/tracker#725).** Settings > Shell behaviour > Background music (a volume, 0, the
+default, being off) and Music folder (picked through Android's picker, which keeps droidtop's read access): the
+folder's audio files, shuffled and looped, while the Gaming shell is in front and no game runs (`BackgroundMusic`,
+`:shell-gamepad`). It takes audio focus as music, so another app's music or video pauses it until that ends, and a
+sound that asks to duck lowers it for a moment; full volume is 60% of the stream, so the navigation sounds stay
+heard over it. The folder is listed off the main thread; a change in Settings takes effect at once. Theme-declared
+music is not built.
+
 **Sleep and return to game (decided 2026-10-09, Droidtop/tracker#86).** The model is the Steam
 Deck's: while a game runs the console never sleeps on its own, the person sleeps it with the power
 button (or the Quick Menu's System section, Sleep), and waking returns to the game. The shell is what

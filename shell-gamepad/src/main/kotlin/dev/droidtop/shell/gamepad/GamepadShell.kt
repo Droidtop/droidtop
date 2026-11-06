@@ -488,10 +488,28 @@ internal fun GamepadShellBody(
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) ControllerLayouts.recheck(context)
+            // Background music plays only while the shell is in front (Droidtop/tracker#725).
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) BackgroundMusic.shellShown(context, true)
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) BackgroundMusic.shellShown(context, false)
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        // A change in Settings (inside this shell) takes effect at once.
+        val musicPrefs = dev.droidtop.library.settings.CatalogPrefs.prefs(context)
+        val musicListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == dev.droidtop.library.settings.GamingSettingsCatalog.ID_BACKGROUND_MUSIC ||
+                key == dev.droidtop.library.settings.GamingSettingsCatalog.ID_BACKGROUND_MUSIC_FOLDER
+            ) BackgroundMusic.settingsChanged(context)
+        }
+        musicPrefs.registerOnSharedPreferenceChangeListener(musicListener)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            musicPrefs.unregisterOnSharedPreferenceChangeListener(musicListener)
+            BackgroundMusic.shellShown(context, false)
+        }
     }
+    // The music waits while a game runs.
+    val musicGame by dev.droidtop.library.LaunchDisplay.running.collectAsState()
+    LaunchedEffect(musicGame != null) { BackgroundMusic.gameRunning(context, musicGame != null) }
     // "Press the button labelled A": asked for from the Quick Menu, or lightly when the pad's
     // earlier answer no longer holds and nothing else says what it is.
     if (ControllerLayouts.captureRequested || ControllerLayouts.needsRecapture) {
