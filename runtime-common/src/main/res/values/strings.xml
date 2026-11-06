@@ -228,6 +228,10 @@
     <string name="gaming_how_soon_after_a_tap_your">How soon after a tap your finger must come back down to drag instead of clicking</string>
     <string name="gaming_name_x">Name: %1$s</string>
     <string name="gaming_screensaver">Screensaver</string>
+    <string name="gaming_background_music">Background music</string>
+    <string name="gaming_background_music_subtitle">Plays your music folder while the menus show; 0 is off. A game or other media pauses it</string>
+    <string name="gaming_music_folder">Music folder</string>
+    <string name="gaming_music_folder_none">None chosen yet</string>
     <string name="gaming_library_artwork">Library artwork</string>
     <string name="gaming_while_a_game_runs">While a game runs</string>
     <string name="gaming_android_keyboard_on_second_screen">Android keyboard on second screen</string>
