@@ -21,6 +21,7 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.ListPreference;
 import android.preference.PreferenceActivity;
+import android.preference.PreferenceManager;
 
 public class PrefScreenFeedback extends PreferenceActivity
         implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -28,6 +29,9 @@ public class PrefScreenFeedback extends PreferenceActivity
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
+        // droidtop patch (Droidtop/tracker#903 H12a): Vibrate on keypress is shown as Vibration strength from here on,
+        // even before the keyboard itself has run since the update.
+        KeyHapticsPlayer.migrate(PreferenceManager.getDefaultSharedPreferences(this));
         addPreferencesFromResource(R.xml.prefs_feedback);
         SharedPreferences prefs = getPreferenceManager().getSharedPreferences();
         prefs.registerOnSharedPreferenceChangeListener(this);

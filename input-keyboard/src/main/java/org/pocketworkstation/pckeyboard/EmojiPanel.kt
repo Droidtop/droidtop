@@ -82,7 +82,7 @@ internal class EmojiBrowser(
         EmojiAssets.load(context) { loaded ->
             catalog = loaded
             buildGroups()
-            select(if (recent().isEmpty()) loaded.groups.firstOrNull()?.id ?: RECENT else RECENT)
+            select(if (recent().isEmpty()) loaded.groups.firstOrNull()?.id ?: RECENT else RECENT, animate = false)
         }
     }
 
@@ -116,7 +116,10 @@ internal class EmojiBrowser(
         toneScroll.visibility = VISIBLE
     }
 
-    private fun select(id: String) {
+    private fun select(id: String, animate: Boolean = true) {
+        // The new group slides in from its side of the row (Droidtop/tracker#903 H12a): Recent first, Kaomoji last.
+        val from = order(selected)
+        val to = order(id)
         selected = id
         toneScroll.visibility = GONE
         // Kaomoji are wide: fewer, wider cells in smaller type (Droidtop/tracker#903 H4).
@@ -126,7 +129,11 @@ internal class EmojiBrowser(
         val tone = ToolsPrefs.prefs(context).getInt(EmojiTones.PREF, 0)
         val items = if (id == RECENT) recent() else catalog?.groups?.firstOrNull { it.id == id }?.entries?.map { EmojiTones.shown(it, tone) } ?: emptyList()
         adapter.show(if (items.isEmpty() && id == RECENT) listOf(context.getString(R.string.emoji_recent_empty)) else items, loading = items.isEmpty())
+        if (animate && from != to) PanelMotion.swap(grid, (if (to > from) 1 else -1) * dp(GROUP_SLIDE_DP).toFloat())
     }
+
+    /** A group's place in the row: Recent first, then the data's groups in order (Kaomoji last). */
+    private fun order(id: String): Int = if (id == RECENT) -1 else catalog?.groups?.indexOfFirst { it.id == id } ?: -1
 
     private class EmojiAdapter(private val context: Context, private val textColor: Int) : BaseAdapter() {
         var items: List<String> = emptyList()
@@ -168,6 +175,9 @@ internal class EmojiBrowser(
 
     companion object {
         private const val RECENT = "recent"
+
+        /** How far a group's emoji slide in when it is picked. */
+        private const val GROUP_SLIDE_DP = 16
 
         /** The button text for a group id of the emoji data. */
         fun groupLabel(context: Context, id: String): String {

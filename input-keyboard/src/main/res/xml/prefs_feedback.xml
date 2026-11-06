@@ -19,20 +19,14 @@
         android:title="@string/pref_screen_feedback_title"
         android:key="feedback_settings">
 
-    <CheckBoxPreference
-            android:key="vibrate_on"
-            android:title="@string/vibrate_on_keypress"
-            android:persistent="true"
-            />
-
-    <org.pocketworkstation.pckeyboard.VibratePreference		
-            android:defaultValue="40"
-            hk:minValue="5"
-            hk:maxValue="200"
-            hk:logScale="true"
-            hk:displayFormat="%.0f ms"
-            android:key="vibrate_len"
-            android:title="@string/title_vibrate_len"
+    <!-- droidtop patch (Droidtop/tracker#903 H12a): one setting in place of Vibrate on keypress and Vibrate
+         duration, whose value KeyHapticsPlayer.migrate moves in. -->
+    <org.pocketworkstation.pckeyboard.VibratePreference
+            android:key="vibrate_strength"
+            android:title="@string/title_vibrate_strength"
+            android:entries="@array/vibrate_strength_entries"
+            android:entryValues="@array/vibrate_strength_values"
+            android:defaultValue="off"
             android:persistent="true"
             />
 

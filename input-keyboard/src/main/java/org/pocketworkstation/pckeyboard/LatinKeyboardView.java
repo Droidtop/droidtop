@@ -166,7 +166,9 @@ public class LatinKeyboardView extends LatinKeyboardBaseView {
             mPreviewPopup.setContentView(mPreviewText);
             mPreviewPopup.setBackgroundDrawable(null);
             mPreviewPopup.setTouchable(false);
-            mPreviewPopup.setAnimationStyle(R.style.KeyPreviewAnimation);
+            // droidtop patch (Droidtop/tracker#903 H12a): no window animation; the preview grows out of its key
+            // (PopupMotion), under the keyboard's own reduce-motion rule.
+            mPreviewPopup.setAnimationStyle(0);
             mPreviewPopup.setClippingEnabled(clippingEnabled);
         } else {
             mShowPreview = false;
@@ -178,7 +180,8 @@ public class LatinKeyboardView extends LatinKeyboardBaseView {
             if (!isInEditMode())
                 Log.i(TAG, "new mMiniKeyboardPopup " + mMiniKeyboardPopup + " from " + this);
             mMiniKeyboardPopup.setBackgroundDrawable(null);
-            mMiniKeyboardPopup.setAnimationStyle(R.style.MiniKeyboardAnimation);
+            // droidtop patch (#903 H12a): the long-press popup grows out of its key instead (PopupMotion).
+            mMiniKeyboardPopup.setAnimationStyle(0);
             mMiniKeyboardPopup.setClippingEnabled(clippingEnabled);
             mMiniKeyboardVisible = false;
         }

@@ -89,6 +89,10 @@ public class CandidateView extends View {
     
     private final GestureDetector mGestureDetector;
 
+    // droidtop patch (Droidtop/tracker#903 H12a): new suggestions fade and rise into the strip (KeyMotion).
+    private long mArrivedAt;
+    private boolean mArriving;
+
     /**
      * Construct a CandidateView for showing suggested words for completion.
      * @param context
@@ -232,6 +236,12 @@ public class CandidateView extends View {
         final boolean scrolled = mScrolled;
         final boolean typedWordValid = mTypedWordValid;
         final int y = (int) (height + mPaint.getTextSize() - mDescent) / 2;
+        // New suggestions: their opacity and how far below the line they still are, for this frame (#903 H12a).
+        final float motion = KeyboardMotion.getScale();
+        final long arrivedFor = android.view.animation.AnimationUtils.currentAnimationTimeMillis() - mArrivedAt;
+        final float arriveAlpha = mArriving ? KeyMotion.candidateAlpha(arrivedFor, motion) : 1f;
+        final float arriveDrop = mArriving
+                ? KeyMotion.candidateRiseDp(arrivedFor, motion) * getResources().getDisplayMetrics().density : 0f;
 
         boolean existsAutoCompletion = false;
 
@@ -274,7 +284,8 @@ public class CandidateView extends View {
             }
 
             if (canvas != null) {
-                canvas.drawText(suggestion, 0, wordLength, x + wordWidth / 2, y, paint);
+                if (arriveAlpha < 1f) paint.setAlpha((int) (paint.getAlpha() * arriveAlpha));
+                canvas.drawText(suggestion, 0, wordLength, x + wordWidth / 2, y + arriveDrop, paint);
                 paint.setColor(mColorOther);
                 canvas.translate(x + wordWidth, 0);
                 // Draw a divider unless it's after the hint
@@ -285,6 +296,10 @@ public class CandidateView extends View {
             }
             paint.setTypeface(Typeface.DEFAULT);
             x += wordWidth;
+        }
+        if (canvas != null && mArriving) {
+            if (arriveAlpha >= 1f && arriveDrop <= 0f) mArriving = false;
+            else postInvalidateOnAnimation();
         }
         if (!isInEditMode())
             mService.onAutoCompletionStateChanged(existsAutoCompletion);
@@ -320,6 +335,11 @@ public class CandidateView extends View {
     
     public void setSuggestions(List<CharSequence> suggestions, boolean completions,
             boolean typedWordValid, boolean haveMinimalSuggestion) {
+        // droidtop patch (#903 H12a): a list that differs from the one shown arrives with a short fade and rise.
+        if (suggestions != null && !suggestions.isEmpty() && !sameAsShown(suggestions) && KeyboardMotion.enabled()) {
+            mArriving = true;
+            mArrivedAt = android.view.animation.AnimationUtils.currentAnimationTimeMillis();
+        }
         clear();
         if (suggestions != null) {
             int insertCount = Math.min(suggestions.size(), MAX_SUGGESTIONS);
@@ -338,6 +358,16 @@ public class CandidateView extends View {
         onDraw(null);
         invalidate();
         requestLayout();
+    }
+
+    /** Whether [suggestions] are the ones already shown, word for word, up to what the strip holds. */
+    private boolean sameAsShown(List<CharSequence> suggestions) {
+        final int count = Math.min(suggestions.size(), MAX_SUGGESTIONS);
+        if (count != mSuggestions.size()) return false;
+        for (int i = 0; i < count; i++) {
+            if (!android.text.TextUtils.equals(suggestions.get(i), mSuggestions.get(i))) return false;
+        }
+        return true;
     }
 
     public boolean isShowingAddToDictionaryHint() {

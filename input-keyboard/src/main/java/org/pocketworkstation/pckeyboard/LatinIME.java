@@ -42,7 +42,6 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.SystemClock;
-import android.os.Vibrator;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceManager;
 import androidx.core.app.NotificationCompat;
@@ -52,7 +51,6 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.PrintWriterPrinter;
 import android.util.Printer;
-import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
 import android.view.View;
 import androidx.annotation.RequiresApi;
@@ -94,8 +92,6 @@ public class LatinIME extends InputMethodService implements
     static Map<Integer, String> ESC_SEQUENCES;
     static Map<Integer, Integer> CTRL_SEQUENCES;
 
-    private static final String PREF_VIBRATE_ON = "vibrate_on";
-    static final String PREF_VIBRATE_LEN = "vibrate_len";
     private static final String PREF_SOUND_ON = "sound_on";
     private static final String PREF_POPUP_ON = "popup_on";
     private static final String PREF_AUTO_CAP = "auto_cap";
@@ -213,8 +209,8 @@ public class LatinIME extends InputMethodService implements
     // Saved shift state when leaving alphabet mode, or when applying multitouch shift
     private int mSavedShiftState;
     private boolean mPasswordText;
-    private boolean mVibrateOn;
-    private int mVibrateLen;
+    // droidtop patch (Droidtop/tracker#903 H12a): a haptic per key class at the "Vibration strength" chosen.
+    private KeyHapticsPlayer mHaptics;
     private boolean mSoundOn;
     private boolean mPopupOn;
     private boolean mAutoCapPref;
@@ -373,6 +369,7 @@ public class LatinIME extends InputMethodService implements
         KeyboardSwitcher.init(this);
         super.onCreate();
         sInstance = this;
+        mHaptics = new KeyHapticsPlayer(this);
         // droidtop: whether offline voice typing's download is in place, read off the main thread (Droidtop/tracker#343).
         OfflineVoice.refresh(this);
         // setStatusIcon(R.drawable.ime_qwerty);
@@ -416,6 +413,7 @@ public class LatinIME extends InputMethodService implements
         mVolUpAction = prefs.getString(PREF_VOL_UP, res.getString(R.string.default_vol_up));
         mVolDownAction = prefs.getString(PREF_VOL_DOWN, res.getString(R.string.default_vol_down));
         KeyboardForm.migrate(prefs); // droidtop patch (Droidtop/tracker#903 H1): shapes per orientation
+        KeyHapticsPlayer.migrate(prefs); // droidtop patch (#903 H12a): Vibrate on keypress becomes Vibration strength
         sKeyboardSettings.initPrefs(prefs, res);
 
         
@@ -797,6 +795,8 @@ public class LatinIME extends InputMethodService implements
         // policy, docs/SPEC.md 4c), so droidtop is told and can draw the
         // same keyboard on the editor's own screen itself.
         SecondScreenKeyboard.onShowRequested(attribute.packageName);
+        // droidtop patch (Droidtop/tracker#903 H12a): the animation settings, read once each time the keyboard shows.
+        KeyboardMotion.refresh(this);
         // droidtop: the voice key asks again which keyboard dictates for this field (Droidtop/tracker#772).
         VoiceInput.fieldStarted();
         // droidtop: a dictionary added or removed since the last field is loaded now (Droidtop/tracker#339).
@@ -3300,8 +3300,8 @@ public class LatinIME extends InputMethodService implements
             mVolUpAction = sharedPreferences.getString(PREF_VOL_UP, res.getString(R.string.default_vol_up));
         } else if (PREF_VOL_DOWN.equals(key)) {
             mVolDownAction = sharedPreferences.getString(PREF_VOL_DOWN, res.getString(R.string.default_vol_down));
-        } else if (PREF_VIBRATE_LEN.equals(key)) {
-            mVibrateLen = getPrefInt(sharedPreferences, PREF_VIBRATE_LEN, getResources().getString(R.string.vibrate_duration_ms));
+        } else if (KeyHaptics.PREF.equals(key)) {
+            mHaptics.setStrength(VibrationStrength.of(sharedPreferences.getString(KeyHaptics.PREF, null)));
         }
 
         updateKeyboardOptions();
@@ -3388,7 +3388,7 @@ public class LatinIME extends InputMethodService implements
     public void onPress(int primaryCode) {
         InputConnection ic = getCurrentInputConnection();
         if (mKeyboardSwitcher.isVibrateAndSoundFeedbackRequired()) {
-            vibrate();
+            mHaptics.play(primaryCode);
             playKeyClick(primaryCode);
         }
         final boolean distinctMultiTouch = mKeyboardSwitcher
@@ -3567,26 +3567,6 @@ public class LatinIME extends InputMethodService implements
         }
     }
 
-    private void vibrate() {
-        if (!mVibrateOn) {
-            return;
-        }
-        vibrate(mVibrateLen);
-    }
-
-    void vibrate(int len) {
-        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-        if (v != null) {
-            v.vibrate(len);
-            return;
-        }
-
-        if (mKeyboardSwitcher.getInputView() != null) {
-            mKeyboardSwitcher.getInputView().performHapticFeedback(
-                    HapticFeedbackConstants.KEYBOARD_TAP,
-                    HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
-        }
-    }
     
     /* package */void promoteToUserDictionary(String word, int frequency) {
         if (mUserDictionary.isValidWord(word))
@@ -3646,8 +3626,7 @@ public class LatinIME extends InputMethodService implements
         // Get the settings preferences
         SharedPreferences sp = PreferenceManager
                 .getDefaultSharedPreferences(this);
-        mVibrateOn = sp.getBoolean(PREF_VIBRATE_ON, false);
-        mVibrateLen = getPrefInt(sp, PREF_VIBRATE_LEN, getResources().getString(R.string.vibrate_duration_ms));
+        mHaptics.setStrength(VibrationStrength.of(sp.getString(KeyHaptics.PREF, null)));
         mSoundOn = sp.getBoolean(PREF_SOUND_ON, false);
         mPopupOn = sp.getBoolean(PREF_POPUP_ON, mResources
                 .getBoolean(R.bool.default_popup_preview));
@@ -3775,7 +3754,7 @@ public class LatinIME extends InputMethodService implements
         p.println("  mCompletionOn=" + mCompletionOn);
         p.println("  TextEntryState.state=" + TextEntryState.getState());
         p.println("  mSoundOn=" + mSoundOn);
-        p.println("  mVibrateOn=" + mVibrateOn);
+        p.println("  vibrationStrength=" + mHaptics.getStrength());
         p.println("  mPopupOn=" + mPopupOn);
     }
 
