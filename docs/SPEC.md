@@ -9799,6 +9799,70 @@ are in addition to Hacker's own layouts (4-row, 5-row, full), never replacing th
   FlorisBoard's floating insets and offset clamp (Apache-2.0). Neither has a thumb split, a calculator or a compact
   layout picked by display, so those are droidtop's own. Both were cloned fresh for this.
 
+### The engine seam and the candidate bar (Droidtop/tracker#903 H6, built 2026-11-06)
+
+The plan posted on #903, in the order the owner approved (H5, H12, H13, then H6): "H6: the engine seam and candidate
+bar, plus the gesture seam." This part is the engine seam and the candidate bar. It comes before the conversion engines, H7 to H9: Mozc for Japanese, librime for Chinese,
+libhangul for Korean. The owner's rule holds: "Hacker's Keyboard is our foundation. If we can rebuild it while keeping
+ALL of hacker's functionality (the full keyboard including functions and stuff, terminal mode, etc, etc), then we do
+that gradually". So this slice is a refactor behind seams, and **Latin typing does not change**.
+
+- **The engine seam** (`InputEngine`, pure): keys in, composing text and candidates out.
+  - A character (with the codes the touch also reached), Backspace, and the engine keys: space and enter, which a
+    converting engine takes to convert and to commit (`InputEngine.Key`; `KeyResult` says whether it took the key and
+    what to commit).
+  - The composing text (`Composing`): the text, its clauses (`Segment`), the clause being converted (drawn
+    highlighted), and the caret.
+  - The candidates (`Candidates`): each with an optional annotation drawn small, the one the engine has chosen, and the
+    engine's own page size when it pages.
+  - Pick candidate N, commit, reset; whether the engine composes in this field at all; whether it wants the candidate
+    bar; and its capabilities: predicts, converts, corrects.
+- **Hacker's Latin path is the first engine** (`LatinEngine`). It wraps what was there and rewrites none of it:
+  - the word being typed (Hacker's `mComposing`, `mWord`, `mPredicting`, now the engine's), typed and deleted through
+    the engine;
+  - the dictionaries' suggestions (`Suggest`, as the engine's `Lexicon`), autocorrect's choice of the word a separator
+    types, and Hacker's "Show suggestions" on or off.
+  - **Where Hacker's does not compose is the engine's capability, unchanged.** That is suggestions off (which the
+    Terminal preset writes), suggestions in landscape off, the suggestion toggle's force on and off, and fields that
+    ask for none: passwords, addresses, URIs, filters, no-suggestions and auto-complete fields. Hacker's
+    `isPredictionOn`, `isPredictionWanted` and `suggestionsDisabled` moved into the engine word for word; LatinIME asks
+    the engine. Ctrl, Alt and Meta held still type keys straight through.
+  - LatinIME keeps the rest of Hacker's typing as it was: capitals, autocorrect at a separator, the word history and
+    revert, double space, the add-to-dictionary hint.
+  - `LatinEngineTest` runs LatinIME's old code (`LatinOldPath`, copied word for word) beside the engine and finds them
+    equal on every input. That covers the 64 combinations of field, settings and orientation; 1,920 suggestion cases
+    (the words, typed-word validity, correction offered, next letters and the separator's word); and a script of
+    typing, deleting, committing and resetting.
+- **A language's own engine** registers with `InputEngines` (none does yet). When the input language has one,
+  LatinIME drives it through `EngineSession`:
+  - character keys, Backspace, space and enter go to the engine first (not while Ctrl, Alt or Meta is held);
+  - its composing text goes to the field, each clause underlined and the converted one on the accent's tint;
+  - its candidates go to the candidate bar, and a pick goes back to it;
+  - what it declines types as before, after what it composed goes in;
+  - moving the cursor away, a new field, a tool that types and closing the keyboard put in or leave what it composed;
+  - Hacker's Latin path only passes keys through meanwhile.
+  So H7 to H9 add an engine and its registration without touching LatinIME again. A test-only engine (`FakeKanaEngine`:
+  a few romaji to kana, a tiny kanji table, two clauses for a reading ending in です) proves the seam carries clauses,
+  paging, annotations, the pad's selection and the pick through to the bar's model (`EngineSessionTest`).
+- **The candidate bar is the one `CandidateView`**, extended rather than replaced. Its model is `CandidateBar` (pure,
+  JVM tested).
+  - With Hacker's words it looks and behaves exactly as before, with H12a's arrival motion.
+  - With a language's own engine, each candidate's annotation is drawn small beside it, and the engine's chosen
+    candidate is highlighted as a touched one is.
+  - When the engine converts, an expand button sits at the row's right end (▾, ▴ while open). It opens every candidate
+    in a grid over the keys. The grid is the same view drawn in grid mode, in a popup the keys' height.
+  - The grid pages by what fits, or by the engine's own page size. A drag up or down turns the page, and a tap picks.
+  - The row still holds its first 32 candidates; the grid holds them all.
+- **The pad reaches the bar** (`PadKeys`; the vocabulary of "A pad on the keyboard" above).
+  - Up from the tool strip, or from the top row when there is no strip, takes the ring onto the candidates, at the
+    engine's choice or the first.
+  - Left and Right step along the row, then onto the expand button. A picks the candidate as a tap does, or opens the
+    grid from the button.
+  - In the grid every direction moves, and Up and Down cross pages.
+  - Down from the row goes back to the tools; B closes the grid, then goes back to the keys. A touch takes the ring away.
+- **Not done here:** no conversion engine (H7 to H9). The caret inside an engine's composing text is carried by the seam
+  but drawn at the end until an engine needs it. Nothing above changes what a person sees with Hacker's own typing.
+
 ## 6b. Desktop surface input (built 2026-09-01)
 
 The seat in §6 was a primitive with no caller. `:shell-desktop`'s
