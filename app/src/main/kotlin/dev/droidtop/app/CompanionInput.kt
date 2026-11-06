@@ -87,24 +87,9 @@ internal object CompanionInputHandle {
 internal object Controllers {
     data class Pad(val name: String, val percent: Int?)
 
-    fun read(context: Context): List<Pad> {
-        val manager = context.getSystemService(android.hardware.input.InputManager::class.java) ?: return emptyList()
-        return manager.inputDeviceIds.toList().mapNotNull { id ->
-            val device = manager.getInputDevice(id) ?: return@mapNotNull null
-            val pad = device.sources and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
-                device.sources and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
-            if (!pad || device.isVirtual) return@mapNotNull null
-            Pad(device.name, batteryPercent(device))
-        }.distinctBy { it.name }
-    }
-
-    private fun batteryPercent(device: InputDevice): Int? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
-        val battery = device.batteryState
-        if (!battery.isPresent) return null
-        val capacity = battery.capacity
-        return if (capacity.isNaN()) null else (capacity * 100).toInt().coerceIn(0, 100)
-    }
+    // The one reader, shared with Settings > Controls (Droidtop/tracker#723).
+    fun read(context: Context): List<Pad> =
+        dev.droidtop.runtime.ConnectedPads.read(context).map { Pad(it.name, it.percent) }
 
     /** Input's controllers line: each pad with its battery, or none. Pure. */
     fun line(pads: List<Pad>): String? = pads.takeIf { it.isNotEmpty() }?.joinToString(", ") { pad ->

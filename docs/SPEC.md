@@ -20723,6 +20723,11 @@ allowlist, which shrinks module by module and file by file; `:shell-gamepad` is 
 last (174 sites, its 167 strings named `gaming_`; a value in a line is a numbered placeholder, `In %1$s mode`, never
 joined in Kotlin), and `%` is written `%%` since `words` always formats (Droidtop/tracker#177).
 
+**Connected controllers (Droidtop/tracker#723).** Settings > Controls opens with the controllers connected now, one row
+each with its battery where Android reports one ("Battery 80%", Android 12 and later; else "Connected"), or "No
+controller connected". It is the companion's reader (`ConnectedPads`, runtime-common), read when the page is built.
+A live button and stick test, a glyph-family override per pad and a stick dead zone are still to build.
+
 **Accessibility is part of the system.** droidtop's chrome is driven by a pad, a finger or a
 screen reader through one focus order: every focusable is reachable by D-pad and by linear
 navigation in the same order, and every control that shows no text (a glyph tile, a hint pill,
