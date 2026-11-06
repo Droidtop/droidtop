@@ -51,6 +51,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
 
     override fun onCreate() {
         super.onCreate()
+        // droidtop's side of the Murine launcher's hooks, after LauncherApplication attached Murine's defaults
+        // (Droidtop/tracker#921). It only sets references, so it is the same in every process.
+        dev.droidtop.shell.standard.hooks.ShellDefaultHooks.install(this)
         // A contained plugin's isolated process (docs/plugin-api.md 5.3) starts nothing of droidtop's: it has no files,
         // no preferences, no network and no permissions, and the plugin in it reaches droidtop only through its broker.
         // Nor does a gpu.render plugin's graphics process, which has droidtop's UID: nothing of droidtop's is kept in

@@ -1659,7 +1659,7 @@ switch, so an app that closes while another stays in front leaves the bar at the
 replaced stock AlertDialog lists with plain focusable Views so a D-pad reaches every row.
 A stock list also told a screen reader what each row is; a focusable `TextView` or
 `LinearLayout` does not, so the rewrite had made them read as bare text. One helper,
-`shell/standard/DialogAccessibility`, puts that back on the same views and is used by
+`DialogAccessibility` (Murine's own, `app.murinelauncher.widget`), puts that back on the same views and is used by
 both: the dialog's title is its accessibility pane title and a heading; a mode row is
 announced as a button; a picker row as a radio button with its checked state (and a
 disabled row is `isEnabled = false`, not only unfocusable); an icon beside a label that is

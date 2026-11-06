@@ -153,6 +153,8 @@ include(":display")
 // root Gradle project) is included here rather than flattened, to keep future
 // upstream syncing tractable.
 include(":shell-default")
+// droidtop's implementations of the Murine launcher's hooks (shell-default-hooks/build.gradle.kts, Droidtop/tracker#921).
+include(":shell-default-hooks")
 
 include(":IconLoader")
 project(":IconLoader").projectDir = file("shell-default/iconloaderlib")
