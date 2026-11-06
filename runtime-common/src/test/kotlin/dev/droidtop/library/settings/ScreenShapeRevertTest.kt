@@ -17,7 +17,7 @@ class ScreenShapeRevertTest {
     @Test fun `keep clears the waiting change and a new one replaces it`() {
         ScreenShapeRevert.propose("Font size 130%", now = 0) {}
         assertEquals("Font size 130%", ScreenShapeRevert.pending.value?.label)
-        assertEquals(10_000, ScreenShapeRevert.pending.value?.deadlineMillis)
+        assertEquals(10_000L, ScreenShapeRevert.pending.value?.deadlineMillis)
         ScreenShapeRevert.propose("Display size Large", now = 0) {}
         val second = ScreenShapeRevert.pending.value
         assertEquals("Display size Large", second?.label)
