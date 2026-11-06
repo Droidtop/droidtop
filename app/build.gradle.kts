@@ -268,6 +268,7 @@ dependencies {
     implementation(project(":plugin-host"))
     implementation(project(":display"))
     implementation(project(":shell-default"))
+    implementation(project(":shell-default-hooks"))
     implementation(project(":shell-desktop"))
     implementation(project(":shell-gamepad"))
     implementation(project(":ui-shared"))
