@@ -1,10 +1,12 @@
 ### Added
 - Hacker Keyboard Reborn has modes, on the tool strip's new Mode button (and in the keyboard settings, one for portrait
-  and one for landscape): Normal, One-handed left or right, Floating, Thumb split and Number pad. Normal is the keyboard
-  exactly as you had it, with every Hacker's layout and setting.
+  and one for landscape): Normal, Split, One-handed left or right, Floating, Thumb split and Number pad. It replaces the
+  Layout button and offers the same shapes, so it always agrees with the key grid shape setting. Every Hacker's layout
+  and setting stays as you had it.
 - One-handed puts the keys against one edge with three buttons beside them: move to the other side, back to the full
   keyboard, and a handle you drag sideways to make the keys wider or narrower. The width is remembered for portrait and
-  for landscape.
+  for landscape. The key grid shape setting's one-handed choices are the same mode; if you used one before, it keeps
+  its width.
 - Floating puts the keyboard in a frame over the app, which keeps its whole screen. Drag the bar along the top to move
   it and the corner to resize it; Dock goes back to Normal. Where and how big it is is remembered for each orientation.
 - Thumb split, on screens wider than about 7.5 inches, moves the two halves of the keys to the outer edges with a gap

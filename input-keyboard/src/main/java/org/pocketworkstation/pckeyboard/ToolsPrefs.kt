@@ -49,7 +49,7 @@ object ToolsPrefs {
      * The key grid's form for [context]'s screen and orientation: the shape setting's ([KeyboardForm.choose],
      * Droidtop/tracker#903 H1), or the input method's mode's ([KeyboardModes.formFor], H12c).
      */
-    fun form(context: Context): KeyboardForm.Form = KeyboardForm.migrate(prefs(context)).let { KeyboardModes.formFor(context, KeyboardForm.forScreen(
+    fun form(context: Context): KeyboardForm.Form = migrate(context).let { KeyboardModes.formFor(context, KeyboardForm.forScreen(
         prefs(context).getString(KeyboardForm.PREF, null),
         prefs(context).getString(KeyboardForm.PREF_LANDSCAPE, null),
         context,
@@ -60,6 +60,12 @@ object ToolsPrefs {
         val landscape = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         prefs(context).edit().putString(KeyboardForm.prefFor(landscape), form.id).apply()
         if (landscape) LatinIME.sKeyboardSettings.formLandscapeChoice = form.id else LatinIME.sKeyboardSettings.formChoice = form.id
+    }
+
+    /** H1's shapes per orientation, then H12c's one store for the shapes and the modes, each once. */
+    private fun migrate(context: Context) {
+        KeyboardForm.migrate(prefs(context))
+        KeyboardModes.migrate(prefs(context))
     }
 
     fun inlineAutofill(context: Context): Boolean = InlineRules.wanted(Build.VERSION.SDK_INT, prefs(context).getBoolean(INLINE_AUTOFILL, true))
@@ -74,7 +80,7 @@ object ToolsPrefs {
      * once, before building its grid, rather than setting fields one by one (Droidtop/tracker#772).
      */
     fun loadInto(settings: GlobalKeyboardSettings, context: Context) {
-        KeyboardForm.migrate(prefs(context))
+        migrate(context)
         settings.formChoice = prefs(context).getString(KeyboardForm.PREF, null) ?: ""
         settings.formLandscapeChoice = prefs(context).getString(KeyboardForm.PREF_LANDSCAPE, null) ?: ""
         settings.spaceDrag = spaceDrag(context)

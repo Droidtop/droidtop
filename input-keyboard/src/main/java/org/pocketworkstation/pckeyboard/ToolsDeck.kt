@@ -181,6 +181,7 @@ class ToolsDeck private constructor(
 
     private fun modeName(mode: KeyboardModes.Mode): Int = when (mode) {
         KeyboardModes.Mode.NORMAL -> R.string.mode_normal
+        KeyboardModes.Mode.SPLIT -> R.string.mode_split
         KeyboardModes.Mode.LEFT -> R.string.mode_one_handed_left
         KeyboardModes.Mode.RIGHT -> R.string.mode_one_handed_right
         KeyboardModes.Mode.FLOATING -> R.string.mode_floating

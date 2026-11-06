@@ -95,9 +95,68 @@ class KeyboardModesTest {
     }
 
     @Test fun theChooserOffersTheThumbSplitOnlyWhereItFits() {
-        assertEquals(6, KeyboardModes.offered(true).size)
+        assertEquals(7, KeyboardModes.offered(true).size)
         assertFalse(KeyboardModes.Mode.THUMB in KeyboardModes.offered(false))
         assertSame(KeyboardModes.Mode.NORMAL, KeyboardModes.offered(false).first())
+    }
+
+    @Test fun aHandheldsChooserOffersH1sSplit() {
+        // The Retroid Pocket 5 sideways has no thumb split, but H1's split is right after Normal.
+        val handheld = KeyboardModes.offered(KeyboardForm.thumb(1920, 401f) != null)
+        assertEquals(
+            listOf("normal", "split", "left", "right", "floating", "numpad"),
+            handheld.map { it.id },
+        )
+        // Split is H1's KeyboardForm split, not a form of its own.
+        assertSame(KeyboardForm.SPLIT, KeyboardModes.form(KeyboardModes.Mode.SPLIT, KeyboardForm.SPLIT, 0.8f, KeyboardModes.floatDefault(true), null))
+    }
+
+    @Test fun theChooserWritesTheShapeAsTheLayoutButtonDoes() {
+        assertEquals("normal" to "full", KeyboardModes.writes(KeyboardModes.Mode.NORMAL))
+        assertEquals("normal" to "split", KeyboardModes.writes(KeyboardModes.Mode.SPLIT))
+        assertEquals("normal" to "left", KeyboardModes.writes(KeyboardModes.Mode.LEFT))
+        assertEquals("normal" to "right", KeyboardModes.writes(KeyboardModes.Mode.RIGHT))
+        // The others leave the shape for when Normal or a shape is chosen again.
+        assertEquals("floating" to null, KeyboardModes.writes(KeyboardModes.Mode.FLOATING))
+        assertEquals("thumb" to null, KeyboardModes.writes(KeyboardModes.Mode.THUMB))
+        assertEquals("numpad" to null, KeyboardModes.writes(KeyboardModes.Mode.NUMBER_PAD))
+    }
+
+    @Test fun theFormAndTheModeAlwaysAgree() {
+        // Whatever the chooser stores reads back as the same choice, from any shape stored before.
+        for (choice in KeyboardModes.Mode.entries) {
+            for (before in listOf(null, "auto", "full", "split", "left", "right")) {
+                val (mode, shape) = KeyboardModes.writes(choice)
+                assertSame("$choice over $before", choice, KeyboardModes.chosen(mode, shape ?: before))
+            }
+        }
+        // A shape picked in the settings or by an embedded keyboard's Layout button is what the chooser lights.
+        assertSame(KeyboardModes.Mode.SPLIT, KeyboardModes.chosen(null, "split"))
+        assertSame(KeyboardModes.Mode.LEFT, KeyboardModes.chosen("normal", "left"))
+        assertSame(KeyboardModes.Mode.RIGHT, KeyboardModes.chosen(null, "right"))
+        assertSame(KeyboardModes.Mode.NORMAL, KeyboardModes.chosen(null, "full"))
+        // Floating, the thumb split and the number pad are the mode's, whatever the shape.
+        assertSame(KeyboardModes.Mode.FLOATING, KeyboardModes.chosen("floating", "left"))
+    }
+
+    @Test fun oneHandedIsOneThingInTheInputMethod() {
+        // The shape setting's one-handed choice draws the resizable one-handed mode, at the kept width.
+        val chosen = KeyboardModes.chosen(null, "left")
+        assertEquals(KeyboardForm.Form("left", 0.8f, 0f, false), KeyboardModes.form(chosen, KeyboardForm.LEFT, 0.8f, KeyboardModes.floatDefault(false), null))
+    }
+
+    @Test fun theMigrationMovesOneHandedIntoTheShapeAndKeepsItsWidth() {
+        // H12c's first build kept one-handed in the mode setting: it moves to the shape, its width as it was.
+        assertEquals(Triple("normal", "left", null), KeyboardModes.migrated("left", "split", widthSet = true))
+        assertEquals(Triple("normal", "right", null), KeyboardModes.migrated("right", null, widthSet = false))
+        // A one-handed shape chosen before H12c keeps its 70%.
+        assertEquals(Triple(null, null, "0.7000"), KeyboardModes.migrated(null, "right", widthSet = false))
+        assertEquals(null, KeyboardModes.migrated("normal", "left", widthSet = true))
+        // Nothing else changes: Hacker's and H1's values stay as they are.
+        assertEquals(null, KeyboardModes.migrated(null, "split", widthSet = false))
+        assertEquals(null, KeyboardModes.migrated("floating", "auto", widthSet = false))
+        assertEquals(null, KeyboardModes.migrated(null, null, widthSet = false))
+        assertEquals(0.7f, KeyboardModes.oneHandedWidth("0.7000"), 0f)
     }
 
     @Test fun theAddOnScreenOfAHandheldIsCompact() {
