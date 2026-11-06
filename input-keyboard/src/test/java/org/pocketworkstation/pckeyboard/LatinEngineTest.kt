@@ -166,7 +166,11 @@ class LatinEngineTest {
                 else -> {
                     val c = op[0].code
                     old.type(c, intArrayOf(c, 'z'.code))
-                    assertEquals(old.mPredicting, engine.onChar(c, intArrayOf(c, 'z'.code)))
+                    val result = engine.onChar(c, intArrayOf(c, 'z'.code))
+                    assertEquals(old.mPredicting, result.handled)
+                    // It only composes: nothing committed, nothing deleted (#903 H7a's KeyResult).
+                    assertNull(result.committed)
+                    assertEquals(0, result.deleteBefore)
                 }
             }
             val label = "step $step ($op)"
@@ -197,8 +201,27 @@ class LatinEngineTest {
         engine.predicting = true
         "wor".forEach { engine.onChar(it.code, intArrayOf(it.code)) }
         engine.suggest(null, null, false, false)
-        assertEquals("word", engine.pick(1).toString())
+        val picked = engine.pick(1)!!
+        assertEquals("word", picked.committed.toString())
+        assertFalse("composing ends with the pick", picked.composing)
+        assertEquals(0, picked.deleteBefore)
         assertFalse(engine.predicting)
         assertNull(engine.pick(99))
+    }
+
+    @Test fun `the engine keys added for conversion engines are never the Latin path's, and leave its word alone`() {
+        // LatinIME sends engine keys only through an EngineSession, which the Latin path never has (#903 H7a); were one
+        // to reach it, it declines every key, so Hacker's own handling of space, enter, the arrows and Esc stands.
+        val engine = LatinEngine(Flags())
+        engine.predicting = true
+        "wor".forEach { engine.onChar(it.code, intArrayOf(it.code)) }
+        for (key in InputEngine.Key.values()) {
+            assertEquals("$key", InputEngine.KeyResult.NOT_HANDLED, engine.onKey(key))
+            assertEquals("$key", "wor", engine.composing().text.toString())
+            assertEquals("$key", -1, engine.composing().cursor)
+        }
+        assertEquals(InputEngine.State.Ready, engine.state)
+        assertTrue("no modes", engine.modes().isEmpty())
+        assertNull(engine.mode())
     }
 }

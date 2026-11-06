@@ -190,13 +190,13 @@ public final class LatinEngine implements InputEngine {
         // The Host reads LatinIME's own flags for the field, so nothing is kept here.
     }
 
-    /** Adds the key to the word while one is being composed (LatinIME starts one, as Hacker's did). */
+    /** Adds the key to the word while one is being composed (LatinIME starts one, as Hacker's did). Commits nothing. */
     @Override
-    public boolean onChar(int code, int[] nearby) {
-        if (!predicting) return false;
+    public InputEngine.KeyResult onChar(int code, int[] nearby) {
+        if (!predicting) return InputEngine.KeyResult.NOT_HANDLED;
         composing.append((char) code);
         word.add(code, nearby);
-        return true;
+        return InputEngine.KeyResult.HANDLED;
     }
 
     @Override
@@ -208,7 +208,10 @@ public final class LatinEngine implements InputEngine {
         return true;
     }
 
-    /** Space and enter are Hacker's separators, handled by its own path (autocorrect, double space). */
+    /**
+     * Space and enter are Hacker's separators, handled by its own path (autocorrect, double space). The other engine
+     * keys never reach it: LatinIME sends them only through an EngineSession, which the Latin path never has.
+     */
     @Override
     public InputEngine.KeyResult onKey(InputEngine.Key key) {
         return InputEngine.KeyResult.NOT_HANDLED;
@@ -224,11 +227,12 @@ public final class LatinEngine implements InputEngine {
         return InputEngine.Candidates.of(mShown);
     }
 
+    /** The word shown at [index]; composing ends, nothing else is deleted. */
     @Override
-    public CharSequence pick(int index) {
+    public InputEngine.Picked pick(int index) {
         if (index < 0 || index >= mShown.size()) return null;
         predicting = false;
-        return mShown.get(index).toString();
+        return new InputEngine.Picked(mShown.get(index).toString(), false, 0);
     }
 
     /** Ends composing and gives the word as typed. The text is kept, as Hacker's keeps it, for a revert. */
