@@ -38,8 +38,9 @@ env:
   # Mesa builds use; their Mesa patches are commits on Droidtop/mesa since
   # Droidtop/tracker#921 (vendor/mesa-lavapipe, vendor/mesa-venus).
   TERMUX_PACKAGES_COMMIT: 2e8fa6379b106caa4829407611410025a0973e02
-  # termux-packages at the commit whose virglrenderer-android (1.3.0, Venus, 0011-use-Android-Vulkan) the vtest
-  # server is built from (read 2026-11-05).
+  # termux-packages at the commit whose virglrenderer-android recipe (1.3.0, Venus, 0011-use-Android-Vulkan) the vtest
+  # server's own recipe is made from, and whose package builder builds it; its patches are commits on
+  # Droidtop/virglrenderer and Droidtop/libepoxy since Droidtop/tracker#921 (read 2026-11-05).
   TERMUX_PACKAGES_COMMIT_VTEST: 789d4606fe4950215443f0f43e80cabafdb3254e
 
 jobs:
@@ -163,8 +164,23 @@ jobs:
           git fetch -q --depth 1 origin "$TERMUX_PACKAGES_COMMIT_VTEST"
           git checkout -q FETCH_HEAD
 
+      - name: Source
+        # vendor/virglrenderer and vendor/libepoxy are left out of every other checkout (update = none in .gitmodules).
+        run: |
+          for s in vendor/virglrenderer vendor/libepoxy; do
+            git -c "submodule.$s.update=checkout" submodule update --init --depth 1 "$s"
+          done
+
       - name: Recipe
-        run: bash build-scripts/x86_64-venus/vtest-server/prepare.sh "$RUNNER_TEMP/termux-packages"
+        # droidtop's recipe, Termux's COPYING-gl4es beside it, and both source trees without their .git
+        # (Droidtop/tracker#921: the patches are commits there, nothing is patched here).
+        run: |
+          tp="$RUNNER_TEMP/termux-packages"
+          mkdir -p "$tp/packages/virgl-vtest-droidtop" "$tp/droidtop-src"
+          cp build-scripts/x86_64-venus/vtest-server/build.sh "$tp/packages/virgl-vtest-droidtop/"
+          cp "$tp/packages/virglrenderer-android/COPYING-gl4es" "$tp/packages/virgl-vtest-droidtop/"
+          git -C vendor/virglrenderer archive --prefix=virglrenderer/ HEAD | tar -x -C "$tp/droidtop-src"
+          git -C vendor/libepoxy archive --prefix=libepoxy/ HEAD | tar -x -C "$tp/droidtop-src"
 
       - name: Build
         run: |

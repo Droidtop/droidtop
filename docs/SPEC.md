@@ -25352,8 +25352,10 @@ Termux's prefix:
   with droidtop's own 0005 in its place: the socket is `VTEST_SOCKET_NAME`, else `/tmp/.virgl_test`. Nothing is
   patched at build time (Droidtop/tracker#921).
 - **Built (slice 2):** the vtest server, `build-scripts/x86_64-venus/vtest-server`: Termux's
-  `virglrenderer-android` 1.3.0 recipe and patches (Venus, replayed on Android's own Vulkan by its 0011) with three
-  changes: no ANGLE (libepoxy opens Android's `libEGL.so` and `libGLESv2.so`), virglrenderer and libepoxy static so the
+  `virglrenderer-android` 1.3.0 recipe and patches (Venus, replayed on Android's own Vulkan by its 0011), the patches
+  as commits on `vendor/virglrenderer` (Droidtop/virglrenderer, branch `droidtop`) and `vendor/libepoxy`
+  (Droidtop/libepoxy, branch `droidtop`, for its 0003), nothing patched at build time (Droidtop/tracker#921), with three
+  changes to the recipe: no ANGLE (libepoxy opens Android's `libEGL.so` and `libGLESv2.so`), virglrenderer and libepoxy static so the
   server is one executable (droidtop already ships GameNative's older `libvirglrenderer.so`, and a second library of
   that name could not sit beside it), and the executable named `libvirgl_vtest.so`. Its socket is given with
   `--socket-path`. The reuse check (owner, 2026-11-05: "reuse and repurpose existing code whenever possible"): the
