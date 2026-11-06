@@ -7388,7 +7388,11 @@ from the catalog on the same page.
   performance mode with More controls (`GamingSettingsCatalog.performanceModeItem`, for the game in front); fan mode and
   charge limit where the probe proves the setting writable (`PowerProbe`); each CPU cluster's clock and governor and the
   GPU's clock where readable, and a cluster's governor and highest clock to pick behind Root-level commands. Exit without
-  More controls: Android's battery saver.
+  More controls: Android's battery saver. Battery saver is one row (`BatterySaver`, mytop-project/tracker#786 S10): a
+  switch with the helper app and Risky actions > "Change system settings", read back after each change and opening
+  Android's screen when Android did not follow; otherwise Android's Battery Saver screen, naming that switch. Home's
+  low-battery line turns it on through the same path, and the companion's System card does not draw the Quick Menu's
+  Battery row again (its level is on this page).
 - **Storage.** Every volume with its meter (internal storage, each SD card or USB drive), use by app, droidtop's
   downloads, containers and caches, clear droidtop's caches; free up space and eject the SD card with More controls.
   Exit: format.
@@ -13311,6 +13315,9 @@ or the system through the privileged helper:
   of its own or one the person gave it, is not this class.
 - **Change display settings** (`DISPLAY_SETTINGS`): the helper app setting a screen's refresh rate for every app
   (`cmd display set-user-preferred-display-mode`, the companion's System > Display cards, mytop-project/tracker#414).
+- **Change system settings** (`SYSTEM_SETTINGS`): the helper app changing a system-wide setting Android keeps from
+  apps: battery saver (`settings put global low_power`, read back; `BatterySaver`, mytop-project/tracker#786 S10).
+  Time, location, dark theme and the plan's others join it as each gets its row.
 - **Change accessibility settings** (`ACCESSIBILITY_SETTINGS`): the helper app setting Android's font size, display
   size, magnification, contrast, inversion and TalkBack for every app (the companion's System > Accessibility).
 - **Root-level commands** (`ROOT_COMMANDS`): commands run as root through a provider that holds it: a CPU cluster's

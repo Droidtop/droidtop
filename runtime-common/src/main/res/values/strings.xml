@@ -189,6 +189,8 @@
     <string name="gaming_opens_the_system_vpn_screen_to">Android\'s VPN screen</string>
     <string name="gaming_battery">Battery</string>
     <string name="gaming_opens_the_system_battery_saver_screen">Android\'s Battery Saver</string>
+    <string name="battery_saver">Battery saver</string>
+    <string name="battery_saver_saves_power">Saves power across the whole device</string>
     <string name="gaming_bluetooth">Bluetooth</string>
     <string name="gaming_pair_controllers_and_audio_in_the">Android\'s Bluetooth screen</string>
     <string name="gaming_location">Location</string>
