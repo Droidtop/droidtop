@@ -87,7 +87,8 @@ import kotlin.concurrent.thread
 class ProotRuntime(
     private val context: Context,
     private val imageStore: OciImageStore,
-    private val cachePolicy: ImageCachePolicy,
+    /** Settings > Containers' image cache settings, read at each pull (docs/SPEC.md 3, "Storage is checked before it is spent"). */
+    private val cachePolicy: () -> ImageCachePolicy,
     /** Whether the person opted into the microphone; read at each desktop start (docs/SPEC.md 3d). */
     private val microphoneEnabled: () -> Boolean = { false },
     /**
@@ -176,7 +177,7 @@ class ProotRuntime(
         stopProcess(name)
         val rootfs = rootfsOf(name)
         log.line("creating $name from ${image.reference}${image.digest?.let { "@$it" } ?: ""}")
-        val runConfig = rootfsPuller.pullAndUnpack(image, rootfs.absolutePath, cachePolicy)
+        val runConfig = rootfsPuller.pullAndUnpack(image, rootfs.absolutePath, cachePolicy())
         withContext(Dispatchers.IO) {
             runConfig?.let { runConfigOf(name).writeText(ImageRunConfig.encode(it)) }
             val config = Properties()

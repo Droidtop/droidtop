@@ -47,13 +47,17 @@ class OciImageStore(
 ) {
     data class Descriptor(val mediaType: String, val digest: String, val size: Long)
 
-    /** A pulled image: [digest] is the key it was pulled by, [manifestDigest] the platform manifest actually stored. */
+    /**
+     * A pulled image: [digest] is the key it was pulled by, [manifestDigest] the platform manifest actually stored.
+     * [downloaded] is true when [pull] fetched it now, false when it was already kept.
+     */
     data class Image(
         val digest: String,
         val reference: String,
         val manifestDigest: String,
         val config: Descriptor,
         val layers: List<Descriptor>,
+        val downloaded: Boolean = false,
     )
 
     /** One stored image for the cache-management UI: [sizeBytes] counts every blob it uses, shared ones included. */
@@ -108,9 +112,25 @@ class OciImageStore(
                 )),
             )
             writeIndex(index, pulled.dropLast(1) + added)
-            imageOf(added)
+            imageOf(added).copy(downloaded = true)
         }
     }
+
+    /**
+     * Runs [block] with the image pulled by [digest] marked in use, so no eviction, Clear or cache-off removal takes
+     * it while a create is still unpacking it (docs/SPEC.md 3, "Storage is checked before it is spent"). Counted, so
+     * two creates from one image each hold it.
+     */
+    suspend fun <T> using(digest: String, block: suspend () -> T): T {
+        synchronized(pins) { pins.merge(digest, 1, Int::plus) }
+        try {
+            return block()
+        } finally {
+            synchronized(pins) { pins.compute(digest) { _, n -> if (n == null || n <= 1) null else n - 1 } }
+        }
+    }
+
+    private fun inUse(): Set<String> = synchronized(pins) { pins.keys.toSet() }
 
     suspend fun entries(): List<Entry> = lock.withLock {
         withContext(Dispatchers.IO) {
@@ -150,30 +170,70 @@ class OciImageStore(
     }
 
     /**
+     * The cache-off path ([ImageCachePolicy.enabled] false): forgets the image a create just downloaded unless
+     * another create is still using it ([using]), and deletes the blobs nothing else uses.
+     */
+    suspend fun removeUnlessInUse(digest: String) = lock.withLock {
+        withContext(Dispatchers.IO) {
+            if (digest in inUse()) return@withContext
+            val index = readIndex() ?: return@withContext
+            writeIndex(index, manifestsOf(index).filter { it.annotation(KEY_DIGEST) != digest })
+            collectGarbage()
+        }
+    }
+
+    /**
      * Removes least recently used images until the blobs on disk fit
      * [ImageCachePolicy.maxCacheBytes], never the image pulled by [keep]
-     * (the one just used), and deletes blobs nothing references, including
-     * the leftovers of an interrupted pull.
+     * (the one just used) nor one an in-progress create is using ([using]),
+     * and deletes blobs nothing references, including the leftovers of an
+     * interrupted pull. With the cache off it removes nothing kept: what is
+     * there stays until it is cleared. Which images go is
+     * [ImageCacheEviction.victims]. Run after each pull and when the limit is
+     * lowered.
      */
     suspend fun evictToFit(policy: ImageCachePolicy, keep: String?) = lock.withLock {
         withContext(Dispatchers.IO) {
             collectGarbage()
-            val cap = policy.maxCacheBytes ?: return@withContext
-            while (blobBytes() > cap) {
-                val index = readIndex() ?: return@withContext
-                val entries = manifestsOf(index)
-                val victim = entries.indexOfFirst { it.annotation(KEY_DIGEST) != keep }
-                if (victim < 0) return@withContext
-                writeIndex(index, entries.filterIndexed { i, _ -> i != victim })
-                collectGarbage()
+            if (!policy.enabled) return@withContext
+            val limit = policy.maxCacheBytes ?: return@withContext
+            val index = readIndex() ?: return@withContext
+            val entries = manifestsOf(index)
+            val kept = entries.map { entry ->
+                ImageCacheEviction.Kept(
+                    digest = entry.annotation(KEY_DIGEST) ?: entry.string("digest").orEmpty(),
+                    blobs = mutableSetOf<String>().also { blobsOf(entry, it) },
+                )
             }
+            val victims = ImageCacheEviction.victims(kept, blobSizes(), limit, inUse() + listOfNotNull(keep)).toSet()
+            if (victims.isEmpty()) return@withContext
+            writeIndex(index, entries.filterIndexed { i, _ -> i !in victims })
+            collectGarbage()
         }
     }
 
+    /**
+     * Settings > Containers' Clear: deletes every kept image but those an in-progress create is using ([using]).
+     * Containers are untouched: each has its own copy of its image's files.
+     */
     suspend fun clear() = lock.withLock {
         withContext(Dispatchers.IO) {
-            root.deleteRecursively()
             legacyCacheDir?.deleteRecursively()
+            val busy = inUse()
+            if (busy.isEmpty()) {
+                root.deleteRecursively()
+                return@withContext
+            }
+            val index = readIndex() ?: return@withContext
+            writeIndex(index, manifestsOf(index).filter { it.annotation(KEY_DIGEST) in busy })
+            collectGarbage()
+        }
+    }
+
+    /** Every blob file's size on disk, by digest. */
+    private fun blobSizes(): Map<String, Long> = buildMap {
+        File(root, "blobs").listFiles().orEmpty().forEach { algorithmDir ->
+            algorithmDir.listFiles().orEmpty().forEach { file -> if (file.isFile) put("${algorithmDir.name}:${file.name}", file.length()) }
         }
     }
 
@@ -184,21 +244,23 @@ class OciImageStore(
     private fun collectGarbage() {
         val index = readIndex() ?: return
         val reachable = mutableSetOf<String>()
-        fun visit(descriptor: JsonObject) {
-            val digest = descriptor.string("digest") ?: return
-            if (!reachable.add(digest)) return
-            val manifest = runCatching { parseJson(blob(digest)) }.getOrNull() ?: return
-            (manifest["config"] as? JsonObject)?.string("digest")?.let { reachable += it }
-            (manifest["layers"] as? JsonArray)?.forEach { layer -> (layer as? JsonObject)?.string("digest")?.let { reachable += it } }
-            (manifest["manifests"] as? JsonArray)?.forEach { child -> (child as? JsonObject)?.let(::visit) }
-        }
-        manifestsOf(index).forEach(::visit)
+        manifestsOf(index).forEach { blobsOf(it, reachable) }
 
         File(root, "blobs").listFiles().orEmpty().forEach { algorithmDir ->
             algorithmDir.listFiles().orEmpty().forEach { file ->
                 if (file.isFile && "${algorithmDir.name}:${file.name}" !in reachable) file.delete()
             }
         }
+    }
+
+    /** Adds to [into] every blob [descriptor] reaches: its manifest, config and layers, and those of an index's children. */
+    private fun blobsOf(descriptor: JsonObject, into: MutableSet<String>) {
+        val digest = descriptor.string("digest") ?: return
+        if (!into.add(digest)) return
+        val manifest = runCatching { parseJson(blob(digest)) }.getOrNull() ?: return
+        (manifest["config"] as? JsonObject)?.string("digest")?.let { into += it }
+        (manifest["layers"] as? JsonArray)?.forEach { layer -> (layer as? JsonObject)?.string("digest")?.let { into += it } }
+        (manifest["manifests"] as? JsonArray)?.forEach { child -> (child as? JsonObject)?.let { blobsOf(it, into) } }
     }
 
     private fun imageOf(entry: JsonObject): Image {
@@ -251,6 +313,9 @@ class OciImageStore(
 
         private val lock = Mutex()
         private val json = Json { prettyPrint = true }
+
+        /** Images in-progress creates are using ([using]), by digest, with how many hold each; process-wide like [lock]. */
+        private val pins = HashMap<String, Int>()
 
         /** When an image config ([text], its config blob) says the image was built: its `created`, or null. */
         fun createdMs(text: String): Long? = runCatching {

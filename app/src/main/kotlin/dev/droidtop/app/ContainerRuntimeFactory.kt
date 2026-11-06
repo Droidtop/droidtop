@@ -37,10 +37,21 @@ object ContainerRuntimeFactory {
     /** What root this device offers -- for callers that want to say so, not just pick a backend. */
     suspend fun rootAccess(): RootAccess = RootProcess.access()
 
+    /**
+     * Brings the image cache within its limit as the settings now say: after a lowered limit, and after a pull that
+     * did not go through a create (`docker pull`). [keep] is the image just pulled.
+     */
+    suspend fun fitImageCache(context: Context, keep: String? = null) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val app = context.applicationContext
+        OciImageStore.of(app).evictToFit(DesktopSetupPrefs.imageCachePolicy(app), keep)
+    }
+
     suspend fun select(context: Context): ContainerRuntime {
         val app = context.applicationContext
         val store = OciImageStore.of(app)
-        val policy = ImageCachePolicy.DEFAULT
+        // Settings > Containers' image cache rows, read at each pull so a change applies without a new runtime
+        // (docs/SPEC.md 3, "Storage is checked before it is spent"; Droidtop/tracker#911).
+        val policy: () -> ImageCachePolicy = { DesktopSetupPrefs.imageCachePolicy(app) }
         return if (rootAccess().available) {
             DroidSpacesRuntime(
                 context = app,

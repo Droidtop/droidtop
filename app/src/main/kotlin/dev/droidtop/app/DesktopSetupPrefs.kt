@@ -18,6 +18,8 @@ object DesktopSetupPrefs {
     private const val KEY_PRIMARY_CREATED_FROM = "droidtop_desktop_primary_created_from"
     private const val KEY_PRINTING = "droidtop_desktop_printing"
     private const val KEY_MICROPHONE = "droidtop_desktop_microphone"
+    private const val KEY_IMAGE_CACHE_KEEP = "droidtop_containers_image_cache_keep"
+    private const val KEY_IMAGE_CACHE_LIMIT = "droidtop_containers_image_cache_limit"
     private const val KEY_ALL_LANGUAGE_FONTS = "droidtop_desktop_all_language_fonts"
     private const val KEY_PANEL = "droidtop_desktop_panel"
     private const val KEY_TILE_WINDOWS = "droidtop_desktop_tile_windows"
@@ -125,6 +127,29 @@ object DesktopSetupPrefs {
 
     fun setMicrophone(context: Context, on: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_MICROPHONE, on).apply()
+    }
+
+    /**
+     * The image cache as Settings > Containers sets it (docs/SPEC.md 3, "Storage is checked before it is spent";
+     * Droidtop/tracker#911): "Keep downloaded images" and "Cache size limit", [dev.droidtop.runtime.ImageCachePolicy.DEFAULT]
+     * until changed. Both backends read it through ContainerRuntimeFactory at each pull.
+     */
+    fun imageCachePolicy(context: Context): dev.droidtop.runtime.ImageCachePolicy {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val default = dev.droidtop.runtime.ImageCachePolicy.DEFAULT
+        return dev.droidtop.runtime.ImageCachePolicy(
+            enabled = prefs.getBoolean(KEY_IMAGE_CACHE_KEEP, default.enabled),
+            maxCacheBytes = dev.droidtop.runtime.ImageCachePolicy.limitFromId(prefs.getString(KEY_IMAGE_CACHE_LIMIT, null)),
+        )
+    }
+
+    fun setImageCacheKeep(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_IMAGE_CACHE_KEEP, on).apply()
+    }
+
+    fun setImageCacheLimit(context: Context, bytes: Long?) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_IMAGE_CACHE_LIMIT, dev.droidtop.runtime.ImageCachePolicy.limitId(bytes)).apply()
     }
 
     /** Whether a desktop image has been chosen: without one no session can start (Droidtop/tracker#370). */

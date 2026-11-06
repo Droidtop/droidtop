@@ -161,4 +161,44 @@ class OciImageStoreTest {
         assertFalse(leftover.exists())
         assertEquals(1, store.entries().size)
     }
+
+    @Test
+    fun `a pull says whether it downloaded`() = runBlocking {
+        val digest = stage("one", layer("a" to "a"))
+        assertTrue(store.pull(RootfsImage("example/one:1", digest)).downloaded)
+        assertFalse(store.pull(RootfsImage("example/one:1", digest)).downloaded)
+    }
+
+    @Test
+    fun `an image an in-progress create is using survives eviction, a lowered limit and Clear`() = runBlocking {
+        val creating = stage("creating", layer("c" to "x".repeat(4000)))
+        val other = stage("other", layer("o" to "y".repeat(4000)))
+        store.pull(RootfsImage("example/creating:1", creating))
+        store.pull(RootfsImage("example/other:1", other))
+        store.using(creating) {
+            // A lowered limit: no image just pulled to keep, only the pin.
+            store.evictToFit(ImageCachePolicy(enabled = true, maxCacheBytes = 1), keep = null)
+            assertEquals(listOf(creating), store.entries().map { it.digest })
+            store.clear()
+            assertEquals(listOf(creating), store.entries().map { it.digest })
+            store.removeUnlessInUse(creating)
+            assertEquals(listOf(creating), store.entries().map { it.digest })
+        }
+        // Once the create is done, Clear takes everything.
+        store.clear()
+        assertEquals(emptyList<String>(), store.entries().map { it.digest })
+        assertFalse(root.exists())
+    }
+
+    @Test
+    fun `with the cache off nothing kept is evicted`() = runBlocking {
+        val first = stage("first", layer("f" to "x".repeat(4000)))
+        val second = stage("second", layer("s" to "y".repeat(4000)))
+        store.pull(RootfsImage("example/first:1", first))
+        store.pull(RootfsImage("example/second:1", second))
+        store.evictToFit(ImageCachePolicy(enabled = false, maxCacheBytes = 1), keep = second)
+        assertEquals(listOf(first, second), store.entries().map { it.digest })
+        store.removeUnlessInUse(second)
+        assertEquals(listOf(first), store.entries().map { it.digest })
+    }
 }

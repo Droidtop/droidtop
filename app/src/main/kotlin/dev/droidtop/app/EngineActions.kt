@@ -201,11 +201,13 @@ internal object EngineActions {
     /**
      * Puts [image] in droidtop's one image store; its digest. The store is keyed on the digest, so the tag is resolved
      * first (`crane digest`), as a container's creation does. `docker pull` passed the bare reference and the store
-     * refused every pull ("pull needs a resolved digest").
+     * refused every pull ("pull needs a resolved digest"). A pull asked for by name is kept even with "Keep
+     * downloaded images" off; the cache limit applies after it, as after every pull (docs/SPEC.md 3).
      */
     suspend fun pull(app: Context, image: String): Result<String> = runCatching {
         val digest = Crane.digest(Crane.binaryPath(app), image)
         OciImageStore.of(app).pull(RootfsImage(reference = image, digest = digest))
+        ContainerRuntimeFactory.fitImageCache(app, keep = digest)
         digest
     }
 
