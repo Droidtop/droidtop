@@ -9458,6 +9458,48 @@ proposal) is not built; these helpers are in the one settings tree that already 
   commit and the three entries corrected there). They show in wider cells in smaller type, are typed as they are, go to
   Recent like any emoji, and emoji search finds them by group ("love", "music") or by "kaomoji". They skip the emoji
   font check, which only answers for one glyph. A kaomoji has no skin tones, so a long press on one does nothing.
+- **GIFs and stickers from the person's own folders (Droidtop/tracker#903 H5, decided 2026-11-06).** The owner wants
+  emoji, GIFs, stickers and kaomoji in Hacker Keyboard Reborn "from the open source boards". Tenor's API shut down on
+  2026-06-30, so the plan posted on #903 ships local GIFs first: no network, no key. What is built:
+  - *Ported, not invented.* The parts that fit are ported from CleverKeys' offline GIF panel
+    (https://github.com/tribixbite/CleverKeys at `c8cbb74b`, GPL-3.0, so droidtop's GPL-3.0 may take it; NOTICE.md):
+    its insert policy (`GifInsertPolicy`, the editor MIME check unchanged), its search rules (one alphabet for the
+    index and the query, every word a prefix and all required, the compound fallback that finds "eye roll" for
+    "eyeroll", recently used first), and its insert through `commitContent` with a capped thumbnail memory cache.
+    CleverKeys builds its own GIF packs into SQLite; droidtop indexes the person's files instead. CleverKeys reads no
+    tags sidecar, so none is read here. Each ported file says where it came from.
+  - *Source.* "GIF and sticker folders" in the keyboard's settings (beside the Emoji panel option, kept by a reset)
+    lists the picked folders, with Add folder (the system folder picker, `ACTION_OPEN_DOCUMENT_TREE`, read access
+    kept with `takePersistableUriPermission`), Remove (the access is given back) and Rescan. Several folders are
+    allowed. Files are never copied or imported to list them: each is referenced by its document URI, and nothing is
+    written next to them. GIF, WebP (animated and still) and PNG are taken, by the type the folder reports or the
+    extension.
+  - *Index.* `GifIndex` reads the folders on its own thread (`KeyboardThreads`), never the main thread: each file's
+    name split into words (`GifNames`: at punctuation, camelCase and letter-digit changes), its folder's name as tags,
+    and, for a WebP, its first 21 bytes to tell an animated one. It is kept in `files/hkr-gifs/index.tsv` (`GifIndexFile`)
+    and made again when a folder is added or on Rescan; at most 5000 images, six folders deep. Tokenising, ranking,
+    the file format, the WebP check and the cache trim are pure and JVM tested (`GifLibraryTest`).
+  - *Tabs.* The emoji panel's last tabs, after Kaomoji, are GIFs and Stickers. A folder whose name says "stickers" or
+    "gifs" decides the tab; otherwise a GIF or animated WebP is a GIF, a PNG or still WebP a sticker. Each tab lists
+    recently used first (`pref_gif_recent`, 30, not recorded in incognito), then folder order, as first-frame thumbnails
+    decoded off the main thread no larger than the cell and kept in a memory cache of at most 8 MB (`GifThumbs`); no
+    animated preview. Search works as the emoji search does (typed on the keyboard, `KeyboardCapture`), matching the
+    name first, then the folder's words.
+  - *Inserting.* Only through the editor's content channel: `InputConnectionCompat.commitContent` with
+    `InputContentInfoCompat` and a read grant, when the editor's `EditorInfoCompat.getContentMimeTypes` take the
+    image's type. The folder's document URI is not handed on, since whether a keyboard can pass its folder grant to
+    another app depends on the folder's provider, and some apps cannot read a tree document URI. So the one image
+    picked is copied into the keyboard's cache (`cache/hkr-media-share/`) and served by the keyboard's own
+    FileProvider (`HkrMediaProvider`, authority `<app id>.hkr.media`) for that insert; the newest three copies stay,
+    older ones are deleted at the next insert, and an image over 24 MB is refused. An editor that takes no image says
+    "This field does not take images." in one line above the keys; a file path or link is never typed.
+  - *Never in a password or no-learning field* (`IncognitoRules.sensitiveField`): the tabs are left out of the panel
+    there, and an insert is refused if the field changed underneath.
+  - *Online search waits.* `GifProvider` is the seam; the local library (`LocalGifLibrary`) is its only
+    implementation. No online provider, network code or key is in the keyboard; Klipy awaits the owner.
+  - *Not in the embedded keyboard.* `KeyboardPanel` (the companion, the overlays, droidtop's own fields) types through
+    a `KeyboardSink` with no InputConnection, so it has nothing to commit an image to: it passes no `MediaTarget` to
+    `ToolsDeck`, and its emoji panel has no GIFs or Stickers tabs.
 - **More layouts.** Every locale Android reports is already selectable; the layouts are the existing `xml-*`
   folders and each locale's key text. Locales that have their own key text but were missing from the picker's
   5-row label list now carry it. A reader for HeliBoard-style text layouts is a later item on Droidtop/tracker#342.

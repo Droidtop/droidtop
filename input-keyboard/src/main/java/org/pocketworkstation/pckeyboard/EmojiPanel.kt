@@ -18,7 +18,8 @@ import android.widget.TextView
 /**
  * The emoji panel (docs/SPEC.md 6a, "Emoji panel and search", Droidtop/tracker#342): a row of group buttons (Recent
  * first), a grid of the group's emoji, and Search and Back. Takes the key grid's place like the other tool panels.
- * Emoji are listed from [EmojiAssets] once loaded; a tap calls [onPick].
+ * Emoji are listed from [EmojiAssets] once loaded; a tap calls [onPick]. With [gifs], GIFs and Stickers tabs follow
+ * Kaomoji (Droidtop/tracker#903 H5, GifPanel.kt).
  */
 internal class EmojiBrowser(
     context: Context,
@@ -26,6 +27,7 @@ internal class EmojiBrowser(
     private val onPick: (String) -> Unit,
     private val onSearch: () -> Unit,
     private val onBack: () -> Unit,
+    private val gifs: GifTabs? = null,
 ) : LinearLayout(context) {
     // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, Droidtop/tracker#562).
     private val colors = KeyboardAppearance.colors(context)
@@ -37,6 +39,10 @@ internal class EmojiBrowser(
     // An emoji's skin tones, shown above the grid on a long press (Droidtop/tracker#903 H4).
     private val toneRow = LinearLayout(context)
     private val toneScroll = HorizontalScrollView(context)
+
+    // The GIFs or Stickers tab while one is shown (Droidtop/tracker#903 H5); null on an emoji tab.
+    private var gifKind: GifKind? = null
+    private val gifAdapter by lazy { GifGridAdapter(context, colors.text) }
 
     init {
         orientation = VERTICAL
@@ -53,7 +59,12 @@ internal class EmojiBrowser(
             },
             LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f),
         )
-        header.addView(button(context.getString(R.string.emoji_search)) { onSearch() })
+        header.addView(
+            button(context.getString(R.string.emoji_search)) {
+                val kind = gifKind
+                if (kind != null && gifs != null) gifs.onSearch(kind) else onSearch()
+            },
+        )
         header.addView(button(context.getString(R.string.tool_back)) { onBack() })
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         toneScroll.apply {
@@ -70,9 +81,12 @@ internal class EmojiBrowser(
             isFocusable = false
             selector = ColorDrawable(Color.TRANSPARENT)
             this.adapter = this@EmojiBrowser.adapter
-            onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ -> onPick(this@EmojiBrowser.adapter.items[position]) }
+            onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
+                if (gifKind != null) gifAdapter.itemAt(position)?.let { gifs?.onPick(it) } else onPick(this@EmojiBrowser.adapter.items[position])
+            }
             // A long press on an emoji with skin tones offers them all; the one picked is typed and its tone kept.
             onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
+                if (gifKind != null) return@OnItemLongClickListener false
                 val entry = this@EmojiBrowser.adapter.items.getOrNull(position)?.let { catalog?.entryOf(it) }
                 if (entry == null || entry.variants.isEmpty()) false else { showTones(entry); true }
             }
@@ -92,6 +106,31 @@ internal class EmojiBrowser(
         groupRow.removeAllViews()
         groupRow.addView(button(context.getString(R.string.emoji_recent)) { select(RECENT) })
         catalog?.groups?.forEach { group -> groupRow.addView(button(groupLabel(context, group.id)) { select(group.id) }) }
+        if (gifs != null) {
+            groupRow.addView(button(context.getString(R.string.emoji_group_gifs)) { selectGifs(GifKind.GIF) })
+            groupRow.addView(button(context.getString(R.string.emoji_group_stickers)) { selectGifs(GifKind.STICKER) })
+        }
+    }
+
+    /**
+     * The GIFs or Stickers tab: the images of the picked folders, recently used first, as first-frame thumbnails. The
+     * index is read off the main thread the first time ([GifIndex]); until then the grid says it is loading.
+     */
+    private fun selectGifs(kind: GifKind) {
+        val tabs = gifs ?: return
+        gifKind = kind
+        toneScroll.visibility = GONE
+        grid.columnWidth = dp(GifGridAdapter.CELL_DP)
+        if (grid.adapter !== gifAdapter) grid.adapter = gifAdapter
+        gifAdapter.note(context.getString(R.string.gif_loading))
+        tabs.provider.search("", kind, tabs.recent(), GifTabs.LIMIT) { found ->
+            if (gifKind != kind) return@search
+            when {
+                found.isNotEmpty() -> gifAdapter.show(found)
+                !tabs.hasFolders() -> gifAdapter.note(context.getString(R.string.gif_no_folders))
+                else -> gifAdapter.note(context.getString(if (kind == GifKind.STICKER) R.string.gif_no_stickers else R.string.gif_no_gifs))
+            }
+        }
     }
 
     private fun showTones(entry: EmojiEntry) {
@@ -118,6 +157,8 @@ internal class EmojiBrowser(
 
     private fun select(id: String) {
         selected = id
+        gifKind = null
+        if (grid.adapter !== adapter) grid.adapter = adapter
         toneScroll.visibility = GONE
         // Kaomoji are wide: fewer, wider cells in smaller type (Droidtop/tracker#903 H4).
         val wide = id == Kaomoji.GROUP

@@ -91,6 +91,15 @@ public class LatinIMESettings extends PreferenceActivity
             });
         }
 
+        // droidtop: the folders the emoji panel's GIFs and Stickers tabs read (Droidtop/tracker#903 H5).
+        Preference gifFolders = findPreference(GifFoldersRow.KEY);
+        if (gifFolders != null) {
+            gifFolders.setOnPreferenceClickListener(p -> {
+                GifFoldersRow.open(this, p);
+                return true;
+            });
+        }
+
         // droidtop: offline voice typing's download (Droidtop/tracker#343).
         Preference offlineVoice = findPreference(OfflineVoiceRow.KEY);
         if (offlineVoice != null) {
@@ -201,6 +210,9 @@ public class LatinIMESettings extends PreferenceActivity
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == DictionaryRow.PICK_REQUEST && resultCode == RESULT_OK && data != null) {
             DictionaryRow.picked(this, findPreference(DictionaryRow.KEY), data.getData());
+        }
+        if (requestCode == GifFoldersRow.PICK_REQUEST && resultCode == RESULT_OK && data != null) {
+            GifFoldersRow.picked(this, findPreference(GifFoldersRow.KEY), data.getData());
         }
     }
 

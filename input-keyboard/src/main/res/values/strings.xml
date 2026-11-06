@@ -805,6 +805,31 @@
     <string name="emoji_group_symbols">Symbols</string>
     <string name="emoji_group_flags">Flags</string>
     <string name="emoji_group_kaomoji">Kaomoji</string>
+    <!-- GIFs and stickers from the person's own folders (Droidtop/tracker#903 H5). -->
+    <string name="emoji_group_gifs">GIFs</string>
+    <string name="emoji_group_stickers">Stickers</string>
+    <string name="gif_loading">Loading…</string>
+    <string name="gif_no_folders">No folders yet. Add one in the keyboard settings: GIF and sticker folders.</string>
+    <string name="gif_no_gifs">No GIFs in your folders.</string>
+    <string name="gif_no_stickers">No stickers in your folders.</string>
+    <string name="gif_search_prompt">Search GIFs: type on the keyboard</string>
+    <string name="gif_search_query">Search GIFs: %1$s</string>
+    <string name="sticker_search_prompt">Search stickers: type on the keyboard</string>
+    <string name="sticker_search_query">Search stickers: %1$s</string>
+    <string name="gif_not_accepted">This field does not take images.</string>
+    <string name="gif_not_taken">The app did not take the image.</string>
+    <string name="gif_too_large">That image is too large to send.</string>
+    <string name="gif_unreadable">That image could not be read. Rescan its folder in the keyboard settings.</string>
+    <string name="title_gif_folders">GIF and sticker folders</string>
+    <string name="summary_gif_folders">Folders of GIF, WebP and PNG images for the emoji panel\'s GIFs and Stickers tabs. Your files stay where they are.</string>
+    <string name="gif_folder_add">Add folder</string>
+    <string name="gif_folder_rescan">Rescan</string>
+    <string name="gif_folder_remove">Remove %1$s</string>
+    <string name="gif_folder_removed">Removed %1$s</string>
+    <string name="gif_folders_scanning">Reading the folders…</string>
+    <string name="gif_folders_scanned">Images found: %1$d.</string>
+    <string name="gif_folders_unreadable">Folders that could not be read: %1$d. Remove them and add them again.</string>
+    <string name="gif_folder_not_kept">Android did not let the keyboard keep reading that folder. Pick it again, or another folder.</string>
     <!-- Why a wordlist was not added (Droidtop/tracker#339, #772). -->
     <string name="dictionary_refused_no_language">The wordlist does not say its language (no locale= in its first line)</string>
     <string name="dictionary_refused_no_words">The wordlist has no words</string>

@@ -395,6 +395,14 @@
             android:summary="@string/summary_emoji"
             />
 
+    <!-- droidtop: the folders the emoji panel's GIFs and Stickers tabs read (Droidtop/tracker#903 H5). -->
+    <Preference
+            android:key="pref_gif_folders"
+            android:title="@string/title_gif_folders"
+            android:summary="@string/summary_gif_folders"
+            android:dependency="pref_emoji"
+            />
+
     <CheckBoxPreference
             android:key="pref_inline_autofill"
             android:title="@string/title_inline_autofill"

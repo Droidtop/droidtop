@@ -33,6 +33,8 @@ class ToolsDeck private constructor(
     private val relayout: Runnable?,
     /** The input method's own move to the next keyboard ([SwitchKeyboard]); null where droidtop is not the IME. */
     private val switchKeyboard: Runnable?,
+    /** The editor GIFs and stickers go into ([ImeMediaTarget]); null where droidtop is not the IME (KeyboardPanel). */
+    private val media: MediaTarget?,
 ) : LinearLayout(context) {
     // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, Droidtop/tracker#562).
     private val colors = KeyboardAppearance.colors(context)
@@ -40,7 +42,7 @@ class ToolsDeck private constructor(
     private var overlay: View? = null
     private var overlayId: String? = null
     private lateinit var incognitoButton: Button
-    private var searchBar: EmojiSearchBar? = null
+    private var searchBar: View? = null
     private val notice = TextView(context)
     private val inlineRow = LinearLayout(context)
 
@@ -239,7 +241,74 @@ class ToolsDeck private constructor(
             showSearch()
         },
         onBack = { hidePanel() },
+        gifs = gifTabs(),
     )
+
+    /**
+     * The GIFs and Stickers tabs (Droidtop/tracker#903 H5): only in the input method, with an editor that takes text,
+     * and never in a password or no-learning field (IncognitoRules.sensitiveField).
+     */
+    private fun gifTabs(): GifTabs? {
+        val target = media ?: return null
+        if (!sink.takesText || target.sensitive()) return null
+        val prefs = ToolsPrefs.prefs(context)
+        return GifTabs(
+            provider = LocalGifLibrary(context),
+            recent = { EmojiRecents.decode(prefs.getString(ToolsPrefs.RECENT_GIF, null)) },
+            hasFolders = { GifFolderList.decode(prefs.getString(ToolsPrefs.GIF_FOLDERS, null)).isNotEmpty() },
+            onPick = { item -> pickGif(target, item) },
+            onSearch = { kind ->
+                hidePanel()
+                showGifSearch(kind)
+            },
+        )
+    }
+
+    /**
+     * Puts [item] into the editor through its content channel ([GifInsertPolicy], ported from CleverKeys): a copy of
+     * that one image is served from the keyboard's cache ([GifShare]) and committed with a read grant. An editor that
+     * takes no image of its type gets one line saying so; a file path is never typed.
+     */
+    private fun pickGif(target: MediaTarget, item: GifItem) {
+        val accepts = GifInsertPolicy.editorAcceptsMime(target.contentMimeTypes(), item.mime)
+        when (GifInsertPolicy.decide(target.editorPresent(), target.sensitive(), accepts)) {
+            GifInsertPolicy.Action.COMMIT_MEDIA -> {
+                beforeInsert?.run()
+                hidePanel()
+                hideSearch()
+                GifShare.prepare(context, item) { ready ->
+                    when (ready) {
+                        is GifShare.Ready.Shared ->
+                            if (target.commit(ready.uri, item.mime, item.name)) rememberGif(item) else showNotice(context.getString(R.string.gif_not_taken))
+                        GifShare.Ready.TooLarge -> showNotice(context.getString(R.string.gif_too_large))
+                        GifShare.Ready.Unreadable -> showNotice(context.getString(R.string.gif_unreadable))
+                    }
+                }
+            }
+            GifInsertPolicy.Action.NOT_ACCEPTED -> showNotice(context.getString(R.string.gif_not_accepted))
+            GifInsertPolicy.Action.SENSITIVE, GifInsertPolicy.Action.NO_EDITOR -> {
+                hidePanel()
+                hideSearch()
+            }
+        }
+    }
+
+    /** Recently used GIFs and stickers, newest first, by document URI; nothing is recorded in incognito. */
+    private fun rememberGif(item: GifItem) {
+        if (ToolsPrefs.incognito(context)) return
+        val prefs = ToolsPrefs.prefs(context)
+        val recent = EmojiRecents.push(EmojiRecents.decode(prefs.getString(ToolsPrefs.RECENT_GIF, null)), item.uri)
+        prefs.edit().putString(ToolsPrefs.RECENT_GIF, EmojiRecents.encode(recent)).apply()
+    }
+
+    /** The GIF or sticker search above the keys, like the emoji search; the keys type its query while it is open. */
+    private fun showGifSearch(kind: GifKind) {
+        hideSearch()
+        val tabs = gifTabs() ?: return
+        val bar = GifSearchBar(context, kind, tabs, onDone = { hideSearch() })
+        searchBar = bar
+        addView(bar, indexOfChild(stack))
+    }
 
     private fun pickEmoji(emoji: String) {
         val prefs = ToolsPrefs.prefs(context)
@@ -408,7 +477,8 @@ class ToolsDeck private constructor(
          * [keyboard] wrapped with the tool strip, or [keyboard] itself when the strip is switched off. [typeText]
          * enters text a key cannot produce (default: the sink's own); [beforeInsert] runs before anything is typed
          * for a tool, so an input method can finish the word it is composing; [relayout] rebuilds the key grid
-         * after the layout form changed, for a surface that is not the input method (which rebuilds itself).
+         * after the layout form changed, for a surface that is not the input method (which rebuilds itself); [media]
+         * is the input method's editor for GIFs and stickers (none for a surface droidtop draws).
          */
         @JvmStatic
         @JvmOverloads
@@ -420,11 +490,12 @@ class ToolsDeck private constructor(
             beforeInsert: Runnable? = null,
             relayout: Runnable? = null,
             switchKeyboard: Runnable? = null,
+            media: MediaTarget? = null,
         ): View {
             if (!ToolsPrefs.strip(context)) return keyboard
             (keyboard.parent as? ViewGroup)?.removeView(keyboard)
             ClipboardHistoryStore.start(context)
-            return ToolsDeck(context, keyboard, sink, typeText ?: { chars -> sink.text(chars) }, beforeInsert, relayout, switchKeyboard)
+            return ToolsDeck(context, keyboard, sink, typeText ?: { chars -> sink.text(chars) }, beforeInsert, relayout, switchKeyboard, media)
         }
     }
 }

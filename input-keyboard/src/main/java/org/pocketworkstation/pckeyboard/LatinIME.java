@@ -1014,7 +1014,7 @@ public class LatinIME extends InputMethodService implements
 
     /**
      * droidtop patch (Droidtop/tracker#340): the input view with the tool strip above the keys (clipboard history,
-     * macros, incognito), or the keys alone when the strip is switched off.
+     * macros, incognito, the emoji panel with its GIFs and Stickers tabs), or the keys alone when the strip is switched off.
      */
     View wrapInputView(LatinKeyboardView keyboard) {
         final View view = ToolsDeck.wrap(this, keyboard, new ImeConnectionSink(), null, new Runnable() {
@@ -1030,7 +1030,7 @@ public class LatinIME extends InputMethodService implements
                 // The strip's Switch keyboard (Droidtop/tracker#717): the same move as the space bar's long press.
                 switchToNextKeyboard();
             }
-        });
+        }, new ImeMediaTarget(this)); // GIFs and stickers go in through this editor's content channel (Droidtop/tracker#903 H5).
         mToolsDeck = view instanceof ToolsDeck ? (ToolsDeck) view : null;
         return view;
     }

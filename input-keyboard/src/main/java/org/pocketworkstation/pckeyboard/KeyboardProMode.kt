@@ -31,11 +31,11 @@ object KeyboardProMode {
         "auto_cap", "pref_screen_feedback",
         "show_suggestions", "pref_dictionaries", "pref_glide", "pref_offline_voice",
         "pref_tools_strip", "pref_keyboard_form", "pref_emoji", "pref_inline_autofill", "pref_incognito",
-        "pref_clipboard_history", "pref_space_drag",
+        "pref_clipboard_history", "pref_space_drag", "pref_gif_folders",
     )
 
-    /** Kept by a reset: the mode itself and what the person wrote (their macros). */
-    val KEPT_ON_RESET: Set<String> = setOf(KEY, "pref_macros")
+    /** Kept by a reset: the mode itself and what the person wrote or picked (their macros, their GIF folders). */
+    val KEPT_ON_RESET: Set<String> = setOf(KEY, "pref_macros", "pref_gif_folders")
 
     /** The settings screens whose options a reset clears. */
     private val SCREENS = intArrayOf(R.xml.prefs, R.xml.prefs_view, R.xml.prefs_actions, R.xml.prefs_feedback)

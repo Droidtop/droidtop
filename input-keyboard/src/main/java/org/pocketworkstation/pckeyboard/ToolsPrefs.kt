@@ -33,6 +33,12 @@ object ToolsPrefs {
     /** The emoji used last, newest first, one per line. */
     const val RECENT_EMOJI = "pref_emoji_recent"
 
+    /** The folders GIFs and stickers are read from, one tree URI per line ([GifFolderList], Droidtop/tracker#903 H5). */
+    const val GIF_FOLDERS = "pref_gif_folders"
+
+    /** The GIFs and stickers used last, newest first, one document URI per line. */
+    const val RECENT_GIF = "pref_gif_recent"
+
     /** The macros, one per line (see [MacroParser]). */
     const val MACROS = "pref_macros"
 

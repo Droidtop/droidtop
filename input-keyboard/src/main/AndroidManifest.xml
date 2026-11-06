@@ -101,5 +101,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <!-- droidtop: serves the one GIF or sticker being inserted, copied into the keyboard's cache, to the app it
+             goes into, read-only and only with the grant the insert gives (Droidtop/tracker#903 H5; docs/SPEC.md 6a). -->
+        <provider
+                android:name="org.pocketworkstation.pckeyboard.HkrMediaProvider"
+                android:authorities="${applicationId}.hkr.media"
+                android:exported="false"
+                android:grantUriPermissions="true">
+            <meta-data
+                    android:name="android.support.FILE_PROVIDER_PATHS"
+                    android:resource="@xml/hkr_media_paths" />
+        </provider>
 </application>
 </manifest>

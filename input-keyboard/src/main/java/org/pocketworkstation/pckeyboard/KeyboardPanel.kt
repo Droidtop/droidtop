@@ -53,6 +53,7 @@ class KeyboardPanel(
     }
 
     // The tool strip (clipboard history, macros, incognito) above the grid, or the grid alone when it is switched off.
+    // No MediaTarget: this panel has no InputConnection, so its emoji panel has no GIFs or Stickers tabs (SPEC 6a).
     private val deck: View? = keyboardView?.let { grid ->
         ToolsDeck.wrap(
             context,

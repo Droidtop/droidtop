@@ -148,6 +148,12 @@ This project is distributed under the GNU General Public License v3.0 (see
   unchanged apart from build-compat fixes and one hook in `LatinIME`, and
   droidtop's additions (the second-screen keyboard, docs/SPEC.md §6c) are
   separate Kotlin files.
+- **CleverKeys** — https://github.com/tribixbite/CleverKeys at `c8cbb74b` — GPL-3.0, Copyright (C) tribixbite and
+  contributors. Hacker Keyboard Reborn's GIFs and Stickers tabs (Droidtop/tracker#903 H5) port the parts of its
+  offline GIF panel that fit: the insert policy and editor MIME check (`gif/GifInsertPolicy.kt`), the search rules and
+  compound-word fallback (`gif/GifDatabase.kt`), the commitContent insert (`KeyboardReceiver.kt`) and the thumbnail
+  memory cap (`gif/GifGridView.kt`), in `input-keyboard`'s `GifLibrary.kt`, `GifLibraryStore.kt` and `GifPanel.kt`,
+  each of which names its origin. No CleverKeys data, GIF packs or artwork are included.
 - **Termux terminal-emulator and terminal-view** — `vendor/termux-terminal`, https://github.com/termux/termux-app
   at `v0.118.3` (`5b657c6a`) — Apache-2.0 (termux-app's own `LICENSE.md` names these two libraries, which carry
   Terminal Emulator for Android code, https://github.com/jackpal/Android-Terminal-Emulator, as Apache-2.0; the rest
