@@ -1,6 +1,9 @@
 package dev.droidtop.shell.standard.hooks
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -11,26 +14,42 @@ import app.murinelauncher.hooks.MenuHooks
 import app.murinelauncher.hooks.MurineHooks
 import app.murinelauncher.hooks.NoticeHooks
 import app.murinelauncher.hooks.SearchHooks
+import app.murinelauncher.hooks.SettingsHooks
+import app.murinelauncher.hooks.ThemeHooks
+import app.murinelauncher.theme.ThemeOverride
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notices
+import dev.droidtop.library.settings.Place
 import dev.droidtop.library.settings.PluginShellHooks
+import dev.droidtop.library.settings.UiModePrefs
 import dev.droidtop.runtime.CompanionSheet
 import dev.droidtop.runtime.LauncherSelfFilter
 import dev.droidtop.runtime.keyboard.AccessibilityHost
+import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
 import com.android.launcher3.Launcher
+import com.android.launcher3.settings.SettingsActivity
+import dev.droidtop.library.settings.AppearancePrefs
+import dev.droidtop.library.settings.CatalogPrefs
 import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.ClearAllApps
 import dev.droidtop.shell.standard.DroidtopScreens
 import dev.droidtop.shell.standard.HomeHints
 import dev.droidtop.shell.standard.HomeRolePrefs
+import dev.droidtop.shell.standard.LauncherImportActivity
 import dev.droidtop.shell.standard.LauncherSearch
 import dev.droidtop.shell.standard.ModeSwitcher
 import dev.droidtop.shell.standard.StandardPadHints
+import dev.droidtop.shell.standard.settings.SettingsDesktopFragment
+import dev.droidtop.shell.standard.settings.SettingsGamingFragment
+import dev.droidtop.shell.standard.settings.SettingsGlobalFragment
+import dev.droidtop.shell.standard.settings.drawableRes
 import dev.droidtop.ui.shared.MenuViews
+import com.android.launcher3.R as LauncherR
 
 /**
  * Installs droidtop's implementations of the Murine launcher's hooks (app.murinelauncher.hooks, Droidtop/tracker#921
- * item 2). Called once from DroidtopApplication.onCreate, after LauncherApplication has attached Murine's defaults.
+ * item 2). Called once from DroidtopApplication.onCreate before LauncherApplication's own start, so the launcher's start
+ * (its light or dark, ThemeOverride) already reads droidtop's. It only sets references, so it is safe in every process.
  */
 object ShellDefaultHooks {
     fun install(context: Context) {
@@ -47,6 +66,8 @@ object ShellDefaultHooks {
         // droidtop is the launcher's own package: its one icon and its widgets show (docs/SPEC.md 2c).
         MurineHooks.apps = AppHooks { className, isWidgetProvider -> LauncherSelfFilter.shown(className, isWidgetProvider) }
         MurineHooks.home = DroidtopHome
+        MurineHooks.settings = DroidtopSettings
+        MurineHooks.theme = DroidtopTheme
     }
 
     /**
@@ -72,6 +93,17 @@ object ShellDefaultHooks {
         }
 
         override fun performGlobalAction(action: Int) = AccessibilityHost.performGlobalAction(action)
+
+        /**
+         * droidtop's one accessibility service (Droidtop/tracker#740), turned on the one way: elevated access when
+         * droidtop has it, else Android's accessibility page. Turning it on may wait on the privileged service, so it
+         * runs off the main thread.
+         */
+        override fun requestAccessibility(context: Context): Boolean {
+            if (AccessibilityKeyboard.isActive(context)) return true
+            Thread { AccessibilityKeyboard.turnOn(context) }.start()
+            return false
+        }
     }
 
     /**
@@ -140,6 +172,87 @@ object ShellDefaultHooks {
         override fun onBackLongPress(launcher: Launcher): Boolean {
             BackButtonMenu.show(launcher)
             return true
+        }
+    }
+
+    /**
+     * droidtop's rows on the launcher's settings: Global settings first (also the toolbar's action on every settings
+     * screen; it was only that action once, and the rig found no way back to Modes after turning Gaming off,
+     * dq-coordinator-23 F5), the places a person can reach in this UI mode (Standard has no left menu, docs/SPEC.md
+     * 7j "Places in every mode"; none in Kiosk and Kid), and Desktop's and Gaming's settings. The launcher's Home
+     * screen row opens Global settings, where "droidtop is your home screen" is (Droidtop/tracker#571 row 11); its
+     * import row opens the Nova and Apex import (Droidtop/tracker#564); droidtop has the taskbar (StandardTaskbar).
+     */
+    private object DroidtopSettings : SettingsHooks {
+        private const val PLACE = "place:"
+        private const val HOME_SCREEN = "pref_home_screen"
+        private const val LAUNCHER_IMPORT = "pref_launcher_import"
+        private const val TASKBAR = "pref_taskbar"
+
+        private fun global(context: Context) = SettingsHooks.Row(
+            id = "global_settings",
+            title = context.getString(LauncherR.string.pref_global_settings_title),
+            summary = context.getString(LauncherR.string.pref_global_settings_desc),
+            icon = LauncherR.drawable.ic_settings_general,
+            fragment = SettingsGlobalFragment::class.java.name,
+        )
+
+        override fun rows(context: Context): List<SettingsHooks.Row> {
+            val places = context.getString(LauncherR.string.pref_subcategory_places)
+            val shells = context.getString(LauncherR.string.pref_subcategory_other_shells)
+            return listOf(global(context)) +
+                Place.visible(UiModePrefs.get(context)).map { place ->
+                    SettingsHooks.Row(PLACE + place.screenId, place.title, icon = place.icon.drawableRes(), group = places)
+                } +
+                listOf(
+                    SettingsHooks.Row(
+                        "desktop_settings", context.getString(LauncherR.string.pref_category_desktop_title),
+                        context.getString(LauncherR.string.pref_category_desktop_desc), LauncherR.drawable.ic_catalog_desktop,
+                        shells, SettingsDesktopFragment::class.java.name,
+                    ),
+                    SettingsHooks.Row(
+                        "gaming_settings", context.getString(LauncherR.string.pref_category_gaming_title),
+                        context.getString(LauncherR.string.pref_category_gaming_desc), LauncherR.drawable.ic_catalog_gaming,
+                        shells, SettingsGamingFragment::class.java.name,
+                    ),
+                )
+        }
+
+        override fun toolbarRow(context: Context) = global(context)
+
+        override fun offers(key: String) = key == HOME_SCREEN || key == LAUNCHER_IMPORT || key == TASKBAR
+
+        override fun run(id: String, context: Context) {
+            val intent = when {
+                id.startsWith(PLACE) -> Place.byScreenId(id.removePrefix(PLACE))?.let { Place.openIntent(context, it) }
+                id == HOME_SCREEN -> Intent(context, SettingsActivity::class.java)
+                    .putExtra(SettingsActivity.EXTRA_FRAGMENT, SettingsGlobalFragment::class.java.name)
+                id == LAUNCHER_IMPORT -> Intent(context, LauncherImportActivity::class.java)
+                else -> null
+            } ?: return
+            if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }
+    }
+
+    /**
+     * droidtop's one Appearance setting (AppearancePrefs, Settings > Appearance; docs/SPEC.md 7k, Droidtop/tracker#560)
+     * is the launcher's light or dark, so the home screen never disagrees with droidtop's other screens.
+     */
+    private object DroidtopTheme : ThemeHooks {
+        /** Held so the registration lives as long as the process (SharedPreferences keeps listeners weakly). */
+        @Volatile private var watch: SharedPreferences.OnSharedPreferenceChangeListener? = null
+
+        override fun choice(context: Context) = when (AppearancePrefs.choice(context)) {
+            AppearancePrefs.LIGHT -> ThemeOverride.THEME_LIGHT
+            AppearancePrefs.DARK -> ThemeOverride.THEME_DARK
+            else -> ThemeOverride.THEME_SYSTEM
+        }
+
+        override fun watch(context: Context, onChange: Runnable) {
+            watch = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == AppearancePrefs.KEY_APPEARANCE) onChange.run()
+            }.also { CatalogPrefs.prefs(context).registerOnSharedPreferenceChangeListener(it) }
         }
     }
 }
