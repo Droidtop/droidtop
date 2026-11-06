@@ -11,6 +11,7 @@ import dev.droidtop.stores.gog.api.GOGManifestMeta
 import dev.droidtop.stores.gog.api.GOGManifestParser
 import dev.droidtop.stores.gog.api.V1DepotFile
 import dev.droidtop.stores.util.CdnRankingUtils
+import dev.droidtop.stores.util.ChunkAssembler
 import dev.droidtop.stores.util.ChunkRetry
 import dev.droidtop.runtime.util.sizeOnDisk
 import dev.droidtop.stores.util.DownloadSpeedConfig
@@ -90,6 +91,9 @@ internal class GOGDownloadManager(
     /**
      * Context needed to refresh secure CDN links when they expire
      */
+    /** A depot file and the product of the depot it came from, the fallback for a file that names no product. */
+    private data class FileWithDepot(val file: DepotFile, val depotProductId: String)
+
     private data class SecureLinkContext(
         val gameId: String,
         val generation: Int,
@@ -391,7 +395,6 @@ internal class GOGDownloadManager(
 
             // Step 4: Fetch depot manifests to get file lists
             // Track which depot each file came from for proper productId mapping
-            data class FileWithDepot(val file: DepotFile, val depotProductId: String)
             val allFilesWithDepots = mutableListOf<FileWithDepot>()
             // Symlinks and empty directories declared in the depot manifests. These carry no chunks,
             // so they bypass the chunk download/assemble path and must be created explicitly.
@@ -430,28 +433,14 @@ internal class GOGDownloadManager(
             val gameInstallDir = installPath
             downloadInfo.updateStatusMessage("Verifying existing files...")
             val beforeCount = gameFiles.size
-            gameFiles = gameFiles.filter { file ->
-                if (!downloadInfo.isActive()) {
-                    MarkerUtils.removeMarker(installPath.absolutePath, Marker.DOWNLOAD_IN_PROGRESS_MARKER)
-                    return@withContext Result.failure(Exception("Download cancelled"))
-                }
-                val outputFile = File(gameInstallDir, file.path)
-                val expectedSize = file.chunks.sumOf { it.size }
-                !fileExistsWithCorrectSize(outputFile, expectedSize, file.md5)
-            }
-            Timber.tag("GOG").d("Skipping ${beforeCount - gameFiles.size} existing file(s), downloading ${gameFiles.size}")
-
             val beforeSupportCount = supportFiles.size
-            supportFiles = supportFiles.filter { file ->
-                if (!downloadInfo.isActive()) {
-                    MarkerUtils.removeMarker(installPath.absolutePath, Marker.DOWNLOAD_IN_PROGRESS_MARKER)
-                    return@withContext Result.failure(Exception("Download cancelled"))
-                }
-                val installRelativePath = getSupportInstallPath(file.path)
-                val outputFile = File(gameInstallDir, installRelativePath)
-                val expectedSize = file.chunks.sumOf { it.size }
-                !fileExistsWithCorrectSize(outputFile, expectedSize, file.md5)
+            val stopped = {
+                MarkerUtils.removeMarker(installPath.absolutePath, Marker.DOWNLOAD_IN_PROGRESS_MARKER)
+                Result.failure<Unit>(Exception("Download cancelled"))
             }
+            gameFiles = stillToFetch(gameFiles, gameInstallDir, downloadInfo) { it.path } ?: return@withContext stopped()
+            Timber.tag("GOG").d("Skipping ${beforeCount - gameFiles.size} existing file(s), downloading ${gameFiles.size}")
+            supportFiles = stillToFetch(supportFiles, gameInstallDir, downloadInfo) { getSupportInstallPath(it.path) } ?: return@withContext stopped()
             downloadInfo.updateStatusMessage(null)
             val supportFilesForGameDirAssemble = supportFiles.map { file ->
                 val installRelativePath = getSupportInstallPath(file.path)
@@ -503,81 +492,15 @@ internal class GOGDownloadManager(
 
             // Step 7: Get secure CDN links for chunks
             downloadInfo.updateStatusMessage("Getting secure download links...")
-
-            // Build mapping of product ID to secure URLs and chunk to product ID
-            val productUrlMap = mutableMapOf<String, List<String>>()
-            val chunkToProductMap = mutableMapOf<String, String>()
-
-            Timber.tag("GOG").d("Mapping chunks to products. gameId parameter: $gameId, realGameId: $realGameId, manifest baseProductId: ${gameManifest.baseProductId}")
-
-            val filesToDownloadPaths = allDownloadFiles.map { it.path }.toSet()
-            // Map each chunk to its product ID using depot info
-            allFilesWithDepots.forEach { (file, depotProductId) ->
-                if (file.path !in filesToDownloadPaths) return@forEach
-                // Use depot's productId as fallback when file has null/placeholder productId
-
-                // TODO: Remove this logic and always use the depotProductId.
-                val productId = when {
-                    file.productId == null -> {
-                        Timber.tag("GOG").d("File ${file.path} has null productId, using depotProductId: $depotProductId")
-                        depotProductId
-                    }
-                    file.productId == "2147483047" -> {
-                        Timber.tag("GOG").d("File ${file.path} has placeholder productId, using depotProductId: $depotProductId")
-                        depotProductId
-                    }
-                    else -> {
-                        Timber.tag("GOG").d("File ${file.path} has productId: ${file.productId}")
-                        file.productId
-                    }
-                }
-
-                // Only include files from products the user owns
-                if (productId in ownedGameIds) {
-                    file.chunks.forEach { chunk ->
-                        chunkToProductMap[chunk.compressedMd5] = productId
-                    }
-                } else {
-                    Timber.tag("GOG").d("Skipping file ${file.path} from unowned product $productId")
-                }
-            }
-
-            // Get unique product IDs we need to fetch secure links for
-            val productIds = chunkToProductMap.values.toSet()
-            Timber.tag("GOG").d("Need secure links for ${productIds.size} owned product(s): ${productIds.joinToString()}")
-            Timber.tag("GOG").d("Mapped ${chunkToProductMap.size} chunks to products")
-
-            // Fetch secure links for each product
-            for (productId in productIds) {
-                val linksResult = apiClient.getSecureLink(
-                    productId = productId,
-                    path = "/",
-                    generation = selectedBuild.generation,
-                )
-                if (linksResult.isSuccess) {
-                    val urls = CdnRankingUtils.rankBaseUrlsByHeadProbe(
-                        linksResult.getOrThrow().urls,
-                        StoreHttp.http,
-                        "GOG Galaxy",
-                    )
-                    productUrlMap[productId] = urls
-                } else {
-                    return@withContext Result.failure(
-                        linksResult.exceptionOrNull() ?: Exception("Failed to get secure links for product $productId"),
-                    )
-                }
-            }
-
-            // Build chunk URL map using the correct product URL for each chunk
-            val chunkUrlCandidates = parser.buildChunkUrlCandidatesWithProducts(chunkHashes, chunkToProductMap, productUrlMap)
-
-            // Store context for refreshing secure links if they expire
-            val secureLinkContext = SecureLinkContext(
+            val (chunkUrlCandidates, secureLinkContext) = secureChunkLinks(
                 gameId = realGameId,
                 generation = selectedBuild.generation,
-                productIds = productIds,
-                chunkToProductMap = chunkToProductMap,
-            )
+                filesWithDepots = allFilesWithDepots,
+                downloadFiles = allDownloadFiles,
+                ownedGameIds = ownedGameIds,
+                chunkHashes = chunkHashes,
+            ).getOrElse { return@withContext Result.failure(it) }
+            val chunkToProductMap = secureLinkContext.chunkToProductMap
 
             // Step 8+9: Download chunks and assemble files in a unified streaming loop.
             // Chunks are ordered by file so files complete front-to-back, allowing
@@ -714,6 +637,106 @@ internal class GOGDownloadManager(
         } catch (e: Exception) {
             Timber.tag("GOG").w(e, "Failed to save GOG setup manifest")
         }
+    }
+
+    /**
+     * The files of [files] not already whole in [installDir] (at [pathOf], by size and MD5), for an install that carries
+     * on: what is there is kept. On a resume this reads the MD5 of every finished file, which can take minutes for a
+     * large game, so it stops between files when the download is stopped (null).
+     */
+    private fun stillToFetch(files: List<DepotFile>, installDir: File, downloadInfo: DownloadInfo, pathOf: (DepotFile) -> String): List<DepotFile>? =
+        files.filter { file ->
+            if (!downloadInfo.isActive()) return null
+            !fileExistsWithCorrectSize(File(installDir, pathOf(file)), file.chunks.sumOf { it.size }, file.md5)
+        }
+
+    /**
+     * Step 7 of a Gen 2 install: each chunk's CDN candidates, from the secure links of the owned product its file
+     * belongs to (the depot's product when the file names none), ranked fastest first; and what a refresh of those
+     * links needs when they expire.
+     */
+    private suspend fun secureChunkLinks(
+        gameId: String,
+        generation: Int,
+        filesWithDepots: List<FileWithDepot>,
+        downloadFiles: List<DepotFile>,
+        ownedGameIds: Set<String>,
+        chunkHashes: List<String>,
+    ): Result<Pair<Map<String, List<String>>, SecureLinkContext>> {
+        // Build mapping of product ID to secure URLs and chunk to product ID
+        val productUrlMap = mutableMapOf<String, List<String>>()
+        val chunkToProductMap = mutableMapOf<String, String>()
+
+        val filesToDownloadPaths = downloadFiles.map { it.path }.toSet()
+        // Map each chunk to its product ID using depot info
+        filesWithDepots.forEach { (file, depotProductId) ->
+            if (file.path !in filesToDownloadPaths) return@forEach
+            // Use depot's productId as fallback when file has null/placeholder productId
+
+            // TODO: Remove this logic and always use the depotProductId.
+            val productId = when {
+                file.productId == null -> {
+                    Timber.tag("GOG").d("File ${file.path} has null productId, using depotProductId: $depotProductId")
+                    depotProductId
+                }
+                file.productId == "2147483047" -> {
+                    Timber.tag("GOG").d("File ${file.path} has placeholder productId, using depotProductId: $depotProductId")
+                    depotProductId
+                }
+                else -> {
+                    Timber.tag("GOG").d("File ${file.path} has productId: ${file.productId}")
+                    file.productId
+                }
+            }
+
+            // Only include files from products the user owns
+            if (productId in ownedGameIds) {
+                file.chunks.forEach { chunk ->
+                    chunkToProductMap[chunk.compressedMd5] = productId
+                }
+            } else {
+                Timber.tag("GOG").d("Skipping file ${file.path} from unowned product $productId")
+            }
+        }
+
+        // Get unique product IDs we need to fetch secure links for
+        val productIds = chunkToProductMap.values.toSet()
+        Timber.tag("GOG").d("Need secure links for ${productIds.size} owned product(s): ${productIds.joinToString()}")
+        Timber.tag("GOG").d("Mapped ${chunkToProductMap.size} chunks to products")
+
+        // Fetch secure links for each product
+        for (productId in productIds) {
+            val linksResult = apiClient.getSecureLink(
+                productId = productId,
+                path = "/",
+                generation = generation,
+            )
+            if (linksResult.isSuccess) {
+                val urls = CdnRankingUtils.rankBaseUrlsByHeadProbe(
+                    linksResult.getOrThrow().urls,
+                    StoreHttp.http,
+                    "GOG Galaxy",
+                )
+                productUrlMap[productId] = urls
+            } else {
+                return Result.failure(
+                    linksResult.exceptionOrNull() ?: Exception("Failed to get secure links for product $productId"),
+                )
+            }
+        }
+
+        // Build chunk URL map using the correct product URL for each chunk
+        val chunkUrlCandidates = parser.buildChunkUrlCandidatesWithProducts(chunkHashes, chunkToProductMap, productUrlMap)
+
+        // Store context for refreshing secure links if they expire
+        val secureLinkContext = SecureLinkContext(
+            gameId = gameId,
+            generation = generation,
+            productIds = productIds,
+            chunkToProductMap = chunkToProductMap,
+        )
+
+        return Result.success(chunkUrlCandidates to secureLinkContext)
     }
 
     /**
@@ -964,7 +987,6 @@ internal class GOGDownloadManager(
             val currentChunkUrlCandidates = ConcurrentHashMap(chunkUrlCandidates)
             val totalChunks = chunkHashes.size
             val totalFiles = files.size
-            val chunkUsageCounts = ConcurrentHashMap<String, AtomicInteger>()
             val downloadedChunkIds = newKeySet<String>()
             val chunkAttempts = ConcurrentHashMap<String, AtomicInteger>()
             val pendingChunks = AtomicInteger(chunkHashes.size)
@@ -982,78 +1004,24 @@ internal class GOGDownloadManager(
                 return@withContext Result.failure(IOException(it))
             }
 
-            chunkHashes.forEach { chunkMd5 ->
-                chunkUsageCounts[chunkMd5] = AtomicInteger(
-                    files.sumOf { file -> file.chunks.count { chunk -> chunk.compressedMd5 == chunkMd5 } }
-                )
-            }
+            // Where each chunk goes, built once; a file whose last chunk is written is checked by its whole MD5, and a
+            // chunk written everywhere it is used leaves the cache. A chunk that cannot be written everywhere counts
+            // nothing, so it can be fetched and placed again ([ChunkAssembler]).
+            val assembler = ChunkAssembler(
+                files = files,
+                chunksOf = { it.chunks },
+                chunkId = { it.compressedMd5 },
+                fileKey = { it.path },
+                allOrNothing = true,
+                write = { file, chunk, position -> assembleFile(file, chunk, position, chunkCacheDir, installDir) },
+                freeChunk = { id -> File(chunkCacheDir, "$id.chunk").delete() },
+                onFileComplete = { file -> verifyAssembledFile(file, installDir) },
+            )
 
             val networkChunkFlow = MutableSharedFlow<String>(extraBufferCapacity = Int.MAX_VALUE)
             val assembleFlow = MutableSharedFlow<Pair<String, Result<File>>>(extraBufferCapacity = Int.MAX_VALUE)
 
             var assemblyFailure: Throwable? = null
-
-            // Remaining chunk positions per file; the full-file MD5 runs once, when this hits zero.
-            val filePendingPositions = ConcurrentHashMap<String, AtomicInteger>()
-            files.forEach { file -> filePendingPositions[file.path] = AtomicInteger(file.chunks.size) }
-
-            // assemble every file whose chunks have all arrived (or that has zero chunks)
-            suspend fun assembleReady(chunkMd5: String): Result<Unit> {
-                if (!downloadInfo.isActive()) {
-                    return Result.failure(Exception("Download cancelled"))
-                }
-
-                // 1. Find all files that contain this chunk
-                val matchedFiles = files.filter { file ->
-                    file.chunks.any { chunk -> chunk.compressedMd5 == chunkMd5 }
-                }
-
-                // 2. For each file found, write this chunk into its position
-                var expectedCount = 0
-                var assemblySuccessCount = 0
-                val assembledPerFile = mutableMapOf<DepotFile, Int>()
-
-                matchedFiles.forEach { file ->
-                    file.chunks.withIndex()
-                        .filter { (_, chunk) -> chunk.compressedMd5 == chunkMd5 }
-                        .forEach { (chunkIndex, chunk) ->
-                            expectedCount++
-                            val result = assembleFile(file, chunk, chunkIndex, chunkCacheDir, installDir)
-                            if (result.isSuccess) {
-                                assemblySuccessCount++
-                                assembledPerFile[file] = (assembledPerFile[file] ?: 0) + 1
-                            } else {
-                                Timber.tag("GOG").d(result.exceptionOrNull()?.message ?: "Failed to assemble ${file.path}")
-                            }
-                        }
-                }
-
-                // 3. Only finalize once every position using this chunk has been written; a partial
-                // result is reported as failure so the caller can re-fetch and retry the chunk.
-                // Position counters are only decremented below, on the fully-successful attempt,
-                // so a retried chunk cannot decrement the same position twice.
-                if (assemblySuccessCount < expectedCount) {
-                    return Result.failure(
-                        Exception("Assembled $assemblySuccessCount/$expectedCount position(s) for chunk $chunkMd5"),
-                    )
-                }
-
-                assembledPerFile.forEach { (file, count) ->
-                    val remaining = filePendingPositions[file.path]?.addAndGet(-count)
-                    if (remaining == 0) {
-                        verifyAssembledFile(file, installDir)
-                    }
-                }
-
-                // 4. Free the cached chunk once it has been placed into all of its positions
-                val usageCount = chunkUsageCounts[chunkMd5]?.addAndGet(-assemblySuccessCount)
-                if (usageCount != null && usageCount <= 0) {
-                    val cacheFile = File(chunkCacheDir, "${chunkMd5}.chunk")
-                    cacheFile.delete()
-                }
-
-                return Result.success(Unit)
-            }
 
             val networkChunkJob: Job = scope.launch {
                 networkChunkFlow
@@ -1091,7 +1059,7 @@ internal class GOGDownloadManager(
                                 // Successful download - add to completed set and try assembly
                                 downloadedChunkIds.add(chunkMd5)
 
-                                val assembleResult = assembleReady(chunkMd5)
+                                val assembleResult = assembler.place(chunkMd5) { downloadInfo.isActive() }
                                 if (assembleResult.isFailure && downloadInfo.isActive()) {
                                     // A position failed to assemble (e.g. corrupt chunk bytes). The per-chunk
                                     // md5 is reliable, so re-fetch a fresh copy and retry a few times. If it
@@ -1168,7 +1136,7 @@ internal class GOGDownloadManager(
                 // Sort files by total chunk usage (lowest first) - files with less-shared chunks complete faster and free cache sooner
                 val sortedFiles = files.sortedBy { file ->
                     file.chunks.sumOf { chunk ->
-                        chunkUsageCounts[chunk.compressedMd5]?.get() ?: 0
+                        assembler.usesOf(chunk.compressedMd5)
                     }
                 }
                 Timber.tag("GOG").d("Processing ${sortedFiles.size} files sorted by chunk usage (least shared first)")
