@@ -220,6 +220,8 @@ object AppSettingsCatalogs {
         // The one game folders screen (Droidtop/tracker#589).
         SettingsScreenRegistry.register(FoldersCatalog.screen())
         SettingsScreenRegistry.register(scraperScreen())
+        // Favourites and collections from another frontend (Droidtop/tracker#724).
+        SettingsScreenRegistry.register(FrontendImportCatalog.screen())
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
         SettingsScreenRegistry.register(pluginsScreen())

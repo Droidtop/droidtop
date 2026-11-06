@@ -313,6 +313,15 @@ object GamingSettingsCatalog {
                         icon = CatalogIcon.SCRAPER,
                     ),
                 )
+                // What another frontend kept, brought in (Droidtop/tracker#724).
+                add(
+                    NestedScreenItem(
+                        id = "pref_gaming_frontend_import",
+                        title = words(R.string.gaming_import_from_another_frontend),
+                        subtitle = words(R.string.gaming_import_from_another_frontend_subtitle),
+                        registryId = "frontend_import",
+                    ),
+                )
                 add(
                     NestedScreenItem(
                         id = ID_CONSOLE_SYSTEMS,
