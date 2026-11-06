@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- droidtop's entries on the Standard home screen's long-press menu (ShellDefaultHooks). -->
+    <string name="home_menu_games">droidtop games</string>
+    <string name="home_menu_quick_menu">Quick Menu</string>
+    <string name="home_menu_companion">Companion</string>
+</resources>

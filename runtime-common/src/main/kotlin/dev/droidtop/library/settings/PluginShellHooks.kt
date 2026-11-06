@@ -3,9 +3,9 @@ package dev.droidtop.library.settings
 import android.content.Context
 
 /**
- * The Standard launcher's half of plugins in every mode (docs/plugin-api.md 1.9). `:shell-default` cannot depend on
- * the library that knows plugins, so `:app` installs a [Provider] at start and the launcher asks it here: the home
- * screen's long-press menu gets "Plugins", the same list of panels Gaming's Quick Menu has. The Companion group of the
+ * The Standard launcher's half of plugins in every mode (docs/plugin-api.md 1.9). `:shell-default-hooks` cannot depend
+ * on the library that knows plugins, so `:app` installs a [Provider] at start and the launcher's menu hook asks it here:
+ * the home screen's long-press menu gets "Plugins", the same list of panels Gaming's Quick Menu has. The Companion group of the
  * catalog (`:runtime-common`) asks it for the plugin panels a person can put on the companion's bar. What the launcher reads is
  * answered from memory, because the menu is built on the main thread; the provider refreshes off it.
  */
@@ -31,17 +31,12 @@ object PluginShellHooks {
 
     @Volatile var provider: Provider? = null
 
-    @JvmStatic fun homeMenu(context: Context): List<MenuEntry> = provider?.homeMenu(context).orEmpty()
+    fun homeMenu(context: Context): List<MenuEntry> = provider?.homeMenu(context).orEmpty()
 
     /** See [Provider.companionTabs]; empty before `:app` installs the provider. Off the main thread. */
     fun companionTabs(context: Context, mode: String): List<Pair<String, String>> = provider?.companionTabs(context, mode).orEmpty()
 
     /** See [Provider.appMenu]; null before `:app` installs the provider. From memory, so the main thread may ask. */
-    @JvmStatic fun appMenu(context: Context, packageName: String, label: String): MenuEntry? =
+    fun appMenu(context: Context, packageName: String, label: String): MenuEntry? =
         provider?.appMenu(context, packageName, label)
-
-    /** Runs an entry from Java. */
-    @JvmStatic fun run(entry: MenuEntry, context: Context) {
-        entry.run(context)
-    }
 }

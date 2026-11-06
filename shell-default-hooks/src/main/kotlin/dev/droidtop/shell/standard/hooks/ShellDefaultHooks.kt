@@ -1,17 +1,21 @@
 package dev.droidtop.shell.standard.hooks
 
 import android.content.Context
+import android.view.View
 import app.murinelauncher.hooks.ActionHooks
+import app.murinelauncher.hooks.MenuHooks
 import app.murinelauncher.hooks.MurineHooks
 import app.murinelauncher.hooks.NoticeHooks
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notices
+import dev.droidtop.library.settings.PluginShellHooks
 import dev.droidtop.runtime.CompanionSheet
 import dev.droidtop.runtime.keyboard.AccessibilityHost
 import dev.droidtop.shell.standard.ClearAllApps
 import dev.droidtop.shell.standard.DroidtopScreens
 import dev.droidtop.shell.standard.LauncherSearch
 import dev.droidtop.shell.standard.ModeSwitcher
+import dev.droidtop.ui.shared.MenuViews
 
 /**
  * Installs droidtop's implementations of the Murine launcher's hooks (app.murinelauncher.hooks, Droidtop/tracker#921
@@ -26,6 +30,7 @@ object ShellDefaultHooks {
             Notices.flash(message, tone = if (tone == NoticeHooks.Tone.Caution) NoticeTone.Caution else NoticeTone.Info, context = app)
         }
         MurineHooks.actions = DroidtopActions
+        MurineHooks.menus = DroidtopMenus
     }
 
     /**
@@ -52,5 +57,51 @@ object ShellDefaultHooks {
         }
 
         override fun performGlobalAction(action: Int) = AccessibilityHost.performGlobalAction(action)
+    }
+
+    /**
+     * droidtop's menus: the launcher's small menus are the one anchored menu, in the colours outside Gaming
+     * (MenuViews, docs/SPEC.md 7k, Droidtop/tracker#827). The home screen's long-press menu gets the library's games
+     * grid, the Quick Menu (the sheet Gaming's R2 opens), the companion while the device has no second screen to hold
+     * it (docs/SPEC.md "The companion's tabs", One screen), then plugins' entries (docs/plugin-api.md 1.9); an app's
+     * long-press menu gets "Plugin actions" (Droidtop/tracker#67). Plugins' entries are answered from memory
+     * (PluginShellHooks) and kept here by id until the next menu asks, since the menu runs one by its id.
+     */
+    private object DroidtopMenus : MenuHooks {
+        @Volatile private var pluginEntries: Map<String, PluginShellHooks.MenuEntry> = emptyMap()
+
+        override fun show(anchor: View, title: String, rows: List<MenuHooks.Row>, note: String?) {
+            MenuViews.show(anchor, title, rows.map { MenuViews.Row(it.title, it.onSelect, it.checked) }, note)
+        }
+
+        override fun homeEntries(context: Context): List<MenuHooks.Entry> {
+            val entries = mutableListOf(
+                MenuHooks.Entry("OPEN_GAMES", context.getString(R.string.home_menu_games)),
+                MenuHooks.Entry("OPEN_QUICK_MENU", context.getString(R.string.home_menu_quick_menu), "setting"),
+            )
+            if (CompanionSheet.offered(context)) {
+                entries += MenuHooks.Entry("OPEN_COMPANION", context.getString(R.string.home_menu_companion))
+            }
+            val plugins = PluginShellHooks.homeMenu(context)
+            remember(plugins.mapIndexed { i, entry -> "plugin-home:$i" to entry })
+            plugins.forEachIndexed { i, entry -> entries += MenuHooks.Entry("plugin-home:$i", entry.label) }
+            return entries
+        }
+
+        override fun appEntry(context: Context, packageName: String, label: String): MenuHooks.Entry? {
+            val entry = PluginShellHooks.appMenu(context, packageName, label) ?: return null
+            val id = "plugin-app:$packageName"
+            remember(listOf(id to entry))
+            return MenuHooks.Entry(id, entry.label)
+        }
+
+        override fun run(id: String, context: Context) {
+            if (!DroidtopActions.run(id, context)) pluginEntries[id]?.run?.invoke(context)
+        }
+
+        private fun remember(entries: List<Pair<String, PluginShellHooks.MenuEntry>>) {
+            val prefix = entries.firstOrNull()?.first?.substringBefore(':') ?: return
+            pluginEntries = pluginEntries.filterKeys { !it.startsWith("$prefix:") } + entries
+        }
     }
 }
