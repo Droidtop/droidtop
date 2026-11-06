@@ -76,3 +76,7 @@
 [submodule "vendor/lib-ui"]
 	path = vendor/lib-ui
 	url = https://github.com/Droidtop/lib-ui
+[submodule "shell-default"]
+	path = shell-default
+	url = https://github.com/Droidtop/murine-launcher
+	branch = droidtop

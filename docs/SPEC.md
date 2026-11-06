@@ -1802,14 +1802,20 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Recent/frequently-used apps row in the app drawer | **built this change** | `RecentAppsStore`, `AlphabeticalAppsList.addRecentAppItems`; see below |
 | Suggested apps: the drawer's top row by time of day (built 2026-11-06, Droidtop/tracker#706) | HAVE (drawer) | Settings > App drawer > Suggested apps, off by default. Each launch is also counted by hour of the day (`RecentAppsStore`, `SuggestedApps.recordHour`, 600 keys at most), and the row then orders the recent apps by `SuggestedApps.rank`: three per launch this hour and one per launch in the hour either side, recency breaking ties, so with no history it is the Recent row. Its heading reads Suggested. No Usage Access grant. A dock or home-screen Suggested row and a list-style Home are not built |
 
-**Following Murine upstream (2026-10-16).** The fork's upstream base is
-Murine `081e840` (v1.1.2, 2026-07-18), found by comparing contents since the
-import named none; `shell-default/UPSTREAM.md` records it and every upstream
-commit droidtop has decided (taken, already done here, or not for this tree),
-and `scripts/murine-upstream.sh` lists the upstream commits not decided yet.
-Upstream's fixes are taken as they come, its features as Mobile's own work
-reaches them; its website, version bumps and build moves (droidtop's build is
-its own) are not.
+**Murine is our own launcher, in its own repo (2026-11-06, Droidtop/tracker#921).** The owner: "The murine
+launcher lives in droidtop, and as part of the linux UI. It'll be our default mobile mode, I guess, kinda?" and "I
+actually don't think I wanna keep in sync with murine upstream, outside of cherry picks, since its focus is on
+simplicity and usability, and ours is on flexibility and power". So:
+- `shell-default` is a submodule of **Droidtop/murine-launcher**, branch `droidtop`: Murine upstream `081e840`
+  (v1.1.2, 2026-07-18) with droidtop's whole history of the tree since the import (cd6b712, 2026-08-21) replayed on
+  it, commit for commit. Its `upstream-sync` branch only records where it came from; it is never merged.
+- Upstream changes come in only as cherry-picks droidtop chooses, one commit each with the upstream SHA in its
+  message; `UPSTREAM.md` in that repo keeps the table of what was taken, skipped or waits. There is no sync tooling
+  (`scripts/murine-upstream.sh` is gone).
+- No standalone releases: Murine is a component, shared by droidtop's Mobile (Standard) mode and the Linux UI, where
+  it becomes the default mobile mode (Mobitop, #919). Its droidtop-specific code moves behind a `MurineHooks`
+  interface with plain Kotlin types, so it can compile for Linux later, in slices tracked on #921; until the last
+  slice the fork still builds only inside droidtop.
 
 **A real plugin-fed launcher surface: the status-tile home-screen widget
 (built this change).** §12a's `PluginCapability.STATUS_TILE` and
