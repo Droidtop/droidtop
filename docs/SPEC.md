@@ -7408,7 +7408,9 @@ from the catalog on the same page.
   read). Exit: the permission manager.
 - **Accessibility.** Every option's state: font size, display size, magnification, high-contrast text, colour inversion
   and TalkBack, changed in place with More controls; font and display size live only here. Turning TalkBack or
-  magnification off asks first. Exits without More controls: Android's accessibility; turning a service on the first
+  magnification off asks first. A font size or display size change shows a Keep bar above every tab ("Font size
+  130%", Keep with the seconds left, Undo) and goes back after 10 seconds without Keep (`ScreenShapeRevert`,
+  `CompanionKeepBar`, mytop-project/tracker#786 S14). Exits without More controls: Android's accessibility; turning a service on the first
   time.
 - **Time and language.** 24-hour clock and droidtop's language; auto time and zone, the time zone (with auto off) and
   other apps' language with More controls. Exit: system language.

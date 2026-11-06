@@ -8,6 +8,7 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
+import dev.droidtop.library.settings.ScreenShapeRevert
 import dev.droidtop.library.settings.words
 import dev.droidtop.runtime.R
 import dev.droidtop.runtime.tasks.RiskyActions
@@ -71,8 +72,12 @@ object AccessibilityControls {
     private fun opener(id: String, title: String, subtitle: String, action: String) =
         ActionItem(id = id, title = title, subtitle = subtitle, value = "In Android's settings", run = { ctx -> SettingsLaunch.start(ctx, Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) })
 
-    /** The rows, as the helper app and the Risky actions class allow. Reads settings: off the main thread. */
-    fun items(context: Context): List<CatalogItem> {
+    /**
+     * The rows, as the helper app and the Risky actions class allow. Reads settings: off the main thread. With
+     * [askKeep], font size and display size go back after ten seconds unless kept ([ScreenShapeRevert]); only a
+     * surface that draws the Keep bar asks for it (Droidtop/tracker#786 S14).
+     */
+    fun items(context: Context, askKeep: Boolean = false): List<CatalogItem> {
         if (!canWrite()) {
             val hint = if (runCatching { TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)) {
                 ". " + RiskyPrompts.turnOnHint(RiskyClass.ACCESSIBILITY_SETTINGS)
@@ -106,7 +111,15 @@ object AccessibilityControls {
                     subtitle = words(R.string.accessibility_text_size_in_every_app),
                     options = FONT_SCALES.map { ChoiceOption(it.toString(), "${(it * 100).toInt()}%" + if (it == 1.0f) " (default)" else "") },
                     current = FONT_SCALES.minByOrNull { kotlin.math.abs(it - font) }.toString(),
-                    onSelect = { _, value -> Thread { put("system", "font_scale", value) }.start() },
+                    onSelect = { _, value ->
+                        Thread { put("system", "font_scale", value) }.start()
+                        if (askKeep) {
+                            val before = font.toString()
+                            ScreenShapeRevert.propose("Font size ${((value.toFloatOrNull() ?: 1f) * 100).toInt()}%") {
+                                put("system", "font_scale", before)
+                            }
+                        }
+                    },
                 ),
             )
             if (physical != null) {
@@ -123,6 +136,14 @@ object AccessibilityControls {
                                 if (factor == 1f) TaskManager.shell.exec(listOf("wm", "density", "reset"))
                                 else TaskManager.shell.exec(listOf("wm", "density", densityFor(physical, factor).toString()))
                             }.start()
+                            if (askKeep) {
+                                val before = override
+                                val label = DISPLAY_FACTORS.firstOrNull { it.first == factor }?.second ?: value
+                                ScreenShapeRevert.propose("Display size $label") {
+                                    if (before == null || before == physical) TaskManager.shell.exec(listOf("wm", "density", "reset"))
+                                    else TaskManager.shell.exec(listOf("wm", "density", before.toString()))
+                                }
+                            }
                         },
                     ),
                 )
