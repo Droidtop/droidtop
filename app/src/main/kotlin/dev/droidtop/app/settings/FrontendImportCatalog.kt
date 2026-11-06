@@ -50,6 +50,19 @@ object FrontendImportCatalog {
                     ),
                 ),
                 CatalogGroup(
+                    id = "frontend_import_launchbox",
+                    title = "LaunchBox",
+                    items = listOf(
+                        DocumentPickItem(
+                            id = "frontend_import_launchbox_platform",
+                            title = "Favourites and play time",
+                            subtitle = "From a platform file, Data/Platforms/<platform>.xml; one platform at a time",
+                            mimeType = "*/*",
+                            onPicked = { ctx, uri -> importLaunchBoxPlatform(ctx, uri) },
+                        ),
+                    ),
+                ),
+                CatalogGroup(
                     id = "frontend_import_note",
                     title = null,
                     items = listOf(
@@ -94,6 +107,40 @@ object FrontendImportCatalog {
             }
         }
         return PegasusImport.reportLine(found, total, "${collections.size} collections")
+    }
+
+    /** Which LaunchBox games' play time was already brought in, so a second import adds none twice. */
+    private const val KEY_LAUNCHBOX_DONE = "droidtop_import_launchbox_played"
+
+    private suspend fun importLaunchBoxPlatform(context: Context, uri: Uri): String {
+        val text = readText(context, uri) ?: return "That file could not be read"
+        val games = dev.droidtop.library.imports.LaunchBoxImport.parse(text)
+        if (games.isEmpty()) return "No LaunchBox game in that file"
+        val library = LibraryCore.library(context)
+        val entries = roms(context)
+        val byId = entries.associateBy { it.id }
+        val paths = entries.map { it.id }
+        val prefs = dev.droidtop.library.settings.CatalogPrefs.prefs(context)
+        val done = withContext(Dispatchers.IO) { prefs.getStringSet(KEY_LAUNCHBOX_DONE, emptySet()).orEmpty().toMutableSet() }
+        var found = 0
+        var timed = 0
+        for (game in games) {
+            val entry = PegasusImport.match(listOf(game.matchPath), paths).ids.firstOrNull()?.let(byId::get) ?: continue
+            found++
+            if (game.favorite && !entry.favorite) library.toggleFavorite(entry)
+            // Play time as one session in "Your play", ending when LaunchBox last saw it played; once per game.
+            val key = game.id.ifEmpty { game.path }
+            if (game.playSeconds > 0 && key !in done) {
+                val end = dev.droidtop.library.imports.LaunchBoxImport.lastPlayedMs(game) ?: System.currentTimeMillis()
+                withContext(Dispatchers.IO) {
+                    dev.droidtop.library.settings.PlayLogStore.record(context, entry.id, entry.title, entry.systemId, end - game.playSeconds * 1000L, end)
+                }
+                done += key
+                timed++
+            }
+        }
+        withContext(Dispatchers.IO) { prefs.edit().putStringSet(KEY_LAUNCHBOX_DONE, done).apply() }
+        return PegasusImport.reportLine(found, games.size, "LaunchBox") + if (timed > 0) "; play time added for $timed" else ""
     }
 
     private suspend fun importPegasusFavorites(context: Context, uri: Uri): String {
