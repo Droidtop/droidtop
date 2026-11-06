@@ -42,11 +42,12 @@ class CompanionCatalogPanelTest {
         )
         // Brightness is drawn by the built-in screen's card above Display's rows (Droidtop/tracker#786 S7).
         assertEquals(quick(QuickSection.DISPLAY).map { it.id } - ON_SCREEN_CARD, cards.first { it.id == "display" }.items.map { it.id })
-        assertEquals(quick(QuickSection.AUDIO).map { it.id }, cards.first { it.id == "sound" }.items.map { it.id })
+        // Media volume is the Sound card's own Media slider (Droidtop/tracker#786 S8).
+        assertEquals(quick(QuickSection.AUDIO).map { it.id } - ON_STREAM_SLIDERS, cards.first { it.id == "sound" }.items.map { it.id })
         // Every Quick Menu item is on the companion exactly once.
         val all = cards.flatMap { card -> card.items.map { it.id } }
         assertEquals(all.size, all.toSet().size)
-        assertTrue((all + ON_SCREEN_CARD).containsAll(ids))
+        assertTrue((all + ON_SCREEN_CARD + ON_STREAM_SLIDERS).containsAll(ids))
     }
 
     @Test fun performanceModeIsOneCatalogIdOnPower() {

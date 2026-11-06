@@ -105,7 +105,9 @@ internal fun companionSystemCards(
         },
         folded = true,
     ),
-    SystemCard("sound", "Sound", section(QuickSection.AUDIO), folded = true),
+    // Media volume is the card's own Media slider, one per stream through VolumeControl (slice C19), so the catalog's
+    // copy is not drawn again (Droidtop/tracker#786 S8).
+    SystemCard("sound", "Sound", section(QuickSection.AUDIO).filter { it.id !in ON_STREAM_SLIDERS }, folded = true),
     // Network detail and Bluetooth devices, drawn by the card itself (slice C19).
     SystemCard("connections", "Connections", section(QuickSection.CONNECTIONS), folded = true),
     SystemCard("power", "Power", listOfNotNull(performanceMode), folded = true),
@@ -123,6 +125,9 @@ internal val ON_SCREEN_CARD = setOf(
     dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
     dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS_GRANT,
 )
+
+/** Rows the Sound card's per-stream sliders draw themselves (`CompanionStreamVolumes`). */
+internal val ON_STREAM_SLIDERS = setOf(dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_VOLUME)
 
 /** Rows whose one place on the companion is Accessibility (plan 4.5). */
 private val ON_ACCESSIBILITY = setOf(

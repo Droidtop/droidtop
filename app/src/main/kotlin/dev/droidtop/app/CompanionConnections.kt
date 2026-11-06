@@ -37,19 +37,13 @@ import kotlinx.coroutines.withContext
 
 /**
  * System > Sound's own rows (docs/SPEC.md "The companion's tabs", Sound and connections; Droidtop/tracker#414 slice
- * C19): a slider for each stream, every one through [VolumeControl], the one volume write path where Kid's cap holds,
- * and Android's output and volume panel.
+ * C19): a slider for each stream, every one through [VolumeControl], the one volume write path where Kid's cap holds.
  */
 @Composable
 internal fun CompanionStreamVolumes() {
-    val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // Outputs are the catalog's Audio output row under these, the same panel (Droidtop/tracker#786 S8).
         VolumeControl.Stream.entries.forEach { stream -> StreamSlider(stream) }
-        CompanionPill("Outputs") {
-            // Android's own volume and output panel (Android 10 and later), else its sound settings.
-            val panel = Intent(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Settings.Panel.ACTION_VOLUME else Settings.ACTION_SOUND_SETTINGS)
-            SettingsLaunch.start(context, panel.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
     }
 }
 
