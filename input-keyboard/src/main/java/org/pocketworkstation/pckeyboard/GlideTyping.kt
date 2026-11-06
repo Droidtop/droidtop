@@ -6,7 +6,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
-import kotlin.math.max
+import android.os.SystemClock
 
 /**
  * Glide typing on the keyboard (Droidtop/tracker#341): one finger drawn across the letter keys types a word. The view
@@ -14,8 +14,10 @@ import kotlin.math.max
  * and travels [GLIDE_START_KEYS] key widths becomes a glide, after which the view stops the ordinary key press and
  * draws the [trail]. On release the guesser's words go to [onWords], best first.
  *
- * The guesser ([GlideClassifier]) is built for each keyboard's letter keys and the language's glide words
- * ([KeyboardDictionaries.glideWords]) on a background thread; until it is ready, or with no words for the language,
+ * The guesser is a [GestureEngine] (Droidtop/tracker#903 H6, the gesture seam): droidtop's [GlideClassifier] unless a
+ * gesture library is set ([GestureEngines]). It is made for each keyboard's letter keys and the language's glide words
+ * ([KeyboardDictionaries.glideWords]) on a background thread, and is handed each stroke whole, with its timing, at
+ * release. Until it is ready, or with no words for the language,
  * nothing becomes a glide and the keys type as before. Main thread, except the build and the scoring at release,
  * which run on the glide's own thread; a guess that comes back after the keyboard changed or after a newer glide
  * ended is dropped.
@@ -24,7 +26,7 @@ class GlideTyping(private val onWords: (List<String>) -> Unit) {
     private val main = Handler(Looper.getMainLooper())
 
     @Volatile
-    private var classifier: GlideClassifier? = null
+    private var engine: GestureEngine? = null
     private var generation = 0
     /** Counts finished glides, so only the newest one's words are typed. */
     private var glides = 0
@@ -36,6 +38,8 @@ class GlideTyping(private val onWords: (List<String>) -> Unit) {
     private var active = false
     private var downX = 0
     private var downY = 0
+    /** The touch's points with their times, for the engine. */
+    private val stroke = GestureStroke()
     private val trailX = IntArray(GlideClassifier.MAX_GESTURE_LENGTH)
     private val trailY = IntArray(GlideClassifier.MAX_GESTURE_LENGTH)
     private var trailSize = 0
@@ -53,37 +57,37 @@ class GlideTyping(private val onWords: (List<String>) -> Unit) {
     fun prepare(keyboard: Keyboard) {
         this.keyboard = keyboard
         val gen = ++generation
-        classifier = null
+        engine = null
         val keys = keyboard.keys.filter { it.codes != null && it.codes.isNotEmpty() && Character.isLetter(it.codes[0]) }
-            .map { GlideClassifier.Key(String(Character.toChars(it.codes[0])).lowercase(), it.x, it.y, it.width, it.height) }
+            .map { GestureKey(String(Character.toChars(it.codes[0])).lowercase(), it.x, it.y, it.width, it.height) }
         if (keys.size < MIN_LETTER_KEYS) return
-        keyWidth = max(1, keys.map { it.width }.sorted()[keys.size / 2])
+        val layout = GestureLayout(keys)
+        keyWidth = layout.keyWidth
         val source = words ?: return
         worker.execute {
             val loaded = logged("glide words not read") { source() }.getOrNull() ?: return@execute
-            val built = GlideClassifier(keys, minPointDistance = max(4, keyWidth / 6), startKeyProximity = keyWidth * 3 / 2)
-            built.load(loaded.first, loaded.second)
-            main.post { if (gen == generation) classifier = built }
+            val built = GestureEngines.create(layout, loaded.first, loaded.second)
+            main.post { if (gen == generation) engine = built }
         }
     }
 
     /** A finger went down at (x, y); [onLetter] when that is a letter key. */
     fun down(x: Int, y: Int, onLetter: Boolean) {
         cancel()
-        val c = classifier ?: return
+        if (engine == null) return
         if (!onLetter) return
         tracking = true
         downX = x
         downY = y
-        c.clear()
-        add(c, x, y)
+        stroke.clear()
+        add(x, y)
     }
 
     /** The finger moved; true once this touch is a glide (the view then keeps it from the keys). */
     fun move(x: Int, y: Int): Boolean {
         if (!tracking) return false
-        val c = classifier ?: return false.also { cancel() }
-        add(c, x, y)
+        if (engine == null) return false.also { cancel() }
+        add(x, y)
         if (!active) {
             val dx = (x - downX).toLong()
             val dy = (y - downY).toLong()
@@ -99,15 +103,16 @@ class GlideTyping(private val onWords: (List<String>) -> Unit) {
             cancel()
             return false
         }
-        val c = classifier
-        if (c != null) {
-            add(c, x, y)
-            val path = c.path()
-            if (path != null) {
+        val e = engine
+        if (e != null) {
+            add(x, y)
+            if (stroke.size > 0) {
+                // The engine scores a copy, so the next touch never changes a stroke being scored.
+                val whole = stroke.copy()
                 val gen = generation
                 val glide = ++glides
                 worker.execute {
-                    val found = c.candidates(path)
+                    val found = e.recognize(whole)
                     if (found.isNotEmpty()) main.post { if (gen == generation && glide == glides) onWords(found) }
                 }
             }
@@ -125,12 +130,12 @@ class GlideTyping(private val onWords: (List<String>) -> Unit) {
     /** Forgets the guesser (the language changed, or glide was turned off). */
     fun clear() {
         generation++
-        classifier = null
+        engine = null
         cancel()
     }
 
-    private fun add(c: GlideClassifier, x: Int, y: Int) {
-        c.addPoint(x, y)
+    private fun add(x: Int, y: Int) {
+        stroke.add(x, y, SystemClock.uptimeMillis())
         if (trailSize < trailX.size) {
             trailX[trailSize] = x
             trailY[trailSize] = y
