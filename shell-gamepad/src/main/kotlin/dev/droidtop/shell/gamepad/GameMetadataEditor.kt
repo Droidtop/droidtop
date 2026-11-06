@@ -74,6 +74,12 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
     androidx.activity.compose.BackHandler { onDismiss() }
     val scope = rememberCoroutineScope()
     var loaded by remember { mutableStateOf<GameMetadataEntity?>(null) }
+    // The person's own rating and status (Droidtop/tracker#722), read off the main thread.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var mark by remember { mutableStateOf(dev.droidtop.library.settings.GameMark()) }
+    LaunchedEffect(entry.id) {
+        mark = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { dev.droidtop.library.settings.GameMarks.of(context, entry.id) }
+    }
     var pickingController by remember { mutableStateOf(false) }
     var pickingEmulator by remember { mutableStateOf(false) }
     val emulators = rememberSystemEmulators(entry)
@@ -168,6 +174,24 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
                     // Real ES-DE MD_RATING convention: 0.0-1.0.
                     MetadataTextRow("Rating (0.0-1.0)", current.rating?.toString() ?: "", keyboardType = KeyboardType.Decimal) {
                         loaded = current.copy(rating = it.toFloatOrNull()?.coerceIn(0f, 1f))
+                    }
+                }
+
+                // The person's own marks (Droidtop/tracker#722): saved at once, apart from the scraped fields above, so
+                // a scrape never changes them and the scraped rating stays the scraped one.
+                item { SectionLabel("Yours") }
+                item {
+                    MetadataPickerRow("My rating", dev.droidtop.library.settings.GameMarks.starsLine(mark.stars)) {
+                        mark = mark.copy(stars = (mark.stars + 1) % 6)
+                        val saved = mark
+                        scope.launch { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { dev.droidtop.library.settings.GameMarks.set(context, entry.id, saved) } }
+                    }
+                }
+                item {
+                    MetadataPickerRow("Status", mark.status.label) {
+                        mark = mark.copy(status = mark.status.next())
+                        val saved = mark
+                        scope.launch { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { dev.droidtop.library.settings.GameMarks.set(context, entry.id, saved) } }
                     }
                 }
 
