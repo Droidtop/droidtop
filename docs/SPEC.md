@@ -2763,49 +2763,75 @@ Desktop mode to be considered working:
    the compositor's desktop, and text typed into it executes (verified by
    `echo droidtop-typed` printing its output).
 
-**Retroid Pocket 5 (Android 13, arm64-v8a) — verification needed.** The
-emulator run was x86_64 on API 34; the Retroid is the project's target
-hardware and has never run Desktop mode. The following differences may
-surface blockers:
+**Desktop mode on hardware: what has been verified (as of 2026-11-06, Droidtop/tracker#912).**
+The Retroid Pocket 5 (Android 13, arm64-v8a, the console) has run Desktop mode on the proot backend since
+2026-10-16; the possible blockers once listed for it (ptrace, arm64 seccomp, the installed ABI, memfd_create, sway on
+arm64) did not stop it. Every console run so far was unrooted proot with Alpine and sway. A row is "Verified on RP5"
+only where a console run's posted result says it passed; "Not verified" is the default.
 
-- **ptrace permission** — BlueStacks (Android 9 x86_64) refuses
-  `ptrace(PTRACE_TRACEME)` to app processes (dq-desktop-04). The Retroid's
-  vendor kernel may or may not allow it. `ProotRuntime.checkSystemRequirements`
-  will report the exact error if blocked (e.g. "proot error: ptrace(TRACEME):
-  Operation not permitted").
+| Area | Status | What was seen | Source |
+|---|---|---|---|
+| proot boot | Verified on RP5 2026-10-16, build 1964; again 2026-11-04, build 2927 (aarch64) | Desktop setup pulled alpine with sway and came up in under 2 minutes, no error | [#555](https://github.com/Droidtop/tracker/issues/555#issuecomment-6216149533), [#683](https://github.com/Droidtop/tracker/issues/683#issuecomment-6649117653) |
+| sway and host-bridge | Verified on RP5 2026-10-16, build 1964; 2026-11-04, build 2927 | sway's desktop drawn at 1920x1080, 360 dpi, under droidtop's one bar; touch reached windows | [#555](https://github.com/Droidtop/tracker/issues/555#issuecomment-6216149533), [#683](https://github.com/Droidtop/tracker/issues/683#issuecomment-6649117653) |
+| Start launching an app | Verified on RP5 2026-10-16, build 1964; 2026-10-29 (build not recorded); 2026-11-04, build 2927 | Start > System > Terminal opened Foot; Foot and PCManFM open floating; the window sheet's Maximize, Snap and Restore size work | [#555](https://github.com/Droidtop/tracker/issues/555#issuecomment-6216149533), [#686](https://github.com/Droidtop/tracker/issues/686#issuecomment-6501403369), [#686](https://github.com/Droidtop/tracker/issues/686#issuecomment-6649117909) |
+| typed input | Verified on RP5 2026-10-16, build 2011, with keys injected by adb | `echo AbC_X-Y` exact, Ctrl+C, Alt, Ctrl+minus and Ctrl+equals pass. Failed: Meta never reached Foot, and Ctrl stayed latched after Ctrl+B (fixed in a921c10d, not re-run on the console). The on-screen keyboard comes up on Foot (2026-10-29); typing through it into Foot passed on the AVD only (build 2936) | [#555](https://github.com/Droidtop/tracker/issues/555#issuecomment-6221794527), [#555](https://github.com/Droidtop/tracker/issues/555#issuecomment-6222503343), [#685](https://github.com/Droidtop/tracker/issues/685#issuecomment-6501271582), [#685](https://github.com/Droidtop/tracker/issues/685#issuecomment-6651417396) |
+| audio (proot) | Verified on emulator only (emulator-5560, build 1094, 2026-09-29) | `pactl` answered on the shared socket and a `pacat` stream ran on the AAudio sink; not heard (the emulator ran without audio). Never run on the console, whose arm64 PulseAudio set is droidtop's own build since #857 (2026-11-04) | [#95](https://github.com/Droidtop/tracker/issues/95#issuecomment-5890248174) |
+| audio (droidspaces) | Not verified | no run on any rooted device | [#758](https://github.com/Droidtop/tracker/issues/758#issuecomment-6645760661) |
+| droidspaces backend | Not verified | no rooted run; the console has Magisk, and the backend of its 2026-10-29 run was not recorded | [#394](https://github.com/Droidtop/tracker/issues/394#issuecomment-6504430561) |
+| Debian plan | Not verified | every run used alpine with sway | none |
+| labwc | Not verified | no run found | none |
+| siblings | Not verified | D5's sibling exports were not run (no session on 2026-10-15); `docker` and `podman` containers ran, but none drew a window | [#555](https://github.com/Droidtop/tracker/issues/555#issuecomment-6192258414) |
+| clipboard | Not verified | no run found | none |
+| rotation | Not verified | no run found | none |
+| second screen | Not verified | built 2026-11-05 and 2026-11-06 (#908, steps D1 to D5); not run on any device | [#908](https://github.com/Droidtop/tracker/issues/908#issuecomment-6674072823) |
+| docker/podman CLI (D14/D15) | Verified on RP5 2026-10-16, builds 1964 and 2011, in part | `docker info` named the backend and kernel features; `run -d`, `ps`, `inspect`, `exec`, `logs`, `stop`, `rm`, `images` and podman's `pull`, `run --rm`, `pod create/ps/rm` passed. Failed: on 1964 the sockets answered one `_ping` and then refused (fixed in 3497bb97; on 2011 the docker CLI reached the API); on 2011 an attached `docker run` logged a wait error, `docker run --rm` hung, `docker version` had no Server block and `podman network` was refused (fixed in d0e571ef, not re-run on the console) | [#555](https://github.com/Droidtop/tracker/issues/555#issuecomment-6216149533), [#555](https://github.com/Droidtop/tracker/issues/555#issuecomment-6221794527), [#555](https://github.com/Droidtop/tracker/issues/555#issuecomment-6222171663) |
 
-- **seccomp policy on arm64** — the fork/vfork→clone patch (build-scripts/proot-patches/0001)
-  addresses x86_64 only (Android's arm64 app seccomp policy does not trap
-  fork/vfork syscalls). No arm64-specific seccomp issue is known, but the
-  Retroid's vendor policy may differ from the stock emulator.
+**Rig run for #912** (the console, run by the coordinator; record the build number, the date and, for each step, pass or
+fail with the exact text or log line seen). The steps of branches still to land are in their own commits: the #909
+terminal (`ci/container-terminal`), the #910 X11 siblings and title-bar buttons (`ci/sibling-x11`,
+`ci/desktop-titlebar-buttons`) and the #911 sizes (`ci/container-sizes-cache`); run the rig steps in that branch's commit
+once it lands, not copies of them here.
 
-- **ABI match** — droidtop ships fat APKs with arm64-v8a proot binaries.
-  `ProotRuntime.installedAbiMismatch()` checks that the installed ABI equals
-  `Build.SUPPORTED_64_BIT_ABIS[0]`; a mismatch (e.g. if Android installs the
-  x86_64 slice on an arm64 device) is reported explicitly.
-
-- **memfd_create** — Android 13 (API 33) has memfd_create; proot's
-  `--ashmem-memfd` option is a no-op where memfd works. The emulator run
-  needed the keymap memfd fix (§6b); the same fix applies on arm64.
-
-- **Wayland compositor on arm64** — sway and wlroots are architecture-
-  agnostic; the Alpine arm64 packages exist. No code change is expected.
-
-**Needs a rig check** (to be run by the coordinator on the Retroid Pocket 5):
-1. Open droidtop, complete onboarding, enable Desktop mode in Global settings.
-2. Open Desktop mode — the viewport should show "Start the desktop"; press it.
-3. Watch logcat (`droidtop.proot` and `droidtop.DesktopSession`) for the four
-   milestones above. Record which pass and which fail, with exact error text.
-4. If milestone 1 fails, capture the full `checkSystemRequirements` stderr —
-   that is the "exact cause" to document (as was done for BlueStacks' ptrace
-   refusal at SPEC §3 line 1060-1064).
-5. If milestones 1-2 pass but 3 fails, capture host-bridge connection logs
-   (socket path, connection result, output resize).
-6. If milestones 1-3 pass but 4 fails, capture Start menu UI and Foot launch
-   logs (desktop entry parsing, exec result, input injection).
-
-Not verified yet (tracked separately): the Debian plan, labwc, sibling
-containers through this backend, clipboard, rotation, and the second screen.
+- **proot** (Elevated access Off, or Shizuku started over ADB):
+  1. Desktop setup shows "Desktop can run here (not rooted, a little slower)." Record the sentence. If it refuses, record
+     `logcat -s droidtop.proot` from the check, the exact `checkSystemRequirements` error.
+  2. Start the desktop; record the time to the first frame and whether `files/proot/containers` exists.
+  3. Start > Linux apps > Foot; type `echo Hello: 1|2` on the on-screen keyboard and Enter. Record the line Foot prints.
+  4. In Foot, `cat -v`, then Ctrl+B and Enter on droidtop's keyboard: record whether Enter prints a plain newline
+     (the a921c10d fix), and whether Super+Enter opens a new Foot.
+  5. `docker run --rm alpine echo hi`, `docker version` and `podman network create n1 && podman network ls`. Record
+     each output and whether the prompt returns (the d0e571ef fixes).
+- **droidspaces** (Shizuku started as root, or Sui; droidtop allowed):
+  1. Desktop setup shows "Desktop can run here (rooted, full speed)". Record the sentence and
+     `logcat -s droidtop.droidspaces`.
+  2. Start the desktop. Record whether it draws, and which backend ran: `files/droidspaces` holds the container, and
+     this run wrote nothing under `files/proot/containers`.
+  3. Repeat proot's steps 3 and 5. Record `docker info`'s backend and kernel-feature lines.
+  4. Magisk's superuser log: record any entry for `dev.droidtop.app` (there should be none; root comes through
+     Shizuku or Sui).
+- **audio**:
+  1. proot: in Foot, `apk add pulseaudio-utils`, `pactl info`, then `speaker-test -t sine -l 1` or `pacat` of a file.
+     Record the server and default sink `pactl info` names, whether it is heard from the console's speaker, and any
+     "audio bridge did not start" in `logcat -s droidtop.audiobridge`.
+  2. Turn the container's Audio row off and restart the desktop: record whether `echo $PULSE_SERVER` in a new Foot
+     is empty and the test is silent.
+  3. Microphone switch on, RECORD_AUDIO granted: `parecord -d droidtop_mic /tmp/m.wav` for five seconds while
+     speaking, then play it back. Record whether the voice is heard, and any "microphone not bridged" line.
+  4. droidspaces: repeat 1. Record whether it is heard, and what `PULSE_SERVER` names.
+- **clipboard**:
+  1. Copy a word in an Android app (the browser's address bar). In Foot, Ctrl+Shift+V (or `wl-paste` after
+     `apk add wl-clipboard`). Record what arrives.
+  2. Select a word in Foot, Ctrl+Shift+C, then paste in an Android text field. Record what arrives.
+  3. Record the bar's Clipboard chip as shown, and `logcat -s droidtop.Clipboard` ("Clipboard bridge started", any
+     "Not reading the clipboard").
+- **rotation**:
+  1. With Foot and PCManFM open, turn the console to portrait and back (auto-rotate on). Record whether the desktop
+     redraws at the new size (`swaymsg -t get_outputs`), whether both windows survive, and where the bar sits.
+  2. Record `logcat -s hostbridge.outputs` for the resize.
+- **second screen** (the Dual-Screen Add-on, then a monitor or TV on DP if one is to hand): run the rig steps in the
+  #908 commits on main (bb69acb1d for the per-screen question, c272953bf for the second output's surface and touch,
+  4a4338969 for moving windows). Record for each screen: whether it was asked, which choice was pre-selected, whether
+  the desktop draws there with its own bar, and whether touch lands under the finger on both screens.
 
 **What the pipeline did off-device (2026-09-24).** Termux's proot built for
 x86_64 Linux, a stock Alpine rootfs owned by an unprivileged user, the exact
@@ -2863,7 +2889,9 @@ silently ignored. Its answer names the feature and why it is not here: "`--memor
 kernel does not have", "... which droidtop can use here only with root (Shizuku or Sui started as root)", "... which
 this device does not let droidtop use"; where the feature is here, "not built in droidtop yet (this device has
 cgroups)" until the engine applies it. `--network host` and `--pid host` are what droidtop's containers already are
-and are taken. The RP5 is expected to have none of them; `docker info` there is the check.
+and are taken. On the RP5 (2026-10-16, build 1964, unrooted) `docker info` said user and PID namespaces are not in its
+kernel, and mount, network and hostname namespaces, cgroups and overlayfs are, but need root
+([#555](https://github.com/Droidtop/tracker/issues/555#issuecomment-6216149533)).
 
 ## 3a. Image index — populated live, not a pinned/prepopulated catalog
 
@@ -3730,12 +3758,12 @@ the `ContainerRuntime` interface that already exists (§3):
   fixed alongside this work, since `recreateFromImage` needed one and the
   container page's own image line was silently blank for every
   droidspaces container. Rig-checked on emulator-5560 (proot backend);
-  the droidspaces backend is unverified against a live container, same
-  standing caveat as the rest of that class -- no rooted device available
-  here. The proot audio bridge itself is unverified on a live device too
-  (needs a rig check, see the commit that landed it): the AAudio sink and
-  the extracted-modules path are new here, not proven on-device the way
-  the rest of gamenative's own PulseAudio use is.
+  the droidspaces backend, its audio included, has not run against a live
+  container on any device. The proot audio bridge reached the AAudio sink
+  on emulator-5560 (build 1094, 2026-09-29, Droidtop/tracker#95: a stream
+  ran on the sink, not heard, the emulator having no audio) and has never
+  run on the console; section 3's "Desktop mode on hardware" table is the
+  record.
   **Microphone (Droidtop/tracker#80, 2026-09-28).** The device microphone
   is a source on that same server, not a second mechanism: with the
   Sockets group's "Microphone" switch on (off by default; one switch for
@@ -25202,9 +25230,10 @@ Wi-Fi only (§10b).
 ## 11. Open risks to verify hands-on, not assume
 
 - Whether sway's headless backend + `wlr-screencopy` performs well enough
-  for gaming-relevant latency and framerate on the handheld. It is shown
-  working on the stock x86_64 emulator (§3); an arm64 device is untested,
-  and this is novel usage no prior art measured.
+  for gaming-relevant latency and framerate on the handheld. It runs on the
+  stock x86_64 emulator and on the RP5 (arm64, proot, since 2026-10-16, §3's
+  "Desktop mode on hardware" table), but latency and framerate have not been
+  measured on either, and this is novel usage no prior art measured.
 - Whether Wine's native Wayland driver (as opposed to Xwayland) is solid
   enough for Wine run inside Desktop mode's container; Xwayland inside the
   container is the fallback. Wine games launched from the library do not
