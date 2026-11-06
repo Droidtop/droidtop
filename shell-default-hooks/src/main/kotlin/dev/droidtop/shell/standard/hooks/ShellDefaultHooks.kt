@@ -1,9 +1,12 @@
 package dev.droidtop.shell.standard.hooks
 
 import android.content.Context
+import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import app.murinelauncher.hooks.ActionHooks
 import app.murinelauncher.hooks.AppHooks
+import app.murinelauncher.hooks.HomeHooks
 import app.murinelauncher.hooks.MenuHooks
 import app.murinelauncher.hooks.MurineHooks
 import app.murinelauncher.hooks.NoticeHooks
@@ -14,10 +17,15 @@ import dev.droidtop.library.settings.PluginShellHooks
 import dev.droidtop.runtime.CompanionSheet
 import dev.droidtop.runtime.LauncherSelfFilter
 import dev.droidtop.runtime.keyboard.AccessibilityHost
+import com.android.launcher3.Launcher
+import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.ClearAllApps
 import dev.droidtop.shell.standard.DroidtopScreens
+import dev.droidtop.shell.standard.HomeHints
+import dev.droidtop.shell.standard.HomeRolePrefs
 import dev.droidtop.shell.standard.LauncherSearch
 import dev.droidtop.shell.standard.ModeSwitcher
+import dev.droidtop.shell.standard.StandardPadHints
 import dev.droidtop.ui.shared.MenuViews
 
 /**
@@ -38,6 +46,7 @@ object ShellDefaultHooks {
         MurineHooks.search = SearchHooks { c, query -> LauncherSearch.open(c, query.orEmpty()) }
         // droidtop is the launcher's own package: its one icon and its widgets show (docs/SPEC.md 2c).
         MurineHooks.apps = AppHooks { className, isWidgetProvider -> LauncherSelfFilter.shown(className, isWidgetProvider) }
+        MurineHooks.home = DroidtopHome
     }
 
     /**
@@ -108,6 +117,29 @@ object ShellDefaultHooks {
         private fun remember(entries: List<Pair<String, PluginShellHooks.MenuEntry>>) {
             val prefix = entries.firstOrNull()?.first?.substringBefore(':') ?: return
             pluginEntries = pluginEntries.filterKeys { !it.startsWith("$prefix:") } + entries
+        }
+    }
+
+    /**
+     * droidtop's work around the Standard home: as it shows, its own icon asked for at the end of setup is placed
+     * (HomeRolePrefs), its in-place hint shows until done (HomeHints, Droidtop/tracker#829) and the pad's hint row is
+     * laid out (StandardPadHints, Droidtop/tracker#699); keys and touches tell that row which input is in use; a long
+     * Back opens the mode menu (BackButtonMenu).
+     */
+    private object DroidtopHome : HomeHooks {
+        override fun onHomeShown(launcher: Launcher) {
+            HomeRolePrefs.placePendingIcon(launcher)
+            HomeHints.onHomeShown(launcher)
+            StandardPadHints.onHomeShown(launcher)
+        }
+
+        override fun onKey(event: KeyEvent) = StandardPadHints.noteKey(event)
+
+        override fun onTouch(event: MotionEvent) = StandardPadHints.noteTouch(event)
+
+        override fun onBackLongPress(launcher: Launcher): Boolean {
+            BackButtonMenu.show(launcher)
+            return true
         }
     }
 }

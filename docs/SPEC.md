@@ -551,7 +551,7 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   Mobile keeps the system bars. Standard keeps them too unless the person turns on Settings > Home > **Hide
   status bar** or **Hide navigation bar** (Droidtop/tracker#703; off by default, the second only where the device
   draws a navigation bar). They hide the home's own bars with a swipe to show them for a moment
-  (`StandardSystemBars`, applied as the home resumes), so an app opened from it keeps its own.
+  (the Murine launcher's `SystemBars`, applied as the home resumes), so an app opened from it keeps its own.
 - **One listener feeds the container's window list.** The bridge has room for one change listener, so the
   taskbar and the windows sheet read the same list.
 - **Android apps and games started from Desktop are in the bar** (Droidtop/tracker#352). A game or an app
@@ -2144,11 +2144,11 @@ same as the rest of droidtop's chrome — Murine's stock pages already satisfy
 this by inheriting Launcher3's own d-pad/keyboard navigation, and
 `ContinuePlayingWidgetProvider`'s rows are ordinary focusable/clickable
 widget views, reachable the same way any home-screen widget is. The pad's
-other buttons have a Mobile meaning of their own (`StandardPad`,
+other buttons have a Mobile meaning of their own (the Murine launcher's `PadKeys`,
 Droidtop/tracker#699): L1/R1 turn the home pages, X opens the focused item's
 own menu (what a long press opens), Y opens the one search, Start opens the
 mode switcher, and B is Android's Back (it closes the drawer, a folder or a
-menu). **The pad's hint row** (`StandardPadHints`, Droidtop/tracker#699): the shared
+menu). **The pad's hint row** (`StandardPadHints`, through the launcher's `MurineHooks.home`, Droidtop/tracker#699): the shared
 `HintRow` above the dock (`HintViews.padRow`), drawn only while a pad was the
 last input (`PadModality`: the launcher reports pad keys and touches) and gone
 at the first touch, its pills on their own plates over the wallpaper and each
