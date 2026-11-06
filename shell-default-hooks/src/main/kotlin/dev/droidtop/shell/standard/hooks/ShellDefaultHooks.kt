@@ -3,13 +3,16 @@ package dev.droidtop.shell.standard.hooks
 import android.content.Context
 import android.view.View
 import app.murinelauncher.hooks.ActionHooks
+import app.murinelauncher.hooks.AppHooks
 import app.murinelauncher.hooks.MenuHooks
 import app.murinelauncher.hooks.MurineHooks
 import app.murinelauncher.hooks.NoticeHooks
+import app.murinelauncher.hooks.SearchHooks
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notices
 import dev.droidtop.library.settings.PluginShellHooks
 import dev.droidtop.runtime.CompanionSheet
+import dev.droidtop.runtime.LauncherSelfFilter
 import dev.droidtop.runtime.keyboard.AccessibilityHost
 import dev.droidtop.shell.standard.ClearAllApps
 import dev.droidtop.shell.standard.DroidtopScreens
@@ -31,6 +34,10 @@ object ShellDefaultHooks {
         }
         MurineHooks.actions = DroidtopActions
         MurineHooks.menus = DroidtopMenus
+        // The launcher's one search is droidtop's library search (docs/SPEC.md "Launcher search").
+        MurineHooks.search = SearchHooks { c, query -> LauncherSearch.open(c, query.orEmpty()) }
+        // droidtop is the launcher's own package: its one icon and its widgets show (docs/SPEC.md 2c).
+        MurineHooks.apps = AppHooks { className, isWidgetProvider -> LauncherSelfFilter.shown(className, isWidgetProvider) }
     }
 
     /**
@@ -42,7 +49,6 @@ object ShellDefaultHooks {
         private val runners: Map<String, (Context) -> Unit> = mapOf(
             "CLEAR_ALL_APPS" to { c -> ClearAllApps.open(c) },
             "OPEN_COMPANION" to { c -> CompanionSheet.open(c, false) },
-            "OPEN_SEARCH" to { c -> LauncherSearch.open(c) },
             "OPEN_QUICK_MENU" to { c -> DroidtopScreens.openQuickMenu(c) },
             "SWITCH_MODE" to { c -> ModeSwitcher.open(c) },
             "OPEN_GAMES" to { c -> DroidtopScreens.openGames(c) },
