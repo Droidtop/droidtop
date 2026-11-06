@@ -23,6 +23,8 @@ internal object ContainerClone {
                 ?.copyTo(ContainerProgram.overridesFile(files, copy.id))
         }
         ContainerPrograms.recordCreated(context.applicationContext, copy.id)
+        // The list measures the copy, and the original again (Droidtop/tracker#911).
+        ContainerSizes.forget(info.container.id)
         return copy
     }
 }

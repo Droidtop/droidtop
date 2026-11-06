@@ -72,14 +72,20 @@ class CraneRootfsPuller(
         // touches the registry.
         if (unpacker.isCurrent(destinationPath, digest)) return null
 
-        val stored = store.pull(resolved)
-        // Read before the cache policy may evict it (docs/SPEC.md 3, "The image's own program").
-        val runConfig = runCatching { ImageRunConfig.fromImageConfig(store.blob(stored.config.digest).readText()) }.getOrNull()
-        unpacker.wipe(destinationPath)
-        unpacker.extract(RootfsContent { sink -> OciFlattener.flatten(store, stored, sink) }, destinationPath)
-        unpacker.markComplete(destinationPath, digest)
+        // In use from before the pull until the rootfs is written, so another create's eviction, a lowered limit or
+        // Clear cannot take its layers mid-unpack (docs/SPEC.md 3, "Storage is checked before it is spent").
+        val (stored, runConfig) = store.using(digest) {
+            val stored = store.pull(resolved)
+            // Read before the cache policy may evict it (docs/SPEC.md 3, "The image's own program").
+            val runConfig = runCatching { ImageRunConfig.fromImageConfig(store.blob(stored.config.digest).readText()) }.getOrNull()
+            unpacker.wipe(destinationPath)
+            unpacker.extract(RootfsContent { sink -> OciFlattener.flatten(store, stored, sink) }, destinationPath)
+            unpacker.markComplete(destinationPath, digest)
+            stored to runConfig
+        }
 
-        if (policy.enabled) store.evictToFit(policy, keep = digest) else store.remove(digest)
+        // Cache off keeps nothing new; an image that was already kept stays until it is cleared.
+        if (!policy.enabled && stored.downloaded) store.removeUnlessInUse(digest) else store.evictToFit(policy, keep = digest)
         return runConfig
     }
 

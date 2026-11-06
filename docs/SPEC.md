@@ -2715,6 +2715,42 @@ person can see what can be reclaimed. The cache is a settings group
 of its own on the Desktop settings catalog — on/off, the cap, the space
 in use, Clear — rather than a policy object nothing exposes.
 
+**The image cache's settings (built 2026-11-06, Droidtop/tracker#911).**
+The coordinator's brief: "Add rows under Settings › Containers, persisted
+like the other container settings, read by both backends via the
+factory"; "Over the limit, evict least-recently-used images. Never evict
+an image in use by an in-progress create. Eviction runs after each pull
+and when the limit is lowered." The group is "Downloaded images" on the
+Containers screen (`ContainersCatalog.imageCacheItems`), under the
+Images row, which Desktop settings opens in place:
+- **Keep downloaded images**, on by default. Off keeps nothing new: an
+  image a create downloaded is removed once its rootfs is written
+  (`OciImageStore.removeUnlessInUse`); the images already kept stay until
+  cleared, and no limit evicts them while it is off. A `docker pull` is
+  asked for by name and is kept either way.
+- **Cache size limit**: 2 GB (the default), 5 GB, 10 GB or No limit
+  (`ImageCachePolicy.LIMITS`). Decimal gigabytes, as `ValueFormat`
+  counts, so a full 2 GB cache reads "2.0 GB" beside its "2 GB" limit
+  (the default was 2 GiB before; it is now 2 000 000 000 bytes). Over
+  the limit the images used longest ago go first
+  (`ImageCacheEviction.victims`): a layer two images share frees nothing
+  until both are gone, and never the image just pulled nor one an
+  in-progress create is using (`OciImageStore.using`, held from before
+  the pull until the rootfs is written, process-wide like the store's
+  lock). When those alone are over the limit, the cache stays over it
+  rather than break a create. Eviction runs after every pull (a create's,
+  and `docker pull`'s through `ContainerRuntimeFactory.fitImageCache`)
+  and at once when the limit is changed.
+- **Clear** shows the space the kept images take, asks first, and deletes
+  them (`OciImageStore.clear`): never a container (each has its own copy
+  of its image's files), never an image a create is using.
+Both settings live in the shared preferences beside the desktop's other
+container settings (`DesktopSetupPrefs.imageCachePolicy`), and both
+backends read them at each pull through the policy provider
+`ContainerRuntimeFactory` hands them, so a change applies without a new
+runtime. The cache only manages what was downloaded: droidtop never builds
+or publishes an image.
+
 **Onboarding's Desktop step** asks the selected backend to prove itself
 (`ContainerRuntime.checkSystemRequirements`: droidspaces' own `check`, or a
 trivial program run under proot against the device's root), instead of
@@ -3287,7 +3323,31 @@ the `ContainerRuntime` interface that already exists (§3):
   twelve characters, and its state (Starting and Running for the primary
   from the session, Running for a sibling with programs in it, Stopped
   for one that must be started, Ready for a proot sibling, which needs no
-  start). A container's page: the primary action (Start the desktop, which
+  start) with its size on disk beside it ("Running · 1.2 GB").
+  **Its size in the list (built 2026-11-06, Droidtop/tracker#911).** The
+  coordinator: "Reuse the measurement the container page's 'Storage used'
+  already does ... Measure off the main thread and cache per container
+  until it changes ... Reopening the list must not re-measure
+  everything. Show 'Measuring…' until known." The size is the page's own
+  `ContainerRuntime.diskUsageBytes` (`ContainerDiskUsage`), run on the IO
+  scope one container at a time (`ContainerSizes` in :app) and kept per
+  container (`ContainerSizeCache`); the row says "Measuring…" until it is
+  known, and the screen is read again as each one arrives
+  (`CatalogScreen.live`; the Preference surface, which does not follow
+  `live`, shows it on the next visit). A kept size holds while the
+  container's state (running or not) and image digest are the same, so a
+  start or stop anywhere, or a remake from another image, measures it
+  again; "Update its software", Terminal's first install, a restore, a
+  copy, Recreate and Delete forget it, and a walk begun before one of
+  those is thrown away. Opening the container's page measures it as
+  always and the list keeps that answer. Where droidtop cannot read the
+  whole tree (droidspaces' is root's, and folders such as `/root` are
+  closed to the app) the walk fails rather than return a short total, so
+  the row shows no size and "Storage used" says Unknown: no size rather
+  than a wrong one, and no root route is added for it (non-root first).
+  Settings search reads Create, Images and the image cache rows
+  (`indexGroups`), not the container rows, so indexing measures nothing.
+  A container's page: the primary action (Start the desktop, which
   opens Desktop; Stop the desktop, which ends the session; Start or Stop
   for a sibling), Terminal (and Terminal here while the desktop is up, "A terminal on
   Android" above), Name (a refused rename says why on the Name
@@ -3749,7 +3809,9 @@ the `ContainerRuntime` interface that already exists (§3):
   and re-create from the SAME recorded image reference, name and role,
   the PRIMARY's provisioning plan carried over -- each backend implements
   it itself, since where the plan lives differs), `diskUsageBytes` (a
-  real recursive walk of the rootfs tree, `ContainerDiskUsage`, shared by
+  real recursive walk of the rootfs tree, `ContainerDiskUsage`, which
+  fails rather than skip a folder it cannot read, since 2026-11-06,
+  Droidtop/tracker#911, and is also the list's size per row; shared by
   both backends as a default method), `sockets`/`setSockets`
   (`ContainerSockets(waylandShared, audioShared)`) and
   `mounts`/`setMounts` (`EnvironmentMounts`: the home, below, and the

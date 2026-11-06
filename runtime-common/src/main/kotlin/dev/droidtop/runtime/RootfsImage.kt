@@ -23,16 +23,37 @@ data class RootfsImage(
  * User-facing choice, not just an implementation detail: keeping pulled
  * images around means re-creating/duplicating a container (e.g. spinning up
  * a second Debian sibling) doesn't re-download anything, at the cost of
- * on-device storage. [OciImageStore] holds them; with [enabled] false an
- * image is removed from it once its rootfs is written.
+ * on-device storage. [OciImageStore] holds them. With [enabled] false
+ * nothing new is kept: an image a create downloaded is removed once its
+ * rootfs is written, and the images already kept stay until they are
+ * cleared ("Keep downloaded images", docs/SPEC.md 3 "Storage is checked
+ * before it is spent"). Read from Settings > Containers through
+ * `ContainerRuntimeFactory`, never fixed by a backend.
  */
 data class ImageCachePolicy(
     val enabled: Boolean,
     val maxCacheBytes: Long? = null, // null = unbounded; least recently used images are evicted when exceeded
 ) {
     companion object {
+        // Decimal, as ValueFormat counts, so a full 2 GB cache reads "2.0 GB" beside its "2 GB" limit.
+        private const val GB = 1_000_000_000L
+        private const val NO_LIMIT = "none"
+
         /** docs/SPEC.md §3, "Storage is checked before it is spent": on, capped at 2 GB. */
-        val DEFAULT = ImageCachePolicy(enabled = true, maxCacheBytes = 2L * 1024 * 1024 * 1024)
+        val DEFAULT = ImageCachePolicy(enabled = true, maxCacheBytes = 2 * GB)
+
+        /** The steps "Cache size limit" offers, smallest first; null is No limit. */
+        val LIMITS: List<Long?> = listOf(2 * GB, 5 * GB, 10 * GB, null)
+
+        /** How a limit is kept in the settings: its bytes, or "none". */
+        fun limitId(bytes: Long?): String = bytes?.toString() ?: NO_LIMIT
+
+        /** The limit [id] stands for; one that is not a step (missing, old or damaged) is the default's. */
+        fun limitFromId(id: String?): Long? =
+            if (id == NO_LIMIT) null else LIMITS.firstOrNull { it != null && it.toString() == id } ?: DEFAULT.maxCacheBytes
+
+        /** "2 GB", "No limit": a step as the row names it, in whole gigabytes. */
+        fun limitLabel(bytes: Long?): String = if (bytes == null) "No limit" else "${bytes / GB} GB"
     }
 }
 

@@ -81,7 +81,8 @@ import java.util.UUID
 class DroidSpacesRuntime(
     private val context: Context,
     private val rootfsPuller: RootfsPuller,
-    private val cachePolicy: ImageCachePolicy,
+    /** Settings > Containers' image cache settings, read at each pull (docs/SPEC.md 3, "Storage is checked before it is spent"). */
+    private val cachePolicy: () -> ImageCachePolicy,
 ) : ContainerRuntime {
     override val backend: ContainerBackend = ContainerBackend.DROIDSPACES
 
@@ -151,7 +152,7 @@ class DroidSpacesRuntime(
         // leaked 08-27 processes were still mounted over.
         RootProcess.run(binaryPath, "--name=$name", "stop")
         val rootfsPath = File(rootfsDir, name).absolutePath
-        val runConfig = rootfsPuller.pullAndUnpack(image, rootfsPath, cachePolicy)
+        val runConfig = rootfsPuller.pullAndUnpack(image, rootfsPath, cachePolicy())
         runConfig?.let { withContext(Dispatchers.IO) { runConfigFile(name).apply { parentFile?.mkdirs() }.writeText(ImageRunConfig.encode(it)) } }
         writeInit(rootfsPath, provisioning)
         withContext(Dispatchers.IO) { writeImageRecord(name, image) }
