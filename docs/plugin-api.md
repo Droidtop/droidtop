@@ -767,6 +767,15 @@ reply cap.
 - `job`: a long-running job (§8, J1) with live progress on the row and in
   Jobs; when it ends the current view is fetched again.
 
+When the view is fetched again after an action that failed, or after
+droidtop's Open the site, Sign in or Refresh, the inputs the person set keep
+their values wherever the new view still has that input and the value still
+fits it (a choice still offered, a slider value in range); the rest take the
+view's own values. After an action that worked, the view's own values are
+shown, because the plugin's state is what changed (2026-11-06,
+Droidtop/tracker#846: a mirror picked before a browser check went back to
+the first one).
+
 On an input node, `action` fires when the value is committed, with the new
 value already in `values`; an input without one only keeps its value for
 the next action. Every call carries:

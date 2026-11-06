@@ -26660,6 +26660,15 @@ of what is built. The decisions, briefly:
     quick op, `job` runs a tracked job) that droidtop sends back to the same
     extension point with the page's form values and a host-filled
     `context`.
+  - **A page read again keeps what the person picked (2026-11-06,
+    Droidtop/tracker#846).** After an action that failed, or after Open the
+    site, Sign in or Refresh, the page is read again with the person's own
+    choices kept wherever the new view still has the input and the value
+    still fits (`PluginView.valuesKeeping`). On the BlueStacks rig, F95's
+    browser-check stop put "Download from" back from the PIXELDRAIN the
+    person picked to the first mirror, so a retry would have quietly used
+    another host. After an action that worked, the view's own values are
+    shown: the plugin's state is what changed.
   - droidtop renders a view by translating it into the settings catalog
     model (`CatalogScreen`, `PluginViews` in `library-core`). That model is
     already drawn in all three modes (Gaming's `CatalogNavigator` through
