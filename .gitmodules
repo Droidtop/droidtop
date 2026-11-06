@@ -24,7 +24,8 @@
 	url = https://github.com/Droidtop/droidtop-platforms.git
 [submodule "vendor/proot"]
 	path = vendor/proot
-	url = https://github.com/termux/proot.git
+	url = https://github.com/Droidtop/proot.git
+	branch = droidtop
 [submodule "vendor/hev-socks5-tunnel"]
 	path = vendor/hev-socks5-tunnel
 	url = https://github.com/heiher/hev-socks5-tunnel.git

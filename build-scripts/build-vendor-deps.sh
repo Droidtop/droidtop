@@ -319,14 +319,11 @@ echo "=== proot ($ABI) ==="
     "$CC" -O2 -fPIC -c "$TALLOC_SRC/talloc.c" -I"$TALLOC_SRC" -o "$PROOT_WORK/talloc/talloc.o"
     "$TOOLCHAIN_BIN/llvm-ar" rcs "$PROOT_WORK/talloc/libtalloc.a" "$PROOT_WORK/talloc/talloc.o"
     # Out-of-tree copy: the GNUmakefile writes objects and build.h beside
-    # the sources, and the vendored submodule stays untouched.
+    # the sources, and the vendored submodule stays untouched. droidtop's
+    # changes to Termux's proot are commits on Droidtop/proot's droidtop
+    # branch, which vendor/proot pins (Droidtop/tracker#921); nothing is
+    # patched here.
     cp -r "$VENDOR/proot/src" "$PROOT_WORK/src"
-    # droidtop's additions to Termux's proot, each a patch with its reason
-    # in its header, applied to that copy only (build-scripts/proot-patches).
-    for proot_patch in "$REPO_ROOT"/build-scripts/proot-patches/*.patch; do
-        [ -e "$proot_patch" ] || continue
-        patch -d "$PROOT_WORK" -p1 --forward < "$proot_patch"
-    done
     cd "$PROOT_WORK/src"
     # CPPFLAGS/LDFLAGS through the environment, not as make arguments:
     # the makefile appends to both with +=, and a command-line assignment

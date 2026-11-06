@@ -2349,10 +2349,11 @@ on droidtop's targets:
 
 So the no-root backend runs **[vendor/proot](../vendor/proot)**, Termux's
 PRoot (the build Termux and proot-distro run whole distributions on),
-pinned to the release termux-packages ships. The vendored tree is not
-modified; droidtop's additions are patches in
-`build-scripts/proot-patches/`, each stating its reason, applied to the
-build's own copy. The first: Android's x86_64 app seccomp policy refuses
+pinned to the release termux-packages ships. droidtop's additions are
+commits, each stating its reason, on the `droidtop` branch of
+**Droidtop/proot**, a fork of termux/proot that `vendor/proot` pins (a
+library we patch gets its own repo, Droidtop/tracker#921; nothing is
+patched at build time). The first: Android's x86_64 app seccomp policy refuses
 the `fork` and `vfork` syscalls (bionic forks with `clone`; arm64 has no
 such syscalls), musl forks with the raw syscall, and proot answered the
 resulting SIGSYS with ENOSYS, so an Alpine guest's shell died at its first
@@ -9147,8 +9148,8 @@ use Android's isolated UID: it needs the GPU, and "our sandbox always
 applies" with Android's isolation as an extra layer where it can be had.
 
 **proot (Phase 3).** `ProotRuntime.startSession` (`ProotRuntime.kt:546-585`)
-starts proot with `ProcessBuilder`. The change is a patch in
-`build-scripts/proot-patches/` (each states its reason, as the fork patch
+starts proot with `ProcessBuilder`. The change is a commit on
+Droidtop/proot's `droidtop` branch (stating its reason, as the fork commit
 does) so that the child proot forks for a traced program installs the
 library's filter before `execve`, with the broker's socket and token passed
 in proot's own environment (`prootEnvironment()`). The guest's granted set is
@@ -24849,8 +24850,7 @@ is.
 
 **Native vendor code** is cross-compiled by
 `build-scripts/build-vendor-deps.sh`, once per ABI, before Gradle runs; the
-result is cached keyed on the vendor submodules' commits and
-`build-scripts/proot-patches/`:
+result is cached keyed on the vendor submodules' commits:
 
 - `libffi` and `libwayland-client` (Meson, a native scanner then the
   cross library) for `:host-bridge`;
@@ -24863,7 +24863,7 @@ result is cached keyed on the vendor submodules' commits and
   NDK clang on every ABI -- Go's pure-Go resolver finds no
   `/etc/resolv.conf` on Android and falls back to localhost:53 -- into
   `:runtime-common`'s `jniLibs` as `libcrane.so`;
-- `proot` and its two loaders, patched from `build-scripts/proot-patches/`,
+- `proot` and its two loaders, from Droidtop/proot's `droidtop` branch,
   into `:runtime-linux-noroot`'s `jniLibs`.
 
 Everything the app executes as itself (crane, proot) ships in

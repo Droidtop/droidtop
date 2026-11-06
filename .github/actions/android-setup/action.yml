@@ -231,8 +231,10 @@ runs:
         # v13 added the arm64 module-pipe-source asset for the Desktop
         # microphone (Droidtop/tracker#132); v14 builds the whole arm64
         # PulseAudio set, which until then was GameNative's prebuilt one
-        # (Droidtop/tracker#857).
-        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', '.git/modules/vendor/pulseaudio/HEAD', '.git/modules/vendor/libsndfile/HEAD', 'build-scripts/proot-patches/**', 'build-scripts/pulseaudio-patches/**', 'build-scripts/talloc/**') }}-v14
+        # (Droidtop/tracker#857); v15 dropped build-scripts/proot-patches,
+        # now commits on Droidtop/proot that vendor/proot's commit carries
+        # (Droidtop/tracker#921).
+        key: android-deps-${{ hashFiles('.git/modules/vendor/libffi/HEAD', '.git/modules/vendor/wayland/HEAD', '.git/modules/vendor/droidspaces/HEAD', '.git/modules/vendor/go-containerregistry/HEAD', '.git/modules/vendor/proot/HEAD', '.git/modules/vendor/hev-socks5-tunnel/HEAD', '.git/modules/vendor/pulseaudio/HEAD', '.git/modules/vendor/libsndfile/HEAD', 'build-scripts/pulseaudio-patches/**', 'build-scripts/talloc/**') }}-v15
 
     - name: Build cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel, PulseAudio)
       if: steps.deps-cache.outputs.cache-hit != 'true'
