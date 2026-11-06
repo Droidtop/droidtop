@@ -38,7 +38,8 @@ object DroidtopBackup {
 
     /** The trees of `filesDir` an archive carries, as the archive names them. */
     private val FILE_TREES = listOf("library/games")
-    private val FILES = listOf("play-log.json")
+    // The person's own ratings and statuses (Droidtop/tracker#722) travel with the play log.
+    private val FILES = listOf("play-log.json", dev.droidtop.library.settings.GameMarks.FILE)
 
     /**
      * Where an archive entry goes, relative to droidtop's own data, or null when it is not one an archive of this

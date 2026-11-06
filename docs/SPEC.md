@@ -14571,6 +14571,13 @@ toast and a notification, and the close timer runs through a second
 `PlayEnforcer`: the warning five minutes before, "Your time is up" with the same
 60 seconds, then `Library.quitRunning`. In Kid mode only Kid's limits apply.
 
+**Your rating and status (Droidtop/tracker#722).** A game's own marks, the person's and nobody else's: **My rating**
+(0, not rated, to 5 stars) and **Status** (Playing, Completed, Backlog, Dropped, or not set), kept apart from the
+scraped fields in a file of droidtop's own (`GameMarks`, `game-marks.json`), so a scrape never changes them and the
+scraped rating stays the scraped one; the backup carries the file (`DroidtopBackup.FILES`). Slice 1: both rows sit
+under "Yours" in Edit metadata, each press turning to the next value and saved at once. On the game page with Left
+and Right, and as a filter and a sort, are still to build.
+
 **Your play (2026-10-29, Droidtop/tracker#597).** UI review 265: "There is no
 play-time summary anywhere: no total, no per-system, no 'this week'". Kid mode's
 ledger counts all play together, and only in Kid, for its limits. The same
