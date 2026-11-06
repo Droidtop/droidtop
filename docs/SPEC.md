@@ -14578,7 +14578,9 @@ says how many of its games were found ("12 of 15 games found; 3 not in your libr
 the same absolute path, the same relative path inside a games folder, or the one game with that file name; a name
 that fits several is not guessed (`PegasusImport.match`). Slice 1 reads Pegasus: `metadata.pegasus.txt`'s
 collections (each becomes a collection of that name, with the games found) and its `favorites.txt` (the games found
-become favourites). Daijisho playlists, LaunchBox's Platforms XML and play time are still to build.
+become favourites). Slice 2 reads LaunchBox's platform files (`Data/Platforms/<platform>.xml`, one at a time): each game's
+favourite mark, and its play time as one session of "Your play" ending at its last play (`LaunchBoxImport`), once per
+game however often the file is imported. Daijisho playlists are still to build.
 
 **Your rating and status (Droidtop/tracker#722).** A game's own marks, the person's and nobody else's: **My rating**
 (0, not rated, to 5 stars) and **Status** (Playing, Completed, Backlog, Dropped, or not set), kept apart from the
