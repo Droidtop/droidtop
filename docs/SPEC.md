@@ -7051,7 +7051,7 @@ here.
 
 This section is the companion's one model. It replaces the earlier 4d (the 2026-09-01 research and its layers), "The
 companion's tabs" (2026-10-02 onward), "The Network tab" and "Companion layout and per-mode orientation", which now
-point here. Where the code does not yet match, a **Code differs** line says so; each reconcile commit removes its line.
+point here.
 
 **The owner, verbatim (2026-11-06, relayed by the coordinator):** "yeah, taht sounds good. It needs to be able to drive
 everything, for every UI. That's the point, if we have a second screen, the first shouldn't HAVE to do anything but be
@@ -7070,13 +7070,9 @@ grab a keyboard whenever)."
   is the measure for both: dense, labelled, touch-sized, and nothing explained in prose (see "Copy" below).
 - **Always-visible quick controls.** A small set of important actions stays on screen on every tab. First among them
   is **Input**: one tap opens a keyboard plus trackpad, with a switch to an on-screen keypad, so a keyboard is always
-  one tap away. **Code differs:** no quick control is built; the keyboard and trackpad are the Input tab, and the
-  docked slab appears only when a field asks for keys.
+  one tap away.
 - **Out of scope:** streaming and recording (windowcast's), root by default, mirroring the shell, system-wide
   remapping, and anything without a public API.
-- **Process (coordinator, 2026-11-06):** one lane owns the companion; every new choice goes to the owner as a question,
-  not built on a default; nothing counts as done until it has been checked on the RP5 console (the AVD cannot draw
-  the companion).
 
 ### Hosts, layout and orientation
 
@@ -7129,8 +7125,7 @@ grab a keyboard whenever)."
   field on the other screen wants keys, droidtop's slab docks at the bottom of the companion's own layout under
   whatever tab shows (`CompanionDockedSlab`), for droidtop's own text entry and always when droidtop is the system
   keyboard (`KeyboardTargets.companion`). Changing tab keeps it; the Input tab shows no second one. **The pad may type
-  on the slab, and only on the slab.** **Code differs:** `TouchOnlySurfaceFocus.consumesKey` swallows every pad key on
-  the companion, the slab's included.
+  on the slab, and only on the slab.**
 - **Every question is `CompanionAsk`** (Droidtop/tracker#786 S2a): the question naming what it acts on, the safe answer
   first, large and filled, the action well apart, drawn in place, never as a window (a dialog window would take the
   focus, and the pad, off the game). A pad press that reaches the companion while it is open closes it as Cancel.
@@ -7142,7 +7137,7 @@ grab a keyboard whenever)."
   Gaming and Mobile; in Desktop **Input** comes first. **Performance** and **Input** are optional. **Plugins** lives
   under droidtop > Plugins. Kid, Kiosk and Guest get Home, Game and Performance. One tab set in every mode, with
   different defaults (approved): Home, Device, droidtop, Social in Gaming and Mobile; Input, Home, Device, droidtop in
-  Desktop. **Code differs:** Plugins is still a tab of its own (`CompanionTab.PLUGINS`, under More unless chosen).
+  Desktop.
 - **The bar.** A window taller than wide draws labelled icons along the bottom, a wider one a rail down the left; both
   are `TabRail` (`:shell-gamepad`), in the shell's tab-strip style (the selected tab on the accent plate). Which tabs
   are on it is one pure function, `slots(chosen, mode, running, extent, labelSizes)`: up to four chosen tabs, then the
@@ -7158,8 +7153,7 @@ grab a keyboard whenever)."
   game starts": Game by default, Input for a runner that asks, any tab, or stay), announces it, and goes back to Home on
   quit; started from another tab, nothing moves.
 - **Panels.** Device and droidtop are the companion's own (`ControlAccess.COMPANION_ONLY`): the Quick Menu never lists
-  them. **Code differs:** `ControlAccess.FULL`'s companion panels still include the old SYSTEM, APPS, CONNECTIONS and
-  PLUGINS beside DEVICE and DROIDTOP; the model's set is Home, Game, Device, droidtop, Social, Performance and Input.
+  them.
 
 ### Home: glanceable
 
@@ -7172,8 +7166,7 @@ a new focus once it has held 350 ms. In order:
    (`StatusIndicators`, callbacks while shown, never polled); beside the battery "3 h 10 min left" or "45 min to full"
    once readings allow (`BatterySampler`, `BatteryEstimator`); "Recording 1:05" while a plugin records
    (`companion.recording`); the optional low-battery line (off by default) with Battery saver and the game's own
-   battery mode; and the last launch or quit error. **Code differs:** a tap on the status line opens Device's System
-   page (`StatusCluster(onClick = showTab(CompanionTab.SYSTEM))`), a page of the old tab layout.
+   battery mode; and the last launch or quit error.
 2. **Pins** (slice C5): catalog items by id (`PinnedControls`; default volume, brightness, Wi-Fi, Do Not Disturb and
    Mute microphone) drawn with the Quick Menu's tile model and pressed its way; every pin draws its glyph beside its
    name, never text alone; a slider pin is the one slider row. The Network pin names the Wi-Fi network (with the
@@ -7187,8 +7180,7 @@ a new focus once it has held 350 ms. In order:
    one quit path, `Library.quitRunning`, asking by `GameControls.asks`) and Controls; it follows
    `LaunchDisplay.running`. With nothing running, the game focused in the shell: art, name, system, last played, the
    emulator that will run it (`resolvePlayer`) and Play. The description stays on the game's page (review finding 4,
-   S18). **Code differs:** the card is headed "Now" and, with nothing running, prints three lines of description plus
-   developer, publisher, year, genre, playtime, PC store facts and an update line.
+   S18).
 4. **Continue playing** and **Recently added** (`CompanionRail`, ten capsules each, tap launches through the one launch
    path; both from `CompanionState.homeActivity`, the list the shell's Home shelves use; deduped by id, then by title and
    system), then **Recent apps** (up to twelve from `RecentAppsStore`, opening on the companion's screen).
@@ -7200,9 +7192,7 @@ a new focus once it has held 350 ms. In order:
    rows with Reply (droidtop's own keyboard and draft, `NotificationReply`, so the game keeps its focus), Open and
    Dismiss (also a swipe and TalkBack actions). "Show message text": When unlocked (default, following Android's
    lock-screen setting), Always or Never.
-8. **System**: storage free and total, and All controls. **Code differs:** this section is not in the model's Home
-   (status, pins, the running game, now playing, notifications, running jobs); All controls opens the old System page
-   (`CompanionHome.kt:526`). Its place is an owner question after this rewrite.
+8. **System**: storage free and total, and All controls.
 9. **Widgets**: the person's Android widgets with Add and Remove on every host (`CompanionWidgetPickActivity`, on the
    companion's own screen).
 
@@ -7297,8 +7287,6 @@ out (`ON_SCREEN_CARD`, `ON_STREAM_SLIDERS`, `ON_ACCESSIBILITY` in `CompanionCata
   the opening tab), When a game starts, Home sections, Dim the companion screen, Wake, Show tabs handle, Trackpad,
   Show message text, Ask before stopping, Ask before load and overwrite, Low battery line, Picture-in-picture on the
   companion, Lock to landscape, and Reset the companion to defaults (asks first). The shell's Settings links here.
-  **Code differs:** the shell's Settings still draws the whole Companion screen group (`GamingSettingsCatalog.companionScreen`)
-  rather than a link to this page.
 - **Downloads** (S6): the Downloads and Updates screen every place opens, so the jobs' controls and Updates' Check now
   are the ones every surface has, each row's outcome kept by its id (Droidtop/tracker#554).
 - **Plugins**: every installed plugin, the Quick Menu's own list (`PluginPanels.listed`: icon, name, status glyph);
@@ -7306,7 +7294,7 @@ out (`ON_SCREEN_CARD`, `ON_STREAM_SLIDERS`, `ON_ACCESSIBILITY` in `CompanionCata
   `companion.tab` target), drawn for touch by `CompanionPluginsTab` in the one panel frame (Droidtop/tracker#515). Any
   one panel can be a tab of its own. A panel that declares `keep_on` keeps the screen on; one that declares `game`
   gives rows for the running game, drawn on Game under droidtop's own (not in Kid or Kiosk). Home's Edit pins lists
-  every plugin tile. **Code differs:** Plugins is a tab (`CompanionTab.PLUGINS`), not this page.
+  every plugin tile.
 - **The rest of droidtop** (Mode, Look, Library, Controls and keyboard, Desktop, Backup, Advanced, Diagnostics,
   Computers, What's new; the #786 plan's S16) each get a page as their slice lands. Until then they are reached from the
   shell's Settings.
@@ -7356,9 +7344,7 @@ out (`ON_SCREEN_CARD`, `ON_STREAM_SLIDERS`, `ON_ACCESSIBILITY` in `CompanionCata
 - **Rows stay in place, read-only, with one sheet that explains** (rule 3 of the #786 plan). `CompanionReadOnlyRow`
   shows the name and state in the read-only look (muted, a meter where it has a level, "Not allowed yet"); a tap opens
   `CompanionLockedSheet`, from one model (`Locked`: what droidtop would be allowed to change, one button for the next
-  step, Android's page where there is one, and Not now). **Code differs:** controls that need More controls are left
-  out rather than shown read-only: the radio switches (`GamingSettingsCatalog`, `if (radios)`), the Stop the app in
-  front row, per-app load and pins of such controls; the old Copy rule below said they are "not drawn at all".
+  step, Android's page where there is one, and Not now).
 
 ### The screen: dim, off and wake
 
@@ -7380,8 +7366,7 @@ The companion gets Home, Game and Performance (`ControlAccess.RESTRICTED`; Guest
 Home's volume and brightness pins, Game's Resume and Quit (both asking), Performance as figures only. The items that
 control the restriction itself (the Companion group, the volume cap, the passkey, the UI mode) are hidden on every
 surface. Leaving takes the optional passkey (`UiModePasskey`, four to eight digits, entered by pad or touch on
-`UiModePasskeyActivity`). **Code differs:** the passkey entry is an activity on the main screen; under this model the
-companion has to be able to leave Kid, Kiosk and Guest itself (`UiMode.kt:77`).
+`UiModePasskeyActivity`).
 
 ### Copy: labels and values, never prose
 
@@ -7391,12 +7376,6 @@ read-only row with "Not allowed yet", "Nothing running" for an empty list (two o
 errors only; there are no "Info" links. An explanation that still has to exist is on the focus line and in Info (Y) on
 the shell (7k, "Explanations: no tooltips"), and on the companion in the one locked sheet. The rest of the app follows
 the same rule.
-
-### Open questions for the owner (one at a time, after this rewrite)
-
-Brightness rows on Display; the Do Not Disturb rows (who may call or message, visual effects); the Wi-Fi name through
-the location permission for the Network pin; player order on Controllers; Home's System section and where the status
-line and All controls go; and how a pad reaches Keep on the main screen for a screen-shape change.
 
 ### Not built
 
