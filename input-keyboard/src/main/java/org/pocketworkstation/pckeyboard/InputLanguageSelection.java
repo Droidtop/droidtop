@@ -40,7 +40,7 @@ public class InputLanguageSelection extends PreferenceActivity {
     private static final String TAG = "PCKeyboardILS";
     private ArrayList<Loc> mAvailableLanguages = new ArrayList<Loc>();
     // droidtop: a language listed here is offered once an engine registered in InputEngines types it
-    // (Droidtop/tracker#903 H7c: Japanese, through Mozc, which :app registers; Korean and Chinese come in H8, H9).
+    // (Droidtop/tracker#903 H7c: Japanese, through Mozc, which :app registers; H8b: Chinese, through RIME; Korean comes in H9).
     private static final String[] BLACKLIST_LANGUAGES = {
         "ko", "ja", "zh"
     };
@@ -53,6 +53,8 @@ public class InputLanguageSelection extends PreferenceActivity {
         NOCAPS_LANGUAGES.add("th");
         // droidtop (Droidtop/tracker#903 H7c): romaji for Mozc; a capital would type a full-width letter.
         NOCAPS_LANGUAGES.add("ja");
+        // droidtop (Droidtop/tracker#903 H8b): pinyin for RIME; luna_pinyin types a capital as a Latin letter.
+        NOCAPS_LANGUAGES.add("zh");
     }
 
     // Languages which should not use dead key logic. The modifier is entered after the base character.

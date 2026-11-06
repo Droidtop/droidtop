@@ -1,0 +1,13 @@
+# RIME for Chinese typing (Droidtop/tracker#903 H8a, H8b): rime/librime 56737cd29a4d393a104a2098ece3697aa2810465 with
+# the lua, octagram and predict plugins, built by .github/workflows/rime-engine.yml on osfans/trime v3.3.13's recipe
+# and released on this repository as the prerelease below.
+# tag and sha256: rime-engine.tar.zst (librime.so for both ABIs, include/rime_api.h, each library's licence, VERSION),
+# fetched at build time by build-scripts/fetch-rime-engine.sh. data_*: rime-data-luna.tar.gz from the same release
+# (luna_pinyin, compiled by rime_deployer, and OpenCC's data), downloaded by the keyboard the first time Chinese is used
+# (RimeData): the archive's SHA-256, then the SHA-256 of rime-data-luna.files.sha256 (beside this pin), which lists
+# every unpacked file's SHA-256, and the unpacked files' total size.
+tag=rime-engine-56737cd2
+sha256=31d8f3b38b8add6c49c1d5a9db569335a7b6963013d6cb86998822dbb020c938
+data_gz_sha256=21595d0426286163ff8c9a51f066e38494a7df5912e6db14f3530af0c620dfb0
+data_files_sha256=148e30e77df286d2312bdcc958d16c53288d1e443ec98aae46b4278113f9b0a0
+data_size=14802733

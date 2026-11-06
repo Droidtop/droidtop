@@ -67,6 +67,8 @@ internal object Seams {
         // settings row, registered with the keyboard's engine seam. Nothing loads or downloads here; the dictionary
         // comes the first time Japanese is used.
         dev.droidtop.input.japanese.MozcJapanese.install()
+        // Chinese typing through RIME (Droidtop/tracker#903 H8b), the same way: its data comes the first time Chinese is used.
+        dev.droidtop.input.chinese.RimeChinese.install()
         // `library.read` `systems` (docs/plugin-api.md 3 A1): the broker runs on a binder thread, which may block here;
         // the answer comes from the library's in-memory index, never a folder walk.
         dev.droidtop.pluginhost.PluginBrokers.librarySystemsProvider = {

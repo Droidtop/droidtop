@@ -9783,7 +9783,7 @@ that gradually". So this slice is a refactor behind seams, and **Latin typing do
     declines, the classifier is used.
   - Nothing is bundled or downloaded for it. How a later library arrives (on request, never in the APK), and how it
     fits the licence rule at the top of 6a ("A closed library never is"), are decided when it comes.
-- **Not done here:** the conversion engines for Chinese and Korean (H8, H9); Japanese is H7c, below. The pad does not
+- **Not done here:** the conversion engine for Korean (H9); Japanese is H7c and Chinese H8b, below. The pad does not
   reach the mode button yet, and a tap inside an engine's composing text does not move the engine's caret (the next key
   draws it back where the engine has it; Mozc's `SessionCommand.MOVE_CURSOR` is the way). Nothing above changes what a
   person sees with Hacker's own typing.
@@ -9862,6 +9862,98 @@ come later as optional downloads, each licence named. Not in this slice."
   until the keyboard's process ends; the next one downloads it again when Japanese is used.
 - **Not done here:** kana flick and 12-key layouts; the Mozc-UT dictionaries; a tap inside the composing text moving
   Mozc's caret (MOVE_CURSOR); a hardware keyboard's own Japanese keys (Henkan, Muhenkan, Kana).
+
+### Chinese through RIME (Droidtop/tracker#903 H8b, built 2026-11-06)
+
+Chinese types through RIME (librime, BSD-3), behind the engine seam above, the way Japanese types through Mozc. The
+engine and its data were built and published by H8a (`.github/workflows/rime-engine.yml`, `build-scripts/rime/`): the
+prerelease `rime-engine-56737cd2` on Droidtop/droidtop, rime/librime at `56737cd29a4d393a104a2098ece3697aa2810465`
+with the lua, octagram and predict plugins linked in, on osfans/trime v3.3.13's CMake recipe (GPL-3.0-or-later, the
+recipe only, not shipped). The coordinator's slice for #903 H8b: "Chinese (pinyin) input through librime, as a new
+Gradle module `:input-chinese`", mirroring `:input-japanese`; "the data is never in the APK"; the download "reuses
+MozcData's consent and Wi-Fi behaviour, whatever it is. Don't invent a new policy; that question is open with the
+owner." Mozc's is: on first use, over whatever connection there is, with no question asked, so RIME's is the same.
+
+- **Where it lives.** `:input-chinese`, which depends on `:input-keyboard` for the seam, as `:input-japanese` does;
+  `:app` registers it at start (`RimeChinese.install`, in `Seams.kt`) with `InputEngines.register` and
+  `InputEngines.registerSettings`. The keyboard module and the standalone Hacker Keyboard Reborn stay free of it.
+- **What ships in the APK.** `librime.so` for arm64-v8a and x86_64, and droidtop's own JNI over it,
+  `libdroidtop_rime.so`. `input-chinese/rime-engine.pin` names the release and `rime-engine.tar.zst`'s SHA-256;
+  `build-scripts/fetch-rime-engine.sh`, run by the android-setup action before Gradle and cached by the pin, checks it
+  and unpacks `jniLibs/<abi>/librime.so`, `include/rime_api.h`, every library's licence and `VERSION` into
+  `input-chinese/rime` (git-ignored), Mozc's arrangement. `librime.so` exports only librime's C entry points
+  (`rime_get_api`, `rime_get_api_stdbool`, `RimeRegisterModule`, `RimeFindModule`), links libc++ statically, needs only
+  liblog, libdl, libm and libc, and its segments are 16 KB aligned. It is released unstripped (81 and 77 MB, symbols
+  included); stripped as AGP strips it, it is 4.4 MB for each ABI, which the APK holds deflated as about 1.7 MB.
+- **droidtop's JNI** (`input-chinese/src/main/cpp`, about 300 lines and a UTF-8 header) is built with CMake by
+  `externalNativeBuild` against the fetched `rime_api.h`, and links `librime.so` as an IMPORTED library, which AGP
+  packages beside it (so it is not also a jniLibs directory). It reaches librime only through `rime_get_api()`. Its
+  natives are `RimeJni`'s, registered in `JNI_OnLoad` (a consumer R8 rule keeps the names): start (setup once per
+  process, since glog starts once; then initialize, `start_maintenance(false)` and `join_maintenance_thread`), stop
+  (`cleanup_all_sessions`, `finalize`), create, find and destroy a session, select a schema, set an option, process a
+  key, read the commit, clear, select a candidate, and read the context: the preedit with its caret and selection, the
+  candidates (up to 100, through librime's candidate list, across its pages), the highlighted one and the page size.
+  librime counts in UTF-8 bytes; the JNI turns every offset into UTF-16 chars and builds every string from UTF-16
+  (`NewString`, never `NewStringUTF`, whose modified UTF-8 breaks characters past U+FFFF), so Kotlin sees only chars.
+  Logging: the traits give librime a `log_dir` (the cache's `rime-log`, emptied at each start) and `min_log_level`
+  (info in debug builds, warnings in release); librime's glog then writes each message to logcat as well, tagged
+  `rime.droidtop`. The JNI's own lines are `droidtop.Rime`.
+- **The data is downloaded the first time Chinese is used**, never at app start and never in the APK. The engine
+  starts Loading. On the keyboard's worker thread (`RimeRuntime`), when `noBackupFilesDir/engine-rime/shared` does not
+  hold this pin's data: `rime-data-luna.tar.gz` (7.0 MB) comes from the same release and its SHA-256 is checked against
+  the pin; it is unpacked beside `shared/` (`RimeTar`: files and directories only, every header's checksum checked,
+  links refused), and every file is checked against `rime-data-luna.files.sha256`, whose copy the module carries and
+  whose own SHA-256 the pin names (`RimeManifest`); a file not on the list, or one missing, fails it. Only then is a
+  marker written and the directory renamed into place (`RimeData`). The 58 files are 14,802,733 bytes: luna_pinyin
+  compiled by rime_deployer from the same librime commit (so the phone compiles nothing) and OpenCC's data. Any
+  failure leaves nothing partial and makes the engine Unavailable with one plain line on the strip ("Chinese needs its
+  15 MB dictionary first, and there is no connection. It tries again in the next text field."); the next field tries
+  again, no sooner than a minute later. Then the libraries are loaded (off the main thread), librime starts over
+  `shared/` and `user/` (`noBackupFilesDir/engine-rime/user`, where it keeps what it learns), its maintenance is waited
+  for, and both schemas the keyboard uses must select in a probe session (librime selects any id, so the JNI counts a
+  schema found only when its status carries the schema's own name). Then Ready, with the download's percent on
+  the strip meanwhile, as Japanese's.
+- **The schemas.** zh, zh_CN, zh_SG and the rest type `luna_pinyin_simp` (朙月拼音·简化字); zh_TW types
+  `luna_pinyin_tw` (朙月拼音·臺灣正體), and zh_HK and zh_MO the same schema with Hong Kong forms. They are the schema
+  ids in the data (`schema/schema_id`). One engine per schema, all over the one librime.
+- **The session** (`RimeEngine`, `RimeKeys`, `RimeContext`), each part of the seam:
+  - one librime session, made on the first key with the language's schema, and made again if librime lost it;
+  - a character is its X11 keysym (Latin-1 as itself, anything else 0x01000000 plus its code point); Backspace,
+    Space, Enter, the arrows, Shift with Left and Right, and Esc are their keysyms; Undo and Toggle have no
+    counterpart and stay the keyboard's;
+  - a key is the engine's when librime took it; when it did not but committed (a character it passes on), the
+    commit and the character go in together; an arrow it ignored while composing is still the engine's, so the
+    field's caret holds still;
+  - a pick is `select_candidate` with the index across librime's pages (a pick of part of the reading commits
+    nothing yet and leaves the rest composing); commit is Enter, which in luna_pinyin commits what is picked and the
+    rest as typed; reset is `clear_composition`;
+  - the preedit is the composing text, split at librime's selection into what is picked, the part being converted
+    (focused) and what follows; the caret is librime's; the candidates carry librime's comments as annotations, and
+    the bar pages them itself;
+  - password fields are not composed; the text before the caret is not used (luna_pinyin converts from what is typed
+    alone); librime writes what it learns as it goes, so a field's end saves nothing.
+- **The modes** are 简 (simplified), 繁 (traditional) and A (letters pass through), in that order for simplified
+  languages and 繁, 简, A for zh_TW and zh_HK. 简 and 繁 set the schema's radio group of output forms, librime's OpenCC
+  filters (`zh_hans`, and `zh_hant` for mainland Chinese, `zh_hant_tw` for Taiwan, `zh_hant_hk` for Hong Kong), each
+  option set and the rest cleared, since `set_option` sets one; A sets `ascii_mode`. The mode follows librime if it
+  switches to letters itself. Switching to A drops what is composed (librime cannot hand it back, and the seam has no
+  way to put it in the field from a mode change); 简 and 繁 keep it.
+- **Forgetting** (Keyboard settings > Chinese > Forget what it learned, which asks first). librime is finalized, so no
+  database is open, then the user directory's `*.userdb` (its LevelDB user dictionaries, with any `.userdb.txt` or
+  `.userdb.old`) and `sync/` go, and librime starts again; the engine says Loading meanwhile. `installation.yaml`,
+  `user.yaml` and the compiled `build/` stay. "Delete the dictionary" removes `shared/`; librime keeps typing from what it
+  has loaded until the keyboard's process ends, and the next one downloads it again.
+- **The language.** Chinese is in the keyboard's language list (zh_CN, zh_TW) once an engine serves it, on Hacker's
+  QWERTY typed as pinyin; Hacker's capitals are off for zh, since luna_pinyin types a capital as a Latin letter.
+- **Licences** (NOTICE.md, "Chinese typing (RIME)", from the archive's licence files): librime BSD-3; the octagram
+  plugin GPL-3.0, which droidtop's GPL-3.0 allows; librime-lua and librime-predict BSD-3; Lua 5.4 MIT; Boost BSL-1.0;
+  glog, LevelDB and Snappy BSD-3; yaml-cpp MIT; marisa-trie BSD-2-Clause (or LGPL-2.1+); OpenCC Apache-2.0; LLVM
+  libc++ from the NDK. The data (rime-prelude, rime-essay, rime-luna-pinyin) is LGPL-3.0 and downloaded, not shipped:
+  its exact sources, with the one change H8a made (the stroke reverse lookup removed), are the release's
+  `rime-data-luna-sources.tar.gz`, beside the data.
+- **Not done here:** a 9-key or stroke layout; double pinyin and other schemas; zero-query suggestions (the predict
+  plugin is linked but luna_pinyin does not use it); a tap inside the composing text moving librime's caret
+  (`set_caret_pos`); a choice of schema in the settings.
 
 ## 6b. Desktop surface input (built 2026-09-01)
 
