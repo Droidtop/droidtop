@@ -36,6 +36,16 @@ enum class RiskyClass(val id: String, val title: String, val summary: String) {
         "Let droidtop set font size, display size, magnification, contrast, inversion and TalkBack for every app",
     ),
 
+    /**
+     * The helper app changing a system-wide setting Android keeps from apps (mytop-project/tracker#786 plan 4.4): battery
+     * saver for now; time, location, dark theme and the others join this class as each gets its row.
+     */
+    SYSTEM_SETTINGS(
+        "system_settings",
+        "Change system settings",
+        "Let droidtop turn battery saver on and off for the whole device",
+    ),
+
     /** Root-level commands through a provider that holds root (Sui, or a root provider plugin). */
     ROOT_COMMANDS(
         "root_commands",
@@ -173,6 +183,11 @@ object RiskyNotices {
                 "Display controls are off for safety",
                 "They change screen refresh and scaling.",
                 "Turning it on lets droidtop set a screen's refresh rate for every app.",
+            )
+            RiskyClass.SYSTEM_SETTINGS -> Triple(
+                "Battery saver switch is off for safety",
+                "It changes a setting for the whole device.",
+                "Turning it on lets droidtop turn Android's battery saver on and off for every app.",
             )
             RiskyClass.ACCESSIBILITY_SETTINGS -> Triple(
                 "Quick actions are off for safety",

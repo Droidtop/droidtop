@@ -59,6 +59,7 @@ internal fun CompanionSystemTab(only: Set<String>? = null) {
                 dndCategories = dev.droidtop.runtime.systemstatus.DndCategories.items(context.applicationContext),
                 dndHeading = dev.droidtop.library.settings.words(dev.droidtop.runtime.R.string.dnd_lets_through),
                 controllers = dev.droidtop.shell.gamepad.ControllerLayoutTiles.items(),
+                batterySaver = dev.droidtop.runtime.systemstatus.BatterySaver.item(context.applicationContext),
             )
         }
     }
