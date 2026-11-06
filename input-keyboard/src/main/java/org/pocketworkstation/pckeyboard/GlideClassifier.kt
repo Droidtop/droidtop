@@ -102,15 +102,33 @@ class GlideClassifier(
 
     /** Adds a point of the finger's path; one closer than the minimum distance to the last is skipped. */
     fun addPoint(x: Int, y: Int) {
-        if (gestureSize > 0) {
-            val dx = gestureXs[gestureSize - 1] - x
-            val dy = gestureYs[gestureSize - 1] - y
-            if (dx * dx + dy * dy <= minPointDistanceSquared) return
+        gestureSize = addFiltered(gestureXs, gestureYs, gestureSize, x, y)
+    }
+
+    /** [addPoint]'s rule, on any arrays: the new size of the kept points after offering (x, y). */
+    private fun addFiltered(xs: IntArray, ys: IntArray, size: Int, x: Int, y: Int): Int {
+        if (size > 0) {
+            val dx = xs[size - 1] - x
+            val dy = ys[size - 1] - y
+            if (dx * dx + dy * dy <= minPointDistanceSquared) return size
         }
-        if (gestureSize == MAX_GESTURE_LENGTH) return
-        gestureXs[gestureSize] = x
-        gestureYs[gestureSize] = y
-        gestureSize++
+        if (size == MAX_GESTURE_LENGTH) return size
+        xs[size] = x
+        ys[size] = y
+        return size + 1
+    }
+
+    /**
+     * The corners of a whole stroke's [n] raw points, kept as [addPoint] keeps them: what [path] gives after the same
+     * points were added one by one; null with none. It touches nothing of the finger's own points, so the gesture seam
+     * ([ClassifierGestureEngine], Droidtop/tracker#903 H6) scores a stroke on another thread.
+     */
+    fun pathOf(xs: IntArray, ys: IntArray, n: Int): ShortArray? {
+        val keptX = IntArray(MAX_GESTURE_LENGTH)
+        val keptY = IntArray(MAX_GESTURE_LENGTH)
+        var size = 0
+        for (i in 0 until n) size = addFiltered(keptX, keptY, size, xs[i], ys[i])
+        return if (size == 0) null else corners(keptX, keptY, size)
     }
 
     fun clear() {
