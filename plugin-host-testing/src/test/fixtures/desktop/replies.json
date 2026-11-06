@@ -1,0 +1,17 @@
+{
+  "desktop.tray": {
+    "facets": [
+      { "id": "tray.state", "kind": "status", "targets": ["desktop.tray"], "label": "Desktop fixture", "state": "ok", "icon": "window" },
+      { "id": "tray.focus", "kind": "action", "targets": ["desktop.tray"], "label": "Focus the first window", "icon": "window", "call": { "op": "focus_first" } },
+      { "id": "tray.read", "kind": "action", "targets": ["desktop.tray"], "label": "Read clipboard", "icon": "clipboard", "call": { "op": "read_clipboard" } },
+      { "id": "tray.copy", "kind": "action", "targets": ["desktop.tray"], "label": "Copy test text", "icon": "clipboard", "call": { "op": "copy_test" } },
+      { "id": "tray.notify", "kind": "action", "targets": ["desktop.tray"], "label": "Send a notification", "icon": "notification", "call": { "op": "notify" } }
+    ]
+  },
+  "desktop.window": {
+    "facets": [
+      { "id": "window.focus", "kind": "action", "targets": ["desktop.window"], "label": "Focus with the fixture", "icon": "window", "call": { "op": "focus_this" } },
+      { "id": "window.badge", "kind": "badge", "targets": ["desktop.window"], "text": "Fixture", "icon": "check" }
+    ]
+  }
+}

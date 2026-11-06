@@ -1976,6 +1976,18 @@ owner (§10, Q6).
   also droidtop's notice on the desktop, led by the plugin's name and kept in Recent, for a plugin that is on in
   Desktop (its mode switch, §1.9) (`AppBrokerEnvironment.desktopNotice`). Linux apps' own notifications are §10, Q5.
 
+**The fixture (slice 6, 2026-11-06).** `plugin-host-testing/src/test/fixtures/desktop` is a python plugin that uses
+every hook above: tray facets (focus the first window, read and copy the clipboard, notify), a window-menu entry
+that focuses its window from droidtop's context, Open with for `.AppImage`, and the four events. Its facets are
+`replies.json`. CI checks both sides: `DesktopFixtureTest` puts its manifest and facets through droidtop's guards and
+its host ops through the broker, and `desktop_fixture_check.py` drives its `plugin.py` with a fake host. Like the
+other fixtures it is never packaged. Writing it found two gaps, both fixed with it:
+- a window page's actions did not carry the window, so an entry could not tell which window it was about: the page's
+  droidtop context now holds the subject (`DesktopPluginFacets`), written after the action's own args, so a plugin
+  cannot name another window there;
+- `desktop.tray` took two facets per plugin (the limits file), while its page holds a plugin's whole tray entry and
+  the target already says "a menu of up to 8": the cap is 8.
+
 **Not offered:** input into another application's window (a keylogger's and an autoclicker's tool; a `shortcut` on
 an action, below, covers the legitimate uses), and capturing a window's picture (windowcast's, by the standing rule).
 
@@ -1987,7 +1999,7 @@ an action, below, covers the legitimate uses), and capturing a window's picture 
 **Slices.** 1, the contract (this section, the `window` and `file` subjects, `desktop.window`, icons; built
 2026-11-06). 2, the host side over host-bridge (`windows.*` and the window events; built 2026-11-06, below). 3, the taskbar drawing
 `desktop.tray` and `desktop.window` (built 2026-11-06, below). 4, Open with (built 2026-11-06, below). 5, the clipboard and notification bridges, each behind its own
-approval (built 2026-11-06, below). 6, a test fixture plugin exercising each.
+approval (built 2026-11-06, below). 6, a test fixture plugin exercising each (built 2026-11-06, below).
 
 **The facet vocabulary grows (owner, 2026-11-06).** The owner: "I think the current vocabularity is too limited". He
 agreed to these, which are proposed on Droidtop/tracker#602 and not yet built ("I agree with 5-8"):

@@ -46,7 +46,7 @@ object DesktopPluginFacets {
         id = "plugin_desktop_tray_${record.manifest.id}",
         title = record.manifest.label,
         args = PluginFacets.getArgs(TRAY, PluginFacets.DEVICE_SUBJECT),
-        hostContext = JSONObject().put("target", TRAY),
+        hostContext = JSONObject().put("target", TRAY).put("subject", PluginFacets.DEVICE_SUBJECT),
     )
 
     /** [record]'s entries for one window as a page, titled with the window's title: its `desktop.window` facets about it. */
@@ -57,7 +57,9 @@ object DesktopPluginFacets {
         id = "plugin_desktop_window_${record.manifest.id}_$windowId",
         title = "${record.manifest.label}: $windowTitle",
         args = PluginFacets.getArgs(WINDOW, windowSubject(windowId, appId)),
-        hostContext = JSONObject().put("target", WINDOW),
+        // The window goes with every action of the page as droidtop's own context, written after the action's args so a
+        // plugin cannot name another window there (PluginViewCall.args).
+        hostContext = JSONObject().put("target", WINDOW).put("subject", windowSubject(windowId, appId)),
     )
 
     private fun declaring(context: Context, target: String): List<PluginRecord> =

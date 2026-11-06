@@ -1,0 +1,25 @@
+{
+  "id": "acme.fixture.desktop",
+  "origin": "acme",
+  "label": "Desktop fixture",
+  "kind": "python",
+  "contractVersion": 2,
+  "provides": [
+    { "point": "ui.facets", "targets": ["desktop.tray", "desktop.window"] },
+    { "point": "files.handler", "associations": [{ "ext": "AppImage", "label": "Inspect with Desktop fixture" }] }
+  ],
+  "permissions": [
+    { "id": "windows.read", "reason": "To list your desktop windows in its tray page" },
+    { "id": "windows.control", "reason": "To bring a window to the front from its tray page" },
+    { "id": "clipboard.read", "reason": "To show what you copied when you press Read clipboard" },
+    { "id": "clipboard.write", "reason": "To copy a test line when you press Copy test text" },
+    { "id": "notify.post", "reason": "To say when a window opens" },
+    { "id": "files.picker", "reason": "To read a file you open with it" }
+  ],
+  "subscribes": [
+    { "event": "window.opened" },
+    { "event": "window.closed" },
+    { "event": "window.focused" },
+    { "event": "clipboard.changed" }
+  ]
+}

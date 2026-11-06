@@ -157,6 +157,11 @@ jobs:
         # conformance cases the native fixture passes in :plugin-host-testing's ConformanceTest.
         if: always()
         run: python3 -I plugin-host-testing/python/droidtop_fake_host.py plugin-host-testing/src/test/fixtures/python
+      - name: Desktop-mode plugin fixture (python)
+        # docs/plugin-api.md 1.12 (Droidtop/tracker#221): the Desktop fixture's plugin.py against each Desktop hook;
+        # DesktopFixtureTest checks droidtop's side of the same hooks.
+        if: always()
+        run: python3 -I plugin-host-testing/python/desktop_fixture_check.py
 
       - name: Upload test reports
         if: always()

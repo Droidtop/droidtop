@@ -965,6 +965,8 @@ functionality". The contract is docs/plugin-api.md 1.12; what it decides for Des
   decided) and sets the desktop clipboard through 6d's bridge and its one `ClipboardSync`, and is told when it
   changes; a sensitive copy is never given to a plugin. A plugin's notification also shows as droidtop's notice on
   the desktop while a session runs.
+- Slice 6 (2026-11-06) is a fixture plugin using every hook, checked in CI from both sides (plugin-api.md 1.12). A
+  tray entry takes up to eight facets, and a window page's actions carry the window as droidtop's context.
 
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 
