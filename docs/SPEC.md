@@ -5,6 +5,11 @@ back here rather than restating it. Sections keep their numbers, because code
 comments cite them ("SPEC §7g"): a new section takes the next free number in
 its group, is placed in numeric order, and gets a line in the contents below.
 
+**This document describes what droidtop will be, not what it is (owner, 2026-11-06).** "The spec describes what WILL
+be, not what IS. It is the authoritative guidance document. If something defies the spec, it's wrong". Where the code
+differs from a section, the code is wrong and is changed to match; what is built, what is not, and what waits on whom
+are tracked on the tracker, not written here.
+
 **Reuse before building (owner, 2026-11-05, relayed by the coordinator).** "Let's see if we can reuse and repurpose
 existing code whenever possible. No need to reinvent wheels". A change first reuses or repurposes what exists: droidtop's
 own code and the shared repos (droidtop-shared, droidtop-components), the vendored trees under `vendor/` (hooked or
@@ -28,7 +33,8 @@ commit and, for a design choice, in the section it belongs to here. This holds f
 - [4a. Networking & VPN (directed 2026-08-30)](#4a-networking--vpn-directed-2026-08-30)
 - [4b. PC-parity requirements: printing, USB peripherals, "open with droidtop"](#4b-pc-parity-requirements-printing-usb-peripherals-open-with-droidtop)
 - [4c. Multi-display: what iiSU does, and why droidtop fights the platform (2026-09-01)](#4c-multi-display-what-iisu-does-and-why-droidtop-fights-the-platform-2026-09-01)
-- [4d. The companion screen, designed (research 2026-09-01)](#4d-the-companion-screen-designed-research-2026-09-01)
+- [4d. The companion](#4d-the-companion)
+- [4e. Jobs and downloads](#4e-jobs-and-downloads)
 - [5. Windows compatibility — no real virtualization](#5-windows-compatibility--no-real-virtualization)
 - [5a. CPU-translation backend choice, and preferring a native Linux build over Wine](#5a-cpu-translation-backend-choice-and-preferring-a-native-linux-build-over-wine)
 - [5b. One Wine engine, one prefix store, whichever backend is live (assessed 2026-09-02)](#5b-one-wine-engine-one-prefix-store-whichever-backend-is-live-assessed-2026-09-02)
@@ -5799,7 +5805,7 @@ not settled designs):
 
 ### Companion layout and per-mode orientation (Droidtop/tracker#213)
 
-Folded into 4d, "The companion" (Hosts, layout and orientation), 2026-11-06.
+See 4d, "The companion" (Hosts, layout and orientation).
 
 Read directly off the installed `com.iisulauncher` 0.1.6.1 APK
 (`/root/re/iisu` in the dev container). The code is obfuscated; the
@@ -5809,9 +5815,8 @@ intent filters and user-facing strings all survive.
 
 ### The companion's tabs (decided 2026-10-02, Droidtop/tracker#247, #273)
 
-Replaced by 4d, "The companion", the one model the owner approved on 2026-11-06 (Droidtop/tracker#786). That section
-now holds the tabs, Home, Device's pages (Network among them; it was "The Network tab"), droidtop's pages, Game,
-Performance, Input, the screen's dim and wake, Kid, Kiosk and Guest, and the copy rule.
+See 4d, "The companion": its tabs, Home, Device's pages (Network among them), droidtop's pages, Game, Performance,
+Input, the screen's dim and wake, Kid, Kiosk and Guest, and the copy rule.
 
 ### iiSU uses Android's own secondary-display home
 
@@ -7047,351 +7052,410 @@ launch (the `coverVacatedDisplays` idle-cover path) was not exercised live this 
 unchanged code moved verbatim and worth a follow-up device-queue item rather than blocking on it
 here.
 
-## 4d. The companion (one model, approved by the owner 2026-11-06, Droidtop/tracker#786)
+## 4d. The companion
 
-This section is the companion's one model. It replaces the earlier 4d (the 2026-09-01 research and its layers), "The
-companion's tabs" (2026-10-02 onward), "The Network tab" and "Companion layout and per-mode orientation", which now
-point here.
+The companion is one model. Its sources: the companion plan the owner decided on 2026-10-30 ("I agree with your
+recommendations there", Droidtop/tracker#786, with its addendum on droidtop's own systems: "the companion also needs to
+manage DROIDTOP. It has a lot of stuff that doesn't normally exist, and the companion should be our inlet into that",
+2026-10-29), and the model the owner approved on 2026-11-06 (relayed by the coordinator), which leads where the two
+differ. "Companion layout and per-mode orientation" and "The companion's tabs" in 4c point here.
 
-**The owner, verbatim (2026-11-06, relayed by the coordinator):** "yeah, taht sounds good. It needs to be able to drive
-everything, for every UI. That's the point, if we have a second screen, the first shouldn't HAVE to do anything but be
-a display, and maybe a trackpad, etc. Clanceability is still important. We want its home to be useful for information,
-while still letting the thing as a whole be powerful. Quick controls for important actions (an input button that pops
-a keyboard and trackpad, with a switch for an on screen keypad, for instance, should always be visible so the user can
-grab a keyboard whenever)."
+**The owner, verbatim (2026-11-06):** "yeah, taht sounds good. It needs to be able to drive everything, for every UI.
+That's the point, if we have a second screen, the first shouldn't HAVE to do anything but be a display, and maybe a
+trackpad, etc. Clanceability is still important. We want its home to be useful for information, while still letting
+the thing as a whole be powerful. Quick controls for important actions (an input button that pops a keyboard and
+trackpad, with a switch for an on screen keypad, for instance, should always be visible so the user can grab a keyboard
+whenever)."
 
 ### What it is
 
-- **A complete, polished access portal to manage everything about the device and the UI.** It drives everything in
-  every UI: Gaming, Standard, Mobile and Desktop. With a second screen, the main screen never has to be touched: it can
-  be only a display, or a trackpad. The companion holds the extra things so the main UI stays clean.
-- **Two levels.** Home is glanceable: status, pins, the running game, now playing, notifications and running jobs, read
-  in a second or two. Behind it, Device and droidtop are the full UI, which controls every part of every mode. Good UX
-  is the measure for both: dense, labelled, touch-sized, and nothing explained in prose (see "Copy" below).
-- **Always-visible quick controls.** A small set of important actions stays on screen on every tab. First among them
-  is **Input**: one tap opens a keyboard plus trackpad, with a switch to an on-screen keypad, so a keyboard is always
-  one tap away.
-- **Out of scope:** streaming and recording (windowcast's), root by default, mirroring the shell, system-wide
-  remapping, and anything without a public API.
+- **A complete, polished access portal to manage everything about the device and the UI** (owner, 2026-10-29). It
+  drives everything in every UI: Gaming, Standard, Mobile and Desktop. With a second screen the main screen never has to
+  be touched: it can be only a display, or a trackpad. The companion holds the extra things, so the main UI stays clean.
+- **A glanceable front, a full UI behind it.** Home is read in a second or two: status, pins, the running game, now
+  playing, notifications and running jobs. Behind it, **Device** manages the device and **droidtop** manages droidtop,
+  two equal halves, each a list of pages that manage their area in place. Together they control every part of every
+  mode droidtop has.
+- **Always-visible quick controls.** A small set of important actions is on screen on every tab. First among them is
+  **Input**: one tap pops up a keyboard plus trackpad over whatever shows, with a switch to an on-screen keypad, so a
+  keyboard is always one tap away.
+- **The main screen does the showing; the companion does the choosing.** Some actions take effect on the main screen:
+  theme and its variants, interface size, screen roles, starting a stream, Launch test, button capture (the row starts
+  it, the person presses the pad). Their rows act from the companion, and the main screen shows the result live.
+- **Out of scope:** streaming and recording (windowcast's), root by default, mirroring the shell, system-wide remapping,
+  and anything without a public API.
+
+### Rules every page keeps
+
+1. **Every page owns its area.** A row hands off to Android only where Android reserves the screen; the exit table
+   below is the whole list, and an exit not on it is a defect.
+2. **One exit style.** The label names the page ("Android's VPN") with the external-page glyph; its Info says it opens
+   Android's Settings on this screen and that Back returns to the same row. An exit is always its page's last row, and
+   no exit is on two pages.
+3. **Rows never vanish because a grant or the helper is missing.** The row stays in place and shows its state in the
+   read-only look (`CompanionReadOnlyRow`: muted, a meter where it has a level, "Not allowed yet"). A tap opens one plain
+   sheet (`CompanionLockedSheet`, from the one `Locked` model): what droidtop would be allowed to change, one button for
+   the next step, Android's page as the second button where the exit table has one, and Not now. One sheet serves every
+   page. Rows for hardware the device lacks (NFC, a flash, a second screen) are not drawn.
+4. **State is drawn** (meter, ring, switch, glyph) with words beside it. Facts are a title and a value, never a
+   sentence.
+5. **One component set.** The companion draws the shell's components in touch form: row kinds, group header, tile,
+   chip, the one dialog, empty state, toast and keyboard slab. Touch form is 48 dp targets, step buttons on every
+   slider, a drawn Info glyph, a back chevron, no hint bar, no focus requests and no pad words.
+6. **Screen readers.** Every row is one node with its role, name and state; meters carry their range; sliders have step
+   actions; tone is a glyph plus colour, never colour alone; live values are not live regions. From font scale 1.3 up,
+   rows stack the title over the value so the value is never cut.
+7. **Depth.** The tab is level 0 and a page level 1. One item's details (an app, a network, a device, a storage
+   consumer) open as a bottom sheet. From 600 dp wide up, Device and droidtop draw the page list and the open page side
+   by side. In the one-screen sheet a page opens full height with a back chevron, and pull-to-close works only from the
+   handle, never mid-scroll.
+8. **Asks first.** Restart, Power off, Uninstall, Clear data, Free up space, Eject, Stop, Clear all, and turning off
+   wireless debugging (it also stops the helper) always ask, naming the target, through the one dialog with the safe
+   answer first. Trust changes ask too: keys, repositories, permission revokes, forgetting a computer, signing out and
+   restoring a backup; a typed key shows its fingerprint and where it came from. **Screen-shape changes** (display size,
+   font size, rotation, refresh rate, screen roles) go back after 10 seconds unless Keep is tapped on the screen that
+   changed.
+9. **Off the main thread.** A page builds its rows in the background and shows the loading shimmer first. Live values
+   come from listeners that exist only while their page shows; the page lists read one cached summary filled in the
+   background. No `dumpsys`, `exec` or per-package query runs while rows are built; installed-app sizes are computed
+   once per opening and icons load for visible rows only. Slider writes go through one background write queue
+   (`LatestWrites`). Each page has a test that opens it under StrictMode.
+10. **Machinery stays out of what a person reads.** Helper, Shizuku, provider, Risky, root, adb, IME and kernel never
+    appear in a row or sheet; a vocabulary test reads every catalog and sheet string. What elevated access unlocks is
+    **More controls**. The helper's state and the Risky actions classes are on droidtop > Advanced, drawn only when a
+    helper exists. A failure says what did not happen ("The change did not go through. Try again").
+11. **Each page puts what needs attention first:** approvals, failed jobs, missing BIOS files, conflicts.
+12. **Copy: labels and values, never prose** (owner, 2026-10-02, Droidtop/tracker#285, strictest form). State is shown by
+    the control itself; an empty state is two or three words ("Nothing running"); sentences are for real errors only;
+    there are no Info links. What still has to be explained is on the shell's focus line and in Info (Y) (7k), and on the
+    companion in the one sheet.
+
+**Exit table.** Always: VPN; hotspot; audio output picker; format SD; App info; per-app notifications; notification
+access; the Modify system settings and Do Not Disturb access grants; permission manager; turning an accessibility
+service on the first time; system language; system update; Cast; Printing; Security; the Developer options page;
+droidtop as Android's home app (Android's Home app page); default apps, SIM and mobile data, wallpaper, Android users and
+USB mode (on About or Apps). Without the helper only: battery saver, location, NFC, airplane mode, Wi-Fi and Bluetooth on
+and off, forget a network, data saver, eject, revoke a special access, accessibility settings.
+
+**One helper write path.** Every write through the helper names its Risky actions class, and a test checks that each
+does ("Risky actions"): System settings (time, location, battery saver, dark theme, night light, NFC, device name, data
+saver), Radios (Wi-Fi, Bluetooth, airplane), Developer settings, Other apps' data (clear data, disable, free up space),
+Give another app access (a special-access revoke), Change accessibility settings, Change display settings and Root-level
+commands. droidtop takes no standing Write secure settings grant (owner, 2026-10-30). Rows that write as root (fan,
+charge limit, CPU governors and clock limits) stay behind Root-level commands, off by default (owner, 2026-10-30).
 
 ### Hosts, layout and orientation
 
-- **One entry.** `CompanionTabs` (`:app`) is drawn by every host that draws the companion: the registry's `Surface`
-  (used by `SecondScreenPresentation` and `SecondaryDisplayActivity`), `CompanionActivity`, and on one screen
-  `CompanionSheetActivity`. Mobile draws the same tabs (decided 2026-10-08, Droidtop/tracker#347). Every host reads
-  the mode through `SecondaryDisplayContent.followedMode` (`Modes.lastModeFlow`), so a companion that stays up across
-  a mode switch redraws as the new mode's: its bar, its opening tab and its input surface.
-- **Which screen** is the one answered Companion in Settings > Displays or in the question a new screen gets, else
-  the screen droidtop started on when the menus moved to another (Droidtop/tracker#776; 4c "What each screen is for").
-  In Desktop each screen asks once whether to extend the desktop or keep the companion (#776, #908; "The desktop on
-  a second screen").
-- **One screen (slice C13).** A device with no second screen gets the same `CompanionTabs` as a pull-down sheet from
-  the top over Mobile's home screen (the home screen's menu "Companion", offered only while Android lists one display,
-  `CompanionSheet.offered`, or the launcher's swipe-down slot set to Companion, `GestureAction.OPEN_COMPANION`; the
-  slot's default stays Android's notifications) and as a tray panel at the bottom right over Desktop's taskbar
-  ("Companion" on the taskbar, on one screen only). A tap outside, Back, or a pull up on the handle closes it. A
-  first-run tip says how to open it again, until dismissed.
-- **Layout from the window's own bounds (Droidtop/tracker#213).** Portrait stacks content vertically, a wide window
-  lays Device's pages and Performance in two columns; layout follows the companion display's size, never the
-  handheld's orientation. Each mode owns a Screen orientation choice (Gaming: Follow device, Landscape, Landscape
-  (flipped); Mobile and Desktop also Portrait and Portrait (flipped)), applied to each droidtop Activity by one
-  `ActivityLifecycleCallbacks`. The companion has its own **Lock to landscape** (droidtop > Companion, off by default;
-  owner, 2026-10-01): it wins over the mode's choice for the companion only, through `DisplayOrientationContent`,
-  which turns the content a quarter when the window is still portrait (a Presentation, or a display that cannot
-  rotate; `CompanionOrientation.rotateContent`). The shell's own orientation is untouched.
-- **Status bars.** In Gaming and Desktop the companion hides Android's status and navigation bars and ends its top row
-  with droidtop's own status line (`StatusCluster`: clock, network, battery); Standard keeps Android's bars and draws
-  no second clock (`companionImmersive`, Droidtop/tracker#524). The shell's activity spot sits before the status line
-  (S5, #742): the icon of what is happening now in a ring that fills, a count past one; a tap opens droidtop >
-  Downloads.
-- **Picture-in-picture moves to the companion (owner, 2026-10-09, Droidtop/tracker#430).** While a companion host is
-  started, `PipMover` moves a task that enters picture-in-picture on the main screen to the companion's display through
-  the helper's shell (`am display move-stack`), and moves it back when the companion stops. "Picture-in-picture on the
-  companion" (droidtop > Companion, on by default); nothing happens without a `priv.shell` provider. It looks when
-  droidtop's accessibility service reports a window change, else every five seconds while the companion shows.
-  Filling the companion screen with the video is not built.
+- **One entry.** `CompanionTabs` is drawn by every host that draws the companion: the registry's `Surface` (in
+  `SecondScreenPresentation` and `SecondaryDisplayActivity`), `CompanionActivity`, and on one screen
+  `CompanionSheetActivity`. Every host follows the mode as it changes (`SecondaryDisplayContent.followedMode`), so a
+  companion that stays up across a mode switch redraws as the new mode's: its bar, its opening tab and its input.
+- **Which screen.** The companion's screen is the one answered Companion in Device > Display or in the question a new
+  screen gets (4c, "What each screen is for", Droidtop/tracker#776). In Desktop each screen asks once whether to extend
+  the desktop or keep the companion (#908).
+- **One screen.** A device with no second screen gets the same companion as a pull-down sheet from the top in Mobile
+  (the home screen's menu, or the launcher's swipe-down slot set to Companion) and a tray panel at the bottom right over
+  Desktop's taskbar. A tap outside, Back, or a pull up on the handle closes it; a first-run tip says how to open it
+  again.
+- **Layout from the window's own bounds** (Droidtop/tracker#213), never the handheld's orientation. Each mode owns a
+  Screen orientation choice (Gaming: Follow device, Landscape, Landscape (flipped); Mobile and Desktop also Portrait and
+  Portrait (flipped)). The companion's **Lock to landscape** (droidtop > Companion, off by default; owner, 2026-10-01)
+  wins over the mode's choice for the companion only, turning the content a quarter where the window cannot rotate
+  (`DisplayOrientationContent`).
+- **Status line.** In Gaming and Desktop the companion hides Android's bars and ends its top row with droidtop's own
+  status line (`StatusCluster`; #524); Standard keeps Android's bars and draws no second clock. The activity spot sits
+  before it (#742): the icon of what is happening now in a ring that fills, a count past one.
+- **Picture-in-picture moves to the companion** (owner, 2026-10-09, Droidtop/tracker#430): a task that enters
+  picture-in-picture on the main screen moves to the companion's screen (`PipMover`), and back when the companion stops.
+  "Picture-in-picture on the companion" is on by default.
 - **Yield completely.** When a game or app owns the companion's panel the companion is gone, not layered over it (4c,
-  "An N64 launch, root-caused"); a launch parked onto the same display dismisses the Presentation on `onStop`, never on
-  an unrelated display change.
+  "An N64 launch, root-caused").
 
 ### Input
 
-- **Touch only for the companion's own controls** (owner, 2026-10-01, Droidtop/tracker#186). Its window is focusable
-  only while Android makes it the top activity, and then every key goes to the shell if one is in front on another
-  screen (`TouchOnlySurfaceFocus`). With no shell to hand it to (a game owns the other screen) every pad button, the
-  D-pad, Enter and Back are swallowed, so an A meant for the game never presses Quit here. Nothing moves an app the
-  person opened (#243).
-- **The keyboard slab is part of the companion (owner, 2026-10-16: "by default, it's PART of the companion").** While a
-  field on the other screen wants keys, droidtop's slab docks at the bottom of the companion's own layout under
-  whatever tab shows (`CompanionDockedSlab`), for droidtop's own text entry and always when droidtop is the system
-  keyboard (`KeyboardTargets.companion`). Changing tab keeps it; the Input tab shows no second one. **The pad may type
-  on the slab, and only on the slab.**
-- **Every question is `CompanionAsk`** (Droidtop/tracker#786 S2a): the question naming what it acts on, the safe answer
-  first, large and filled, the action well apart, drawn in place, never as a window (a dialog window would take the
-  focus, and the pad, off the game). A pad press that reaches the companion while it is open closes it as Cancel.
+- **Touch only for the companion's own controls** (owner, 2026-10-01, Droidtop/tracker#186). The pad never drives a
+  companion control: an A meant for the game on the other screen must not press Quit here. The companion's window hands
+  every key to the shell when a shell is in front on another screen (`TouchOnlySurfaceFocus`), and swallows pad keys
+  otherwise. Nothing moves an app the person opened (#243).
+- **The keyboard slab is part of the companion** (owner, 2026-10-16: "by default, it's PART of the companion"). While a
+  field on the other screen wants keys, droidtop's slab docks at the bottom of the companion under whatever tab shows
+  (`CompanionDockedSlab`), for droidtop's own text entry and whenever droidtop is the system keyboard. Changing tab keeps
+  it. **The pad may type on the slab, and only on the slab.**
+- **The Input quick control** pops up the keyboard and trackpad over the current tab and closes back to it. Its switch
+  turns the keyboard into an on-screen keypad. It types where the Input tab types (below).
+- **Every question is the one dialog, `CompanionAsk`**: the question naming what it acts on, the safe answer first,
+  large and filled, the action well apart, drawn in place, never as a window (a dialog window would take the focus, and
+  the pad, off the game). A pad press that reaches it closes it as Cancel.
+- **Secrets.** A secret field on the companion is masked and the window is secure while it shows; it skips suggestions,
+  autofill and clipboard history, and is never logged or restored. A test covers this.
 
 ### The bar and tabs
 
-- **Always on the bar: Home, Device and droidtop.** Any page can be a tab of its own, stored as `page:<parent>/<page>`
-  (`CompanionPrefs.pageId`), whose panel is its parent's. **Game** appears while a game runs. **Social** is a default in
-  Gaming and Mobile; in Desktop **Input** comes first. **Performance** and **Input** are optional. **Plugins** lives
-  under droidtop > Plugins. Kid, Kiosk and Guest get Home, Game and Performance. One tab set in every mode, with
-  different defaults (approved): Home, Device, droidtop, Social in Gaming and Mobile; Input, Home, Device, droidtop in
-  Desktop.
-- **The bar.** A window taller than wide draws labelled icons along the bottom, a wider one a rail down the left; both
-  are `TabRail` (`:shell-gamepad`), in the shell's tab-strip style (the selected tab on the accent plate). Which tabs
-  are on it is one pure function, `slots(chosen, mode, running, extent, labelSizes)`: up to four chosen tabs, then the
-  running tabs (Game; Input while a stream or a PC game runs, unless chosen), then More, always last. Labels wrap to two
-  lines at the current font; when they do not fit, chosen tabs move into More from the right end. Home and Device never
-  move into More (`ControlAccess.NEVER_IN_MORE`). A page chosen as a tab is on the bar, never under More; a page that is
-  not on the bar opens on its parent's tab. A tab under More passes its badge to More. Every entry has the tab role,
-  its selected state and a spoken name. A first-run tip says what the bar is, until dismissed. Only the selected tab is
-  composed. A saved bar keeps its reach (`CompanionPrefs.currentId`: System reads as Device; Network and Apps as
-  Device's pages).
+- **Home, Device and droidtop are always on the bar.** Game joins while a game runs. Social is a default in Gaming and
+  Mobile; Input is optional and comes first in Desktop; Performance is optional. Any Device or droidtop page can be a tab
+  of its own, stored as `page:<parent>/<page>` with its parent's panel, so a mode that denies the panel denies the page.
+  Plugins is droidtop's Plugins page, not a tab. One tab set in every mode, with different defaults: Home, Device,
+  droidtop and Social in Gaming and Mobile; Input, Home, Device and droidtop in Desktop. A saved bar keeps its reach
+  (System reads as Device, Network and Apps as Device's pages).
+- **The bar.** Labelled icons along the bottom of a window taller than wide, a rail down the left of a wider one, in the
+  shell's tab-strip style (`TabRail`). One pure function decides the slots (`slots`): up to four chosen tabs, then the
+  running tabs (Game; Input while a stream or a PC game runs), then More, always last. When labels at the current font do
+  not fit, chosen tabs move into More from the right end; Home and Device never do. A page chosen as a tab is on the bar,
+  never under More; a page not on the bar opens on its parent's tab. A tab under More passes its badge to More. Every
+  entry has the tab role, its selected state and a spoken name. Only the selected tab is composed.
+- **Badges.** The droidtop tab carries a badge for what waits on the person (plugin approvals, updates ready, a sync
+  conflict, a crash note, What's new after an update), each opening its page; Social carries its unread count.
 - **Opening tab and game start.** The companion opens on the mode's opening tab (Home in Gaming and Mobile, Input in
-  Desktop), any tab, or the last one used. When a game starts while Home shows it turns to the runner's tab ("When a
-  game starts": Game by default, Input for a runner that asks, any tab, or stay), announces it, and goes back to Home on
-  quit; started from another tab, nothing moves.
-- **Panels.** Device and droidtop are the companion's own (`ControlAccess.COMPANION_ONLY`): the Quick Menu never lists
-  them.
+  Desktop), any tab, or the last one used. When a game starts while Home shows it turns to the runner's tab ("When a game
+  starts": Game by default, Input for a runner that asks, any tab, or stay) and goes back to Home on quit; started from
+  another tab, nothing moves.
+- **Panels.** The companion's panels have their own allow-list, default-deny, split from the Quick Menu's, with a
+  per-mode test of the tab sets and of each host's visible row ids. Device and droidtop are the companion's own: the
+  Quick Menu never lists them (`ControlAccess.COMPANION_ONLY`). In Full the companion's set is Home, Game, Device,
+  droidtop, Social, Performance and Input.
 
-### Home: glanceable
+### Home: the glanceable front
 
 One scrolling column over the idle art (`CompanionSurface`; Droidtop/tracker#285, #328): nothing stacked over anything,
-rails scroll sideways inside it, and every section starts with a heading so the next shows below. The idle art is a
-slow rotation from the library, never a wordmark; the focused entry is read through `settledFocusedEntry`, which draws
-a new focus once it has held 350 ms. In order:
+rails scrolling sideways inside it, every section headed so the next shows below. The idle art is a slow rotation from
+the library, never a wordmark; the focused entry is drawn once it has held 350 ms (`settledFocusedEntry`). A drag starting
+anywhere scrolls the page when it is mostly up or down, even when a rail or a widget took its first movement
+(`secondScreenScroll`). In order:
 
-1. **Status line**: clock, network, battery and, as spoken words, "Mic muted", "Mic in use" and "Camera in use"
-   (`StatusIndicators`, callbacks while shown, never polled); beside the battery "3 h 10 min left" or "45 min to full"
-   once readings allow (`BatterySampler`, `BatteryEstimator`); "Recording 1:05" while a plugin records
-   (`companion.recording`); the optional low-battery line (off by default) with Battery saver and the game's own
-   battery mode; and the last launch or quit error.
-2. **Pins** (slice C5): catalog items by id (`PinnedControls`; default volume, brightness, Wi-Fi, Do Not Disturb and
-   Mute microphone) drawn with the Quick Menu's tile model and pressed its way; every pin draws its glyph beside its
-   name, never text alone; a slider pin is the one slider row. The Network pin names the Wi-Fi network (with the
-   helper; else Wi-Fi, Ethernet, Mobile data, Wi-Fi off or Offline), lights while Wi-Fi is on, gives the signal to a
-   screen reader, and a tap switches Wi-Fi with the helper (`switchRadio`), else opens Device > Network. "Edit pins"
-   lists every System, Display and Sound item, plugin tiles, apps and (while droidtop is the home app) an app's
-   shortcuts, and live stat tiles (battery temperature and watts, the fastest core's clock; `PerformanceMonitor` runs
-   only while that tile shows). **Now playing** (`CompanionNowPlayingCard`, `MediaNow`, also the Quick Menu's) sits
-   under the pins: title, artist, app, Previous, Play or Pause, Next.
-3. **The game card.** While a game runs: art, the game's name as the heading, this session's time, Resume, Quit (the
-   one quit path, `Library.quitRunning`, asking by `GameControls.asks`) and Controls; it follows
-   `LaunchDisplay.running`. With nothing running, the game focused in the shell: art, name, system, last played, the
-   emulator that will run it (`resolvePlayer`) and Play. The description stays on the game's page (review finding 4,
-   S18).
-4. **Continue playing** and **Recently added** (`CompanionRail`, ten capsules each, tap launches through the one launch
-   path; both from `CompanionState.homeActivity`, the list the shell's Home shelves use; deduped by id, then by title and
-   system), then **Recent apps** (up to twelve from `RecentAppsStore`, opening on the companion's screen).
-5. **Downloads and updates**: running jobs with their bars (at most four) and the count of games with an update. A
-   running job on Home holds the companion on (#526).
-6. **Social**: unread conversations and friends in a game; a tap opens the conversation on Social. Not in Kid or
-   Kiosk.
-7. **Notifications** (slice C6): folded, the heading is the count and the newest line; open, Clear all and up to twelve
-   rows with Reply (droidtop's own keyboard and draft, `NotificationReply`, so the game keeps its focus), Open and
-   Dismiss (also a swipe and TalkBack actions). "Show message text": When unlocked (default, following Android's
-   lock-screen setting), Always or Never.
-8. **System**: storage free and total, and All controls.
-9. **Widgets**: the person's Android widgets with Add and Remove on every host (`CompanionWidgetPickActivity`, on the
-   companion's own screen).
+1. **Status line.** Clock, network, battery and time left or to full (`BatteryEstimator`), "Mic muted", "Mic in use" and
+   "Camera in use" as spoken words (`StatusIndicators`), "Recording 1:05" while a plugin records, the optional low-battery
+   line with Battery saver and the game's own battery mode, and the last launch or quit error. **Each indicator opens its
+   page** (network: Device > Network; battery: Device > Battery; and so on).
+2. **The running game.** Art, the game's name as the heading, this session's time, Resume, Quit (the one quit path,
+   asking as Game does, #588) and Controls. With nothing running, the game focused in the shell: art, name, system, last
+   played, the emulator that will run it and Play. Its description is on the game's own page, not here.
+3. **Pins**, picked from the Device and droidtop page structure: any toggle, slider or action carries a pin glyph. Default
+   pins: volume, brightness, Wi-Fi, Bluetooth, Do Not Disturb, performance mode and screenshot. A pin is the Quick Menu's
+   tile pressed its way, its glyph beside its name, never text alone; a slider pin is the one slider row. The Network pin
+   names the Wi-Fi network, lights while Wi-Fi is on, gives the signal to a screen reader, and a tap switches Wi-Fi where
+   droidtop may, else opens Device > Network. Edit pins also offers plugin tiles, apps and an app's shortcuts, and live
+   stat tiles (battery temperature and watts, the fastest core's clock).
+4. **Now playing** (`MediaNow`, also the Quick Menu's): title, artist, app, Previous, Play or Pause, Next.
+5. **Notifications** (one row model with Social): folded to the count and the newest line; open, Clear all and up to
+   twelve rows with Reply (droidtop's own keyboard and draft, so the game keeps its focus), Open and Dismiss. "Show
+   message text": When unlocked (default), Always or Never.
+6. **Running jobs** in the activity spot, and Downloads and updates on Home with their bars and the count of games with
+   an update; while a job runs the companion stays awake (#526). droidtop's events that wait on the person (approvals,
+   updates, a sync conflict, a crash note) show there too, each opening its page. **After an update**, a card opens
+   droidtop > What's new.
+7. **Library rails**: Continue playing and Recently added (ten capsules each, launching through the one launch path, from
+   the list the shell's Home shelves use), then Recent apps (from the launcher's history, opening on the companion's
+   screen).
+8. **Social at a glance** (unread conversations and friends in a game, opening on Social) and **Widgets** (the person's
+   Android widgets, added and removed on the companion's own screen).
+9. **Leave Kid** (or Kiosk, or Guest): a row at the end, only in a restricted mode, which asks for the passkey.
 
-Each heading folds its section (remembered); a section with nothing draws nothing; droidtop > Companion > Home turns
-any section off (`CompanionHomePrefs`; Notifications folded by default). Home ends with "More controls need a one-time
-setup. Set up" while no `priv.shell` provider runs (not in Kid or Kiosk). Kid and Kiosk keep volume and brightness pins,
-cannot edit, and show nothing past the pins. **A drag starting anywhere scrolls** (`secondScreenScroll`,
-`dragAnywhereScroll` in `:display`): a drag mostly up or down is the page's even when a rail or a widget took its first
-movement; a mostly sideways drag scrolls the rail; a tap is untouched.
+Each section folds by its heading (remembered); a section with nothing draws nothing; droidtop > Companion turns any
+section off. In Kid and Kiosk, Home keeps the volume and brightness pins, the running game and Leave Kid.
 
 ### Device: the device, managed in place
 
-Device is a tab whose content is its pages (level 0); a page opens in place under a Back row (level 1;
-`CompanionAreaTab`). Each page manages its area in place, handing off only where Android reserves the screen. Pages:
-System, Display, Sound, Network, Controllers, Battery, Storage, Apps, Privacy, Accessibility, and Android's pages.
+Device lists its pages in groups, each row drawing its state; Settings search at the top covers every row of Device and
+droidtop, exits included, each result showing its page.
 
-**How a page draws (the catalog host, slices C4 and S2a).** Rows are catalog items drawn for touch
-(`CompanionCatalogItems`), never controls of their own, so the Quick Menu and the companion show the same items by
-construction (`quickSectionGroups`). Every row kind is drawn: a text field opens the shared editor in place
-(`TextEditPanel`); a folder or document opens the system's picker (`rememberCatalogPickers`; on a Presentation, which
-has no activity to answer, the row says to choose it from the main screen); another app's screen opens there. A
-screen's titled groups keep their names over their first row (`companionHeadings`). **The one slider row**
-(`CompanionSliderRow`): name and value on one line, a drawn track with a step button at each end; the value moves at
-once and writes go through `LatestWrites` (only the newest write per control waits, never on the main thread); one
-screen-reader node with Lower and Raise. A catalog page is built off the main thread while shown, again after each change
-and on a return from another screen. Where a row is shown elsewhere on the companion, the page leaves the catalog's copy
-out (`ON_SCREEN_CARD`, `ON_STREAM_SLIDERS`, `ON_ACCESSIBILITY` in `CompanionCatalogPanel.kt`).
+| Group | Pages |
+|---|---|
+| Screen and sound | Display, Sound |
+| Connections | Network, Bluetooth, Controllers |
+| Power and space | Battery, Storage |
+| Apps and alerts | Apps, Notifications, Special access |
+| You | Privacy, Accessibility, Time and language, About |
 
-- **System**: the Quick Menu's System section, without the Android settings row (an exit lives on one page:
-  Android's pages), and Connections: the paired Bluetooth devices, connected ones first, each Connected or Not connected
-  (`BluetoothDevice.isConnected`), asking for Bluetooth access when the card first opens, and Android's Bluetooth
-  settings. **Pairing from the companion (coordinator, 2026-11-06, from the owner's standing rule #830):** ask for
-  Nearby devices (Android 12 and later) or location (8 to 11) only when the person taps Pair a device, with a one-line
-  hint of what it allows; a refusal shows in place with a route to Android's Bluetooth page and is not asked again on
-  every tap. Not built. Connecting and disconnecting stay Android's (a privileged API).
-- **Display** (slices C14, S7): `DisplayControls` is the one write path for each screen's brightness, power and refresh
-  rate. One card per screen: name, built-in or external, size, orientation and role; the built-in screen's brightness
-  (Android's setting, whatever the screen's role, so the catalog's Brightness row is not drawn again), the companion's
-  own brightness (its window's, never below 10%; "Dim further" when the companion is on the built-in screen too) and
-  Turn this screen off; the refresh rate where the screen lists more than one (through the helper, Risky actions >
-  "Change display settings"); "Low resolution: 480×640 of 1080×1920" and Reinitialize displays on a second screen stuck
-  in its safe mode (the catalog's Reinitialize row stays for faults no card shows, such as mirroring); and "This screen
-  controls its own brightness" where droidtop has none. Identify screens shows a number and name on each screen for
-  five seconds. Font and display size are on Accessibility only, whenever Accessibility has them (plan 4.5).
-- **Sound** (slices C19, S8): `VolumeControl` is the one volume write path (the Quick Menu's slider, pins and this
-  page), and Kid's highest volume holds there for every stream. A slider per stream (media, ring, notifications,
-  alarms, calls), so the catalog's Volume row is not drawn again; Android's output panel is the Audio output row, once.
-  Under Do Not Disturb, with its access, "Do Not Disturb lets through" has a switch per priority category the device's
-  Android has (`DndCategories`), keeping who may call or message as it is.
-- **Network** (Droidtop/tracker#583; a tab until S3, now this page): each network that is up is one card, in the order
-  Wi-Fi, mobile data, Ethernet, VPN, Bluetooth tethering, USB: "Connected (name)", Details (interface, addresses, DNS,
-  Wi-Fi's signal, band and link speed, a VPN's all or some traffic, metered) and Manage, which opens Android's own
-  screen for it. With nothing up, one Offline card with Manage. A VPN's name is the always-on VPN app, read with the
-  helper. **The public address** is asked of api.ipify.org only from Details' "Check public address" (owner,
-  2026-10-17), never by itself, and the answer names who answered. Under the networks, every interface that is up, and
-  with the helper whether ADB over Wi-Fi is on. Read off the main thread when the page opens and on Refresh. Not built:
-  Manage for droidtop's container and Wine networks.
-- **Controllers** (S9): each connected pad with its battery (`ConnectedPads`, `InputDevice.getBatteryState` on Android
-  12 and later), then Controller buttons and Swap A and B (`ControllerLayoutTiles`, the Quick Menu's own rows, while a
-  pad is attached). Home's status line names the one in hand ("Pad 80%") when exactly one reports a battery.
-- **Battery** (slice C16): the battery's level, health, temperature and charge rate; Battery saver (Android's screen);
-  performance mode (`GamingSettingsCatalog.performanceModeItem`, while a game droidtop launched is in front and the
-  helper runs); what `PowerProbe` finds on this device: a fan mode or charge limit with its value where the device
-  keeps one as an Android setting (changing it opens the device's own page), each CPU cluster's clock and governor and
-  the GPU's clock where readable; with Risky actions > Root-level commands and a root provider, each cluster's governor
-  and highest clock to pick.
-- **Storage** (slice C21): every volume (internal storage, then each SD card or USB drive Android mounted), its free and
-  total space and a bar.
-- **Apps** (slices C20 and earlier): the task manager's rows (`CompanionTasks`, `SharedRunningAppsList`; switch, ask for
-  the other screen, Stop through `TaskManager.close`), Protect (kept from Clear all, `ProtectedApps`), Clear all (asks
-  first; leaves what is protected and what is open on the companion's screen); sort by Recent, Processor, Memory or Data
-  (`AppsInsights`). While a desktop session runs, a Linux desktop card lists the container's windows with Raise or
-  Restore, Minimize and Close (`CompanionDesktopWindows`). **Open an app** (`CompanionAppPicker`): a search typed with
-  droidtop's own keyboard (no input method, so a game keeps its focus), a Games filter, and every launchable app: Pinned,
-  Recent, then by name, or one flat list for a search (`AppPicker.sections`); a tap opens it on the companion's screen,
-  Main screen on the shell's, Pin and Unpin pin it to Home.
-- **Privacy** (slice C17): Android's privacy dashboard; with the helper, the apps that used the camera, microphone or
-  location in the last 24 hours (`PrivacyAccess`), each opening its App info; "What droidtop can access": notification
-  access, Usage access, the accessibility service (typing, screenshots, the pointer), Bluetooth and More controls, each
-  with whether droidtop holds it and why.
-- **Accessibility** (slice C22): Android's font size, display size, magnification, high-contrast text, colour inversion
-  and TalkBack (`AccessibilityControls`), written with the helper and Risky actions > "Change accessibility settings",
-  else each row opens Android's screen and says which switch would let droidtop do it. Turning TalkBack or magnification
-  off asks first. Font and display size are the same items as the Quick Menu's Display section.
-- **Android's pages**: Android's own Settings pages droidtop has no page for yet, folded under one row, each labelled as
-  the exit it is ("Android's Display", "Opens Android's Settings on this screen. Back returns here"; NFC and Printing
-  only where the device has them). Each leaves the fold when its area gets a page.
+Location, NFC, Cast and Printing appear only where the device has them; Developer options only while Android's developer
+options are on.
+
+**How a page draws.** Rows are catalog items drawn for touch (`CompanionCatalogItems`), so the Quick Menu and the
+companion show the same item by construction (`quickSectionGroups`). Every row kind is drawn: a text field types through
+the companion's own keyboard slab, a picker opens Android's picker on the companion's screen and returns to the row, a
+sub-screen opens in place, group titles are kept, and a live screen updates its rows; a test fails when a row kind is not
+drawn. **The one slider row** (`CompanionSliderRow`): name and value on one line, a drawn track, a step button at each end;
+the value moves at once and the write queues in the background. A control drawn on a page's own card is not drawn again
+from the catalog on the same page.
+
+- **Display.** `DisplayControls` is the one write path for each screen's brightness, power and refresh rate. One card per
+  screen: name, built-in or external, size, orientation and role; the built-in screen's brightness (Android's setting,
+  whatever its role); the companion's own brightness (its window's, never below 10%; "Dim further" when it shares the
+  built-in screen) and Turn this screen off; the refresh rate where the screen lists more than one; screen roles, names
+  and interface size; "Low resolution" with Reinitialize displays on a second screen stuck in its safe mode; "This screen
+  controls its own brightness" where droidtop has none. Also auto brightness, screen timeout, rotation, dark theme and
+  night light. Identify flashes a number on every screen, "This screen" marked. Roles, interface size and refresh rate
+  are screen-shape changes (Keep or go back).
+- **Sound.** `VolumeControl` is the one volume write path, and Kid's highest volume holds there. A slider per stream
+  (media, ring, notifications, alarms, calls), the ringer (sound, vibrate, silent), haptics, mic mute, and Do Not Disturb
+  with what it lets through (`DndCategories`, a switch per category the device's Android has) and its exceptions. Exit:
+  the audio output picker.
+- **Network.** Each network that is up is one card, in the order Wi-Fi, mobile data, Ethernet, VPN, Bluetooth tethering,
+  USB: "Connected (name)", Details (interface, addresses, DNS, Wi-Fi's signal, band and link speed, a VPN's all or some
+  traffic, metered) and its controls; with nothing up, one Offline card. Joining a Wi-Fi network (Android's add-network
+  dialog); Wi-Fi on and off, forget a network, airplane mode, data saver and the VPN app's name with More controls. **The
+  public address** is asked of api.ipify.org only from Details' "Check public address" (owner, 2026-10-17), and the
+  answer names who answered. Every interface that is up, and whether ADB over Wi-Fi is on. Exits: VPN, hotspot.
+- **Bluetooth.** Paired devices, connected ones first, each Connected or Not connected; discovery and pairing; on and off
+  with More controls. Pairing asks for Nearby devices (Android 12 and later) or location (8 to 11) only when the person
+  taps Pair a device, with a one-line hint of what it allows; a refusal shows in place with Android's Bluetooth page as the
+  way on, and is not asked again on every tap (coordinator, 2026-11-06, from the owner's rule #830: "Give the user the
+  choice"). Connecting and disconnecting a paired device are Android's.
+- **Controllers.** Connected pads with their batteries (`ConnectedPads`), player order, Controller buttons and Swap A and
+  B (`ControllerLayoutTiles`); button capture starts from here and runs on the main screen. Home's status line names the
+  one in hand when exactly one reports a battery.
+- **Battery.** Level, time left, health, temperature, charge rate, screen time by app (usage access); battery saver and
+  performance mode with More controls (`GamingSettingsCatalog.performanceModeItem`, for the game in front); fan mode and
+  charge limit where the probe proves the setting writable (`PowerProbe`); each CPU cluster's clock and governor and the
+  GPU's clock where readable, and a cluster's governor and highest clock to pick behind Root-level commands. Exit without
+  More controls: Android's battery saver.
+- **Storage.** Every volume with its meter (internal storage, each SD card or USB drive), use by app, droidtop's
+  downloads, containers and caches, clear droidtop's caches; free up space and eject the SD card with More controls.
+  Exit: format.
+- **Apps.** Running apps (switch, ask for the other screen, Stop, Protect, Clear all, move), installed apps (search,
+  sort by Recent, Processor, Memory or Data), Open an app (a search typed with droidtop's own keyboard, a Games filter,
+  every launchable app: Pinned, Recent, then by name; a tap opens it on the companion's screen, Main screen on the
+  shell's, Pin and Unpin), uninstall (Android confirms, on the companion's screen), each app's permission summary; clear
+  data and disable with More controls. While a desktop session runs, the Linux desktop's windows with Raise or Restore,
+  Minimize and Close. Exit: App info.
+- **Notifications.** The inbox (reply, dismiss, clear all) and the apps that posted (a live listener, never stored).
+  Exits: per-app notifications, notification access.
+- **Special access.** Which apps hold draw-over, usage access, notification access, Modify system settings, install apps
+  and the battery exemption; revoke with More controls, else Android's page for each.
+- **Privacy.** droidtop's own grants, each with its revoke route (notification access, usage access, the accessibility
+  service and its three jobs: typing, screenshots, the pointer; Bluetooth; More controls), the grants droidtop gave
+  emulators (a ledger, each undoable), and recent camera, microphone and location use ("Not available" when it cannot be
+  read). Exit: the permission manager.
+- **Accessibility.** Every option's state: font size, display size, magnification, high-contrast text, colour inversion
+  and TalkBack, changed in place with More controls; font and display size live only here. Turning TalkBack or
+  magnification off asks first. Exits without More controls: Android's accessibility; turning a service on the first
+  time.
+- **Time and language.** 24-hour clock and droidtop's language; auto time and zone, the time zone (with auto off) and
+  other apps' language with More controls. Exit: system language.
+- **About.** Model, Android version, security patch, memory, storage, droidtop's version and Check for updates; the device
+  name with More controls. Exits: system update; default apps, SIM and mobile data, wallpaper, Android users and USB mode.
+- **Location and NFC** (where present): state, on and off with More controls, else Android's page. **Cast and Printing**
+  (where present): connected screens and print services, and the page. **Developer options** (while on): state; stay
+  awake, animation scales and show touches with More controls; the page.
 
 ### droidtop: one page per droidtop system
 
-- **Companion** (S2b): the companion's own settings, the only place they live: tabs per mode (the four bar slots and
-  the opening tab), When a game starts, Home sections, Dim the companion screen, Wake, Show tabs handle, Trackpad,
-  Show message text, Ask before stopping, Ask before load and overwrite, Low battery line, Picture-in-picture on the
-  companion, Lock to landscape, and Reset the companion to defaults (asks first). The shell's Settings links here.
-- **Downloads** (S6): the Downloads and Updates screen every place opens, so the jobs' controls and Updates' Check now
-  are the ones every surface has, each row's outcome kept by its id (Droidtop/tracker#554).
-- **Plugins**: every installed plugin, the Quick Menu's own list (`PluginPanels.listed`: icon, name, status glyph);
-  a tap opens its panel with Back. A plugin's companion panel is its Quick Menu panel (`ui.panel`, or its `ui.facets`
-  `companion.tab` target), drawn for touch by `CompanionPluginsTab` in the one panel frame (Droidtop/tracker#515). Any
-  one panel can be a tab of its own. A panel that declares `keep_on` keeps the screen on; one that declares `game`
-  gives rows for the running game, drawn on Game under droidtop's own (not in Kid or Kiosk). Home's Edit pins lists
-  every plugin tile.
-- **The rest of droidtop** (Mode, Look, Library, Controls and keyboard, Desktop, Backup, Advanced, Diagnostics,
-  Computers, What's new; the #786 plan's S16) each get a page as their slice lands. Until then they are reached from the
-  shell's Settings.
+droidtop lists its pages in groups, each row drawing its state ("3 approvals waiting", "Scanning 40%", "2 updates",
+"Wine 9.0"). Kid, Kiosk and Guest see none of them.
+
+| Group | Pages |
+|---|---|
+| Playing | Modes, Library, Emulators, PC games |
+| Getting things | Downloads, Accounts, Plugins |
+| How it looks and works | Look, Controls, Companion |
+| Connected | Computers, Desktop |
+| Care | Diagnostics, What's new, Advanced |
+
+- **Modes.** The current mode drawn and switched in place (the result shows on the main screen); Kid, Kiosk and Guest
+  with the passkey typed on the companion, the volume cap, play-time limits and which games show in Kid; the shell's own
+  options (hint bar, Home rows, Quick Menu order, left-menu places, default mode). Leaving Kid needs the passkey, which is
+  set when Kid is first turned on (owner, 2026-10-30); changing, clearing or leaving a mode needs the current passkey, and
+  wrong tries are rate-limited. droidtop as Android's home app is an exit.
+- **Library.** Game folders (the picker on the companion), platforms (forms on the companion keyboard), the scraper and
+  its key, Scan now as a job with its bar, the last scan's result, the What's new feed.
+- **Emulators.** Per system: the default player, setup state, BIOS present or missing (Get opens the picker here),
+  RetroArch cores, Enginehost cores with versions and updates; Launch test runs on the main screen.
+- **PC games.** Wine builds and their sources, prefixes and their tools, Windows games, installers through the picker.
+- **Downloads.** Jobs live with Pause, Cancel and Retry, the queue, Download rules and metered connections, and Updates
+  with Check now, each row's outcome kept by its id (Droidtop/tracker#554; 4e).
+- **Accounts.** Debrid services, file hosts, stores and sites, and social accounts; a web sign-in opens on the companion's
+  screen.
+- **Plugins.** Installed plugins with their status glyphs, updates, approvals waiting at the top, each plugin's
+  permissions with revoke, repositories and keys (typed or picked), and each plugin's panel in the one panel frame
+  (`CompanionPluginsTab`, Droidtop/tracker#515), its Game rows on the Game tab and its tiles in Edit pins. Any one panel
+  can be a tab of its own. **Approvals:** one pending record serves both screens; the first answer wins and the other
+  screen's sheet closes; the companion shows exactly what the shell's sheet shows; Deny comes first; root is a separate
+  choice; a denied plugin is not asked again in the same session.
+- **Look.** Theme, scheme, variant, aspect, icon pack and columns as rows, applied live on the main screen; light or dark;
+  interface size per screen; idle art; Browse themes as a touch grid of previews with download progress.
+- **Controls.** Controllers and layouts (capture on the main screen), chords and hotkeys, overlays (performance overlay
+  level, touch controls), keyboards.
+- **Companion.** The companion's own settings, and the only place they live: tabs and the opening tab per mode, When a
+  game starts, which screen, orientation (Lock to landscape), dim and wake, Home sections, pins, widgets, Show message
+  text, the trackpad, Ask before stopping, Ask before load and overwrite, the low-battery line, Picture-in-picture on the
+  companion, and Reset the companion to defaults (asks first). The shell's Settings links here.
+- **Computers.** Paired computers with their sync state, pairing (the code or QR shown on the companion), Sync now,
+  Forget (asks), the games and apps each shows; the running windowcast stream (which entry, Disconnect asking first; the
+  pad and the game's input stay on the main screen).
+- **Desktop.** The session's start and stop, containers and images, scale, keyboard layout, the Linux windows.
+- **Diagnostics.** The last crash notes, Send a report (logs, the crash and device facts, through Share), Logs,
+  droidtop's developer options, Backup and restore of droidtop's settings and pins (pickers on the companion), and Rerun
+  onboarding.
+- **What's new.** The release's changes, with each new step's action button; a step that needs the main screen or an
+  Android grant starts there.
+- **Advanced.** The helper's state and the Risky actions classes, drawn only when a helper exists.
+
+**On the main screen, and why.** These cannot be finished on the companion alone; each row starts them and says "On the
+main screen": onboarding steps (full-screen pad steps), button capture (the pad's keys go to the shell), theme rendering
+(the shell's ES-DE engine draws it), Launch test and prefix tools (they draw on the main screen), the mode switch's
+result, and Android's install prompt (Android picks the display). Pickers, web sign-ins and plugin grant, secret and
+broker sheets open on the companion's screen and return to the row; where Android refuses that screen, the row says
+"Opens on the main screen".
 
 ### Game, Performance, Input and Social
 
-- **Game** (slice C8; dense since Droidtop/tracker#835): a header (art, name, this session's time), then one list of
-  48dp rows from `GameControls` for the UI mode and the runner: Resume (the one filled row), Pause the game (a console
-  game, RetroArch's `PAUSE_TOGGLE`), Emulator (`GameEmulatorChoice`, from the next start), Overlay, Performance mode,
-  Screenshot and Share, and for a game in droidtop's own screen Mouse mode, Controls and Report a problem; Quit, Restart
-  and Kill together last, under Stop, in the danger tone; then Guides. Kid and Kiosk get Resume and Quit. A stream hides
-  Restart and Kill unless its runner says they apply. `GameControls.asks` decides whether a row asks first (the runner's
-  or a plugin's `confirm`; Ask before stopping; Ask before load and overwrite; always in Kid and Kiosk), and the L2
-  sheet and Home's game card read the same decision. Plugin rows for the running game follow droidtop's (RetroArch's
-  network commands, slice C10, to the loopback address only; "Save and load from here: Set up", slice C11).
-  **Screenshots** (slice C15): `Capture` takes it through the helper's `screencap` or the accessibility service; it goes
-  to Pictures/Screenshots and, while a game droidtop started runs, also to that game's own folder (`GameScreenshots`,
-  #596).
-- **Performance** (`CompanionPerformanceTab`): `PerformanceMonitor`, the one sampler the Quick Menu also reads (a
-  90-entry ring, two seconds apart), sampling only while shown; processor, memory, battery and heat, a graph each, a
-  value as each headline, and what Android hides said, not drawn. Per-app CPU with the helper. **Logs** (slice C18, not
-  in Kid or Kiosk): Android's log through the helper, else droidtop's own, with filters (level, tag, app, Running game
-  only), Pause, Save and Share (`LogReader`).
-- **Input** (slice C12): fills the screen; the bar becomes a "Show tabs" handle (at least 48dp, opened by a tap or a
-  pull of more than 24dp, never a drag on the trackpad). The header names where keys go (`InputTarget`: in Desktop
-  "Typing to: Linux desktop", the container's seat; elsewhere the shell's screen by its droidtop name, never the
-  companion's own), with Pin to keep typing to that screen. Chord keys (Alt+Tab, Ctrl+C, Ctrl+V, Ctrl+Z) above the
-  keyboard, played by `MacroPlayer`. The keyboard is the slab with a whole keyboard's keys (`SlabView(extras = true)`,
-  #567): Esc, Tab, Ctrl, Alt, Super, F1 to F12, arrows; it lays out from its real size (three fifths of what is left,
-  never less than `SlabView.minimumHeight`), so keys are never cut off and the trackpad takes the rest. A key press goes
-  down on touch and up on release; modifiers latch; held keys repeat where the far side does not (`KeyRepeat`). The
-  trackpad uses libinput's options and defaults (droidtop > Companion > Trackpad); three fingers swiped sideways switch
-  the desktop's workspace under sway. Outside Desktop the trackpad is a pointer on the target screen (`TrackpadRoute`:
-  the shell's selection while the shell shows, the game's mouse on droidtop's Windows game screen, else a pointer built
-  from the accessibility service's `dispatchGesture` with a drawn cursor, or the helper's `input` command;
-  `:input-seat`'s `PointerInjection.kt`, pure and tested). With nothing to take the keys they are dimmed and "Use
-  droidtop keyboard" says what to do.
-- **Social**: every provider's friends and conversations, with droidtop's own keyboard for typing (see "Social",
-  Droidtop/tracker#327); its message notifications sit above its conversations, with the same row as Home.
-
-### Rows droidtop may not change yet
-
-- **The person never meets the machinery's name** (owner, 2026-10-17, Droidtop/tracker#582). What elevated access
-  unlocks is **More controls** wherever a feature needs it; "the helper app", "privileged helper" and Shizuku appear in
-  no feature's text, only where the person sets it up (Home's Set up page, Settings' Elevated access row). A failure says
-  what did not happen ("The change did not go through. Try again").
-- **Rows stay in place, read-only, with one sheet that explains** (rule 3 of the #786 plan). `CompanionReadOnlyRow`
-  shows the name and state in the read-only look (muted, a meter where it has a level, "Not allowed yet"); a tap opens
-  `CompanionLockedSheet`, from one model (`Locked`: what droidtop would be allowed to change, one button for the next
-  step, Android's page where there is one, and Not now).
+- **Game.** A header (art, name, this session's time), then one list of 48 dp rows from `GameControls` for the UI mode and
+  the runner: Resume (the one filled row), Pause the game (a console game), Emulator (from the next start), Overlay,
+  Performance mode, Screenshot and Share, and for a game in droidtop's own screen Mouse mode, Controls and Report a
+  problem; Quit, Restart and Kill together last, under Stop, in the danger tone; then Guides. Plugin rows for the running
+  game follow (RetroArch's save and load through its network commands to the loopback address only, with "Save and load
+  from here: Set up" when steps are missing). Kid and Kiosk get Resume and Quit. `GameControls.asks` is the one decision
+  whether a row asks first (the runner's or a plugin's `confirm`, Ask before stopping, Ask before load and overwrite,
+  always in Kid and Kiosk), read by the L2 sheet and Home too. Each game remembers its own settings (#423); its profile
+  keeps refresh rate, performance mode, fan where writable, overlay and companion brightness (owner, 2026-10-30).
+  Screenshots go to Pictures/Screenshots and, while a game droidtop started runs, to that game's own folder (#596).
+- **Performance.** Processor, memory, battery and heat, a graph each (`PerformanceMonitor`, the one sampler the Quick Menu
+  also reads, sampling only while shown), with a value as each headline and what Android hides said, not drawn; the
+  top-apps card in Full only; Logs in Full with the developer menu only (filters, Pause, Save, Share); and Send a report.
+  In Kid and Kiosk it is figures only.
+- **Input.** Fills the screen: the bar becomes a "Show tabs" handle. The header names where keys go (in Desktop the Linux
+  desktop's seat; elsewhere the shell's screen by its droidtop name, never the companion's own), with Pin. Chord keys
+  (Alt+Tab, Ctrl+C, Ctrl+V, Ctrl+Z) above a whole keyboard's slab (`SlabView(extras = true)`: Esc, Tab, Ctrl, Alt, Super,
+  F1 to F12, arrows), laid out from its real size so no key is ever cut off, the trackpad taking the rest. Keys go down on
+  touch and up on release, modifiers latch, held keys repeat where the far side does not. The trackpad follows libinput's
+  options and defaults; three fingers swiped sideways switch the desktop's workspace. Outside Desktop it is a pointer on
+  the target screen: the shell's selection while the shell shows, the game's mouse on droidtop's Windows game screen, else
+  a drawn cursor and touches played through the accessibility service or the helper (`PointerInjection.kt`).
+- **Social.** Every provider's friends and conversations, with droidtop's own keyboard ("Social"); its message
+  notifications sit above its conversations, with Home's row.
 
 ### The screen: dim, off and wake
 
 - **Dim and Off are the backlight only** (owner, 2026-10-16: "We can't capture the companion if it's always black"): the
-  UI stays drawn, so a screenshot shows the real companion. Off is the companion window at the lowest window
-  brightness, still taking touch to wake (Android gives the shell no per-panel power command). A Presentation has no
-  window brightness, so it does not dim.
-- **Idle** (`CompanionIdle`, "Dim the companion screen"): with no input it dims after Never, 1, 2 (default), 5 or 10
-  minutes and goes off 3 minutes later, stretched to what accessibility asks; TalkBack hears a warning ten seconds
-  before. **What wakes it**: a touch, input in droidtop's own windows on the main screen, a game ending, a launch
-  alert, a new message (to dimmed; not in Kid or Kiosk), and the Quick Menu's Companion screen row. It does not run
-  while Social shows, a keep-on panel shows, a running job is on Home, the keyboard is open, or a stream runs. Every
-  touch is seen before the tab, so a tap on a dimmed screen brightens it and does what was tapped. **Wake**: a double
-  tap (default), a single tap, or only the Quick Menu's row; the off screen is one TalkBack element.
+  UI stays drawn, so a capture shows the real companion. Off is the companion window at its lowest brightness, still
+  taking touch to wake.
+- **Idle** ("Dim the companion screen"): with no input it dims after Never, 1, 2 (default), 5 or 10 minutes and goes off 3
+  minutes later, stretched to what accessibility asks, with a spoken warning ten seconds before. It wakes on a touch,
+  input in droidtop's own windows on the main screen, a game ending, a launch alert, a new message (to dimmed; not in Kid
+  or Kiosk) and the Quick Menu's Companion screen row. It stays on while Social shows, a keep-on panel shows, a job runs,
+  the keyboard is open, or a stream runs. A tap on a dimmed screen brightens it and does what was tapped. **Wake**: a
+  double tap (default), a single tap, or only the Quick Menu's row.
 
 ### Kid, Kiosk and Guest
 
-The companion gets Home, Game and Performance (`ControlAccess.RESTRICTED`; Guest the same tabs, Droidtop/tracker#420):
-Home's volume and brightness pins, Game's Resume and Quit (both asking), Performance as figures only. The items that
-control the restriction itself (the Companion group, the volume cap, the passkey, the UI mode) are hidden on every
-surface. Leaving takes the optional passkey (`UiModePasskey`, four to eight digits, entered by pad or touch on
-`UiModePasskeyActivity`).
+The companion gets Home, Game and Performance (Droidtop/tracker#414, #420): Home's volume and brightness pins, the running
+game and Leave Kid; Game's Resume and Quit (both asking); Performance as figures only. Neither Device nor droidtop;
+Notifications, Privacy use and Logs stay out of every restricted mode. The items that control the restriction itself (the
+Companion settings, the volume cap, the passkey, the UI mode) are hidden on every surface. Leaving is the Leave Kid row on
+the companion's Home or the Quick Menu's Leave row, each asking for the passkey (`UiModePasskey`, four to eight digits, by
+pad or touch); a test checks that Leave Kid is the only exit.
 
-### Copy: labels and values, never prose
+### What the companion does not show
 
-(owner, 2026-10-02, Droidtop/tracker#285, strictest form) No explanatory sentence is visible on a companion screen or the
-shared running-apps list. State is shown by the control itself: a row reading "Closing…" and then disappearing, a
-read-only row with "Not allowed yet", "Nothing running" for an empty list (two or three words). Sentences are for real
-errors only; there are no "Info" links. An explanation that still has to exist is on the focus line and in Info (Y) on
-the shell (7k, "Explanations: no tooltips"), and on the companion in the one locked sheet. The rest of the app follows
-the same rule.
+droidtop does not read an emulator's in-process state: achievements earned inside an emulator stay the emulator's (what
+droidtop shows comes from RetroAchievements itself, 7h), and each emulator owns its key bindings (droidtop's shell
+bindings would be the wrong thing to show). **Save states** (decided Droidtop/tracker#76, 2026-09-28): discovery is core,
+data-driven and read-only, one cited table per player package of where its states live and how a slot file is named; a
+row is added only once confirmed on a real device; a store droidtop cannot read is "not visible to droidtop", never "no
+states"; a game's detail may list slots and times; loading, switching, backing up and syncing a state stay the runner's.
 
-### Not built
+## 4e. Jobs and downloads
 
-The power menu (needs the accessibility service or a provider); "relaunch shell, companion, last app"; the video filling
-the companion screen; droidtop's own companion widgets (library stats, playtime, scan progress as placeable tiles).
-On a game's companion detail, three things wait for a real data source and are not shown: **save states** (decided
-Droidtop/tracker#76, 2026-09-28: discovery is core, data-driven and read-only, one cited table per player package of
-where its states live and how a slot file is named, a row added only once confirmed on a real device, a store droidtop
-cannot read reported as "not visible to droidtop"; loading, switching and backing up stay the runner's; no row is
-confirmed yet, so no reader ships), **achievements inside an emulator** (what droidtop shows is read from
-RetroAchievements itself, 7h), and **per-core controls** (each emulator owns its bindings; droidtop's shell bindings
-would be the wrong thing to show).
-
-## 4e. Jobs and downloads (moved out of the old 4d, 2026-11-06)
-
-The one jobs center and how its jobs are shown; it sat under the old companion section's status-strip notes.
+The one jobs center, and how its jobs are shown on every surface.
 
 - **One jobs list.** The visible download/install queue uses `PluginJobsCenter` / the Jobs screen (`plugin_jobs`) directly (`GamingSettingsCatalog` exposes it as "Downloads and installs", `Droidtop/tracker#85`; it is the only entry, the screen carries that title). No `ScanProgress`/download-queue store is invented -- the existing registry (`entries(): StateFlow<List<Entry>>`) is the one surface every caller reads, controller-first (`CatalogNavigator`'s own `LazyColumn` focus and touch dispatch), with end-user wording ("Downloading…" / "Done" / "Failed", progress % and status line, cancel best-effort). A row's title is the job's own name and its second line who runs it (the plugin, "via" its launcher); the job's page keeps "<plugin>: <name>". Led by the plugin's name, a list from one plugin was ten rows reading "Downloads: ..." once cut to the row (Droidtop/tracker#85, rig 2026-10-14). The value column says how far, then the status line, said once: a paused job whose status is "Paused" read "Paused Paused". No main-thread file/database work: all reads go through the flow, writes stay in the plugin runtime.
 - **Jobs and their results (decided 2026-10-22, Droidtop/tracker#577).** The owner: "we need better informational
