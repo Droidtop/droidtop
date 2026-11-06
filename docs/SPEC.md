@@ -25610,7 +25610,10 @@ the secondary path for sources that publish no key.
   in Share diagnostics; shown masked (last four characters), removable, and
   testable (the Test row asks api.github.com/user for the login and the
   request allowance). `GitHubAuth` is the one place that decides where it may
-  go: an `Authorization: Bearer` header on https requests to `api.github.com`,
+  go, and that decision is lib-net's `:net` (`dev.droidtop.shared.net.GitHubAuth`,
+  `vendor/lib-net/net`, compiled into `:net-core`), the code Enginehost uses too, so
+  both apps send the token to the same places (Droidtop/tracker#194, 2026-11-05;
+  droidtop's `dev.droidtop.net.GitHubAuth` only calls it): an `Authorization: Bearer` header on https requests to `api.github.com`,
   `github.com` and `raw.githubusercontent.com` only, decided again on every
   redirect hop (redirects are followed by hand). `objects.githubusercontent.com`
   is deliberately NOT on the list: a private release asset (the
