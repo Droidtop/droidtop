@@ -28,4 +28,12 @@ dependencies {
     implementation(project(":shell-default"))
     implementation(project(":runtime-common"))
     implementation(project(":ui-shared"))
+    // The droidtop screens and services of the Standard launcher that live here (Droidtop/tracker#921 slice 9):
+    // catalog settings drawn as preferences, the taskbar, Clear all apps, the Nova and Apex import.
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.preference)
+    implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.kotlinx.coroutines.android)
 }

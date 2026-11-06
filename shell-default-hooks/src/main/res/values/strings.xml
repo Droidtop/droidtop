@@ -4,4 +4,38 @@
     <string name="home_menu_games">droidtop games</string>
     <string name="home_menu_quick_menu">Quick Menu</string>
     <string name="home_menu_companion">Companion</string>
+    <!-- The Standard launcher's droidtop screens and rows (moved from the Murine launcher, Droidtop/tracker#921). -->
+    <plurals name="clear_all_confirm_title">
+        <item quantity="one">Close %d app?</item>
+        <item quantity="other">Close %d apps?</item>
+    </plurals>
+    <string name="clear_all_confirm">Close all</string>
+    <string name="clear_all_confirm_body">Unsaved progress in them is lost. droidtop, Enginehost and the apps you protected stay open.</string>
+    <string name="clear_all_nothing">Nothing to close.</string>
+    <string name="hint_hold_home">Press and hold Home to switch modes</string>
+    <string name="launcher_import_brought">What comes across</string>
+    <string name="launcher_import_changed">Changed on the way</string>
+    <string name="launcher_import_done">Your %1$s home screen is in place</string>
+    <string name="launcher_import_failed">This backup could not be imported</string>
+    <string name="launcher_import_go">Import</string>
+    <string name="launcher_import_heading">Import from %1$s</string>
+    <string name="launcher_import_left_out">Not brought across</string>
+    <string name="launcher_import_nothing">There is nothing in this backup that droidtop can bring across.</string>
+    <string name="launcher_import_replaces">This replaces your home screen and dock. Drawer tabs, hidden apps and app names are added to yours.</string>
+    <string name="launcher_import_working">Importing your home screen…</string>
+    <string name="pref_category_desktop_desc">Settings for Desktop mode</string>
+    <string name="pref_category_desktop_title">Desktop mode</string>
+    <string name="pref_category_gaming_desc">Settings for Gaming mode</string>
+    <string name="pref_category_gaming_title">Gaming mode</string>
+    <string name="pref_global_settings_desc">Modes, your home screen and setup</string>
+    <string name="pref_global_settings_title">Settings</string>
+    <string name="pref_subcategory_other_shells">Other modes</string>
+    <string name="pref_subcategory_places">droidtop</string>
+    <string name="taskbar_apps">Apps</string>
+    <string name="taskbar_hide">Hide</string>
+    <string name="taskbar_recents">Recents</string>
+    <string name="taskbar_show">Show taskbar</string>
+    <string name="mode_menu_close_all">Close all apps</string>
+    <string name="mode_menu_reinit_displays">Reinitialize displays</string>
+    <string name="mode_menu_settings">Settings</string>
 </resources>

@@ -191,28 +191,28 @@ object ShellDefaultHooks {
 
         private fun global(context: Context) = SettingsHooks.Row(
             id = "global_settings",
-            title = context.getString(LauncherR.string.pref_global_settings_title),
-            summary = context.getString(LauncherR.string.pref_global_settings_desc),
+            title = context.getString(R.string.pref_global_settings_title),
+            summary = context.getString(R.string.pref_global_settings_desc),
             icon = LauncherR.drawable.ic_settings_general,
             fragment = SettingsGlobalFragment::class.java.name,
         )
 
         override fun rows(context: Context): List<SettingsHooks.Row> {
-            val places = context.getString(LauncherR.string.pref_subcategory_places)
-            val shells = context.getString(LauncherR.string.pref_subcategory_other_shells)
+            val places = context.getString(R.string.pref_subcategory_places)
+            val shells = context.getString(R.string.pref_subcategory_other_shells)
             return listOf(global(context)) +
                 Place.visible(UiModePrefs.get(context)).map { place ->
                     SettingsHooks.Row(PLACE + place.screenId, place.title, icon = place.icon.drawableRes(), group = places)
                 } +
                 listOf(
                     SettingsHooks.Row(
-                        "desktop_settings", context.getString(LauncherR.string.pref_category_desktop_title),
-                        context.getString(LauncherR.string.pref_category_desktop_desc), LauncherR.drawable.ic_catalog_desktop,
+                        "desktop_settings", context.getString(R.string.pref_category_desktop_title),
+                        context.getString(R.string.pref_category_desktop_desc), R.drawable.ic_catalog_desktop,
                         shells, SettingsDesktopFragment::class.java.name,
                     ),
                     SettingsHooks.Row(
-                        "gaming_settings", context.getString(LauncherR.string.pref_category_gaming_title),
-                        context.getString(LauncherR.string.pref_category_gaming_desc), LauncherR.drawable.ic_catalog_gaming,
+                        "gaming_settings", context.getString(R.string.pref_category_gaming_title),
+                        context.getString(R.string.pref_category_gaming_desc), R.drawable.ic_catalog_gaming,
                         shells, SettingsGamingFragment::class.java.name,
                     ),
                 )

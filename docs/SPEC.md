@@ -1819,9 +1819,14 @@ simplicity and usability, and ours is on flexibility and power". So:
   message; `UPSTREAM.md` in that repo keeps the table of what was taken, skipped or waits. There is no sync tooling
   (`scripts/murine-upstream.sh` is gone).
 - No standalone releases: Murine is a component, shared by droidtop's Mobile (Standard) mode and the Linux UI, where
-  it becomes the default mobile mode (Mobitop, #919). Its droidtop-specific code moves behind a `MurineHooks`
-  interface with plain Kotlin types, so it can compile for Linux later, in slices tracked on #921; until the last
-  slice the fork still builds only inside droidtop.
+  it becomes the default mobile mode (Mobitop, #919). Where droidtop changes what it does, Murine calls
+  `MurineHooks` (`app.murinelauncher.hooks`: notices, actions, menus, search, apps, home, settings, theme), one
+  interface per area with plain Kotlin types and Murine's own behaviour as the default, so it can compile for Linux
+  later (#921). Launcher features that need nothing of droidtop's are Murine's own code. droidtop's implementations,
+  its screens and services of the Standard launcher (the Home trampoline, the taskbar, Clear all apps, the Nova and
+  Apex import, the catalog settings screens) and the resources only they use live in `:shell-default-hooks`, which
+  `DroidtopApplication` installs before the launcher starts. The fork depends on none of droidtop's modules; it is
+  built as part of droidtop's Gradle build.
 
 **A real plugin-fed launcher surface: the status-tile home-screen widget
 (built this change).** §12a's `PluginCapability.STATUS_TILE` and

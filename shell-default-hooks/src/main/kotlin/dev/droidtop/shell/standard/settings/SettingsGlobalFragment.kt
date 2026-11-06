@@ -1,0 +1,51 @@
+package dev.droidtop.shell.standard.settings
+
+import android.os.Bundle
+import androidx.preference.Preference
+import app.murinelauncher.settings.common.AbstractSettingsFragment
+import com.android.launcher3.LauncherFiles
+import dev.droidtop.shell.standard.hooks.R
+import com.android.launcher3.util.DisplayController
+import dev.droidtop.library.settings.SettingsScreenRegistry
+
+/**
+ * Global settings on the Standard settings surface: the shared catalog
+ * :app registers as "global_settings" (DroidtopWideSettings), chromed as
+ * preferences. The Gaming shell draws the same catalog in its own rows,
+ * so the two can never drift apart. Reached from the persistent "Global
+ * settings" action-bar item on every SettingsActivity screen.
+ */
+public final class SettingsGlobalFragment : AbstractSettingsFragment() {
+
+    private var navigator: CatalogPreferenceNavigator? = null
+
+    // Unused: the screen is built from the catalog in onCreatePreferences.
+    override fun getPreferenceScreenResId() = 0
+
+    override fun getPreferenceTitle(): Int = R.string.pref_global_settings_title
+
+    override fun initPreference(preference: Preference, info: DisplayController.Info): Boolean = true
+
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        preferenceManager.sharedPreferencesName = LauncherFiles.SHARED_PREFERENCES_KEY
+        val nav = CatalogPreferenceNavigator(
+            fragment = this,
+            rootGroups = { ctx -> SettingsScreenRegistry.get("global_settings")?.groups?.invoke(ctx).orEmpty() },
+            savedState = savedInstanceState,
+            enableSearch = true,
+            rootScreenId = "global_settings",
+            rootTitle = getString(R.string.pref_global_settings_title),
+        )
+        navigator = nav
+        nav.rebuild()
+        activity?.title = getString(R.string.pref_global_settings_title)
+    }
+
+    // The recreate Text size triggers must not drop the user back at this
+    // screen's root (Droidtop/tracker#139): the navigator saves its pushed
+    // screens and the row to refocus.
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        navigator?.saveState(outState)
+    }
+}
