@@ -148,6 +148,13 @@ This project is distributed under the GNU General Public License v3.0 (see
   unchanged apart from build-compat fixes and one hook in `LatinIME`, and
   droidtop's additions (the second-screen keyboard, docs/SPEC.md §6c) are
   separate Kotlin files.
+- **Termux terminal-emulator and terminal-view** — `vendor/termux-terminal`, https://github.com/termux/termux-app
+  at `v0.118.3` (`5b657c6a`) — Apache-2.0 (termux-app's own `LICENSE.md` names these two libraries, which carry
+  Terminal Emulator for Android code, https://github.com/jackpal/Android-Terminal-Emulator, as Apache-2.0; the rest
+  of termux-app is GPLv3 and is not taken). Their `src/main` trees are copied unchanged and built as the
+  `:terminal-emulator` and `:terminal-view` modules: the VT parser, the pseudo-terminal JNI (`libtermux.so`) and the
+  terminal View under droidtop's container terminal. `WcWidth.java` follows jquast/wcwidth (MIT). The Apache
+  licence text and upstream's `LICENSE.md` travel with the tree.
 - **Murine Launcher** — `shell-default`, https://github.com/alesimula/Murine-launcher — Apache-2.0.
   Itself derived from AOSP Launcher3 (Apache-2.0). Forked in as
   `shell-default` and its sub-projects (not a submodule) and edited

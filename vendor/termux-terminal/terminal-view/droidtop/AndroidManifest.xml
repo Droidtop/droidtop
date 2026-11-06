@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- droidtop's manifest for the vendored module: upstream's names its package in the manifest, which this Android
+     Gradle plugin refuses, so the namespace is set in build.gradle.kts and upstream's file is left as it came. -->
+<manifest />
