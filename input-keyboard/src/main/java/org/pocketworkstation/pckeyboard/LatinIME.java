@@ -713,6 +713,11 @@ public class LatinIME extends InputMethodService implements
         mConfigurationChanging = true;
         super.onConfigurationChanged(conf);
         mConfigurationChanging = false;
+        // droidtop patch (Droidtop/tracker#903 H12b): night mode and a new wallpaper's palette arrive as a
+        // configuration change; a modern theme follows them at once, not only at the next field.
+        if (mKeyboardSwitcher != null && mKeyboardSwitcher.getInputView() != null) {
+            mKeyboardSwitcher.refreshAppearance();
+        }
     }
 
     @Override
@@ -810,7 +815,7 @@ public class LatinIME extends InputMethodService implements
         sKeyboardSettings.editorImeOptions = attribute.imeOptions;
 
         //Log.i("PCKeyboard", "onStartInputView " + attribute + ", inputType= " + Integer.toHexString(attribute.inputType) + ", restarting=" + restarting);
-        // droidtop patch: "Follow light or dark" follows a change made while the keyboard was away (Droidtop/tracker#562).
+        // droidtop patch: a modern theme follows a change made while the keyboard was away (Droidtop/tracker#562, #903 H12b).
         mKeyboardSwitcher.refreshAppearance();
         LatinKeyboardView inputView = mKeyboardSwitcher.getInputView();
         // In landscape mode, this method gets called without the input view

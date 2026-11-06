@@ -164,6 +164,12 @@ This project is distributed under the GNU General Public License v3.0 (see
     it, each effect built once and kept, in `KeyHaptics` and `KeyHapticsPlayer`.
   - HeliBoard, https://github.com/Helium314/HeliBoard at `2d9869b2` — Apache-2.0 AND GPL-3.0-only: the rule that an
     animator duration scale of 0 means no animation (`EmojiPalettesView.isAnimationsDisabled`), in `KeyMotion`.
+- **Keyboard dynamic colours, ported in part** (Droidtop/tracker#903 H12b; docs/SPEC.md 6a, "Themes, light and
+  dark"). HeliBoard, https://github.com/Helium314/HeliBoard at `2d9869b2` — GPL-3.0-only, Copyright (C) HeliBoard
+  contributors: the Material You tone choices of `app/src/main/java/helium314/keyboard/latin/common/Colors.kt`
+  (`DynamicColors`: the ground in neutral 50 or 900, keys in neutral 0 or 800, the accent in accent1 200 by night and
+  600 by day), as `DynamicKeyColors.derive` in `input-keyboard`, whose header names it; and the rule of
+  `KeyboardTheme.getAvailableDefaultColors` that offers dynamic colours only on Android 12 and later, in `ThemePresets`.
 - **Termux terminal-emulator and terminal-view** — `vendor/termux-terminal`, https://github.com/termux/termux-app
   at `v0.118.3` (`5b657c6a`) — Apache-2.0 (termux-app's own `LICENSE.md` names these two libraries, which carry
   Terminal Emulator for Android code, https://github.com/jackpal/Android-Terminal-Emulator, as Apache-2.0; the rest

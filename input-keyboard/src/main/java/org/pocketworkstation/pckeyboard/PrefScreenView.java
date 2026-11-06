@@ -27,6 +27,7 @@ public class PrefScreenView extends PreferenceActivity
         implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     private ListPreference mRenderModePreference;
+    private ListPreference mLightDarkPreference;
 
     @Override
     protected void onCreate(Bundle icicle) {
@@ -35,6 +36,30 @@ public class PrefScreenView extends PreferenceActivity
         SharedPreferences prefs = getPreferenceManager().getSharedPreferences();
         prefs.registerOnSharedPreferenceChangeListener(this);
         mRenderModePreference = (ListPreference) findPreference(LatinIME.PREF_RENDER_MODE);
+        mLightDarkPreference = (ListPreference) findPreference(KeyboardAppearance.KEY_LIGHT_DARK);
+        if (mLightDarkPreference != null && KeyboardAppearance.getHost() != null) {
+            // droidtop (#903 H12b): with a host, following the system follows the host's own Light or dark (#562).
+            CharSequence[] entries = mLightDarkPreference.getEntries().clone();
+            entries[0] = getString(R.string.light_dark_follow_host);
+            mLightDarkPreference.setEntries(entries);
+        }
+        updateLightDark();
+    }
+
+    /**
+     * droidtop (Droidtop/tracker#903 H12b): "Light and dark" applies to Modern, Dynamic and High contrast. A classic
+     * theme keeps its fixed look and Match droidtop follows droidtop, so the row is off for them, and says so.
+     */
+    private void updateLightDark() {
+        if (mLightDarkPreference == null) return;
+        int stored = KeyboardAppearance.storedTheme(this);
+        boolean applies = KeyboardAppearance.modern(stored) && stored != KeyboardAppearance.MATCH_HOST;
+        mLightDarkPreference.setEnabled(applies);
+        if (applies) {
+            mLightDarkPreference.setSummary(mLightDarkPreference.getEntry());
+        } else {
+            mLightDarkPreference.setSummary(R.string.light_dark_fixed);
+        }
     }
 
     @Override
@@ -46,6 +71,9 @@ public class PrefScreenView extends PreferenceActivity
 
     public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
         (new BackupManager(this)).dataChanged();
+        if (KeyboardSwitcher.PREF_KEYBOARD_LAYOUT.equals(key) || KeyboardAppearance.KEY_LIGHT_DARK.equals(key)) {
+            updateLightDark();
+        }
     }
     
     @Override

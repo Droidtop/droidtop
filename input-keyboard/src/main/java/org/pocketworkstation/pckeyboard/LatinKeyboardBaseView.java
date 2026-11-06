@@ -1051,16 +1051,19 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
      */
     private void drawPlate(Canvas canvas, Key key) {
         final float density = getResources().getDisplayMetrics().density;
-        final float inset = KeyPlates.INSET_DP * density;
-        final float radius = KeyPlates.RADIUS_DP * density;
         final boolean functional = KeyPlates.functional(key.codes, key.label, key.icon != null, key.modifier, key.sticky);
         // Pressed: the focused shade at once; released, it fades back to the resting colour (#903 H12a).
         final int rest = KeyPlates.plateColor(mPlates, functional, false, key.on);
         final float tint = mDrawTint;
-        mPlatePaint.setColor(tint >= 1f ? mPlates.getKeyFocused()
-                : tint <= 0f ? rest : KeyPlates.blend(rest, mPlates.getKeyFocused(), tint));
-        mPlateRect.set(inset, inset, key.width - inset, key.height - inset);
-        canvas.drawRoundRect(mPlateRect, radius, radius, mPlatePaint);
+        final int color = tint >= 1f ? mPlates.getKeyFocused()
+                : tint <= 0f ? rest : KeyPlates.blend(rest, mPlates.getKeyFocused(), tint);
+        mPlateRect.set(0, 0, key.width, key.height);
+        KeyPlates.draw(canvas, mPlateRect, color, density, mPlatePaint);
+    }
+
+    /** The plate colours this view draws in, or null for a classic theme's own drawing (#903 H12b). */
+    KeyboardColors getPlates() {
+        return mPlates;
     }
 
     /** The icon colour filter for [color], made again only when the colour changes. */

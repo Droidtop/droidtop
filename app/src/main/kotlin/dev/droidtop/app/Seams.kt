@@ -37,14 +37,19 @@ internal object Seams {
         dev.droidtop.pluginhost.PluginGrantPrompts.setSurface { PluginGrantSheetActivity.open(app) }
         // A plugin's secret facet, shown on droidtop's own sheet when the person presses Show (docs/plugin-api.md 1.10).
         dev.droidtop.pluginhost.PluginSecrets.setSurface { PluginSecretSheetActivity.open(app) }
-        // The keyboard's "Follow light or dark" follows droidtop's Light or dark (docs/SPEC.md 7k, Droidtop/tracker#562),
-        // and its panels and glide trail take droidtop's palette for that light or dark (Droidtop/tracker#772).
+        // The keyboard's modern themes follow droidtop's Light or dark (docs/SPEC.md 7k, Droidtop/tracker#562), and the
+        // keyboards droidtop embeds take droidtop's palette for that light or dark (Droidtop/tracker#772, #903 H2): the
+        // active ES-DE theme's while a Gaming screen holds one, else the colours outside Gaming (Device colours by
+        // default). The input method takes them too when the person picks "Match droidtop" (#903 H12b).
         org.pocketworkstation.pckeyboard.KeyboardAppearance.host = object : org.pocketworkstation.pckeyboard.KeyboardAppearance.Host {
             override fun light(context: android.content.Context) = dev.droidtop.library.settings.AppearancePrefs.light(context)
 
             override fun colors(context: android.content.Context, light: Boolean): org.pocketworkstation.pckeyboard.KeyboardColors {
                 // The palette droidtop draws now (its theme's, when one is held) when it is the same light or dark,
-                // else droidtop's own palette for the keyboard's light or dark.
+                // else droidtop's own palette for the keyboard's light or dark. An input method that starts droidtop's
+                // process before any screen does still gets the colours outside Gaming, once they are resolved (off
+                // the main thread); until then droidtop's own palette.
+                dev.droidtop.shell.gamepad.GamingTheme.followOutside(context)
                 val live = dev.droidtop.shell.gamepad.GamingTheme.palette.colors
                 val c = if (live.isLight == light) live else dev.droidtop.shell.gamepad.GamingPalette.defaultFor(light).colors
                 return org.pocketworkstation.pckeyboard.KeyboardColors(

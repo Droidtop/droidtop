@@ -1,6 +1,9 @@
 package org.pocketworkstation.pckeyboard
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
 
 /**
  * Hacker Keyboard Reborn's modern key drawing (Droidtop/tracker#903 H2): each key a flat rounded plate in the
@@ -8,9 +11,10 @@ import android.content.Context
  * shade apart from the letters, a latched modifier lit in the accent, and a pressed key in the focused shade. It draws
  * the same keys, labels, hints and icons; only the plates and their colours change.
  *
- * Who gets plates ([colorsFor]): HKR's own theme, "Follow light or dark" (the default), and every keyboard droidtop
- * embeds (in-window, companion, overlays), which takes droidtop's colours through [KeyboardAppearance.Host]. A classic
- * Hacker's Keyboard theme someone chose keeps its own drawing.
+ * Who gets plates ([colorsFor]): HKR's modern themes (Modern, the default, Dynamic, High contrast and Match droidtop,
+ * [KeyboardAppearance.modern]) and every keyboard droidtop embeds (in-window, companion, overlays), which takes
+ * droidtop's colours through [KeyboardAppearance.Host]. A classic Hacker's Keyboard theme someone chose keeps its own
+ * drawing. The theme picker's previews draw their keys with [draw] too (#903 H12b, [ThemePreference]).
  */
 object KeyPlates {
     /** Corner radius and the gap left around each plate, in dp. */
@@ -46,13 +50,28 @@ object KeyPlates {
 
     /**
      * The colours to draw plates in for a keyboard drawn in [context], or null to keep the theme's own drawing: inside
-     * the input method only for HKR's own theme; everywhere droidtop embeds it, always (its colours are the host's).
+     * the input method only for HKR's modern themes; everywhere droidtop embeds it, always (its colours are the host's).
      */
     @JvmStatic
     fun colorsFor(context: Context): KeyboardColors? {
         val inputMethod = KeyboardAppearance.drawnByInputMethod(context)
-        if (inputMethod && KeyboardAppearance.storedTheme(context) != KeyboardAppearance.FOLLOW) return null
+        if (inputMethod && !KeyboardAppearance.modern(KeyboardAppearance.storedTheme(context))) return null
         return KeyboardAppearance.colors(context)
+    }
+
+    /**
+     * One plate in [rect] of [canvas] in [color] ([plateColor]): inset by [INSET_DP] and rounded by [RADIUS_DP] at
+     * [density]. The one drawing of a plate, for the keyboard and the theme picker's previews alike; [paint] is the
+     * caller's, kept between draws so a frame allocates nothing.
+     */
+    @JvmStatic
+    fun draw(canvas: Canvas, rect: RectF, color: Int, density: Float, paint: Paint) {
+        val inset = INSET_DP * density
+        val radius = RADIUS_DP * density
+        paint.color = color
+        rect.inset(inset, inset)
+        canvas.drawRoundRect(rect, radius, radius, paint)
+        rect.inset(-inset, -inset)
     }
 
     /** [a] moved [t] of the way to [b], channel by channel, alpha included. Pure. */

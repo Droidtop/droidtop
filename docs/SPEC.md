@@ -9322,7 +9322,7 @@ Removing the download (the same row) frees the 75 MB, and the voice key falls ba
 
 **The keyboard follows Light or dark (Droidtop/tracker#562, with #337's "droidtop theme").** #562: "A default keyboard theme that follows droidtop's Light or dark: Material light or Material dark, re-chosen when the setting changes. The person's explicit theme choice still wins." The theme list gains "Follow light or dark" (id 8, after every existing id, as `strings.xml` asks), now the default for anyone who never chose a theme; a stored choice, the old default "0" included, is kept as it is. It draws Material light or Material dark by `KeyboardAppearance`: droidtop's `DroidtopApplication` sets the host answer to its Appearance setting (7k, `AppearancePrefs.light`); the standalone app has no host and follows the system's night mode. `KeyboardSwitcher` keeps the stored choice apart from the theme drawn and re-checks as each editor starts (`refreshAppearance` in `onStartInputView`), so a change made while the keyboard was away shows on its next use. The tools strip, clipboard and macro panels, emoji browser and search, the inline autofill chips and the glide trail take one set of colours (`KeyboardAppearance.colors`, a `KeyboardColors`): light beside the light keyboard, dark beside every other theme. They are the host's colours when it gives them: droidtop gives the palette it draws now (its theme's, when one is held and it is the same light or dark), else its own default palette for that light or dark; the standalone app has none and keeps Material light and Material dark. The glide trail is that accent at 80%, where it was a fixed azure. The slab takes the same `KeyboardColors` type, filled by each surface from its own theme (Droidtop/tracker#772, decided 2026-10-29).
 
-**Hacker Keyboard Reborn's own look, and the theme seam (Droidtop/tracker#903 H2, decided 2026-11-05).** The owner: "Hacker Keyboard Reborn doesn't have to look like droidtop, it can look like a good, modern keyboard. The embedded keyboard droidtop vendors from it can import our styling." So the colours are chosen by where the keyboard is drawn (`KeyboardAppearance.colors`, the seam): **inside the input method** (any app's text field) they are always HKR's own (`KeyboardAppearance.LIGHT`, white keys on a light grey ground, or `DARK`), never the host's; **in a keyboard droidtop embeds** (`KeyboardPanel`: the in-window keyboard, the companion screen, overlays) they are the host's, droidtop's palette as above. Which is which is read from the drawing context (`drawnByInputMethod`: the input method's service, or a wrapper around it). Light or dark still follows droidtop's setting in both (#562). With HKR's own theme ("Follow light or dark", the default) and in every embedded keyboard, keys are drawn as flat rounded plates (`KeyPlates`, JVM tested; 6dp corners, a 2.5dp gap): letters in the key colour, function keys (modifiers, Esc, Tab, the F-keys, the icon keys; never the space bar) a shade toward the text colour, a latched modifier toward the accent, a pressed key in the focused shade; labels, hints and icons in the text and muted colours with no shadow. Every key, label, alt-key hint, layout and setting is drawn as before; a classic Hacker's Keyboard theme someone chose keeps its own 9-patch drawing.
+**Hacker Keyboard Reborn's own look, and the theme seam (Droidtop/tracker#903 H2, decided 2026-11-05).** The owner: "Hacker Keyboard Reborn doesn't have to look like droidtop, it can look like a good, modern keyboard. The embedded keyboard droidtop vendors from it can import our styling." So the colours are chosen by where the keyboard is drawn (`KeyboardAppearance.colors`, the seam): **inside the input method** (any app's text field) they are always HKR's own (`KeyboardAppearance.LIGHT`, white keys on a light grey ground, or `DARK`), never the host's; **in a keyboard droidtop embeds** (`KeyboardPanel`: the in-window keyboard, the companion screen, overlays) they are the host's, droidtop's palette as above. Which is which is read from the drawing context (`drawnByInputMethod`: the input method's service, or a wrapper around it). Light or dark still follows droidtop's setting in both (#562). With HKR's own theme ("Follow light or dark", the default) and in every embedded keyboard, keys are drawn as flat rounded plates (`KeyPlates`, JVM tested; 6dp corners, a 2.5dp gap): letters in the key colour, function keys (modifiers, Esc, Tab, the F-keys, the icon keys; never the space bar) a shade toward the text colour, a latched modifier toward the accent, a pressed key in the focused shade; labels, hints and icons in the text and muted colours with no shadow. Every key, label, alt-key hint, layout and setting is drawn as before; a classic Hacker's Keyboard theme someone chose keeps its own 9-patch drawing. (H12b, below, adds Dynamic, High contrast and Match droidtop beside it, renames it Modern, and lets the input method take the host's colours when the person picks Match droidtop.)
 
 **A pad on the keyboard (Droidtop/tracker#338).** #338: "D-pad moves a focus ring over keys, A presses"; the slab (4c) had since given a pad its typing buttons, so the input method's own keyboard takes the same ones, one pad vocabulary for typing: while it shows, Android hands key events to the input method first, and `PadKeys` takes a pad's (source gamepad or joystick, or a gamepad button): the D-pad moves a focus ring over the keys (`KeyFocus`, pure: rows share a top edge, Left and Right wrap, Up and Down go to the nearest key across and stop at the top and bottom rows), A presses the key under it as a tap would, X is Backspace (held, it repeats), Y Space, L1 Shift, R1 the symbols, R2 or Start Enter, and B closes the keyboard; the face buttons go through `FaceKeys`, so a Nintendo-layout swap holds. The first A or D-pad press shows the ring in the middle of the keyboard; it is drawn only while the pad drives (DESIGN-LANGUAGE) and a touch removes it. The ring's place is a point, not a key, so it survives a layer switch by landing on the nearest key. A physical keyboard is not taken (lane default, 2026-10-28): it types, and its arrows move the app's caret, as before; its Ctrl, Alt and Fn keys already reach the app. The companion's and the second screen's keyboards are the slab, which a pad already drives.
 
@@ -9622,6 +9622,76 @@ JVM tested); `KeyboardMotion` and `KeyHapticsPlayer` apply them on the device.
   and the animator-scale rule is HeliBoard's (GPL-3.0). None of the three has a key-press scale or a popup that grows
   from its key in the View system (HeliBoard dropped AOSP's preview animation, FlorisBoard draws with Compose), so
   those are droidtop's own.
+
+### Themes, light and dark (Droidtop/tracker#903 H12b, built 2026-11-06)
+
+The owner, relayed by the coordinator for #903: "We want polish, new detailing, modern styling, extra modes, dynamic
+stuffs". The approved H12 text for this slice: Material You colours from the wallpaper on Android 12 and later; light
+and dark that follow the system or the app's own field; in droidtop's embedded copy, the active ES-DE theme's colours
+through the theme seam (H2); theme presets with a preview in HKR's settings. The owner's standing rules hold: "Hacker's
+Keyboard is our foundation. If we can rebuild it while keeping ALL of hacker's functionality...", so every classic
+Hacker's theme stays selectable and keeps its look, and "Hacker Keyboard Reborn doesn't have to look like droidtop, it
+can look like a good, modern keyboard. The embedded keyboard droidtop vendors from it can import our styling."
+
+- **The theme list** (`ThemePresets`, JVM tested) offers HKR's modern themes first, then every classic Hacker's theme
+  in Hacker's order. Modern themes draw flat plates (`KeyPlates`) in colours of their own (`KeyboardAppearance.modern`):
+  - **Modern** (id 8, the default; it was "Follow light or dark"): `KeyboardAppearance.LIGHT` and `DARK` as in H2.
+  - **Dynamic (wallpaper)** (id 9): Android 12's Material You palette, read from `android.R.color.system_accent1_*`,
+    `system_neutral1_*` and `system_neutral2_*` (`DynamicPaletteReader`, a class of its own reached only under
+    SDK_INT >= 31, so `check_class_load_api.py` needs no allowlist line). The roles are derived by `DynamicKeyColors.derive`
+    (JVM tested) with HeliBoard's tone choices: light keys neutral1 0 on neutral1 50 with a neutral1 900 label and the
+    accent in accent1 600; dark keys neutral2 800 on neutral1 900 with a neutral1 50 label and accent1 200. It is offered
+    only on Android 12 and later, as HeliBoard offers its dynamic colours; stored on an older Android (a restored
+    backup), it stays listed and draws as Modern. The read is kept per `Configuration` and done again only when it
+    differs: a new wallpaper's palette arrives as a configuration change, after which the input method checks its theme
+    (`LatinIME.onConfigurationChanged`, `KeyboardSwitcher.refreshAppearance`, which builds the view again only when the
+    theme drawn or its colours changed). Nothing beyond reading a dozen resource colours is done on the main thread.
+  - **High contrast** (id 10): near-black keys on black with white labels and a yellow accent, or white keys on mid grey
+    with black labels and a deep blue accent; letters read at 7:1 or better.
+  - **Match droidtop** (id 11), offered only where a host gives colours (droidtop; never in the standalone app): the
+    input method takes the host's colours, as the embedded keyboard does.
+  - The classic themes keep their 9-patch drawing, their own colours and their fixed light or dark. Hacker's list
+    labelled id 5 "Material Black" and id 7 "Material Light" although 5 draws `input_material_light` and 7
+    `input_material_black`; the list now names each by what it draws. No stored value changes.
+- **Previews.** The theme setting (`ThemePreference`) shows each theme with Esc, "a" with its hint, "s" pressed and Shift
+  latched, drawn the way the keyboard draws them: a modern theme's plates by `KeyPlates.draw`, the one plate drawing the
+  key view uses too, in that theme's colours now (Dynamic in this wallpaper's palette, each in the light or dark it would
+  use); a classic theme's own key drawable in its at-rest, pressed and on states, over its own background, with its
+  label, hint and shadow colours, read from its layout as the key view reads them. Not a screenshot.
+- **"Light and dark"** (`pref_keyboard_light_dark`, in "Theme and label settings", JVM tested as
+  `KeyboardAppearance.lightFor`): **Follow the system** (the default), **Always light** or **Always dark**, for Modern,
+  Dynamic and High contrast. In droidtop's copy following the system follows droidtop's own Light or dark setting
+  (#562 above), which itself follows Android unless changed, so there the first choice reads "Follow droidtop's Light or
+  dark". Classic themes keep their fixed look and Match droidtop follows droidtop, so for them the row is off and says
+  "This theme keeps its own look". A change redraws the keyboard at once.
+- **Following the app's own field is not done**, because there is no reliable signal. `EditorInfo` carries the field's
+  input type, IME options, hint, label, package and ids, nothing about its colours or the app's light or dark; an app's
+  own night mode (AppCompat's, or `UiModeManager.setApplicationNightMode` on Android 12+) changes that app's
+  configuration, not the input method's, so the keyboard only ever sees the system's night mode. Guessing from the
+  package or reading the screen would be faking it, so HKR follows the system (or droidtop) instead.
+- **The embedded copy and the seam** (`KeyboardAppearance.Host`, H2). The seam already passes droidtop's palette: what
+  droidtop draws now (`GamingTheme.palette`), the active ES-DE theme's colours while a Gaming screen holds a theme, else
+  the colours outside Gaming (`OutsideGamingColors`: Device colours by default, the Gaming theme's or Custom), for the
+  keyboard's light or dark; droidtop's own default palette when that palette is the other light or dark. H12b reuses
+  that one source and adds no second path: an embedded keyboard (`KeyboardPanel`) still always draws in it; the input
+  method draws in it only when the person picks Match droidtop, and otherwise keeps HKR's own look. An input method that
+  starts droidtop's process before any droidtop screen asks for the colours outside Gaming to be followed
+  (`GamingTheme.followOutside`, off the main thread), so Match droidtop has them from its next field on; until then it
+  draws droidtop's default palette. An embedded keyboard's light or dark is now droidtop's whatever theme the input
+  method uses; before, a classic theme chosen there made the embedded keyboard dark.
+- **Contrast** (`KeyContrast`, JVM tested): every look HKR draws itself, each preset and the derived Dynamic palette
+  and the host's palette alike, has its key labels at 4.5:1 or better (WCAG 2) against every plate a label sits on (a
+  letter's, a function key's, a latched modifier's, a pressed key's) and its alt-key hints at 3:1 against the letter and
+  function plates. A palette that falls short is adjusted (`KeyContrast.readable`): the label moves toward black or
+  white, whichever reads better on the key, and, once it is there, a plate still short moves the other way; the ground
+  and panels are never touched, and a palette that passes comes back unchanged. HKR's own Modern and High contrast
+  palettes pass as designed. Classic themes are drawn from bitmaps and are left as Hacker's drew them, unmeasured.
+- **Ported where it fits** (NOTICE.md): HeliBoard's dynamic tone choices (`Colors.kt`, `DynamicColors`) and its rule of
+  offering dynamic colours only on Android 12 and later (`KeyboardTheme.getAvailableDefaultColors`), GPL-3.0-only.
+  HeliBoard's colour list is names beside radio buttons; FlorisBoard's theme screen shows the highlighted theme on its
+  live Compose keyboard under a preview field, and derives Material You schemes through the materialkolor library.
+  Neither draws a preview per row with its own key renderer in the View system, so the previews and the contrast rule
+  are droidtop's own. Nothing of FlorisBoard's is taken in this slice.
 
 ## 6b. Desktop surface input (built 2026-09-01)
 
