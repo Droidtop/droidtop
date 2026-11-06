@@ -128,9 +128,24 @@ object StorageSharesCatalog {
         )
     }
 
+    /** A share's row: where it is, and while it can't be reached, when it last connected. */
+    private fun rowLine(share: StorageShare): String {
+        val where = when (share.kind) {
+            StorageShares.SMB -> "${share.url}\\${share.shareName}"
+            StorageShares.S3 -> "${share.bucket} on ${share.url.substringAfter("://").substringBefore('/')}"
+            else -> share.url.substringAfter("://").substringBefore('/')
+        }
+        if (!StorageShares.unreachable(share.state) || share.lastConnectedMs <= 0) return where
+        val last = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT)
+            .format(java.util.Date(share.lastConnectedMs))
+        return "$where. Last connected $last"
+    }
+
     private fun mark(state: String): StatusMark = when (state) {
         StorageShares.CONNECTED -> StatusMark.SIGNED_IN
         StorageShares.NOT_TESTED -> StatusMark.ATTENTION
+        // Not reached is waiting (for a network, a server switched on), not refused.
+        StorageShares.UNREACHABLE, StorageShares.NO_NETWORK -> StatusMark.ATTENTION
         else -> StatusMark.ERROR
     }
 
@@ -146,7 +161,7 @@ object StorageSharesCatalog {
         return NestedScreenItem(
             id = id,
             title = share.name,
-            subtitle = share.url.substringAfter("://").substringBefore('/'),
+            subtitle = rowLine(share),
             valueLabel = { StorageShares.stateLabel(share.state) },
             statusMark = mark(share.state),
             inline = CatalogScreen(
@@ -166,7 +181,10 @@ object StorageSharesCatalog {
                                     subtitle = now.stateDetail,
                                     value = StorageShares.stateLabel(now.state),
                                     statusMark = mark(now.state),
-                                    run = { c, _ -> withContext(Dispatchers.IO) { StorageShares.test(c, now) } },
+                                    run = { c, onStatus ->
+                                        onStatus("Testing ${now.name}...")
+                                        withContext(Dispatchers.IO) { StorageShares.test(c, now) }
+                                    },
                                 ),
                             ),
                         ),

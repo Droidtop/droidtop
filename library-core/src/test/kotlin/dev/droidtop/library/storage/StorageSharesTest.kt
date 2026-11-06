@@ -133,6 +133,28 @@ class StorageSharesTest {
     }
 
     @Test
+    fun aMissingFolderAndNoNetworkAreTheirOwnStates() {
+        assertEquals(StorageShares.NOT_FOUND, StorageShares.outcome(JSONObject().put("error", "/x is not on the share").put("code", "not_found")).first)
+        assertEquals("Folder not there", StorageShares.stateLabel(StorageShares.NOT_FOUND))
+        assertEquals("No network", StorageShares.stateLabel(StorageShares.NO_NETWORK))
+        assertTrue(StorageShares.unreachable(StorageShares.UNREACHABLE))
+        assertTrue(StorageShares.unreachable(StorageShares.NO_NETWORK))
+        assertFalse(StorageShares.unreachable(StorageShares.SIGN_IN_REFUSED))
+        assertFalse(StorageShares.unreachable(StorageShares.CONNECTED))
+    }
+
+    @Test
+    fun whenAShareLastConnectedIsKept() {
+        val share = StorageShare(
+            id = "w1", name = "Cloud", kind = StorageShares.WEBDAV, url = "https://cloud.example.com/dav/", user = "me",
+            allowPlainHttp = false, trusted = false, state = StorageShares.UNREACHABLE, lastConnectedMs = 1_793_860_215_000,
+        )
+        val back = StorageShares.parse(JSONArray().put(share.toJson()).toString()).single()
+        assertEquals(1_793_860_215_000, back.lastConnectedMs)
+        assertEquals(0L, StorageShares.parse("""[{"id":"x","url":"https://a.example/"}]""").single().lastConnectedMs)
+    }
+
+    @Test
     fun bucketNamesFollowS3sRules() {
         assertNull(StorageShares.bucketProblem("my-droidtop.saves"))
         assertNotNull(StorageShares.bucketProblem(""))

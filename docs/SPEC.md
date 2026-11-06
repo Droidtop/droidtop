@@ -23895,8 +23895,16 @@ downloads, maintenance, build scripts), and the check is recorded in its commit.
   NFS.
 
 **Settings > Accounts and sources > "Network and cloud storage"** (`StorageSharesCatalog`, `StorageShares`):
-- One row per share, with its state drawn and said: Not tested, Connected, Can't reach it, Sign-in refused,
-  Not encrypted, Address not valid, Refused. Opening the row gives:
+- One row per share, with its state drawn and said:
+  - **Not reached** (attention mark; waiting, not refused): Can't reach it; No network. While a share is not reached,
+    its row says where it is and when it last connected ("Last connected <date>").
+    - With no network at all, Test answers "No network" at once instead of waiting out the share's timeout
+      (`DownloadPolicy.networkNow`, the check droidtop's other network jobs use).
+  - **Answered and refused** (error mark): Sign-in refused; Not encrypted; Address not valid; Folder not there (the
+    share's folder is missing); Refused; and for SFTP, Check the server's key and Server's key changed.
+  - Not tested (attention mark); Connected.
+  - Test shows "Testing <share>..." while it runs.
+  Opening the row gives:
   - Test;
   - the address and sign-in fields (the password is never shown back);
   - Allow unencrypted;

@@ -1635,3 +1635,74 @@ mod tests {
         assert!(out.get("unreachable").is_some(), "{out}");
     }
 }
+
+// The share operations through droidtop's own JSON interface (Droidtop/tracker#573): what each kind refuses before
+// connecting, and that a server which doesn't answer is "unreachable" for every kind. Nothing here needs a server.
+#[cfg(test)]
+mod share_tests {
+    use super::call;
+    use serde_json::{json, Value};
+
+    fn test_share(share: Value) -> Value {
+        serde_json::from_str(&call("remote_test", &json!({ "share": share }).to_string())).unwrap()
+    }
+
+    fn code(reply: &Value) -> &str {
+        reply["code"].as_str().unwrap_or("")
+    }
+
+    #[test]
+    fn a_share_that_is_missing_or_unknown_is_refused() {
+        let none: Value = serde_json::from_str(&call("remote_test", "{}")).unwrap();
+        assert!(none["error"].as_str().unwrap().contains("no share"));
+        assert!(test_share(json!({ "kind": "ftp" }))["error"].as_str().unwrap().contains("ftp"));
+    }
+
+    #[test]
+    fn each_kind_refuses_an_address_it_cant_use_before_connecting() {
+        assert_eq!(code(&test_share(json!({ "kind": "webdav" }))), "bad_address");
+        assert_eq!(code(&test_share(json!({ "kind": "webdav", "url": "http://127.0.0.1:9/" }))), "not_encrypted");
+        assert_eq!(code(&test_share(json!({ "kind": "webdav", "url": "https://me:pw@cloud.example.com/" }))), "bad_address");
+        assert_eq!(code(&test_share(json!({ "kind": "sftp" }))), "bad_address");
+        assert_eq!(code(&test_share(json!({ "kind": "sftp", "host": "me@nas.local", "user": "me" }))), "bad_address");
+        assert_eq!(code(&test_share(json!({ "kind": "smb", "server": "nas.local" }))), "bad_address");
+        assert_eq!(code(&test_share(json!({ "kind": "s3", "endpoint": "https://s3.example.com" }))), "bad_address");
+        assert_eq!(code(&test_share(json!({ "kind": "s3", "endpoint": "http://127.0.0.1:9", "bucket": "b" }))), "not_encrypted");
+    }
+
+    #[test]
+    fn a_server_that_does_not_answer_is_unreachable_for_every_kind() {
+        let mut shares = vec![
+            json!({ "kind": "webdav", "url": "http://127.0.0.1:9/", "allow_plain_http": true }),
+            json!({ "kind": "sftp", "host": "127.0.0.1", "port": 9, "user": "me", "password": "x" }),
+            json!({ "kind": "s3", "endpoint": "http://127.0.0.1:9", "bucket": "b", "access_key": "k", "secret_key": "s",
+                    "allow_plain_http": true }),
+        ];
+        // libsmb2 is built for unix targets only.
+        if cfg!(unix) {
+            shares.push(json!({ "kind": "smb", "server": "127.0.0.1:9", "share": "s", "user": "me", "password": "x" }));
+        }
+        for share in shares {
+            let reply = test_share(share.clone());
+            assert!(reply.get("unreachable").is_some(), "{share} answered {reply}");
+        }
+        // A listing goes the same way.
+        let list: Value = serde_json::from_str(&call(
+            "remote_list",
+            &json!({ "share": { "kind": "webdav", "url": "http://127.0.0.1:9/", "allow_plain_http": true }, "dir": "" }).to_string(),
+        ))
+        .unwrap();
+        assert!(list.get("unreachable").is_some(), "{list}");
+    }
+
+    #[test]
+    fn a_password_never_appears_in_a_reply() {
+        let reply = call(
+            "remote_test",
+            &json!({ "share": { "kind": "webdav", "url": "http://127.0.0.1:9/", "user": "me", "password": "hunter2",
+                                "allow_plain_http": true } })
+            .to_string(),
+        );
+        assert!(!reply.contains("hunter2"), "{reply}");
+    }
+}

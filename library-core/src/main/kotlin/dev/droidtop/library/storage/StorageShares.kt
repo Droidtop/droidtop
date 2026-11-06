@@ -2,6 +2,8 @@ package dev.droidtop.library.storage
 
 import android.content.Context
 import dev.droidtop.library.credentials.CredentialStore
+import dev.droidtop.net.DownloadPolicy
+import dev.droidtop.net.NetworkClass
 import dev.droidtop.net.peer.AgentNative
 import org.json.JSONArray
 import org.json.JSONObject
@@ -45,6 +47,8 @@ data class StorageShare(
     val hostKey: String = "",
     /** SFTP: the key the server showed at the last Test when it wasn't the accepted one, waiting for the person. */
     val offeredHostKey: String = "",
+    /** When a Test last connected, in ms since the epoch; 0 when it never has. Shown while the share can't be reached. */
+    val lastConnectedMs: Long = 0,
 ) {
     val passwordKey: String get() = "droidtop_share_${id}_password"
 
@@ -54,7 +58,7 @@ data class StorageShare(
         .put("state", state).put("state_detail", stateDetail).put("tested_at", testedAtMs)
         .put("bucket", bucket).put("region", region).put("folder", folder).put("bucket_in_host", bucketInHost)
         .put("port", port).put("share_name", shareName).put("domain", domain).put("require_encryption", requireEncryption)
-        .put("host_key", hostKey).put("offered_host_key", offeredHostKey)
+        .put("host_key", hostKey).put("offered_host_key", offeredHostKey).put("last_connected", lastConnectedMs)
 
     companion object {
         fun fromJson(o: JSONObject): StorageShare? {
@@ -82,6 +86,7 @@ data class StorageShare(
                 requireEncryption = o.optBoolean("require_encryption"),
                 hostKey = o.optString("host_key"),
                 offeredHostKey = o.optString("offered_host_key"),
+                lastConnectedMs = o.optLong("last_connected"),
             )
         }
     }
@@ -110,6 +115,8 @@ object StorageShares {
     const val REFUSED = "refused"
     const val HOST_KEY_UNKNOWN = "host_key_unknown"
     const val HOST_KEY_CHANGED = "host_key_changed"
+    const val NOT_FOUND = "not_found"
+    const val NO_NETWORK = "no_network"
 
     /** The words for a share's state, as its row's value. */
     fun stateLabel(state: String): String = when (state) {
@@ -121,6 +128,8 @@ object StorageShares {
         REFUSED -> "Refused"
         HOST_KEY_UNKNOWN -> "Check the server's key"
         HOST_KEY_CHANGED -> "Server's key changed"
+        NOT_FOUND -> "Folder not there"
+        NO_NETWORK -> "No network"
         else -> "Not tested"
     }
 
@@ -389,11 +398,23 @@ object StorageShares {
      * line to show. Network work: never on the main thread.
      */
     fun test(context: Context, share: StorageShare): String {
+        // With no network at all, say so at once rather than wait out the share's timeout.
+        if (DownloadPolicy.networkNow(context) == NetworkClass.OFFLINE) {
+            update(context, share.id) { it.copy(state = NO_NETWORK, stateDetail = null, testedAtMs = System.currentTimeMillis()) }
+            return "No network: connect this device, then press Test"
+        }
         val reply = AgentNative.call("remote_test", JSONObject().put("share", nativeArgs(context, share)))
         val (state, detail) = outcome(reply)
         val offered = offeredKey(reply)
+        val now = System.currentTimeMillis()
         update(context, share.id) {
-            it.copy(state = state, stateDetail = detail, testedAtMs = System.currentTimeMillis(), offeredHostKey = offered.orEmpty())
+            it.copy(
+                state = state,
+                stateDetail = detail,
+                testedAtMs = now,
+                offeredHostKey = offered.orEmpty(),
+                lastConnectedMs = if (state == CONNECTED) now else it.lastConnectedMs,
+            )
         }
         return when (state) {
             CONNECTED -> "Connected to ${share.name}"
@@ -412,10 +433,17 @@ object StorageShares {
             BAD_ADDRESS -> BAD_ADDRESS
             HOST_KEY_UNKNOWN -> HOST_KEY_UNKNOWN
             HOST_KEY_CHANGED -> HOST_KEY_CHANGED
+            NOT_FOUND -> NOT_FOUND
             else -> REFUSED
         } to reply.optString("error")
         else -> CONNECTED to null
     }
+
+    /**
+     * Whether [state] means the share couldn't be reached, as opposed to answering and refusing: then the row says
+     * when it last connected, and nothing that uses the share waits on it. Pure.
+     */
+    fun unreachable(state: String): Boolean = state == UNREACHABLE || state == NO_NETWORK
 
     /** The SFTP server key a `remote_test` reply showed when it wasn't the accepted one, or null. Pure. */
     fun offeredKey(reply: JSONObject): String? =
