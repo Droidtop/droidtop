@@ -428,13 +428,13 @@ internal fun PcGamesSection(
             // walk or a network ask per entry, which a list never pays.
             facets = listOf(
                 LibraryFacet.SOURCE, LibraryFacet.OWNERSHIP, LibraryFacet.KIND, LibraryFacet.COLLECTION, LibraryFacet.IMPORTED_FROM,
-                LibraryFacet.ENGINE, LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES,
+                LibraryFacet.ENGINE, LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES, LibraryFacet.MY_STATUS,
                 LibraryFacet.PLAYED, LibraryFacet.RECENTLY_PLAYED, LibraryFacet.GENRE, LibraryFacet.DEVELOPER,
                 LibraryFacet.YEAR, LibraryFacet.UPDATE, LibraryFacet.MISSING_ART, LibraryFacet.HIDDEN,
             ),
             sorts = listOf(
                 LibrarySortKey.NAME, LibrarySortKey.RECENT, LibrarySortKey.ADDED, LibrarySortKey.PLAYTIME,
-                LibrarySortKey.YEAR, LibrarySortKey.RATING, LibrarySortKey.SIZE,
+                LibrarySortKey.YEAR, LibrarySortKey.RATING, LibrarySortKey.MY_RATING, LibrarySortKey.SIZE,
             ),
         )
     }

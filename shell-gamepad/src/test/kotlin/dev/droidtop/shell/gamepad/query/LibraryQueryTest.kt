@@ -556,4 +556,21 @@ class LibraryQueryTest {
         assertEquals("lutris", dev.droidtop.library.PcLaunchers.viaOf("Lutris: GOG installer"))
         assertNull(dev.droidtop.library.PcLaunchers.viaOf("Chosen by you"))
     }
+
+    // Droidtop/tracker#722: the person's own marks, apart from the scraped rating.
+    @Test
+    fun `my status filters and my rating sorts, from the person's own marks`() {
+        val marks = mapOf(
+            "a" to dev.droidtop.library.settings.GameMark(2, dev.droidtop.library.settings.PlayStatus.PLAYING),
+            "b" to dev.droidtop.library.settings.GameMark(5, dev.droidtop.library.settings.PlayStatus.BACKLOG),
+        )
+        val marked = scope.copy(context = scope.context.copy(markOf = { marks[it.id] ?: dev.droidtop.library.settings.GameMark() }))
+        val a = game("a", rating = 0.9f)
+        val b = game("b", rating = 0.1f)
+        val c = game("c")
+        assertEquals(listOf("Playing"), LibraryFacet.MY_STATUS.valuesOf(a, marked.context))
+        assertTrue(LibraryFacet.MY_STATUS.valuesOf(c, marked.context).isEmpty())
+        // Most stars first, an unrated game last, whatever the scraped rating says.
+        assertEquals(listOf("b", "a", "c"), LibraryQuery(sort = LibrarySortKey.MY_RATING).applyTo(listOf(a, c, b), marked).map { it.title })
+    }
 }

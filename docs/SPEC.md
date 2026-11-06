@@ -14575,8 +14575,10 @@ toast and a notification, and the close timer runs through a second
 (0, not rated, to 5 stars) and **Status** (Playing, Completed, Backlog, Dropped, or not set), kept apart from the
 scraped fields in a file of droidtop's own (`GameMarks`, `game-marks.json`), so a scrape never changes them and the
 scraped rating stays the scraped one; the backup carries the file (`DroidtopBackup.FILES`). Slice 1: both rows sit
-under "Yours" in Edit metadata, each press turning to the next value and saved at once. On the game page with Left
-and Right, and as a filter and a sort, are still to build.
+under "Yours" in Edit metadata, each press turning to the next value and saved at once. Slice 2: the PC, console and
+Standard game lists filter by **My status** (a facet) and sort by **My rating** (most stars first, unrated last),
+read from memory (`GameMarks.cached`, warmed off the main thread at start and kept current as marks are set), so a
+list never reads the file while it filters. On the game page with Left and Right is still to build.
 
 **Your play (2026-10-29, Droidtop/tracker#597).** UI review 265: "There is no
 play-time summary anywhere: no total, no per-system, no 'this week'". Kid mode's

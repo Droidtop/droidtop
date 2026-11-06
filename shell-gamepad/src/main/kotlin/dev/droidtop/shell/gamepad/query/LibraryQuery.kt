@@ -38,6 +38,8 @@ enum class LibrarySortKey(val label: String, val naturalOrder: String, val flipp
     ADDED("Recently added", "Newest first", "Oldest first"),
     YEAR("Release year", "Oldest first", "Newest first"),
     RATING("Rating", "Highest first", "Lowest first"),
+    /** The person's own stars (Droidtop/tracker#722), apart from the scraped Rating. */
+    MY_RATING("My rating", "Most stars first", "Fewest stars first"),
     SIZE("Size", "Largest first", "Smallest first"),
     ;
 
@@ -81,6 +83,8 @@ enum class LibraryFacet(val key: String, val label: String) {
     // A console gamelist's own facts (the ES-DE completed flag, and what a
     // Switch game's update and DLC files add up to, docs/SPEC.md 7m).
     COMPLETED("completed", "Completed"),
+    /** The person's own status for the game (Droidtop/tracker#722): Playing, Completed, Backlog or Dropped. */
+    MY_STATUS("my_status", "My status"),
     SWITCH_CONTENT("switch", "Switch content"),
 
     // The Apps view's own facts (docs/SPEC.md 7j): read from the entry's
@@ -124,6 +128,7 @@ enum class LibraryFacet(val key: String, val label: String) {
         // entries out of a list unless this facet asks for them.
         HIDDEN -> if (entry.hidden) listOf(HIDDEN_YES) else emptyList()
         COMPLETED -> if (entry.completed) listOf(COMPLETED_YES) else emptyList()
+        MY_STATUS -> context.markOf(entry).status.takeIf { it != dev.droidtop.library.settings.PlayStatus.NONE }?.let { listOf(it.label) }.orEmpty()
         // A Switch game classification could say nothing about is not
         // "missing" anything: only a row known to be a base game without an
         // update beside it is.
@@ -243,6 +248,8 @@ data class LibraryQueryContext(
     val collectionsOf: (LibraryEntry) -> Set<String> = { emptySet() },
     /** A collection's name by id, for the Collection facet's values. */
     val collectionName: (String) -> String? = { null },
+    /** The person's own rating and status for a game (Droidtop/tracker#722), from memory ([dev.droidtop.library.settings.GameMarks.cached]). */
+    val markOf: (LibraryEntry) -> dev.droidtop.library.settings.GameMark = { dev.droidtop.library.settings.GameMarks.cached(it.id) },
 )
 
 /** What one list offers: which facets, which sorts, and how to read the facts. */
@@ -562,6 +569,7 @@ fun LibrarySortKey.comparator(
         LibrarySortKey.ADDED -> compareByDescending<LibraryEntry> { it.addedEpochMs() }
         LibrarySortKey.YEAR -> compareBy<LibraryEntry> { it.releaseDate ?: "99999999" }
         LibrarySortKey.RATING -> compareByDescending<LibraryEntry> { it.rating ?: -1f }
+        LibrarySortKey.MY_RATING -> compareByDescending<LibraryEntry> { context.markOf(it).stars }
         LibrarySortKey.SIZE -> compareByDescending<LibraryEntry> { it.pcInfo?.sizeBytes ?: 0L }
     }
     return missingLast.then(if (reversed) primary.reversed() else primary).then(byTitle)
@@ -576,6 +584,7 @@ private fun LibrarySortKey.hasFact(entry: LibraryEntry, context: LibraryQueryCon
     LibrarySortKey.ADDED -> entry.addedEpochMs() > 0L
     LibrarySortKey.YEAR -> entry.releaseDate != null
     LibrarySortKey.RATING -> entry.rating != null
+    LibrarySortKey.MY_RATING -> context.markOf(entry).stars > 0
     LibrarySortKey.SIZE -> (entry.pcInfo?.sizeBytes ?: 0L) > 0L
 }
 
@@ -635,10 +644,10 @@ fun appsQueryScope(
 fun retroQueryScope(groupLabel: String): LibraryQueryScope = LibraryQueryScope(
     id = "retro:$groupLabel",
     facets = listOf(
-        LibraryFacet.FAVOURITES, LibraryFacet.COMPLETED, LibraryFacet.PLAYED, LibraryFacet.GENRE,
+        LibraryFacet.FAVOURITES, LibraryFacet.COMPLETED, LibraryFacet.MY_STATUS, LibraryFacet.PLAYED, LibraryFacet.GENRE,
         LibraryFacet.DEVELOPER, LibraryFacet.YEAR, LibraryFacet.SWITCH_CONTENT, LibraryFacet.HIDDEN,
     ),
-    sorts = listOf(LibrarySortKey.NAME, LibrarySortKey.RATING, LibrarySortKey.YEAR, LibrarySortKey.RECENT),
+    sorts = listOf(LibrarySortKey.NAME, LibrarySortKey.RATING, LibrarySortKey.MY_RATING, LibrarySortKey.YEAR, LibrarySortKey.RECENT),
     sortLabels = mapOf(LibrarySortKey.YEAR to "Release date"),
 )
 
@@ -649,10 +658,13 @@ fun retroQueryScope(groupLabel: String): LibraryQueryScope = LibraryQueryScope(
 fun launcherGamesQueryScope(): LibraryQueryScope = LibraryQueryScope(
     id = LAUNCHER_GAMES_SCOPE_ID,
     facets = listOf(
-        LibraryFacet.FAVOURITES, LibraryFacet.RECENTLY_PLAYED, LibraryFacet.PLAYED, LibraryFacet.GENRE,
+        LibraryFacet.FAVOURITES, LibraryFacet.MY_STATUS, LibraryFacet.RECENTLY_PLAYED, LibraryFacet.PLAYED, LibraryFacet.GENRE,
         LibraryFacet.DEVELOPER, LibraryFacet.YEAR, LibraryFacet.HIDDEN,
     ),
-    sorts = listOf(LibrarySortKey.NAME, LibrarySortKey.RECENT, LibrarySortKey.MOST_USED, LibrarySortKey.YEAR, LibrarySortKey.RATING),
+    sorts = listOf(
+        LibrarySortKey.NAME, LibrarySortKey.RECENT, LibrarySortKey.MOST_USED, LibrarySortKey.YEAR, LibrarySortKey.RATING,
+        LibrarySortKey.MY_RATING,
+    ),
     sortLabels = mapOf(LibrarySortKey.YEAR to "Release date"),
 )
 

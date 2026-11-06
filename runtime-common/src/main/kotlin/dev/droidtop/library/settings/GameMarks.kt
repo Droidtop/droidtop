@@ -55,6 +55,20 @@ object GameMarks {
 
     private fun file(context: Context) = File(context.filesDir, FILE)
 
+    /**
+     * The marks in memory, for the lists' filters and sorts (Droidtop/tracker#722), so a list never reads the file while
+     * it filters: [warm]ed once off the main thread at start and kept current by [set].
+     */
+    @Volatile private var cache: Map<String, GameMark> = emptyMap()
+
+    /** Reads the file into memory; call off the main thread. */
+    fun warm(context: Context) {
+        cache = all(context)
+    }
+
+    /** [gameId]'s marks from memory; empty until [warm] ran. */
+    fun cached(gameId: String): GameMark = cache[gameId] ?: GameMark()
+
     fun all(context: Context): Map<String, GameMark> = parse(runCatching { file(context).readText() }.getOrNull())
 
     fun of(context: Context, gameId: String): GameMark = all(context)[gameId] ?: GameMark()
@@ -62,6 +76,7 @@ object GameMarks {
     @Synchronized
     fun set(context: Context, gameId: String, mark: GameMark) {
         val updated = all(context).let { if (mark.empty) it - gameId else it + (gameId to mark) }
+        cache = updated
         runCatching {
             val target = file(context)
             val temp = File(target.parentFile, "$FILE.tmp")

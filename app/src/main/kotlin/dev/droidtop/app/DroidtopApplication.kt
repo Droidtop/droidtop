@@ -94,6 +94,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         PlayTimeLimiter.install(this)
         // The stick's dead zone (Settings > Controls, Droidtop/tracker#723), read off the main thread.
         dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.runtime.StickDeadZone.load(this@DroidtopApplication) }
+        // The person's own ratings and statuses, in memory for the lists' filters and sorts (Droidtop/tracker#722).
+        dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.library.settings.GameMarks.warm(this@DroidtopApplication) }
         // The power policy (docs/SPEC.md "Power policy", Droidtop/tracker#841): a game droidtop launches gets its level, off
         // the main thread; droidtop's own screen coming back puts every changed game back (onActivityResumed below).
         val powerApp = this
