@@ -43,6 +43,19 @@ data class Facet(
         ).associateWith { setOf(1) }
 
         val BUNDLES = setOf("metadata", "description", "image", "download", "links", "store", "update", "identity")
+
+        /**
+         * droidtop's icon set: the names an `icon` may take on `action`, `status`, `badge` and `toggle` (docs/plugin-api.md
+         * 1.10, "The kinds"). Each target draws a name with its own glyph, so a plugin picks a meaning, never a picture. A
+         * name not in the set is dropped and logged, and the facet is drawn without it (Droidtop/tracker#221: a tray slot
+         * has room for an icon, not for words).
+         */
+        val ICONS: Set<String> = setOf(
+            "add", "app", "battery", "bluetooth", "check", "clipboard", "close", "cloud", "download", "error", "file",
+            "folder", "info", "lock", "mic", "network", "next", "notification", "open", "pause", "play", "previous",
+            "remove", "search", "send", "settings", "share", "star", "stop", "sync", "terminal", "unlock", "upload",
+            "volume", "vpn", "warning", "wifi", "window",
+        )
     }
 }
 
@@ -58,12 +71,27 @@ sealed interface FacetSubject {
     /** A library game droidtop asked the plugin about, by droidtop's id. */
     data class Game(val gameId: String) : FacetSubject
 
+    /**
+     * A Desktop window droidtop asked the plugin about (Droidtop/tracker#221): [windowId] is droidtop's own id for it
+     * (host-bridge's toplevel id), never the compositor's, and [appId] is the app id the compositor reported. droidtop
+     * names the subject when it asks; a plugin cannot name a window it was not shown.
+     */
+    data class Window(val windowId: Long, val appId: String) : FacetSubject
+
+    /**
+     * A file or folder the person picked, for "Open with" and the file actions (Droidtop/tracker#221, catalogue E4):
+     * [token] is droidtop's document token for it (D4), never a path, and [mime] its type.
+     */
+    data class File(val token: String, val mime: String) : FacetSubject
+
     val type: String
         get() = when (this) {
             Plugin -> "plugin"
             Device -> "device"
             is Item -> "item"
             is Game -> "game"
+            is Window -> "window"
+            is File -> "file"
         }
 }
 
@@ -81,9 +109,10 @@ data class FacetCall(val op: String, val argsJson: String = "{}", val kind: Kind
 sealed interface FacetBody {
     data class Info(val label: String, val value: String?, val sub: String?, val filterable: Boolean, val sortable: Boolean) : FacetBody
 
-    data class Status(val label: String, val state: String, val tone: String, val value: String?) : FacetBody
+    // [icon] on these and on [Action] is a name from [Facet.ICONS], or null.
+    data class Status(val label: String, val state: String, val tone: String, val value: String?, val icon: String? = null) : FacetBody
 
-    data class Badge(val text: String, val tone: String) : FacetBody
+    data class Badge(val text: String, val tone: String, val icon: String? = null) : FacetBody
 
     /** [value] is 0..100, or -1 when unknown. */
     data class Progress(val label: String, val value: Int, val sub: String?, val cancel: FacetCall?) : FacetBody
@@ -96,7 +125,7 @@ sealed interface FacetBody {
     data class Action(val label: String, val sub: String?, val call: FacetCall, val confirm: String, val icon: String?) : FacetBody
 
     // An input's [call] is null inside a form group: the form's submit sends its value (docs/plugin-api.md 1.10, `group`).
-    data class Toggle(val label: String, val value: Boolean, val sub: String?, val call: FacetCall?) : FacetBody
+    data class Toggle(val label: String, val value: Boolean, val sub: String?, val call: FacetCall?, val icon: String? = null) : FacetBody
 
     data class Choice(val label: String, val options: List<Pair<String, String>>, val value: String, val sub: String?, val call: FacetCall?) : FacetBody
 
@@ -290,6 +319,16 @@ object Facets {
             if (source != null && id != null) FacetSubject.Item(source, id) else null
         }
         "game" -> json.text("gameId")?.let { FacetSubject.Game(it) }
+        "window" -> {
+            val windowId = json.optLong("windowId", -1L)
+            val appId = json.text("appId")
+            if (windowId >= 0 && appId != null) FacetSubject.Window(windowId, appId) else null
+        }
+        "file" -> {
+            val token = json.text("token")
+            val mime = json.text("mime")
+            if (token != null && mime != null) FacetSubject.File(token, mime) else null
+        }
         else -> null
     }
 
@@ -392,6 +431,14 @@ object Facets {
             return default
         }
 
+        /** The facet's `icon`: a name from [Facet.ICONS], or null; any other name is dropped and said. */
+        fun icon(): String? {
+            val name = json.text("icon") ?: return null
+            if (name in Facet.ICONS) return name
+            messages += "facet \"$id\": icon \"$name\" is not in droidtop's icon set and was left out"
+            return null
+        }
+
         fun url(key: String, from: JSONObject = json): String? =
             from.text(key)?.takeIf { it.length <= length("url") && NetScope.hostOf(it) != null }
 
@@ -400,8 +447,8 @@ object Facets {
 
         fun read(kind: String): FacetBody? = when (kind) {
             "info" -> label()?.let { FacetBody.Info(it, ViewValue.format(json.opt("value"))?.cut(length("value")), text("sub", "sub"), json.optBoolean("filterable"), json.optBoolean("sortable")) }
-            "status" -> label()?.let { FacetBody.Status(it, oneOf("state", STATES, "unknown"), oneOf("tone", TONES, "neutral"), text("value", "value")) }
-            "badge" -> text("text", "badge")?.let { FacetBody.Badge(it, oneOf("tone", TONES, "neutral")) }
+            "status" -> label()?.let { FacetBody.Status(it, oneOf("state", STATES, "unknown"), oneOf("tone", TONES, "neutral"), text("value", "value"), icon()) }
+            "badge" -> text("text", "badge")?.let { FacetBody.Badge(it, oneOf("tone", TONES, "neutral"), icon()) }
             "progress" -> label()?.let { FacetBody.Progress(it, json.optInt("value", -1).let { v -> if (v < 0) -1 else v.coerceAtMost(100) }, text("sub", "sub"), call("cancel")) }
             "meter" -> {
                 val value = number("value")
@@ -424,9 +471,9 @@ object Facets {
             }
             "action" -> {
                 val call = call()
-                if (call == null) null else label()?.let { FacetBody.Action(it, text("sub", "sub"), call, oneOf("confirm", CONFIRMS, "none"), json.text("icon")) }
+                if (call == null) null else label()?.let { FacetBody.Action(it, text("sub", "sub"), call, oneOf("confirm", CONFIRMS, "none"), icon()) }
             }
-            "toggle" -> input { c -> label()?.let { FacetBody.Toggle(it, json.optBoolean("value"), text("sub", "sub"), c) } }
+            "toggle" -> input { c -> label()?.let { FacetBody.Toggle(it, json.optBoolean("value"), text("sub", "sub"), c, icon()) } }
             "choice" -> input { c ->
                 val options = capped(json.optJSONArray("options"), "options", "options") { o ->
                     val value = o.text("value") ?: return@capped null

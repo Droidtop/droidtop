@@ -58,7 +58,7 @@
           "label": { "type": ["string", "null"] },
           "surfaces": { "type": "array", "items": { "type": "string" } },
           "target": { "type": "string" },
-          "targets": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "ui.context_action: the item kinds it is offered on (game, app, file, folder, system, container, window). ui.facets: the places its facets go (game.page, quickmenu, plugin.page, search.filter, item.page, companion.tab, ... and a plugin's own <name>:<place>), docs/plugin-api.md 1.10." },
+          "targets": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "ui.context_action: the item kinds it is offered on (game, app, file, folder, system, container, window). ui.facets: the places its facets go (game.page, quickmenu, plugin.page, search.filter, item.page, companion.tab, desktop.tray, desktop.window, files.action, ... and a plugin's own <name>:<place>), docs/plugin-api.md 1.10 and 1.12." },
           "systems": { "oneOf": [ { "type": "array", "items": { "type": "string" } }, { "const": "*" } ], "description": "ui.context_action: the systems the action is offered on. library.sources: the droidtop system ids the source serves (PC systems pc, windows, windows3x, windows9x, dos, linux, mac, macos are the PC library), or \"*\" (alone or in the list) for all; absent, empty or malformed keeps the old behaviour of serving every system." },
           "packages": { "type": "array", "items": { "type": "string" } },
           "job": { "type": "boolean" },

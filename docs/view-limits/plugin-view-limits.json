@@ -100,6 +100,7 @@
       "widget": 6,
       "plugin.page": 40,
       "desktop.tray": 2,
+      "desktop.window": 3,
       "files.action": 4,
       "launcher.drawer": 4,
       "onboarding.step": 1,

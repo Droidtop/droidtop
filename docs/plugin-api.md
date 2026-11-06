@@ -1457,8 +1457,12 @@ Every facet is one JSON object:
   it). A kind droidtop does not know is skipped, as an unknown field is (§7).
 - `subject`: what it is about. `{type: "item", source, id}` (an item of one of the plugin's `provides` entries: a
   forum thread, a store product, a release feed, an app in a catalog), `{type: "game", gameId}` (a library game
-  droidtop asked the plugin about, by droidtop's id), `{type: "plugin"}` (the plugin itself; the default) or
-  `{type: "device"}`.
+  droidtop asked the plugin about, by droidtop's id), `{type: "plugin"}` (the plugin itself; the default),
+  `{type: "device"}`, `{type: "window", windowId, appId}` (a Desktop window, by droidtop's own id for it, never the
+  compositor's) or `{type: "file", token, mime}` (a file or folder the person picked, by document token, never a
+  path). **droidtop names windows and files** (Droidtop/tracker#221, 2026-11-06): a facet about either is taken only
+  when it is about the very one droidtop asked about (`FacetGuards.admit`'s `asked`), so a plugin cannot reach a
+  window or a file it was not shown.
 - `targets`: where the plugin would like it (see Targets). droidtop takes only targets the plugin declared and that
   take this kind; it may show a facet on fewer targets than asked, never more.
 - `priority`: `low`, `normal` or `high`, the plugin's own order among its facets on one target. It never moves a
@@ -1475,13 +1479,13 @@ Every facet is one JSON object:
 | Kind | Fields | Drawn as |
 |---|---|---|
 | `info` | `label`, `value` (a string, or a typed value as in §1.6: bool, number with unit, enum), `sub?`, `filterable?`, `sortable?` | A label and value. With `filterable` or `sortable`, an item's info becomes a filter facet or a sort of the lists it is in (the label names it; values group by equality, numbers by range) |
-| `status` | `label`, `state` (`on`, `off`, `busy`, `ok`, `warning`, `error`, `unknown`), `tone?` (`neutral`, `positive`, `caution`, `danger`), `value?` | Its words in the value column and the host's status glyph beside the label: `busy` a turning ring, `warning` the caution circled "!", `error` the danger octagon; `ok`, `on` and `off` show no glyph (Droidtop/tracker#644) |
-| `badge` | `text` (at most 16 characters), `tone?` | A small chip on a row, a capsule or a tile ("Update", "Beta", "3 new") |
+| `status` | `label`, `state` (`on`, `off`, `busy`, `ok`, `warning`, `error`, `unknown`), `tone?` (`neutral`, `positive`, `caution`, `danger`), `value?`, `icon?` | Its words in the value column and the host's status glyph beside the label: `busy` a turning ring, `warning` the caution circled "!", `error` the danger octagon; `ok`, `on` and `off` show no glyph (Droidtop/tracker#644) |
+| `badge` | `text` (at most 16 characters), `tone?`, `icon?` | A small chip on a row, a capsule or a tile ("Update", "Beta", "3 new") |
 | `progress` | `label`, `value` (0 to 100, or -1 for unknown), `sub?`, `cancel?` (an action) | A bar with its words; a job's progress is a job's, in Downloads and installs (§8) |
 | `meter` | `label`, `value`, `max`, `unit?`, `warnAt?`, `dangerAt?` | The host's bar, filled to `value` of `max`, with "120 of 512 MB" under it (storage, battery, a quota; Droidtop/tracker#644) |
 | `chart` | `label`, `style` (`line` or `bars`), `points` (at most 60 numbers; for `bars`, at most 12 `{label, value}`), `unit?` | A sparkline (a speed, a temperature over the last minutes) or a small bar chart (storage by folder). Nothing larger: no axes the plugin draws, no colours of its own |
 | `action` | `label`, `sub?`, `call` (an action, below), `confirm?` (`none`, `confirm`, `danger`), `icon?` (from droidtop's icon set) | A button, a menu entry or a row, as the target draws actions. `confirm` is droidtop's two-step confirm; `danger` adds danger colours and names what is lost (`sub`) |
-| `toggle` | `label`, `value: bool`, `sub?`, `call` | A switch; the change is sent at once |
+| `toggle` | `label`, `value: bool`, `sub?`, `call`, `icon?` | A switch; the change is sent at once |
 | `choice` | `label`, `options: [{value, label}]` (at most 100), `value`, `sub?`, `call` | A pick-one |
 | `slider` | `label`, `min`, `max`, `step?`, `value`, `unit?`, `call` | A stepper or slider |
 | `input` | `label`, `value`, `hint?`, `inputKind?` (`text`, `number`, `url`, `search`; 2026-10-29: `kind` is the envelope's, so the field type has its own key), `call`, `optional?` | A text field (controller and touch entry). Never secret: secrets stay with G1/G3. In a form group it has no `call`, and `optional: true` lets the form be sent with it empty; any other empty input holds the submit back ("Fill in Device ID first"), and nothing reaches the plugin |
@@ -1498,6 +1502,14 @@ Every facet is one JSON object:
 
 A facet's text is the plugin's; its look, size, focus order, pad and touch behaviour and its TalkBack wording
 ("VPN, on, Connected to Home, switch") are droidtop's alone.
+
+**Icons are names, from droidtop's icon set** (Droidtop/tracker#221, 2026-11-06). `icon` on `action`, `status`,
+`badge` and `toggle` is one of: `add`, `app`, `battery`, `bluetooth`, `check`, `clipboard`, `close`, `cloud`,
+`download`, `error`, `file`, `folder`, `info`, `lock`, `mic`, `network`, `next`, `notification`, `open`, `pause`,
+`play`, `previous`, `remove`, `search`, `send`, `settings`, `share`, `star`, `stop`, `sync`, `terminal`, `unlock`,
+`upload`, `volume`, `vpn`, `warning`, `wifi`, `window` (`Facet.ICONS`). Each target draws the name with its own glyph,
+so a plugin picks a meaning, never a picture; any other name is left out and logged, and the facet is drawn without
+it. A tray slot has room for an icon and not for words, which is why the three kinds gained it.
 
 #### Content bundles: standard sets for items
 
@@ -1611,7 +1623,8 @@ its own (a game, an item) or none. A plugin declares the targets it uses on a `p
 | `widget` | Android home-screen widgets (C10) | `info`, `status`, `progress`, `meter`, `media`, `list` (5 rows), `action` (2) | the plugin, the device |
 | `plugin.page` | The plugin's own page under Plugins | everything | the plugin |
 | `desktop.tray` | The desktop's taskbar tray (C8) | `status`, `badge`, `action` (a menu of up to 8), `toggle`, `meter` | the device |
-| `files.action` | The file manager's actions and "open with" (C9) | `action` | a file or folder the person picked (droidtop passes a document token, D4, never a path) |
+| `desktop.window` | A Desktop window's menu on the bar (2026-11-06, Droidtop/tracker#221): where a plugin hooks into an application, "Send to phone" on a browser window | `action`, `toggle`, `badge` (three per plugin) | the window (`{type: "window"}`), asked only for windows of apps the plugin may see: it needs `windows.read`, narrowed by the manifest's `apps` (catalogue E5). Risk medium |
+| `files.action` | The file manager's actions and "open with" (C9) | `action` | a file or folder the person picked (`{type: "file", token, mime}`: droidtop passes a document token, D4, never a path). The guards took only `plugin` as its subject until 2026-11-06 (Droidtop/tracker#221), which no file action can be about |
 | `launcher.drawer` | The app drawer's and home screen's actions (C12) | `action`, `badge` | an app |
 | `onboarding.step` | A step of onboarding (C13) | `info`, `text`, `media`, inputs, `action`, `notice` | the device. Risk high: offered only by plugins from the person's trusted catalogs, and shown only after droidtop's own steps |
 | `<plugin>:<slot>` | A slot another plugin opens in its own page or card (below) | what the slot's owner lists | the slot owner's subject |
@@ -1871,6 +1884,83 @@ plugin. The parts marked *(built)* have landed.
    - gamegrab-sources: F95, the ROM catalog plugin, LewdCorner, Repacks, Nyaa, Abandonware, BIOS, the F95 adapter in
      droidtop-agent;
    - Droidtop: Old versions, and any other plugin that matches or acquires.
+
+### 1.12 Plugins in Desktop mode: hooking into desktop applications (designed 2026-11-06, Droidtop/tracker#221)
+
+*The owner, 2026-10-01: "allow for plugins to run IN desktop mode, hook into applications in the desktop for
+functionality". The design is on Droidtop/tracker#221 (2026-11-06), built to the lane's recommendation; it is built
+in slices, and each slice says here what it built.*
+
+**Where the code runs.** In the plugin's own contained process, as every plugin's does (§5.3). It talks only to
+droidtop's broker, and droidtop serves every desktop call from what it already holds: host-bridge's window list
+(wlr-foreign-toplevel-management, `HostBridge.toplevels()` and `toplevelChanges`), sway IPC on the socket droidtop
+already reaches (`SwayIpc`, `DesktopWindows`), and the clipboard bridge (`ClipboardSync`, docs/SPEC.md 6d). Nothing
+runs in the container for a plugin, no plugin is a Wayland or sway client, and nothing needs root: reading, focusing
+and closing windows work under labwc and sway and on proot; moving a window between screens is sway's, as the bar's
+is. This was chosen over code in the container (a sway client, a D-Bus service): it keeps one broker, one grant list
+and one audit log for every plugin, and adds nothing to the images droidtop never builds.
+
+**What a plugin may observe** (catalogue E5):
+- the events `window.opened`, `window.closed` and `window.focused`, each `{id, appId, title, output}`, and
+  `windows.list()`;
+- `id` is droidtop's toplevel id, never sway's container id;
+- titles and app ids need `windows.read` (dangerous: a title can carry what a person is reading). A manifest may
+  narrow it to apps, `"apps": ["org.mozilla.firefox"]` on the permission, and droidtop filters every event and list
+  to those.
+
+**What a plugin may do:**
+- `windows.focus` and `windows.close {id}` under `windows.control` (dangerous);
+- launch a desktop app by its desktop-entry id, through the Start menu's own launch path;
+- **Open with** (catalogue E4): manifest `associations: [{mime, ext, label}]` lists the plugin in droidtop's Open
+  with; its `files.action` facets are about the picked file (`{type: "file", token, mime}`);
+- **the clipboard bridge**: `clipboard.read`, `clipboard.write` and the event `clipboard.changed`, text only, through
+  `ClipboardSync`'s cap and echo suppression, so a plugin cannot loop with the container;
+- **the notification bridge**: a plugin's `notify.post` shows in Desktop's own notification area. Reading Linux
+  apps' own notifications (`org.freedesktop.Notifications`) would need a listener in the container and is not in
+  this design: it is a question for the owner (§10);
+- **widgets**: `desktop.tray` (the taskbar's tray) and `desktop.window` (a window's bar menu, about that window), in
+  §1.10's Targets.
+
+**Not offered:** input into another application's window (a keylogger's and an autoclicker's tool; a `shortcut` on
+an action, below, covers the legitimate uses), and capturing a window's picture (windowcast's, by the standing rule).
+
+**What the person approves.** Each permission above, each target (`facets:desktop.tray`, `facets:desktop.window`,
+`facets:files.action`) and each association is its own row on the plugin's approval list (§4.2, Droidtop/tracker#164).
+`windows.read`, `windows.control`, `clipboard.read` and `clipboard.write` are dangerous and start unticked. Every
+use of them is in the audit log (§4.6, Droidtop/tracker#61); window events delivered are counted per day.
+
+**Slices.** 1, the contract (this section, the `window` and `file` subjects, `desktop.window`, icons; built
+2026-11-06). 2, the host side over host-bridge (`windows.*` and the window events). 3, the taskbar drawing
+`desktop.tray` and `desktop.window`. 4, Open with. 5, the clipboard and notification bridges, each behind its own
+approval. 6, a test fixture plugin exercising each.
+
+**The facet vocabulary grows (owner, 2026-11-06).** The owner: "I think the current vocabularity is too limited". He
+agreed to these, which are proposed on Droidtop/tracker#602 and not yet built ("I agree with 5-8"):
+- `copy` on `info` and on `list` entries: droidtop copies the value on the person's press, so no clipboard
+  permission is needed;
+- a `countdown` and relative-time value ("ends in 3 min", "2 h ago"), counted by droidtop, where today a live time
+  costs a push a second;
+- a `shortcut` on `action` in Desktop: the person binds a key chord to a plugin's action; droidtop holds the
+  binding, and a plugin may only suggest one;
+- `date` and `time` input kinds.
+
+**A surface: a page of the plugin's own UI, guarded (owner, 2026-11-06; proposed, not built).** The owner, correcting
+the lane's "no kind that draws arbitrary content": "a facet doesn't draw anything, it provides content bundles to
+droidtop, which processes them. A facet that draws semi-arbitrary surfaces would be guarded and gated more severely
+than the rest, but is also among the most useful. For instance, making a tailscale taskbar icon straight from the
+plugin, we could present a facet that IS a special page of the full UI the plugin contains". The proposal:
+- an action `kind: "surface"` names a surface the plugin declares ahead of time in its manifest, on its `ui.main`
+  entry (`"surfaces": [{"id": "tray", "size": "popover"}]`), as every facet a plugin can describe ahead of time is
+  declared (Droidtop/tracker#852, the owner's #883 decision);
+- the plugin draws inside it, in its own process, as `ui.main` does (§1.7), so it is offered where `ui.main` is;
+- droidtop owns the frame: a "from <plugin>" header, a size cap per target, Close and Back, and its place, anchored
+  to what opened it. Nothing the plugin draws covers droidtop's own components;
+- it opens only on the person's press, never inline and never on its own, and never in a grant prompt, onboarding
+  or anything droidtop itself asks;
+- each surface is its own approval row, at a risk above `ui.main`'s.
+
+A VPN plugin's tray item is then a `status` facet with `icon: "vpn"`, and pressing it opens the plugin's own tray
+page as a popover beside the tray.
 
 ## 2. Plugin-provided APIs
 
@@ -3596,8 +3686,8 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | E1 | Containers and lifecycle | see and drive the Linux/Wine containers (§3) | `containers.list()`, `containers.state {id}`; `start`, `stop`, `create {image ref}` (**jobs**); events `container.started` / `stopped` | D: Containers screen, taskbar; G: PC section | `containers.read` (normal) / `containers.manage` (dangerous) | medium / high | not built |
 | E2 | Container exec | run a command inside a container as the container user | `containers.exec {id, argv, env, cwd}` → a job with streamed stdout/stderr | data | `containers.exec` (critical: full access to the user's container home) | critical | not built |
 | E3 | Terminal | open a terminal for the user at a place (a container, a game's folder) | `terminal.open {container, cwd}`: the host opens its own terminal; the plugin never reads it | D: terminal window; A/G: a context action (C4) | `terminal.open` (normal: the user sees it and types) | low | not built |
-| E4 | File associations | declare that a container app or a plugin handles a MIME type | manifest static `associations: [{mime, ext, label}]` + EP C9 | D: the file manager's defaults; A: droidtop's file actions | `provide:files.handler` | medium | not built |
-| E5 | Windowing (through windowcast) | list, focus, move or close app windows; know which window a game runs in | `windows.list()` → [{id, app, title}]; `windows.focus/close {id}`; events `window.opened` / `closed`. **Streaming, capture and remote display are never in droidtop**: they are windowcast's (standing rule), and this API only manages windows droidtop already knows | D: taskbar menus (C8) | `windows.read` (dangerous: window titles leak content) / `windows.control` (dangerous) | high | not built |
+| E4 | File associations | declare that a container app or a plugin handles a MIME type | manifest static `associations: [{mime, ext, label}]` + EP C9 | D: the file manager's defaults; A: droidtop's file actions | `provide:files.handler` | medium | designed 2026-11-06 (§1.12, Droidtop/tracker#221); not built |
+| E5 | Windowing (through windowcast) | list, focus, move or close app windows; know which window a game runs in | `windows.list()` → [{id, app, title}]; `windows.focus/close {id}`; events `window.opened` / `closed`. **Streaming, capture and remote display are never in droidtop**: they are windowcast's (standing rule), and this API only manages windows droidtop already knows | D: taskbar menus (C8) | `windows.read` (dangerous: window titles leak content; narrowed by the manifest's `apps`) / `windows.control` (dangerous) | high | designed 2026-11-06 (§1.12, Droidtop/tracker#221): served from host-bridge's window list and sway IPC, nothing in the container; not built |
 | E6 | Printing bridge | print from a plugin, or add a printer (the CUPS bridge, §4b) | `print.submit {fd, mime, options}` → the host shows its own print dialog; `print.printers()` | D/A: the print dialog | `print.submit` (normal: the dialog is the consent) / `print.admin` (dangerous) | low / high | not built |
 | E7 | Container package bridge | an "app store" for containers: search and install packages (apt, pacman, Flathub-style) | EP `containers.packages@1`: `search`, `install` (**job**), `remove` (**job**), `updates`; the host runs the package manager through E2 on the provider's behalf | D: the app store or Start menu; G: the PC section's "Get apps" | `provide:containers.packages` + `containers.exec` | critical | not built |
 | E8 | Background services and daemons | a long-running plugin task (a sync daemon, a server) | EP `jobs.service@1` entries `{id, label, restart: never\|on_failure}` (default `on_failure`); droidtop starts each as a job (`run {serviceId}`) while the point is allowed and the entry's own switch is on, under one silent foreground notification, and restarts a failed one after 30 s, 2, 10 and 30 min, then leaves it stopped. **One row (2026-10-30, Droidtop/tracker#790):** a failing service keeps one row in Downloads, its last failed run, with Retry, which starts it at once with no failures counted; each new run takes that row's place. A plugin job's failure line is one plain sentence: a message that is a runtime's own words (a class name, an exception, a stack trace, over 200 characters or several lines) becomes "<plugin> couldn't load its native code on this device" or "<plugin> ran into a problem it didn't explain", and its words are the job's Details (`JobFailureLine`); a plugin's own plain sentence stays the line | all modes: Jobs, the notification; switches on the plugin's Permissions screen | `provide:jobs.service` (dangerous: battery and network while you are away; starts unticked) | high | built (2026-10-08, `PluginBackground`, `PluginServicesService`) |
@@ -5731,3 +5821,8 @@ answer.
   needs it? The recommendation is yes. **Decided 2026-10-08
   (Droidtop/tracker#378): contained is the default for every contract 2
   plugin, official ones included.**
+- **Q5. Should Linux apps' own notifications reach droidtop?** (Droidtop/tracker#221, 2026-11-06.) §1.12's
+  notification bridge carries a plugin's notifications into Desktop. The other direction, a container app's
+  `org.freedesktop.Notifications` shown by droidtop and readable by plugins, needs a listener on the container's
+  session bus, which is code in the container. The recommendation is a droidtop feature of its own if wanted, not a
+  plugin permission.

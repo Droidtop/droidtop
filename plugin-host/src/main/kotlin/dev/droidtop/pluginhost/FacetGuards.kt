@@ -39,7 +39,11 @@ object FacetGuards {
         Target("widget", setOf("info", "status", "progress", "meter", "media", "list", "action"), setOf("plugin", "device"), PointRisk.LOW),
         Target("plugin.page", ALL_KINDS, setOf("plugin"), PointRisk.LOW),
         Target("desktop.tray", setOf("status", "badge", "action", "toggle", "meter"), setOf("plugin", "device"), PointRisk.LOW),
-        Target("files.action", setOf("action"), setOf("plugin"), PointRisk.HIGH),
+        // A window's bar menu in Desktop (Droidtop/tracker#221): asked only about a window droidtop names, of an app the
+        // plugin may see (`windows.read`, narrowed by its `apps`).
+        Target("desktop.window", setOf("action", "toggle", "badge"), setOf("window"), PointRisk.MEDIUM),
+        // Open with and the file actions: about the file the person picked, by document token, never a path (catalogue E4).
+        Target("files.action", setOf("action"), setOf("file"), PointRisk.HIGH),
         Target("launcher.drawer", setOf("action", "badge"), setOf("plugin"), PointRisk.MEDIUM),
         Target("onboarding.step", setOf("info", "text", "media", "action", "notice") + INPUTS, setOf("device", "plugin"), PointRisk.HIGH),
     ).associateBy { it.name }
@@ -72,8 +76,17 @@ object FacetGuards {
      * The facets of one reply that [target] draws from [plugin], in drawing order: only facets that asked for this
      * target, of a kind it takes, about a subject it takes, under the plugin's per-target cap, and past the store and
      * media guards; by priority, then the order the plugin gave. What was turned away is said in [messages].
+     *
+     * [asked] is the subject droidtop asked about. A facet about a window or a file must be about that very one
+     * (Droidtop/tracker#221): droidtop names windows and files, so a plugin cannot reach one it was not shown.
      */
-    fun admit(facets: List<Facet>, target: String, plugin: Plugin, messages: MutableList<String> = mutableListOf()): List<Facet> {
+    fun admit(
+        facets: List<Facet>,
+        target: String,
+        plugin: Plugin,
+        messages: MutableList<String> = mutableListOf(),
+        asked: FacetSubject? = null,
+    ): List<Facet> {
         val slot = ':' in target
         val spec = TARGETS[target]
         if (spec == null && !slot) {
@@ -95,6 +108,8 @@ object FacetGuards {
                 target !in facet.targets -> false
                 spec != null && facet.kind !in spec.kinds -> drop(messages, facet, "$target does not take ${facet.kind}")
                 spec != null && facet.subject.type !in spec.subjects -> drop(messages, facet, "$target is not about a ${facet.subject.type}")
+                namedByDroidtop(facet.subject) && facet.subject != asked ->
+                    drop(messages, facet, "it is about a ${facet.subject.type} droidtop did not ask about")
                 else -> guarded(facet, plugin, messages)
             }
         }.mapNotNull { facet -> shown(facet, spec, plugin, messages) }.sortedBy { -it.priority.ordinal }
@@ -141,9 +156,13 @@ object FacetGuards {
         else -> facet
     }
 
+    /** Subjects only droidtop names: a facet about one is taken only for the one droidtop asked about. */
+    private fun namedByDroidtop(subject: FacetSubject): Boolean = subject is FacetSubject.Window || subject is FacetSubject.File
+
     /** The permission a target needs besides its own row (docs/plugin-api.md 1.10, "Permissions"). */
     fun needed(target: String): String? = when (target) {
         "notification" -> "notify.post"
+        "desktop.window" -> "windows.read"
         else -> null
     }
 
@@ -241,6 +260,7 @@ object FacetGuards {
         "status.area" to "Status bar",
         "widget" to "Home-screen widgets",
         "desktop.tray" to "Desktop tray",
+        "desktop.window" to "Desktop window menus",
         "files.action" to "Files",
         "launcher.drawer" to "App drawer",
         "onboarding.step" to "Setup",

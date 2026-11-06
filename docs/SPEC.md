@@ -931,6 +931,27 @@ monitors, by dragging or from a window's menu, D4 below). How it is put there:
   answered Extend shows the second screen's window with nothing in it,
   and no window offers a move.
 
+### Plugins in Desktop mode (Droidtop/tracker#221, designed 2026-11-06)
+
+The owner, 2026-10-01: "allow for plugins to run IN desktop mode, hook into applications in the desktop for
+functionality". The contract is docs/plugin-api.md 1.12; what it decides for Desktop:
+- **A plugin's code stays in its own contained process** and reaches the desktop only through droidtop's broker.
+  droidtop answers from what the session already has: host-bridge's window list, sway IPC on the socket droidtop
+  already reaches (as `DesktopWindows` and `DesktopSessionService.extendTo` do), and the clipboard bridge (6d).
+  Nothing is started in the container for a plugin, and nothing needs root: this is all non-root, under labwc and
+  sway, on proot.
+- **What it sees:** window opened, closed and focused, with app id and title (`windows.read`, narrowed to the apps
+  its manifest names). **What it does:** focus and close (`windows.control`), launch a desktop app, Open with, the
+  clipboard and notification bridges, and facets on the tray (`desktop.tray`) and in a window's bar menu
+  (`desktop.window`, about that window). Never input into another app's window, and never a window's picture.
+- **Windows and files are named by droidtop** (`FacetSubject.Window` by host-bridge's toplevel id, `FacetSubject.File`
+  by document token): a facet about one is taken only for the one droidtop asked about (`FacetGuards.admit`).
+- **Each is its own approval row** (Droidtop/tracker#164), the window and clipboard ones dangerous and unticked,
+  and every use is audited (Droidtop/tracker#61).
+- Built in slices, each on its own `ci/` branch; slice 1 (2026-11-06) is the contract and the guards: the `window` and
+  `file` subjects, the `desktop.window` target (three facets per plugin), `files.action` about a file (it took only
+  the plugin as subject before), and `icon` from droidtop's set on `status`, `badge` and `toggle` as on `action`.
+
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 
 droidtop is one app and one process hosting three modes. The user's words:
