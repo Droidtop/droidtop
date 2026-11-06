@@ -20,12 +20,10 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # Identity, pairing, the channel, the protocol and the sync rules: Droidtop/lib-sync.
 droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.1.6" }
-# The person's own shares (Droidtop/tracker#573): Droidtop/lib-net's share client, WebDAV and the backends to come.
-# S3 as well as WebDAV (lib-net ci/remote-sftp-feature, on top of ci/remote-s3), pinned by that commit until lib-net
-# releases it as v0.2.4; then that tag. Default features off, so no SFTP yet: russh 0.65 needs ed25519-dalek ^3, and the
-# mesh test's droidtop-agent brings windowcast's sspi 0.21, which pins ed25519-dalek =3.0.0-rc.1; one graph can't hold
-# both. SFTP turns on ("sftp") once windowcast takes sspi 0.22 or later.
-net-remote = { git = "https://github.com/Droidtop/lib-net", rev = "43d9236f3605831669355caa755d197c87fe3bba", default-features = false }
+# The person's own shares (Droidtop/tracker#573): Droidtop/lib-net's share client. WebDAV, S3, SFTP and SMB (libsmb2,
+# built from lib-net's vendor/libsmb2 for both Android ABIs). SFTP's russh needs ed25519-dalek 3, which the mesh test's
+# droidtop-agent allows since it took windowcast's IronRDP on sspi 0.23.1 (fc52738).
+net-remote = { git = "https://github.com/Droidtop/lib-net", tag = "v0.2.6" }
 # KDE Connect, both ways (Droidtop/tracker#645, SPEC 7q): kdeconnect_<op> is passed to
 # lib-kdeconnect's operation table.
 kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", tag = "v0.1.1" }

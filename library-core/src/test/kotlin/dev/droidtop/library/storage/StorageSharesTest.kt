@@ -73,6 +73,66 @@ class StorageSharesTest {
     }
 
     @Test
+    fun anSftpShareCarriesItsPinnedKeyAndAnSmbShareItsShareName() {
+        val sftp = StorageShare(
+            id = "f1", name = "Deck", kind = StorageShares.SFTP, url = "steamdeck.local", user = "deck",
+            allowPlainHttp = false, trusted = false, folder = "droidtop", port = 0,
+            hostKey = "SHA256:abc",
+        )
+        val a = StorageShares.nativeArgsFor(sftp, "pw")
+        assertEquals("sftp", a.getString("kind"))
+        assertEquals("steamdeck.local", a.getString("host"))
+        assertEquals(22, a.getInt("port"))
+        assertEquals("deck", a.getString("user"))
+        assertEquals("pw", a.getString("password"))
+        assertEquals("SHA256:abc", a.getString("host_key"))
+        assertEquals(2222, StorageShares.nativeArgsFor(sftp.copy(port = 2222), "pw").getInt("port"))
+
+        val smb = StorageShare(
+            id = "m1", name = "NAS", kind = StorageShares.SMB, url = "nas.local", user = "me", allowPlainHttp = false,
+            trusted = true, folder = "games/saves", shareName = "home", domain = "WORKGROUP", requireEncryption = true,
+        )
+        val b = StorageShares.nativeArgsFor(smb, "pw")
+        assertEquals("smb", b.getString("kind"))
+        assertEquals("nas.local", b.getString("server"))
+        assertEquals("home", b.getString("share"))
+        assertEquals("WORKGROUP", b.getString("domain"))
+        assertEquals("games/saves", b.getString("folder"))
+        assertTrue(b.getBoolean("require_encryption"))
+        assertEquals("nas.local:4450", StorageShares.nativeArgsFor(smb.copy(port = 4450), "pw").getString("server"))
+        assertEquals("nas.local", StorageShares.nativeArgsFor(smb.copy(port = 445), "pw").getString("server"))
+
+        // Both read back from the stored list, without the password.
+        val text = JSONArray().put(sftp.toJson()).put(smb.toJson()).toString()
+        assertFalse(text.contains("\"pw\""))
+        assertEquals(listOf(sftp, smb), StorageShares.parse(text))
+    }
+
+    @Test
+    fun serverNamesAreNamesOnly() {
+        assertNull(StorageShares.hostProblem("nas.local"))
+        assertNull(StorageShares.hostProblem("192.168.1.20"))
+        assertNotNull(StorageShares.hostProblem(""))
+        assertNotNull(StorageShares.hostProblem("sftp://nas.local"))
+        assertNotNull(StorageShares.hostProblem("nas.local/share"))
+        assertNotNull(StorageShares.hostProblem("me@nas.local"))
+    }
+
+    @Test
+    fun aServerKeyNotYetAcceptedIsOfferedForThePersonToCheck() {
+        val unknown = JSONObject().put("error", "droidtop doesn't know this server's key yet").put("code", "host_key_unknown")
+            .put("fingerprint", "SHA256:UN92sNP/UxDHd7Vh05wpQGj7SjlCmZequqTapOwsr8A")
+        assertEquals(StorageShares.HOST_KEY_UNKNOWN, StorageShares.outcome(unknown).first)
+        assertEquals("SHA256:UN92sNP/UxDHd7Vh05wpQGj7SjlCmZequqTapOwsr8A", StorageShares.offeredKey(unknown))
+        val changed = JSONObject().put("error", "changed").put("code", "host_key_changed").put("fingerprint", "SHA256:new")
+        assertEquals(StorageShares.HOST_KEY_CHANGED, StorageShares.outcome(changed).first)
+        assertEquals("SHA256:new", StorageShares.offeredKey(changed))
+        // Nothing is offered for any other failure, or a fingerprint in the wrong form.
+        assertNull(StorageShares.offeredKey(JSONObject().put("error", "x").put("code", "refused").put("fingerprint", "SHA256:x")))
+        assertNull(StorageShares.offeredKey(JSONObject().put("error", "x").put("code", "host_key_unknown").put("fingerprint", "md5:x")))
+    }
+
+    @Test
     fun bucketNamesFollowS3sRules() {
         assertNull(StorageShares.bucketProblem("my-droidtop.saves"))
         assertNotNull(StorageShares.bucketProblem(""))

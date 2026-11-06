@@ -34,6 +34,17 @@ data class StorageShare(
     val folder: String = "",
     /** S3: address the bucket as `<bucket>.<server>` (AWS's way) instead of `<server>/<bucket>` (most others). */
     val bucketInHost: Boolean = false,
+    /** SFTP and SMB: the port when it isn't the kind's own (22, 445); 0 for that. [url] is the server's name. */
+    val port: Int = 0,
+    /** SMB: the share's name on the server (`\\server\<share>`), and the sign-in's domain or workgroup. */
+    val shareName: String = "",
+    val domain: String = "",
+    /** SMB: insist on SMB 3 encryption. */
+    val requireEncryption: Boolean = false,
+    /** SFTP: the server key's SHA-256 fingerprint the person accepted. Empty until they do. */
+    val hostKey: String = "",
+    /** SFTP: the key the server showed at the last Test when it wasn't the accepted one, waiting for the person. */
+    val offeredHostKey: String = "",
 ) {
     val passwordKey: String get() = "droidtop_share_${id}_password"
 
@@ -42,6 +53,8 @@ data class StorageShare(
         .put("allow_plain_http", allowPlainHttp).put("trusted", trusted)
         .put("state", state).put("state_detail", stateDetail).put("tested_at", testedAtMs)
         .put("bucket", bucket).put("region", region).put("folder", folder).put("bucket_in_host", bucketInHost)
+        .put("port", port).put("share_name", shareName).put("domain", domain).put("require_encryption", requireEncryption)
+        .put("host_key", hostKey).put("offered_host_key", offeredHostKey)
 
     companion object {
         fun fromJson(o: JSONObject): StorageShare? {
@@ -63,6 +76,12 @@ data class StorageShare(
                 region = o.optString("region"),
                 folder = o.optString("folder"),
                 bucketInHost = o.optBoolean("bucket_in_host"),
+                port = o.optInt("port"),
+                shareName = o.optString("share_name"),
+                domain = o.optString("domain"),
+                requireEncryption = o.optBoolean("require_encryption"),
+                hostKey = o.optString("host_key"),
+                offeredHostKey = o.optString("offered_host_key"),
             )
         }
     }
@@ -79,6 +98,8 @@ object StorageShares {
 
     const val WEBDAV = "webdav"
     const val S3 = "s3"
+    const val SFTP = "sftp"
+    const val SMB = "smb"
 
     const val NOT_TESTED = "not_tested"
     const val CONNECTED = "connected"
@@ -87,6 +108,8 @@ object StorageShares {
     const val NOT_ENCRYPTED = "not_encrypted"
     const val BAD_ADDRESS = "bad_address"
     const val REFUSED = "refused"
+    const val HOST_KEY_UNKNOWN = "host_key_unknown"
+    const val HOST_KEY_CHANGED = "host_key_changed"
 
     /** The words for a share's state, as its row's value. */
     fun stateLabel(state: String): String = when (state) {
@@ -96,6 +119,8 @@ object StorageShares {
         NOT_ENCRYPTED -> "Not encrypted"
         BAD_ADDRESS -> "Address not valid"
         REFUSED -> "Refused"
+        HOST_KEY_UNKNOWN -> "Check the server's key"
+        HOST_KEY_CHANGED -> "Server's key changed"
         else -> "Not tested"
     }
 
@@ -192,6 +217,94 @@ object StorageShares {
         return Added.Share(share)
     }
 
+    /**
+     * Why [host] can't be an SFTP or SMB server's name, or null when it can. A name or address only: no `https://`,
+     * no path, no user name in it (a sign-in goes in its own fields). Pure.
+     */
+    fun hostProblem(host: String): String? {
+        val h = host.trim()
+        return when {
+            h.isEmpty() -> "Type the server's name or address"
+            "://" in h -> "Type the server's name or address only, without ://"
+            h.any { it == '/' || it == '\\' || it == ' ' } -> "Type the server's name or address only, without a path"
+            '@' in h -> "Put the user name in its own field, not in the server's name"
+            else -> null
+        }
+    }
+
+    /** Adds an SFTP share: an SSH server, the person's own user name and password, and a folder on it. */
+    fun addSftp(
+        context: Context,
+        name: String,
+        host: String,
+        port: Int,
+        user: String,
+        password: String,
+        folder: String,
+        trusted: Boolean,
+    ): Added {
+        hostProblem(host)?.let { return Added.Refused(it) }
+        if (user.isBlank()) return Added.Refused("Type your user name on that server")
+        if (port !in 0..65535) return Added.Refused("A port is a number up to 65535")
+        val share = StorageShare(
+            id = UUID.randomUUID().toString().replace("-", "").take(12),
+            name = name.trim().ifBlank { host.trim() },
+            kind = SFTP,
+            url = host.trim(),
+            user = user.trim(),
+            allowPlainHttp = false,
+            trusted = trusted,
+            folder = folder.trim().trimEnd('/'),
+            port = port,
+        )
+        if (password.isNotEmpty()) CredentialStore.put(context, share.passwordKey, password)
+        write(context, read(context) + share)
+        return Added.Share(share)
+    }
+
+    /** Adds an SMB share (Windows, Samba, a NAS): the server, the share's name and the person's own sign-in. */
+    fun addSmb(
+        context: Context,
+        name: String,
+        server: String,
+        shareName: String,
+        user: String,
+        password: String,
+        domain: String,
+        folder: String,
+        requireEncryption: Boolean,
+        trusted: Boolean,
+    ): Added {
+        val cleanServer = server.trim().removePrefix("\\\\").removePrefix("//").substringBefore('\\').substringBefore('/')
+        hostProblem(cleanServer)?.let { return Added.Refused(it) }
+        val cleanShare = shareName.trim().trim('/', '\\')
+        if (cleanShare.isEmpty() || cleanShare.any { it == '/' || it == '\\' }) return Added.Refused("Type the share's name, the part after the server")
+        val share = StorageShare(
+            id = UUID.randomUUID().toString().replace("-", "").take(12),
+            name = name.trim().ifBlank { "$cleanShare on $cleanServer" },
+            kind = SMB,
+            url = cleanServer,
+            user = user.trim(),
+            allowPlainHttp = false,
+            trusted = trusted,
+            folder = folder.trim().trim('/', '\\'),
+            shareName = cleanShare,
+            domain = domain.trim(),
+            requireEncryption = requireEncryption,
+        )
+        if (password.isNotEmpty()) CredentialStore.put(context, share.passwordKey, password)
+        write(context, read(context) + share)
+        return Added.Share(share)
+    }
+
+    /**
+     * Accepts the SFTP server key [id]'s last Test showed: it becomes the pinned key, and the share is tested again
+     * with it. The person's own act, after comparing the fingerprint with the server's.
+     */
+    fun acceptHostKey(context: Context, id: String) {
+        update(context, id) { it.copy(hostKey = it.offeredHostKey, offeredHostKey = "", state = NOT_TESTED, stateDetail = null, testedAtMs = 0) }
+    }
+
     /** Why [bucket] can't be an S3 bucket's name, or null when it can (S3's naming rules, loosely). Pure. */
     fun bucketProblem(bucket: String): String? {
         val b = bucket.trim()
@@ -209,7 +322,9 @@ object StorageShares {
             if (old.id != id) return@map old
             val new = change(old).copy(id = old.id)
             val reached = new.url != old.url || new.user != old.user || new.allowPlainHttp != old.allowPlainHttp ||
-                new.bucket != old.bucket || new.region != old.region || new.folder != old.folder || new.bucketInHost != old.bucketInHost
+                new.bucket != old.bucket || new.region != old.region || new.folder != old.folder || new.bucketInHost != old.bucketInHost ||
+                new.port != old.port || new.shareName != old.shareName || new.domain != old.domain ||
+                new.requireEncryption != old.requireEncryption || new.hostKey != old.hostKey
             if (reached) new.copy(state = NOT_TESTED, stateDetail = null, testedAtMs = 0) else new
         })
     }
@@ -244,6 +359,23 @@ object StorageShares {
             .put("folder", share.folder)
             .put("path_style", !share.bucketInHost)
             .put("allow_plain_http", share.allowPlainHttp)
+        SFTP -> JSONObject()
+            .put("kind", SFTP)
+            .put("host", share.url)
+            .put("port", if (share.port in 1..65535) share.port else 22)
+            .put("user", share.user)
+            .put("password", secret)
+            .put("folder", share.folder)
+            .put("host_key", share.hostKey)
+        SMB -> JSONObject()
+            .put("kind", SMB)
+            .put("server", if (share.port in 1..65535 && share.port != 445) "${share.url}:${share.port}" else share.url)
+            .put("share", share.shareName)
+            .put("user", share.user)
+            .put("password", secret)
+            .put("domain", share.domain)
+            .put("folder", share.folder)
+            .put("require_encryption", share.requireEncryption)
         else -> JSONObject()
             .put("kind", WEBDAV)
             .put("url", share.url)
@@ -259,9 +391,14 @@ object StorageShares {
     fun test(context: Context, share: StorageShare): String {
         val reply = AgentNative.call("remote_test", JSONObject().put("share", nativeArgs(context, share)))
         val (state, detail) = outcome(reply)
-        update(context, share.id) { it.copy(state = state, stateDetail = detail, testedAtMs = System.currentTimeMillis()) }
+        val offered = offeredKey(reply)
+        update(context, share.id) {
+            it.copy(state = state, stateDetail = detail, testedAtMs = System.currentTimeMillis(), offeredHostKey = offered.orEmpty())
+        }
         return when (state) {
             CONNECTED -> "Connected to ${share.name}"
+            HOST_KEY_UNKNOWN -> "Check the server's key before accepting it: $offered"
+            HOST_KEY_CHANGED -> "The server's key has changed to $offered. Check the server before accepting it"
             else -> "${stateLabel(state)}: ${detail ?: share.name}"
         }
     }
@@ -273,10 +410,16 @@ object StorageShares {
             SIGN_IN_REFUSED -> SIGN_IN_REFUSED
             NOT_ENCRYPTED -> NOT_ENCRYPTED
             BAD_ADDRESS -> BAD_ADDRESS
+            HOST_KEY_UNKNOWN -> HOST_KEY_UNKNOWN
+            HOST_KEY_CHANGED -> HOST_KEY_CHANGED
             else -> REFUSED
         } to reply.optString("error")
         else -> CONNECTED to null
     }
+
+    /** The SFTP server key a `remote_test` reply showed when it wasn't the accepted one, or null. Pure. */
+    fun offeredKey(reply: JSONObject): String? =
+        reply.optString("fingerprint").takeIf { it.startsWith("SHA256:") && reply.optString("code").startsWith("host_key_") }
 
     private fun read(context: Context): List<StorageShare> {
         val text = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null) ?: return emptyList()

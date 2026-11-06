@@ -65,6 +65,69 @@ object StorageSharesCatalog {
         onChange = { c, v -> withContext(Dispatchers.IO) { StorageShares.update(c, share.id) { change(it, v) } } },
     )
 
+    private const val PORT_LINE = "Blank for the usual one"
+    private const val ENCRYPTION_LINE = "Connect only with SMB 3 encryption. Turn it on when the server supports it"
+
+    private fun StorageShare.isServerKind() = kind == StorageShares.SFTP || kind == StorageShares.SMB
+
+    /** One field of a share of one of [kinds], or null for a share of another kind. */
+    private fun kindField(
+        share: StorageShare,
+        kinds: Set<String>,
+        id: String,
+        title: String,
+        value: String,
+        subtitle: String? = null,
+        change: (StorageShare, String) -> StorageShare,
+    ): CatalogItem? = if (share.kind !in kinds) null else TextInputItem(
+        id = id,
+        title = title,
+        subtitle = subtitle,
+        value = value,
+        onChange = { c, v -> withContext(Dispatchers.IO) { StorageShares.update(c, share.id) { change(it, v) } } },
+    )
+
+    /**
+     * An SFTP share's server key: the one the person accepted, and the one its last Test showed when that differed,
+     * with Accept. A key is never accepted for the person: they compare the fingerprint with the server's own
+     * (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on it) first.
+     */
+    private fun serverKeyGroup(id: String, now: StorageShare): CatalogGroup? {
+        if (now.kind != StorageShares.SFTP) return null
+        val changed = now.hostKey.isNotEmpty() && now.offeredHostKey.isNotEmpty()
+        return CatalogGroup(
+            id = "${id}_server_key",
+            title = "Server's key",
+            items = listOfNotNull(
+                dev.droidtop.library.settings.TextBlockItem(
+                    id = "${id}_server_key_now",
+                    text = if (now.hostKey.isEmpty()) {
+                        "Not accepted yet. Press Test to see the server's key"
+                    } else {
+                        "Accepted: ${now.hostKey}"
+                    },
+                ),
+                if (now.offeredHostKey.isEmpty()) null else AsyncActionItem(
+                    id = "${id}_server_key_accept",
+                    title = if (changed) "Accept the new key" else "Accept this key",
+                    subtitle = now.offeredHostKey,
+                    statusMark = StatusMark.ATTENTION,
+                    confirmTitle = if (changed) {
+                        "The server's key changed. Someone may be in between. Accept it only if you changed the server"
+                    } else {
+                        "Accept this key only if it matches the server's own"
+                    },
+                    run = { c, _ ->
+                        withContext(Dispatchers.IO) {
+                            StorageShares.acceptHostKey(c, now.id)
+                            StorageShares.get(c, now.id)?.let { StorageShares.test(c, it) } ?: "Accepted"
+                        }
+                    },
+                ),
+            ),
+        )
+    }
+
     private fun mark(state: String): StatusMark = when (state) {
         StorageShares.CONNECTED -> StatusMark.SIGNED_IN
         StorageShares.NOT_TESTED -> StatusMark.ATTENTION
@@ -75,7 +138,7 @@ object StorageSharesCatalog {
     fun group(context: Context): CatalogGroup = CatalogGroup(
         id = "accounts_storage",
         title = "Network and cloud storage",
-        items = StorageShares.all(context).map(::shareRow) + addRow() + addS3Row(),
+        items = StorageShares.all(context).map(::shareRow) + addRow() + addS3Row() + addSftpRow() + addSmbRow(),
     )
 
     private fun shareRow(share: StorageShare): CatalogItem {
@@ -107,6 +170,7 @@ object StorageSharesCatalog {
                                 ),
                             ),
                         ),
+                    ) + listOfNotNull(serverKeyGroup(id, now)) + listOf(
                         CatalogGroup(
                             id = "${id}_sign_in",
                             title = "Address and sign-in",
@@ -119,15 +183,31 @@ object StorageSharesCatalog {
                                 ),
                                 TextInputItem(
                                     id = "${id}_url",
-                                    title = "Address",
-                                    subtitle = if (now.kind == StorageShares.S3) "The service's S3 address" else "The share's WebDAV address",
+                                    title = if (now.isServerKind()) "Server" else "Address",
+                                    subtitle = when (now.kind) {
+                                        StorageShares.S3 -> "The service's S3 address"
+                                        StorageShares.SFTP, StorageShares.SMB -> "The server's name or address"
+                                        else -> "The share's WebDAV address"
+                                    },
                                     value = now.url,
                                     onChange = { c, v ->
                                         withContext(Dispatchers.IO) {
-                                            if (StorageShares.addressProblem(v, now.allowPlainHttp) == null) StorageShares.update(c, now.id) { it.copy(url = v.trim()) }
+                                            val problem = if (now.isServerKind()) StorageShares.hostProblem(v) else StorageShares.addressProblem(v, now.allowPlainHttp)
+                                            if (problem == null) StorageShares.update(c, now.id) { it.copy(url = v.trim()) }
                                         }
                                     },
                                 ),
+                                kindField(now, setOf(StorageShares.SMB), "${id}_share_name", "Share", now.shareName, "The share's name, the part after the server") { sh, v ->
+                                    v.trim().trim('/', '\\').takeIf { it.isNotEmpty() && '/' !in it && '\\' !in it }?.let { sh.copy(shareName = it) } ?: sh
+                                },
+                                kindField(now, setOf(StorageShares.SFTP, StorageShares.SMB), "${id}_port", "Port", if (now.port == 0) "" else now.port.toString(), PORT_LINE) { sh, v ->
+                                    val port = v.trim().ifEmpty { "0" }.toIntOrNull()
+                                    if (port != null && port in 0..65535) sh.copy(port = port) else sh
+                                },
+                                kindField(now, setOf(StorageShares.SFTP, StorageShares.SMB), "${id}_folder_srv", "Folder", now.folder, "On the share; blank is its top") { sh, v ->
+                                    sh.copy(folder = v.trim().trim('/', '\\'))
+                                },
+                                kindField(now, setOf(StorageShares.SMB), "${id}_domain", "Domain", now.domain, "Blank for most home shares") { sh, v -> sh.copy(domain = v.trim()) },
                                 s3Field(now, "${id}_bucket", "Bucket", now.bucket) { sh, v -> if (StorageShares.bucketProblem(v) == null) sh.copy(bucket = v.trim()) else sh },
                                 s3Field(now, "${id}_region", "Region", now.region, "Blank is us-east-1") { sh, v -> sh.copy(region = v.trim()) },
                                 s3Field(now, "${id}_folder", "Folder", now.folder, "Inside the bucket; blank is its top") { sh, v -> sh.copy(folder = v.trim().trim('/')) },
@@ -145,12 +225,19 @@ object StorageSharesCatalog {
                                     secret = true,
                                     onChange = { c, v -> withContext(Dispatchers.IO) { StorageShares.setPassword(c, now.id, v) } },
                                 ),
-                                ToggleItem(
+                                if (now.isServerKind()) null else ToggleItem(
                                     id = "${id}_plain",
                                     title = "Allow unencrypted",
                                     subtitle = "Only for a share on your own network: the password and files travel readable",
                                     current = now.allowPlainHttp,
                                     onToggle = { c, on -> withContext(Dispatchers.IO) { StorageShares.update(c, now.id) { it.copy(allowPlainHttp = on) } } },
+                                ),
+                                if (now.kind != StorageShares.SMB) null else ToggleItem(
+                                    id = "${id}_encrypt",
+                                    title = "Require encryption",
+                                    subtitle = ENCRYPTION_LINE,
+                                    current = now.requireEncryption,
+                                    onToggle = { c, on -> withContext(Dispatchers.IO) { StorageShares.update(c, now.id) { it.copy(requireEncryption = on) } } },
                                 ),
                                 if (now.kind != StorageShares.S3) null else ToggleItem(
                                     id = "${id}_bucket_host",
@@ -193,6 +280,209 @@ object StorageSharesCatalog {
             ),
         )
     }
+
+    /** Add SFTP share's and Add SMB share's fields until Add is pressed. Passwords are never shown back. */
+    @Volatile private var sftpName = ""
+    @Volatile private var sftpHost = ""
+    @Volatile private var sftpPort = ""
+    @Volatile private var sftpUser = ""
+    @Volatile private var sftpPassword = ""
+    @Volatile private var sftpFolder = ""
+    @Volatile private var sftpTrusted = false
+    @Volatile private var smbName = ""
+    @Volatile private var smbServer = ""
+    @Volatile private var smbShare = ""
+    @Volatile private var smbUser = ""
+    @Volatile private var smbPassword = ""
+    @Volatile private var smbDomain = ""
+    @Volatile private var smbFolder = ""
+    @Volatile private var smbEncrypt = false
+    @Volatile private var smbTrusted = false
+
+    /** The port typed in an add screen: blank is the kind's usual one (0), or null when it isn't a port. */
+    private fun portOf(text: String): Int? = text.trim().ifEmpty { "0" }.toIntOrNull()?.takeIf { it in 0..65535 }
+
+    /**
+     * Add SFTP share: any SSH server, with the person's own user name and password. Test then shows the server's key
+     * for them to accept: it is never trusted silently.
+     */
+    private fun addSftpRow(): CatalogItem = NestedScreenItem(
+        id = "accounts_storage_add_sftp",
+        title = "Add SFTP share",
+        subtitle = "Any computer or NAS you reach with SSH, with your own sign-in",
+        inline = CatalogScreen(
+            id = "accounts_storage_add_sftp_screen",
+            title = "Add SFTP share",
+            groups = {
+                listOf(
+                    CatalogGroup(
+                        id = "accounts_storage_add_sftp_group",
+                        title = null,
+                        items = listOf(
+                            TextInputItem(
+                                id = "accounts_storage_add_sftp_host",
+                                title = "Server",
+                                subtitle = "Its name or address, such as nas.local or 192.168.1.20",
+                                value = sftpHost,
+                                onChange = { _, v -> sftpHost = v.trim() },
+                            ),
+                            TextInputItem(id = "accounts_storage_add_sftp_port", title = "Port", subtitle = PORT_LINE, value = sftpPort, onChange = { _, v -> sftpPort = v.trim() }),
+                            TextInputItem(id = "accounts_storage_add_sftp_user", title = "User name", value = sftpUser, onChange = { _, v -> sftpUser = v.trim() }),
+                            TextInputItem(
+                                id = "accounts_storage_add_sftp_password",
+                                title = "Password",
+                                subtitle = "Kept locked on this device",
+                                value = "",
+                                secret = true,
+                                onChange = { _, v -> sftpPassword = v },
+                            ),
+                            TextInputItem(
+                                id = "accounts_storage_add_sftp_folder",
+                                title = "Folder",
+                                subtitle = "On the server; blank is your home folder",
+                                value = sftpFolder,
+                                onChange = { _, v -> sftpFolder = v.trim() },
+                            ),
+                            TextInputItem(
+                                id = "accounts_storage_add_sftp_name",
+                                title = "Name",
+                                subtitle = "How it is listed; the server's name when left blank",
+                                value = sftpName,
+                                onChange = { _, v -> sftpName = v },
+                            ),
+                            ChoiceItem(
+                                id = "accounts_storage_add_sftp_trusted",
+                                title = "What droidtop writes",
+                                subtitle = trustLine(sftpTrusted),
+                                options = trustOptions,
+                                current = if (sftpTrusted) TRUSTED else LOCKED,
+                                onSelect = { _, v -> sftpTrusted = v == TRUSTED },
+                            ),
+                            AsyncActionItem(
+                                id = "accounts_storage_add_sftp_run",
+                                title = "Add and test",
+                                run = { ctx, _ ->
+                                    val port = portOf(sftpPort)
+                                    if (port == null) {
+                                        "A port is a number up to 65535"
+                                    } else {
+                                        val added = withContext(Dispatchers.IO) {
+                                            StorageShares.addSftp(ctx, sftpName, sftpHost, port, sftpUser, sftpPassword, sftpFolder, sftpTrusted)
+                                        }
+                                        when (added) {
+                                            is StorageShares.Added.Refused -> added.reason
+                                            is StorageShares.Added.Share -> {
+                                                sftpName = ""; sftpHost = ""; sftpPort = ""; sftpUser = ""; sftpPassword = ""; sftpFolder = ""; sftpTrusted = false
+                                                "Added. " + withContext(Dispatchers.IO) { StorageShares.test(ctx, added.share) } +
+                                                    ". Open the share to accept its key"
+                                            }
+                                        }
+                                    }
+                                },
+                            ),
+                        ),
+                    ),
+                )
+            },
+        ),
+    )
+
+    /** Add SMB share: a Windows share, Samba or a NAS, with the person's own sign-in. */
+    private fun addSmbRow(): CatalogItem = NestedScreenItem(
+        id = "accounts_storage_add_smb",
+        title = "Add SMB share",
+        subtitle = "A Windows shared folder, Samba or a NAS, with your own sign-in",
+        inline = CatalogScreen(
+            id = "accounts_storage_add_smb_screen",
+            title = "Add SMB share",
+            groups = {
+                listOf(
+                    CatalogGroup(
+                        id = "accounts_storage_add_smb_group",
+                        title = null,
+                        items = listOf(
+                            TextInputItem(
+                                id = "accounts_storage_add_smb_server",
+                                title = "Server",
+                                subtitle = "Its name or address, such as nas.local or 192.168.1.20",
+                                value = smbServer,
+                                onChange = { _, v -> smbServer = v.trim() },
+                            ),
+                            TextInputItem(
+                                id = "accounts_storage_add_smb_share",
+                                title = "Share",
+                                subtitle = "The share's name, the part after the server, such as home",
+                                value = smbShare,
+                                onChange = { _, v -> smbShare = v.trim() },
+                            ),
+                            TextInputItem(id = "accounts_storage_add_smb_user", title = "User name", value = smbUser, onChange = { _, v -> smbUser = v.trim() }),
+                            TextInputItem(
+                                id = "accounts_storage_add_smb_password",
+                                title = "Password",
+                                subtitle = "Kept locked on this device",
+                                value = "",
+                                secret = true,
+                                onChange = { _, v -> smbPassword = v },
+                            ),
+                            TextInputItem(
+                                id = "accounts_storage_add_smb_domain",
+                                title = "Domain",
+                                subtitle = "Blank for most home shares",
+                                value = smbDomain,
+                                onChange = { _, v -> smbDomain = v.trim() },
+                            ),
+                            TextInputItem(
+                                id = "accounts_storage_add_smb_folder",
+                                title = "Folder",
+                                subtitle = "On the share; blank is its top",
+                                value = smbFolder,
+                                onChange = { _, v -> smbFolder = v.trim() },
+                            ),
+                            TextInputItem(
+                                id = "accounts_storage_add_smb_name",
+                                title = "Name",
+                                subtitle = "How it is listed; the share and server when left blank",
+                                value = smbName,
+                                onChange = { _, v -> smbName = v },
+                            ),
+                            ToggleItem(
+                                id = "accounts_storage_add_smb_encrypt",
+                                title = "Require encryption",
+                                subtitle = ENCRYPTION_LINE,
+                                current = smbEncrypt,
+                                onToggle = { _, on -> smbEncrypt = on },
+                            ),
+                            ChoiceItem(
+                                id = "accounts_storage_add_smb_trusted",
+                                title = "What droidtop writes",
+                                subtitle = trustLine(smbTrusted),
+                                options = trustOptions,
+                                current = if (smbTrusted) TRUSTED else LOCKED,
+                                onSelect = { _, v -> smbTrusted = v == TRUSTED },
+                            ),
+                            AsyncActionItem(
+                                id = "accounts_storage_add_smb_run",
+                                title = "Add and test",
+                                run = { ctx, _ ->
+                                    val added = withContext(Dispatchers.IO) {
+                                        StorageShares.addSmb(ctx, smbName, smbServer, smbShare, smbUser, smbPassword, smbDomain, smbFolder, smbEncrypt, smbTrusted)
+                                    }
+                                    when (added) {
+                                        is StorageShares.Added.Refused -> added.reason
+                                        is StorageShares.Added.Share -> {
+                                            smbName = ""; smbServer = ""; smbShare = ""; smbUser = ""; smbPassword = ""
+                                            smbDomain = ""; smbFolder = ""; smbEncrypt = false; smbTrusted = false
+                                            "Added. " + withContext(Dispatchers.IO) { StorageShares.test(ctx, added.share) }
+                                        }
+                                    }
+                                },
+                            ),
+                        ),
+                    ),
+                )
+            },
+        ),
+    )
 
     /** Add S3 storage's fields until Add is pressed. The secret field is never shown back. */
     @Volatile private var s3Name = ""

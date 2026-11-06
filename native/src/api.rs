@@ -30,7 +30,7 @@ use droidtop_agent_core::proto::{check_announcements, Announcements, GameRef, Re
 use droidtop_agent_core::saves::{prefix_roots, Roots};
 use droidtop_agent_core::savesync::{self, SaveSyncRequest, Side};
 use droidtop_agent_core::{hex, Error, PAIR_PORT, PORT};
-use net_remote::{Error as RemoteError, Remote, RemotePath, S3Config, WebDav, WebDavConfig, S3};
+use net_remote::{Error as RemoteError, Remote, RemotePath, S3Config, Sftp, SftpConfig, Smb, SmbConfig, WebDav, WebDavConfig, S3};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -743,7 +743,11 @@ fn share_post_saves(args: &Value) -> Outcome {
 // client (Droidtop/tracker#573), named in `share`:
 // - `{"kind": "webdav", "url", "user", "password", "allow_plain_http"}`;
 // - `{"kind": "s3", "endpoint", "bucket", "region", "access_key", "secret_key", "folder", "path_style",
-//   "allow_plain_http"}`.
+//   "allow_plain_http"}`;
+// - `{"kind": "sftp", "host", "port", "user", "password", "private_key", "key_passphrase", "folder", "host_key"}`:
+//   the server's key is pinned by its SHA-256 fingerprint, and a key not accepted yet answers `host_key_unknown`
+//   (or `host_key_changed`) with the key the server showed in `fingerprint`, for the person to check and accept;
+// - `{"kind": "smb", "server", "share", "user", "password", "domain", "folder", "require_encryption"}`.
 
 /// The share named in [`args`]' `share`, or None when there is none.
 fn share_of(args: &Value) -> Result<Option<Box<dyn Remote>>, Failure> {
@@ -760,6 +764,33 @@ fn share_of(args: &Value) -> Result<Option<Box<dyn Remote>>, Failure> {
                 config = config.sign_in(user, text("password").unwrap_or_default());
             }
             Ok(Some(Box::new(WebDav::new(config).map_err(remote_failure)?)))
+        }
+        "sftp" => {
+            let host = text("host").ok_or_else(|| Failure::Coded("bad_address", "the share has no server".into()))?;
+            let mut config = SftpConfig::new(host, text("user").unwrap_or_default())
+                .port(share["port"].as_u64().and_then(|p| u16::try_from(p).ok()).filter(|p| *p != 0).unwrap_or(22))
+                .folder(text("folder").unwrap_or_default());
+            if let Some(password) = text("password") {
+                config = config.password(password);
+            }
+            if let Some(key) = text("private_key") {
+                config = config.private_key(key, text("key_passphrase"));
+            }
+            if let Some(fingerprint) = text("host_key") {
+                config = config.host_key(fingerprint);
+            }
+            Ok(Some(Box::new(Sftp::connect(config).map_err(remote_failure)?)))
+        }
+        "smb" => {
+            let server = text("server").ok_or_else(|| Failure::Coded("bad_address", "the share has no server".into()))?;
+            let name = text("share").ok_or_else(|| Failure::Coded("bad_address", "the share has no share name".into()))?;
+            let mut config = SmbConfig::new(server, name, text("user").unwrap_or_default(), text("password").unwrap_or_default())
+                .folder(text("folder").unwrap_or_default())
+                .require_encryption(share["require_encryption"].as_bool().unwrap_or(false));
+            if let Some(domain) = text("domain") {
+                config = config.domain(domain);
+            }
+            Ok(Some(Box::new(Smb::connect(config).map_err(remote_failure)?)))
         }
         "s3" => {
             let endpoint = text("endpoint").ok_or_else(|| Failure::Coded("bad_address", "the share has no address".into()))?;

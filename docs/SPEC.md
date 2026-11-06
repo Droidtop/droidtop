@@ -23988,12 +23988,24 @@ downloads, maintenance, build scripts), and the check is recorded in its commit.
 - **S3-compatible** (built): AWS S3, Backblaze B2, Wasabi, Cloudflare R2, MinIO, Garage. "Add S3 storage" takes the
   service's address, a bucket, a region, a folder inside it, the person's own access key and secret, and whether the
   bucket is a subdomain (AWS) or a path (most others).
-- **SFTP** (built in lib-net, its server key pinned and accepted by the person; not yet in droidtop):
-  - droidtop builds `net-remote` without its `sftp` feature, because one dependency graph can't hold russh 0.65's
-    `ed25519-dalek ^3` and the `=3.0.0-rc.1` that sspi 0.21 pins. sspi 0.21 comes from windowcast's IronRDP, through
-    droidtop-agent in the native mesh test.
-  - It turns on when windowcast takes sspi 0.22 or later.
-- **SMB 2/3:** waits for the owner's OK to vendor libsmb2's C sources (#573).
+- **SFTP** (built): any computer or NAS reached with SSH. "Add SFTP share" takes the server, a port (blank for 22),
+  the person's own user name and password, and a folder (blank is their home).
+  - **The server's key is pinned and never trusted silently.** The first Test answers "Check the server's key" and
+    shows its SHA-256 fingerprint. The share's screen has a "Server's key" group:
+    - the accepted key, or "Not accepted yet";
+    - **Accept this key** (or, when it changed, **Accept the new key**, behind a danger confirm saying someone may be
+      in between), which pins it and tests again.
+    The person compares the fingerprint with the server's own first (`ssh-keygen -lf` on its host key).
+  - It came into droidtop once droidtop-agent took windowcast's IronRDP on sspi 0.23.1 (`fc52738`). sspi 0.21's
+    `ed25519-dalek =3.0.0-rc.1` pin had kept russh 0.65 out of the native graph.
+- **SMB 2/3** (built, through libsmb2 6.3, vendored in lib-net; see lib-net's NOTICES.md): Windows shared folders,
+  Samba, most NAS.
+  - "Add SMB share" takes the server, the share's name (the part after the server), the person's own user name and
+    password, an optional domain, a folder on the share, and **Require encryption** (SMB 3 encryption only).
+  - Signing is always asked for. libsmb2 is built for both Android ABIs by lib-net's build script, with the NDK
+    compilers droidtop's native build already names.
+- SFTP and SMB shares have no "Allow unencrypted": SSH is always encrypted, and SMB's own choice is Require
+  encryption.
 - **Then:** cloud drives (Dropbox, OneDrive, Google Drive, through OAuth with PKCE and droidtop's client ids only) and
   NFS.
 
