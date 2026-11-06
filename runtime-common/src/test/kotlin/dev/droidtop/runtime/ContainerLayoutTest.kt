@@ -53,6 +53,12 @@ class ContainerLayoutTest {
     }
 
     @Test
+    fun `DISPLAY is a sibling's own X server, and unset without one`() {
+        assertEquals(":123", ContainerLayout.clientEnvironment("wayland-1", x11Display = 123)["DISPLAY"])
+        assertEquals(null, ContainerLayout.clientEnvironment("wayland-1")["DISPLAY"])
+    }
+
+    @Test
     fun `exported commands are on the path, after the container's own`() {
         assertEquals("${ContainerLayout.GUEST_PATH}:${ContainerEnter.COMMANDS_DIR}", ContainerLayout.clientEnvironment(null)["PATH"])
     }

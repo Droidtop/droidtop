@@ -21,6 +21,7 @@ import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
 import dev.droidtop.runtime.SharedVolume
+import dev.droidtop.runtime.SiblingX11
 import dev.droidtop.runtime.RootfsPuller
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -402,7 +403,19 @@ class DroidSpacesRuntime(
             (switchTo?.let { mapOf(ContainerUser.SWITCH_ENV to it) } ?: emptyMap())
         val envPrefix = fullEnv.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
         val commandLine = command.joinToString(" ") { shellQuote(it) }
-        val shellScript = if (envPrefix.isEmpty()) commandLine else "$envPrefix $commandLine"
+        // A sibling's own X server (docs/SPEC.md 3d "Clipboard per container", Droidtop/tracker#910): started detached
+        // inside it, where its init keeps it, when the package is there and it is not running; DISPLAY only once its
+        // socket is. The tree is root's, so whether the package is there is asked inside the container.
+        val x11Display = if (container.id != PRIMARY_NAME && waylandSocketName != null && SiblingX11.NO_SERVER_ENV !in env) {
+            val ids = withContext(Dispatchers.IO) {
+                configsDir.listFiles { f -> f.isFile && f.name.endsWith(".config") }.orEmpty().map { it.name.removeSuffix(".config") }
+            }
+            SiblingX11.displayNumber(container.id, ids)
+        } else {
+            null
+        }
+        val x11Prefix = x11Display?.let { SiblingX11.detachedPrefix(it, envPrefix) }.orEmpty()
+        val shellScript = x11Prefix + if (envPrefix.isEmpty()) commandLine else "$envPrefix $commandLine"
 
         val result = RootProcess.run(binaryPath, "--name=${container.id}", "run", "sh", "-c", shellScript)
         return ContainerExecResult(exitCode = result.exitCode, stdout = result.stdout, stderr = result.stderr)

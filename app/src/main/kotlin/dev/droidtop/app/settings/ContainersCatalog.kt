@@ -47,6 +47,7 @@ import dev.droidtop.runtime.ContainerReach
 import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerUsage
 import dev.droidtop.runtime.PackageUpgrade
+import dev.droidtop.runtime.SiblingX11
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.CraneImageCatalogResolver
@@ -335,6 +336,7 @@ object ContainersCatalog {
         // suspend call (the real disk-usage walk) is computed up front.
         val diskUsageBytes = runCatching { runtime.diskUsageBytes(container) }.getOrNull()
         val usage = if (running) readUsage(runtime, container, PAGE_USAGE_SAMPLE_MS) else null
+        val x11 = if (primary) null else readX11(runtime, info)
         val main = buildList<CatalogItem> {
             // The state, and the one action that changes it.
             when {
@@ -406,6 +408,7 @@ object ContainersCatalog {
             if (running) add(usageItem(runtime, container, usage))
             add(terminalItem(info, runtime, desktopUp))
             add(updateSoftwareItem(info, runtime))
+            x11?.let { add(x11Item(info, runtime, it)) }
             add(
                 TextInputItem(
                     id = "container_name",
@@ -1212,6 +1215,107 @@ object ContainersCatalog {
                 PackageUpgrade.summary(manager, last) ?: "Done (${manager.label})"
             },
         )
+    }
+
+    // ---- X11 programs (Droidtop/tracker#910) ----
+
+    /** Where a sibling stands for X11 programs, as the page shows it. */
+    private sealed interface X11Row {
+        object Ready : X11Row
+        object WaylandOff : X11Row
+        object NotAvailable : X11Row
+        /** Installable, or not known until it is started (a stopped droidspaces sibling). */
+        object Install : X11Row
+    }
+
+    /** Containers whose package manager said it has no X server package, kept while droidtop runs. */
+    private val x11NotPackaged = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Asked inside the container ([SiblingX11.STATUS_SCRIPT]) without starting its X server; a stopped sibling that
+     * needs starting is not started just to show the page.
+     */
+    private suspend fun readX11(runtime: ContainerRuntime, info: ContainerInfo): X11Row {
+        val container = info.container
+        val sockets = runCatching { runtime.sockets(container) }.getOrDefault(ContainerSockets())
+        if (!sockets.waylandShared) return X11Row.WaylandOff
+        if (runtime.siblingsNeedStart && !info.running) {
+            return if (container.id in x11NotPackaged) X11Row.NotAvailable else X11Row.Install
+        }
+        val root = dev.droidtop.runtime.ContainerUser.Spec("root", null)
+        val result = runCatching {
+            runtime.exec(container, listOf("/bin/sh", "-c", SiblingX11.STATUS_SCRIPT), mapOf(SiblingX11.NO_SERVER_ENV to "1"), root)
+        }.getOrNull() ?: return X11Row.Install
+        return when (SiblingX11.status(result.stdout)) {
+            SiblingX11.Status.Ready -> X11Row.Ready.also { x11NotPackaged.remove(container.id) }
+            SiblingX11.Status.NoManager -> X11Row.NotAvailable
+            is SiblingX11.Status.Installable -> if (container.id in x11NotPackaged) X11Row.NotAvailable else X11Row.Install
+        }
+    }
+
+    /**
+     * "X11 programs" (docs/SPEC.md 3d "Clipboard per container", the Xwayland bullet): ready, installable with the
+     * container's own package manager after asking, as "Update its software" asks, or not available for its distro.
+     * Never the desktop's own X server.
+     */
+    private fun x11Item(info: ContainerInfo, runtime: ContainerRuntime, row: X11Row): CatalogItem {
+        val container = info.container
+        return when (row) {
+            X11Row.Ready -> ActionItem(
+                id = "container_x11",
+                title = "X11 programs",
+                subtitle = "X11 programs open as windows on the desktop, through its own X server",
+                value = "Ready",
+            )
+            X11Row.WaylandOff -> ActionItem(
+                id = "container_x11",
+                title = "X11 programs",
+                subtitle = "They need Wayland under Sockets, which is off for this container",
+                value = "Off",
+            )
+            X11Row.NotAvailable -> ActionItem(
+                id = "container_x11",
+                title = "X11 programs",
+                subtitle = "Not available for this distro: its packages have no X server droidtop can use",
+                value = "Not available",
+            )
+            X11Row.Install -> AsyncActionItem(
+                id = "container_x11",
+                title = "X11 programs",
+                subtitle = "Installs an X server in it with its own package manager, so X11 programs open",
+                value = "Install",
+                confirmTitle = "Install an X server in ${info.displayName}? Its package manager downloads it.",
+                run = { _, onStatus ->
+                    if (runtime.siblingsNeedStart && !info.running) {
+                        onStatus("Starting it")
+                        runtime.start(container)
+                    }
+                    onStatus("Finding its package manager")
+                    val root = dev.droidtop.runtime.ContainerUser.Spec("root", null)
+                    val quiet = mapOf(SiblingX11.NO_SERVER_ENV to "1")
+                    val found = runtime.exec(container, listOf("/bin/sh", "-c", SiblingX11.STATUS_SCRIPT), quiet, root)
+                    when (val status = SiblingX11.status(found.stdout)) {
+                        SiblingX11.Status.Ready -> "Ready. X11 programs started from now on open on the desktop."
+                        SiblingX11.Status.NoManager -> error("not available for this distro: it has no package manager droidtop knows")
+                        is SiblingX11.Status.Installable -> {
+                            val manager = status.manager
+                            for (step in SiblingX11.installSteps(manager)) {
+                                onStatus("${step.line} (${manager.label})")
+                                val result = runtime.exec(container, step.command, step.env + quiet, root)
+                                val output = result.stdout + "\n" + result.stderr
+                                if (!result.succeeded && SiblingX11.notPackaged(manager, output)) {
+                                    x11NotPackaged += container.id
+                                    error("not available for this distro: ${manager.label} has no ${SiblingX11.PACKAGE}")
+                                }
+                                check(result.succeeded) { "${manager.label} stopped: ${PackageUpgrade.failureLine(output)}" }
+                            }
+                            x11NotPackaged.remove(container.id)
+                            "Installed. X11 programs started from now on open on the desktop."
+                        }
+                    }
+                },
+            )
+        }
     }
 
     private fun terminalItem(info: ContainerInfo, runtime: ContainerRuntime, desktopUp: Boolean): CatalogItem {
