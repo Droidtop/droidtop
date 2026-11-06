@@ -16897,6 +16897,17 @@ follows:
   Keystore sealing as droidtop's other keys, never in a settings backup) until Sign out, which removes it; Keys and
   accounts lists it. An install asks for a fresh installer link (`products/download`, or `giveawaydownload` for a
   giveaway) and runs `SingleFileInstall`: Legacy's games are Windows installers, kept in the game's folder.
+- **ZOOM Platform** (`ZoomStore`, `ZoomApi`; Droidtop/tracker#335, built 2026-11-06 as the lane's recommendation of
+  the stores still missing: DRM-free installers, as GOG's and Humble's are): read as Heroic Games Launcher reads it
+  (`storeManagers/zoom`, GPL-3.0). Sign-in is ZOOM's own page (`/login?li=droidtop&return_li_token=true`), which
+  returns with a launcher token in its address (`li_token`). droidtop checks it with `li/loggedin` and keeps it, the
+  same way Humble's session is kept. The library is `li/games`, read a page at a time with a second between pages as
+  Heroic does. An install asks `li/game/<id>/files` for the Windows installer files (else Linux; manuals, extras
+  and soundtracks are not the game) and a fresh `li/download/<file>` link for each, and runs `SingleFileInstall` once
+  per file into the game's folder: ZOOM may split one installer into several files. ZOOM names no versions and
+  gives no checksums, so an update is a change in the installer files' names or sizes. droidtop names itself on the
+  sign-in page (`li=droidtop`), never as another launcher. **Owner to confirm:** if ZOOM's page answers only
+  launchers it knows (Heroic sends `heroic`), `ZoomApi.LAUNCHER` is the line that changes.
 - **Amazon Games** (`AmazonStore`): sign-in is Amazon's own page with a
   fresh PKCE session per sign-in (nile's device registration, through
   GameNative's `AmazonAuthManager`); the code comes back on the address
