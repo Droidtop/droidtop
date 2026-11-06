@@ -9652,7 +9652,7 @@ there is no second store. The rules are pure and JVM tested (`ClipboardRules.kt`
   clear question over the dimmed history (Apache-2.0). Neither has a pad route or a search typed on the keys
   themselves, so those are droidtop's own.
 
-### The engine seam, the candidate bar and the gesture seam (Droidtop/tracker#903 H6, built 2026-11-06)
+### The engine seam, the candidate bar and the gesture seam (Droidtop/tracker#903 H6 and H7a, built 2026-11-06)
 
 The plan posted on #903, in the order the owner approved (H5, H12, H13, then H6): "H6: the engine seam and candidate
 bar, plus the gesture seam." It comes before the conversion engines, H7 to H9: Mozc for Japanese, librime for Chinese,
@@ -9670,6 +9670,56 @@ that gradually". So this slice is a refactor behind seams, and **Latin typing do
     engine's own page size when it pages.
   - Pick candidate N, commit, reset; whether the engine composes in this field at all; whether it wants the candidate
     bar; and its capabilities: predicts, converts, corrects.
+  - **What a conversion engine needs (H7a).** The coordinator's slice: "Extend the `InputEngine` seam with what a real
+    conversion engine (Mozc for Japanese in H7c, then librime and libhangul) needs, without adding any engine yet.
+    **Latin typing must not change**". Each addition maps to Mozc's `protocol/commands.proto`:
+    - **Units.** Every index and length in the seam counts UTF-16 chars, Android's unit. Mozc's `Preedit.cursor` and
+      `Preedit.Segment.value_length` count code points, so an engine converts with `CodePoints` (pure): `toUtf16` (a
+      code point index to a char index), `utf16Before` (the last N code points before the caret, in chars) and
+      `segments` (clauses from their code point lengths). 𠮷 and most emoji are one code point and two chars.
+    - **The caret inside the composing text** (`Preedit.cursor`; `Composing.cursor`). The field draws it where the
+      engine has it. `setComposingText`'s newCursorPosition reaches only the composing text's ends, so a caret inside is
+      set after it with `setSelection`, in one batch edit. While the session composes, the cursor counts as moved away
+      only when it leaves the composing text or selects a range.
+    - **A partial commit** (`Output.result` and `Output.preedit` in one answer; `SessionCommand.SUBMIT_CANDIDATE`). A key
+      returns `KeyResult` (now from a character too) and a pick returns `Picked`: the text to commit and whether
+      composing continues. A pick on the first of several clauses commits it and leaves the rest composing; typing after
+      a conversion commits it and starts a new reading in one key. The session reads `composing()` and `candidates()`
+      again after every key and every pick.
+    - **Candidates with nothing composed** (zero-query suggestions: `Request.zero_query_suggestion`,
+      `Output.candidate_window` with no preedit). The bar shows them, and a pick commits the candidate. Another key
+      that the engine leaves to the keyboard drops them, as they were for the text before it.
+    - **Not ready** (the library or its data still loading, or missing; Mozc also answers `Output.error_code`
+      `SESSION_FAILURE`). The engine's `state` is `Ready`, `Loading` or `Unavailable(reason)`, and `watchState` tells the
+      session when it changes. Meanwhile keys type as plain text, and the strip shows one line in place of candidates:
+      "Japanese is getting ready…" (the input language's name), or the engine's reason. If it stops being ready
+      mid-word, what it composed stays as typed.
+    - **Engine keys** (`KeyEvent.SpecialKey` `LEFT`, `RIGHT`, `UP`, `DOWN`, `ESCAPE` with the `SHIFT` modifier;
+      `SessionCommand.UNDO` and `STOP_KEY_TOGGLING`). `InputEngine.Key` adds Left and Right (the caret, or the clause in
+      focus), Up and Down (the focused clause's candidates), Shift-Left and Shift-Right (the clause one shorter or
+      longer), Escape (cancel), Undo (the last commit back into composing) and Toggle (ends a multi-tap key's cycling,
+      for kana flick and toggle input). The keyboard's arrow keys (and the space bar's cursor drag), a hardware
+      keyboard's arrows and Esc reach the engine only while it composes, and not with Ctrl, Alt or Meta held; otherwise
+      they do what they always did. A pad's D-pad still drives the keys (`PadKeys`) and does not reach the engine.
+    - **A composition mode** (`CompositionMode`: hiragana, full katakana, half-width; `SessionCommand.SWITCH_COMPOSITION_MODE`,
+      `Output.mode`). The engine lists its modes (`Mode`, an id and a short label), says which it is in, and is set to
+      one. The strip shows the mode's label on a button at the row's left end, and a tap there moves to the next.
+    - **Deletion before the caret** (`Output.deletion_range`, counted from the composing text's start). `KeyResult`
+      and `Picked` carry `deleteBefore`, in chars; the session deletes it, then commits, then draws the composing
+      text, the order Mozc's own IBus client applies them in (`MozcEngine::UpdateAll`).
+    - **The text before the caret** (`Context.preceding_text`). The engine is given up to 20 chars of the field before
+      the caret (`textBeforeCaret`) when a field starts and after each commit.
+    - **Storage and lifecycle** (`Input.CommandType` `SYNC_DATA`, `CLEAR_USER_HISTORY`, `CLEAR_USER_PREDICTION`).
+      `startField` and `finishField` (called when a field ends, so the engine saves what it learned), and
+      `forgetLearned` for a later setting. A factory gets the engine's `Profile`, a writable directory at
+      `noBackupFilesDir/engine-<id>` that refuses to be resolved on the main thread. Engines do all file work on their
+      own thread.
+    - **Threading.** Mozc's `evalCommand` is synchronous, and an engine's calls stay on the main thread as Hacker's
+      composing does. The coordinator: "Keep engine calls on the main thread as now, but note in SPEC the budget and the
+      plan to move an engine to a worker if the rig shows lag. Don't build a worker now." The budget is 8 ms a call
+      (half a 60 Hz frame on the Retroid Pocket 5, leaving the rest for drawing the key, the field and the strip). If
+      the rig shows a key's call over it, that engine moves to a worker thread of its own: keys queued in order,
+      answers applied on the main thread, as glide typing hands its strokes to the gesture engine.
 - **Hacker's Latin path is the first engine** (`LatinEngine`). It wraps what was there and rewrites none of it:
   - the word being typed (Hacker's `mComposing`, `mWord`, `mPredicting`, now the engine's), typed and deleted through
     the engine;
@@ -9696,7 +9746,11 @@ that gradually". So this slice is a refactor behind seams, and **Latin typing do
   - Hacker's Latin path only passes keys through meanwhile.
   So H7 to H9 add an engine and its registration without touching LatinIME again. A test-only engine (`FakeKanaEngine`:
   a few romaji to kana, a tiny kanji table, two clauses for a reading ending in です) proves the seam carries clauses,
-  paging, annotations, the pad's selection and the pick through to the bar's model (`EngineSessionTest`).
+  paging, annotations, the pad's selection and the pick through to the bar's model (`EngineSessionTest`). Since H7a it
+  also covers each addition above: the caret over 𠮷 and emoji, a partial commit, zero-query suggestions, an engine
+  loading and then ready, the clause keys, a multi-tap key, the modes, an undo that deletes before the caret, the
+  text before the caret, the field's end and forgetting. `LatinEngineTest` still finds the Latin path equal to the old
+  code, and checks it declines every engine key.
 - **The candidate bar is the one `CandidateView`**, extended rather than replaced. Its model is `CandidateBar` (pure,
   JVM tested).
   - With Hacker's words it looks and behaves exactly as before, with H12a's arrival motion.
@@ -9728,8 +9782,10 @@ that gradually". So this slice is a refactor behind seams, and **Latin typing do
     declines, the classifier is used.
   - Nothing is bundled or downloaded for it. How a later library arrives (on request, never in the APK), and how it
     fits the licence rule at the top of 6a ("A closed library never is"), are decided when it comes.
-- **Not done here:** no conversion engine (H7 to H9). The caret inside an engine's composing text is carried by the seam
-  but drawn at the end until an engine needs it. Nothing above changes what a person sees with Hacker's own typing.
+- **Not done here:** no conversion engine (H7 to H9). The pad does not reach the mode button yet, and a tap inside an
+  engine's composing text does not move the engine's caret (the next key draws it back where the engine has it; Mozc's
+  `SessionCommand.MOVE_CURSOR` is the way when an engine comes). Nothing above changes what a person sees with Hacker's
+  own typing.
 
 ## 6b. Desktop surface input (built 2026-09-01)
 

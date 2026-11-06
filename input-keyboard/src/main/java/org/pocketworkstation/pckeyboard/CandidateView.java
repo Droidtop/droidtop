@@ -110,6 +110,9 @@ public class CandidateView extends View {
     private CandidateView mGrid;
     private PopupWindow mGridPopup;
     private boolean mGridPaged;
+    // droidtop patch (Droidtop/tracker#903 H7a): an engine's composition mode on a button at the row's left end (its
+    // width this frame, 0 with none), and a notice line in place of candidates while the engine gets ready.
+    private int mModeWidth;
     private static final String EXPAND_GLYPH = "\u25BE";
     private static final String COLLAPSE_GLYPH = "\u25B4";
 
@@ -179,8 +182,8 @@ public class CandidateView extends View {
 
         @Override
         public void onLongPress(MotionEvent me) {
-            if (mSuggestions.size() > 0) {
-                if (me.getX() + getScrollX() < mWordWidth[0] && getScrollX() < 10) {
+            if (mSuggestions.size() > 0 && me.getX() >= mModeWidth) {
+                if (me.getX() + getScrollX() < mModeWidth + mWordWidth[0] && getScrollX() < 10) {
                     longPressFirstWord();
                 }
             }
@@ -281,11 +284,16 @@ public class CandidateView extends View {
         boolean existsAutoCompletion = false;
         // The expand button (#903 H6) sits over the row's right end; a touch there is the button's, not a word's.
         final boolean expandable = mShowingEngine && mBar.getExpandable();
-        final boolean touchOnButton = expandable && touchX >= getWidth() - mExpandWidth;
+        // The mode button (#903 H7a) sits over the row's left end in the same way; the words start after it.
+        final CharSequence modeLabel = mShowingEngine ? mBar.getModeLabel() : null;
+        mModeWidth = modeLabel == null ? 0
+                : Math.max(mExpandWidth, (int) mPaint.measureText(modeLabel, 0, modeLabel.length()) + X_GAP * 2);
+        final boolean touchOnButton = (expandable && touchX >= getWidth() - mExpandWidth)
+                || (touchX != OUT_OF_BOUNDS_X_COORD && touchX < mModeWidth);
         final boolean ring = mBar.getPadActive();
         if (ring) mRingPaint.setColor(KeyboardAppearance.colors(getContext()).getAccent());
 
-        int x = 0;
+        int x = mModeWidth;
         for (int i = 0; i < count; i++) {
             CharSequence suggestion = mSuggestions.get(i);
             if (suggestion == null) continue;
@@ -359,6 +367,13 @@ public class CandidateView extends View {
             else postInvalidateOnAnimation();
         }
         if (canvas != null && expandable) drawExpandButton(canvas, scrollX, height, ring && mBar.getOnExpandButton());
+        final CharSequence notice = mShowingEngine && count == 0 ? mBar.getNotice() : null;
+        if (canvas != null && notice != null && notice.length() > 0) {
+            // One plain line while the engine gets ready, or why it cannot work (#903 H7a).
+            paint.setColor(mColorOther);
+            canvas.drawText(notice, 0, notice.length(), mModeWidth + (getWidth() - mModeWidth) / 2, y, paint);
+        }
+        if (canvas != null && modeLabel != null) drawModeButton(canvas, scrollX, height, modeLabel);
         if (!isInEditMode())
             mService.onAutoCompletionStateChanged(existsAutoCompletion);
         // With the button, the row scrolls far enough to bring its last word out from under it.
@@ -552,6 +567,9 @@ public class CandidateView extends View {
             if (!mScrolled && mShowingEngine && mBar.getExpandable() && x >= getWidth() - mExpandWidth) {
                 // The expand button (#903 H6).
                 toggleGrid();
+            } else if (!mScrolled && x < mModeWidth) {
+                // The mode button (#903 H7a): the engine's next composition mode.
+                mService.cycleEngineMode();
             } else if (!mScrolled) {
                 if (mSelectedString != null) {
                     if (mShowingAddToDictionary) {
@@ -662,6 +680,26 @@ public class CandidateView extends View {
         final String glyph = mBar.getExpanded() ? COLLAPSE_GLYPH : EXPAND_GLYPH;
         canvas.drawText(glyph, left + mExpandWidth / 2, (int) (height + mPaint.getTextSize() - mDescent) / 2, mPaint);
         if (ringed) drawRing(canvas, left, mExpandWidth, height);
+    }
+
+    /** The engine's mode over the row's left end, on the strip's own ground, so the words scroll under it (#903 H7a). */
+    private void drawModeButton(Canvas canvas, int scrollX, int height, CharSequence label) {
+        canvas.save();
+        canvas.clipRect(scrollX, 0, scrollX + mModeWidth, height);
+        final View parent = getParent() instanceof View ? (View) getParent() : null;
+        final Drawable ground = parent != null ? parent.getBackground() : null;
+        if (ground != null) {
+            canvas.translate(scrollX - getLeft(), -getTop());
+            ground.draw(canvas);
+            canvas.translate(getLeft() - scrollX, getTop());
+        }
+        canvas.translate(scrollX + mModeWidth - mDivider.getIntrinsicWidth(), 0);
+        mDivider.draw(canvas);
+        canvas.restore();
+        mPaint.setColor(mColorNormal);
+        mPaint.setAlpha(255);
+        canvas.drawText(label, 0, label.length(), scrollX + mModeWidth / 2,
+                (int) (height + mPaint.getTextSize() - mDescent) / 2, mPaint);
     }
 
     private void toggleGrid() {
@@ -862,8 +900,8 @@ public class CandidateView extends View {
         final int left = mWordX[index];
         final int right = left + mWordWidth[index];
         final int scrollX = getScrollX();
-        if (left < scrollX) {
-            mTargetScrollX = left;
+        if (left < scrollX + mModeWidth) {
+            mTargetScrollX = Math.max(0, left - mModeWidth);
         } else if (right > scrollX + visible) {
             mTargetScrollX = Math.min(Math.max(0, mTotalWidth - getWidth()), right - visible);
         }

@@ -2,6 +2,7 @@ package org.pocketworkstation.pckeyboard
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -158,5 +159,24 @@ class CandidateBarTest {
         assertEquals(3, bar.selectedCandidate())
         bar.show(InputEngine.Candidates.NONE, expandable = false)
         assertFalse(bar.padActive)
+    }
+
+    @Test fun `a notice stands in for candidates, and Hacker's words carry neither it nor a mode`() {
+        val bar = CandidateBar()
+        bar.show(InputEngine.Candidates.of(listOf("the")), expandable = false)
+        assertNull(bar.notice)
+        assertNull(bar.modeLabel)
+        bar.show(candidates(3), expandable = true)
+        bar.showMode("あ")
+        assertTrue(bar.padEnter())
+        bar.showNotice("Japanese is getting ready…")
+        assertEquals("Japanese is getting ready…", bar.notice)
+        assertTrue(bar.items.isEmpty())
+        assertFalse(bar.expandable)
+        assertFalse(bar.padActive)
+        assertNull(bar.modeLabel)
+        assertFalse("nothing for the pad to reach", bar.padEnter())
+        bar.show(candidates(2), expandable = true)
+        assertNull("candidates replace the notice", bar.notice)
     }
 }
