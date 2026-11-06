@@ -86,7 +86,7 @@ fun DesktopSecondOutput(
                     .fillMaxSize()
                     .padding(top = if (atTop) barHeight else 0.dp, bottom = if (atTop) 0.dp else barHeight),
             ) {
-                SecondOutputSurface(hostBridge, outputName, outputCount, onSurfaceSize)
+                SecondOutputSurface(hostBridge, outputName, outputCount, windows, onSurfaceSize)
             }
             Column(
                 modifier = Modifier
@@ -129,6 +129,7 @@ private fun SecondOutputSurface(
     hostBridge: HostBridge,
     outputName: String?,
     outputCount: Int,
+    windows: DesktopWindows?,
     onSurfaceSize: (width: Int, height: Int, densityDpi: Int) -> Unit,
 ) {
     val router = remember(hostBridge) {
@@ -200,6 +201,8 @@ private fun SecondOutputSurface(
                 }
             },
         )
+        // The title-bar buttons and resize band of the windows on this output (Droidtop/tracker#910).
+        WindowControlsOverlay(windows, router, outputName, primary = false)
         if (presentFailed) {
             Text(
                 stringResource(R.string.desktop_output_failed),

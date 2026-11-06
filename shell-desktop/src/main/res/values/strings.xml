@@ -37,5 +37,7 @@
     <string name="desktop_move_to">Move to %1$s</string>
     <string name="desktop_move_to_other">Move to another screen</string>
     <string name="desktop_move_failed">Couldn\'t move this window</string>
+    <!-- A title-bar button droidtop draws on a Linux window could not reach it (Droidtop/tracker#910). -->
+    <string name="desktop_window_action_failed">Couldn\'t reach this window</string>
     <string name="desktop_tray_vpn">VPN</string>
 </resources>

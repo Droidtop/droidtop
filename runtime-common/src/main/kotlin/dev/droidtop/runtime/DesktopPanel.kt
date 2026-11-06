@@ -58,6 +58,10 @@ enum class DesktopPanel(val id: String, val label: String) {
          * key asks droidtop for its Start menu ([ContainerLauncher.START]),
          * so a keyboard's Super+D opens the same menu as the bar's Start.
          *
+         * `floating_modifier $mod normal` always (Droidtop/tracker#910): droidtop's resize band around a window presses
+         * Super and the right button for sway to resize it (DesktopInputRouter), so the modifier and the button are
+         * not left to the distro's config.
+         *
          * Windows float unless [tileWindows] (docs/SPEC.md 2b "Window controls", Droidtop/tracker#686): a new
          * window opens at its own size instead of halving the others, a finger moves it by its title bar and
          * resizes it by its border, and droidtop's bar maximizes and snaps it.
@@ -77,6 +81,10 @@ enum class DesktopPanel(val id: String, val label: String) {
             appendLine("bar bar-0 swaybar_command true")
             if (panel == WAYBAR) appendLine("exec waybar -c $WAYBAR_CONFIG")
             appendLine("bindsym --no-warn ${'$'}mod+d exec sh ${ContainerLauncher.HELPER} ${ContainerLauncher.START}")
+            // Super with the left button moves a window and with the right button resizes it, floating or tiled, as the
+            // stock config already has it: droidtop's resize band starts sway's resize that way (Droidtop/tracker#910),
+            // so it is said here rather than left to whatever /etc/sway/config holds.
+            appendLine("floating_modifier ${'$'}mod normal")
             if (!tileWindows) {
                 appendLine("for_window [all] floating enable")
                 // A border wide enough to take a fingertip's drag; the title bar stays, to move the window by.

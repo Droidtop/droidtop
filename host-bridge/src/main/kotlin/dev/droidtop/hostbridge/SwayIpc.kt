@@ -28,6 +28,34 @@ class SwayIpc(private val socketPath: String) {
     /** The process of the window that has the focus, as sway sees it; null with none, or 0 when sway cannot see it. */
     fun focusedPid(): Int? = focusedPid(tree())
 
+    /**
+     * A connection subscribed to sway's [events] (`window`, `workspace`, `output`, ...; sway-ipc's SUBSCRIBE), for
+     * following the tree without asking for it all the time (Droidtop/tracker#910). Its [SwayEvents.next] blocks until
+     * the next event; closing it from another thread ends a wait. Null when sway refused the subscription.
+     */
+    fun subscribe(events: List<String>): SwayEvents? {
+        val socket = LocalSocket()
+        try {
+            socket.connect(LocalSocketAddress(socketPath, LocalSocketAddress.Namespace.FILESYSTEM))
+            socket.soTimeout = TIMEOUT_MS
+            val payload = events.joinToString(",", "[", "]") { JSONObject.quote(it) }
+            socket.outputStream.apply { write(frame(SUBSCRIBE, payload)); flush() }
+            val input = DataInputStream(socket.inputStream)
+            val header = ByteArray(HEADER_SIZE).also { input.readFully(it) }
+            val reply = String(ByteArray(replyLength(header, SUBSCRIBE)).also { input.readFully(it) }, Charsets.UTF_8)
+            if (!JSONObject(reply).optBoolean("success")) {
+                socket.close()
+                return null
+            }
+            // Events come when sway has them; an idle desktop sends none for as long as it is idle.
+            socket.soTimeout = 0
+            return SwayEvents(socket, input)
+        } catch (e: Throwable) {
+            runCatching { socket.close() }
+            throw e
+        }
+    }
+
     private fun request(type: Int, payload: String): String =
         LocalSocket().use { socket ->
             socket.connect(LocalSocketAddress(socketPath, LocalSocketAddress.Namespace.FILESYSTEM))
@@ -42,10 +70,14 @@ class SwayIpc(private val socketPath: String) {
     companion object {
         // sway/include/ipc.h, enum ipc_command_type.
         internal const val RUN_COMMAND = 0
+        internal const val SUBSCRIBE = 2
         internal const val GET_TREE = 4
 
+        /** An event's message type has the high bit set (sway/include/ipc.h, IPC_EVENT_*). */
+        internal const val EVENT_BIT = 1 shl 31
+
         private val MAGIC = "i3-ipc".toByteArray(Charsets.US_ASCII)
-        private const val HEADER_SIZE = 14
+        internal const val HEADER_SIZE = 14
         private const val TIMEOUT_MS = 1500
         private const val MAX_REPLY = 16 shl 20
 
@@ -62,14 +94,20 @@ class SwayIpc(private val socketPath: String) {
 
         /** The payload length a reply [header] announces, checked against the [type] that was asked. */
         internal fun replyLength(header: ByteArray, type: Int): Int {
+            val (length, replyType) = header(header)
+            if (replyType != type) throw IOException("sway answered message type $replyType to $type")
+            return length
+        }
+
+        /** A message [header]'s payload length and type, the magic and the length checked. */
+        internal fun header(header: ByteArray): Pair<Int, Int> {
             val buffer = ByteBuffer.wrap(header).order(ByteOrder.nativeOrder())
             val magic = ByteArray(MAGIC.size).also { buffer.get(it) }
             if (!magic.contentEquals(MAGIC)) throw IOException("not a sway IPC reply")
             val length = buffer.int
-            val replyType = buffer.int
-            if (replyType != type) throw IOException("sway answered message type $replyType to $type")
+            val type = buffer.int
             if (length < 0 || length > MAX_REPLY) throw IOException("bad sway reply length $length")
-            return length
+            return length to type
         }
 
         /** RUN_COMMAND answers one `{"success": ...}` per command; a comma chain succeeds only when all of them did. */
@@ -120,6 +158,27 @@ class SwayIpc(private val socketPath: String) {
             }
             return null
         }
+    }
+}
+
+/**
+ * A subscribed connection to sway ([SwayIpc.subscribe]). [next] blocks for the next event and returns its type
+ * (IPC_EVENT_*, high bit set), its payload read and dropped: what changed is read from the tree again. [close] from any
+ * thread ends it; a [next] waiting then throws.
+ */
+class SwayEvents internal constructor(private val socket: LocalSocket, private val input: DataInputStream) : java.io.Closeable {
+    fun next(): Int {
+        while (true) {
+            val header = ByteArray(SwayIpc.HEADER_SIZE).also { input.readFully(it) }
+            val (length, type) = SwayIpc.header(header)
+            input.readFully(ByteArray(length))
+            if ((type and SwayIpc.EVENT_BIT) != 0) return type
+        }
+    }
+
+    override fun close() {
+        runCatching { socket.shutdownInput() }
+        runCatching { socket.close() }
     }
 }
 

@@ -52,6 +52,31 @@ class DesktopInputRouter {
     var pointerTarget: PointerTarget = PointerTarget.Layout
 
     /**
+     * The title-bar buttons and resize bands drawn over this surface (docs/SPEC.md 2b "Window controls",
+     * Droidtop/tracker#910), in this view's pixels; [WindowControls.NONE] under labwc, with no session, or before sway's
+     * tree is read. A finger or a mouse's primary button pressed on one of them is droidtop's ([onWindowButton], or
+     * sway's own resize from the band), and nothing of that press reaches the compositor as a click. Every other press
+     * goes exactly as it did before. Main thread.
+     */
+    var windowControls: dev.droidtop.hostbridge.WindowControls = dev.droidtop.hostbridge.WindowControls.NONE
+
+    /** A title-bar button was pressed and let go on itself. Main thread. */
+    var onWindowButton: ((dev.droidtop.hostbridge.ControlButton) -> Unit)? = null
+
+    /** Every pointer button is up again, after a press on the surface: the windows may have moved. Main thread. */
+    var onPointerReleased: (() -> Unit)? = null
+
+    /** The press droidtop took for a window control, until it is let go. */
+    private sealed interface Capture {
+        class Button(val button: dev.droidtop.hostbridge.ControlButton) : Capture
+
+        /** The band: the pointer is held [dx], [dy] from the finger, inside the window, while sway resizes it. */
+        class Resize(val source: InputSource, val dx: Float, val dy: Float, val pressedSuper: Boolean) : Capture
+    }
+
+    private var capture: Capture? = null
+
+    /**
      * Whether the right analog stick drives the pointer. See
      * [onJoystickMotion] for why this covers the right stick and the stick
      * clicks only, and nothing that Compose's focus navigation uses.
@@ -158,6 +183,7 @@ class DesktopInputRouter {
      * that behaves as though Ctrl is permanently pressed.
      */
     fun releaseHeldInput() {
+        capture = null
         releaseChords()
         // A touch drag's button goes first, through the gestures, so it is not released twice below.
         touchHandler?.removeCallbacks(touchTimeout)
@@ -205,6 +231,9 @@ class DesktopInputRouter {
     private fun onTouch(event: MotionEvent): Boolean {
         if (seat == null || transform == null) return false
         val now = event.eventTime
+        if (capture != null || event.actionMasked == MotionEvent.ACTION_DOWN) {
+            if (touchCapture(event.actionMasked, event.x, event.y)) return true
+        }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> touch.down(event.x, event.y, now)
             MotionEvent.ACTION_POINTER_DOWN -> {
@@ -220,12 +249,107 @@ class DesktopInputRouter {
                 }
             }
             MotionEvent.ACTION_POINTER_UP -> touch.pointerUp(now)
-            MotionEvent.ACTION_UP -> touch.up(event.x, event.y, now)
-            MotionEvent.ACTION_CANCEL -> touch.cancel()
+            MotionEvent.ACTION_UP -> touch.up(event.x, event.y, now).also { onPointerReleased?.invoke() }
+            MotionEvent.ACTION_CANCEL -> touch.cancel().also { onPointerReleased?.invoke() }
             else -> return false
         }
         scheduleTouchTimeout()
         return true
+    }
+
+    /**
+     * A finger on a window control ([windowControls]): a press that starts on one is taken whole, every finger after
+     * it included, until the last finger is up. False leaves the event to the gestures, unchanged. Plain values, so a
+     * JVM unit test can drive it.
+     */
+    internal fun touchCapture(action: Int, x: Float, y: Float): Boolean {
+        if (action == MotionEvent.ACTION_DOWN) {
+            // A new first finger ends whatever press was still held, as its end never came.
+            endCapture(x, y, letGo = false)
+            return beginCapture(InputSource.TOUCH, x, y)
+        }
+        if (capture == null) return false
+        when (action) {
+            MotionEvent.ACTION_MOVE -> moveCapture(x, y)
+            MotionEvent.ACTION_UP -> endCapture(x, y, letGo = true)
+            MotionEvent.ACTION_CANCEL -> endCapture(x, y, letGo = false)
+        }
+        return true
+    }
+
+    /**
+     * A mouse Android places, with [buttonState] held: its primary button pressed alone on a window control
+     * is taken until every button is up. False leaves the event as it was. Plain values, for a JVM unit test.
+     */
+    internal fun mouseCapture(x: Float, y: Float, buttonState: Int): Boolean {
+        if (capture == null) {
+            if (lastMouseButtonState != 0 || buttonState != MotionEvent.BUTTON_PRIMARY) return false
+            if (!beginCapture(InputSource.LAPDOCK_PERIPHERAL, x, y)) return false
+            lastMouseButtonState = buttonState
+            return true
+        }
+        if (buttonState == 0) {
+            endCapture(x, y, letGo = true)
+            lastMouseButtonState = 0
+        } else {
+            moveCapture(x, y)
+            lastMouseButtonState = buttonState
+        }
+        return true
+    }
+
+    /** Takes a press at ([x], [y]) when it is on a window control; false when it is not. */
+    private fun beginCapture(source: InputSource, x: Float, y: Float): Boolean {
+        val seat = seat ?: return false
+        when (val hit = windowControls.hit(x, y)) {
+            null -> return false
+            is dev.droidtop.hostbridge.ControlHit.Button -> capture = Capture.Button(hit.button)
+            is dev.droidtop.hostbridge.ControlHit.Resize -> {
+                // sway's floating_modifier drag (its config's `floating_modifier $mod normal`): Super held and the right
+                // button pressed over the window starts sway's own resize, of a floating window and a tiled one alike
+                // (sway/input/seatop_default.c, "via mod"). The pointer is put inside the window first, as sway resizes
+                // the window under it, and follows the finger from there.
+                val pressedSuper = EvdevKeys.META_LEFT !in heldKeys && EvdevKeys.META_RIGHT !in heldKeys
+                if (pressedSuper) {
+                    heldKeys[EvdevKeys.META_LEFT] = false
+                    seat.onKey(source, EvdevKeys.META_LEFT, down = true, typed = false)
+                }
+                pointAt(source, hit.grabX, hit.grabY)
+                pressButton(seat, source, EvdevKeys.BTN_RIGHT)
+                capture = Capture.Resize(source, hit.grabX - x, hit.grabY - y, pressedSuper)
+            }
+        }
+        return true
+    }
+
+    private fun moveCapture(x: Float, y: Float) {
+        val resize = capture as? Capture.Resize ?: return
+        pointAt(resize.source, x + resize.dx, y + resize.dy)
+    }
+
+    /** The press is over: a button let go on itself is pressed; the band's resize ends. */
+    private fun endCapture(x: Float, y: Float, letGo: Boolean) {
+        val taken = capture ?: return
+        capture = null
+        when (taken) {
+            is Capture.Button -> {
+                val on = windowControls.buttonAt(x, y)
+                if (letGo && on != null && on.window.conId == taken.button.window.conId && on.kind == taken.button.kind) {
+                    onWindowButton?.invoke(taken.button)
+                }
+            }
+            is Capture.Resize -> {
+                val seat = seat
+                if (seat != null) {
+                    if (letGo) pointAt(taken.source, x + taken.dx, y + taken.dy)
+                    releaseButton(seat, taken.source, EvdevKeys.BTN_RIGHT)
+                    if (taken.pressedSuper && heldKeys.remove(EvdevKeys.META_LEFT) != null) {
+                        seat.onKey(taken.source, EvdevKeys.META_LEFT, down = false, typed = false)
+                    }
+                }
+            }
+        }
+        onPointerReleased?.invoke()
     }
 
     /** The long press fires without another touch event, so its time is waited for. */
@@ -251,8 +375,11 @@ class DesktopInputRouter {
             return true
         }
 
+        if (mouseCapture(event.x, event.y, event.buttonState)) return true
         pointAt(InputSource.LAPDOCK_PERIPHERAL, event.x, event.y)
+        val wasPressed = lastMouseButtonState != 0
         syncMouseButtons(seat, event.buttonState)
+        if (wasPressed && lastMouseButtonState == 0) onPointerReleased?.invoke()
         return true
     }
 
