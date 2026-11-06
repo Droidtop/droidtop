@@ -93,6 +93,26 @@ public class CandidateView extends View {
     private long mArrivedAt;
     private boolean mArriving;
 
+    // droidtop patch (Droidtop/tracker#903 H6): the one candidate bar for every engine (CandidateBar is its model).
+    // Hacker's suggestions are drawn exactly as before; a language's own engine adds small annotations, its chosen
+    // candidate highlighted, and an expand button at the row's end that opens every candidate in a grid over the
+    // keys. The grid is this same view, drawn in grid mode in a popup. The pad's ring (PadKeys) is drawn on the
+    // candidate or the button it has selected.
+    private final CandidateBar mOwnBar = new CandidateBar();
+    private CandidateBar mBar = mOwnBar;
+    private boolean mShowingEngine;
+    private final ArrayList<CharSequence> mAnnotations = new ArrayList<CharSequence>();
+    private final Paint mAnnotationPaint;
+    private final Paint mRingPaint;
+    private final int mExpandWidth;
+    private final int mRowHeight;
+    private boolean mGridMode;
+    private CandidateView mGrid;
+    private PopupWindow mGridPopup;
+    private boolean mGridPaged;
+    private static final String EXPAND_GLYPH = "\u25BE";
+    private static final String COLLAPSE_GLYPH = "\u25B4";
+
     /**
      * Construct a CandidateView for showing suggested words for completion.
      * @param context
@@ -130,6 +150,16 @@ public class CandidateView extends View {
         mPaint.setTextAlign(Align.CENTER);
         mDescent = (int) mPaint.descent();
         mMinTouchableWidth = (int)res.getDimension(R.dimen.candidate_min_touchable_width);
+        mAnnotationPaint = new Paint(mPaint);
+        mAnnotationPaint.setTextSize(mPaint.getTextSize() * 0.6f);
+        mAnnotationPaint.setTextAlign(Align.CENTER);
+        mAnnotationPaint.setColor(mColorOther);
+        final float density = res.getDisplayMetrics().density;
+        mRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mRingPaint.setStyle(Paint.Style.STROKE);
+        mRingPaint.setStrokeWidth(3f * density);
+        mExpandWidth = (int) (44 * density);
+        mRowHeight = (int) res.getDimension(R.dimen.candidate_strip_height);
         
         mGestureDetector = new GestureDetector(
                 new CandidateStripGestureListener(mMinTouchableWidth));
@@ -165,6 +195,7 @@ public class CandidateView extends View {
         @Override
         public boolean onScroll(MotionEvent e1, MotionEvent e2,
                 float distanceX, float distanceY) {
+            if (mGridMode) return onGridScroll(e1, e2);
             if (!mScrolled) {
                 // This is applied only when we recognize that scrolling is starting.
                 final int deltaX = (int) (e2.getX() - e1.getX());
@@ -216,6 +247,10 @@ public class CandidateView extends View {
         if (canvas != null) {
             super.onDraw(canvas);
         }
+        if (mGridMode) {
+            if (canvas != null) drawGrid(canvas);
+            return;
+        }
         mTotalWidth = 0;
         
         final int height = getHeight();
@@ -244,12 +279,20 @@ public class CandidateView extends View {
                 ? KeyMotion.candidateRiseDp(arrivedFor, motion) * getResources().getDisplayMetrics().density : 0f;
 
         boolean existsAutoCompletion = false;
+        // The expand button (#903 H6) sits over the row's right end; a touch there is the button's, not a word's.
+        final boolean expandable = mShowingEngine && mBar.getExpandable();
+        final boolean touchOnButton = expandable && touchX >= getWidth() - mExpandWidth;
+        final boolean ring = mBar.getPadActive();
+        if (ring) mRingPaint.setColor(KeyboardAppearance.colors(getContext()).getAccent());
 
         int x = 0;
         for (int i = 0; i < count; i++) {
             CharSequence suggestion = mSuggestions.get(i);
             if (suggestion == null) continue;
             final int wordLength = suggestion.length();
+            final CharSequence annotation = i < mAnnotations.size() ? mAnnotations.get(i) : null;
+            final int annotationWidth = annotation == null ? 0
+                    : (int) mAnnotationPaint.measureText(annotation, 0, annotation.length()) + X_GAP;
 
             paint.setColor(mColorNormal);
             if (mHaveMinimalSuggestion 
@@ -265,13 +308,21 @@ public class CandidateView extends View {
             int wordWidth;
             if ((wordWidth = mWordWidth[i]) == 0) {
                 float textWidth =  paint.measureText(suggestion, 0, wordLength);
-                wordWidth = Math.max(mMinTouchableWidth, (int) textWidth + X_GAP * 2);
+                wordWidth = Math.max(mMinTouchableWidth, (int) textWidth + X_GAP * 2 + annotationWidth);
                 mWordWidth[i] = wordWidth;
             }
 
             mWordX[i] = x;
 
-            if (touchX != OUT_OF_BOUNDS_X_COORD && !scrolled
+            // The engine's chosen candidate, highlighted as a touched one is (#903 H6).
+            if (canvas != null && mShowingEngine && i == mBar.getFocused()) {
+                canvas.translate(x, 0);
+                mSelectionHighlight.setBounds(0, bgPadding.top, wordWidth, height);
+                mSelectionHighlight.draw(canvas);
+                canvas.translate(-x, 0);
+            }
+
+            if (touchX != OUT_OF_BOUNDS_X_COORD && !scrolled && !touchOnButton
                     && touchX + scrollX >= x && touchX + scrollX < x + wordWidth) {
                 if (canvas != null && !mShowingAddToDictionary) {
                     canvas.translate(x, 0);
@@ -285,7 +336,13 @@ public class CandidateView extends View {
 
             if (canvas != null) {
                 if (arriveAlpha < 1f) paint.setAlpha((int) (paint.getAlpha() * arriveAlpha));
-                canvas.drawText(suggestion, 0, wordLength, x + wordWidth / 2, y + arriveDrop, paint);
+                canvas.drawText(suggestion, 0, wordLength, x + (wordWidth - annotationWidth) / 2, y + arriveDrop, paint);
+                if (annotation != null) {
+                    mAnnotationPaint.setAlpha((int) (255 * arriveAlpha));
+                    canvas.drawText(annotation, 0, annotation.length(),
+                            x + wordWidth - X_GAP / 2 - annotationWidth / 2, y + arriveDrop, mAnnotationPaint);
+                }
+                if (ring && i == mBar.getSelected()) drawRing(canvas, x, wordWidth, height);
                 paint.setColor(mColorOther);
                 canvas.translate(x + wordWidth, 0);
                 // Draw a divider unless it's after the hint
@@ -301,9 +358,11 @@ public class CandidateView extends View {
             if (arriveAlpha >= 1f && arriveDrop <= 0f) mArriving = false;
             else postInvalidateOnAnimation();
         }
+        if (canvas != null && expandable) drawExpandButton(canvas, scrollX, height, ring && mBar.getOnExpandButton());
         if (!isInEditMode())
             mService.onAutoCompletionStateChanged(existsAutoCompletion);
-        mTotalWidth = x;
+        // With the button, the row scrolls far enough to bring its last word out from under it.
+        mTotalWidth = expandable ? x + mExpandWidth : x;
         if (mTargetScrollX != scrollX) {
             scrollToTarget();
         }
@@ -335,6 +394,44 @@ public class CandidateView extends View {
     
     public void setSuggestions(List<CharSequence> suggestions, boolean completions,
             boolean typedWordValid, boolean haveMinimalSuggestion) {
+        fill(suggestions, null, completions, typedWordValid, haveMinimalSuggestion);
+        // Hacker's own suggestions: plain words, no grid (#903 H6). The model keeps them for the pad.
+        final boolean padActive = mBar.getPadActive();
+        mShowingEngine = false;
+        mBar = mOwnBar;
+        mBar.show(InputEngine.Candidates.of(mSuggestions), false);
+        if (padActive && !mBar.getPadActive()) mBar.padEnter();
+        hideGrid();
+    }
+
+    /**
+     * droidtop patch (Droidtop/tracker#903 H6): a language's own engine's candidates, from the bar's model: the same
+     * row, the same arrival motion, with each candidate's annotation drawn small, its chosen one highlighted, and the
+     * expand button when the engine converts. The row holds the first MAX_SUGGESTIONS; the grid holds them all.
+     */
+    void showEngineCandidates(CandidateBar bar) {
+        final List<InputEngine.Candidate> items = bar.getItems();
+        final ArrayList<CharSequence> words = new ArrayList<CharSequence>(items.size());
+        final ArrayList<CharSequence> annotations = new ArrayList<CharSequence>(items.size());
+        for (InputEngine.Candidate candidate : items) {
+            words.add(candidate.getText());
+            annotations.add(candidate.getAnnotation());
+        }
+        final boolean padActive = mBar.getPadActive();
+        mBar = bar;
+        if (padActive && !bar.getPadActive()) bar.padEnter();
+        mShowingEngine = true;
+        fill(words, annotations, false, false, false);
+        syncGrid();
+    }
+
+    /** Whether the row shows a language's own engine's candidates (so a pick is the engine's). */
+    boolean isShowingEngineCandidates() {
+        return mShowingEngine;
+    }
+
+    private void fill(List<CharSequence> suggestions, List<CharSequence> annotations, boolean completions,
+            boolean typedWordValid, boolean haveMinimalSuggestion) {
         // droidtop patch (#903 H12a): a list that differs from the one shown arrives with a short fade and rise.
         if (suggestions != null && !suggestions.isEmpty() && !sameAsShown(suggestions) && KeyboardMotion.enabled()) {
             mArriving = true;
@@ -348,6 +445,9 @@ public class CandidateView extends View {
                 if (--insertCount == 0)
                     break;
             }
+        }
+        if (annotations != null) {
+            for (int i = 0; i < mSuggestions.size() && i < annotations.size(); i++) mAnnotations.add(annotations.get(i));
         }
         mShowingCompletions = completions;
         mTypedWordValid = typedWordValid;
@@ -396,6 +496,7 @@ public class CandidateView extends View {
         // Don't call mSuggestions.clear() because it's being used for logging
         // in LatinIME.pickSuggestionManually().
         mSuggestions.clear();
+        mAnnotations.clear();
         mTouchX = OUT_OF_BOUNDS_X_COORD;
         mSelectedString = null;
         mSelectedIndex = -1;
@@ -407,6 +508,14 @@ public class CandidateView extends View {
     
     @Override
     public boolean onTouchEvent(MotionEvent me) {
+        // droidtop patch (#903 H6): a touch takes the pad's ring away, as it does on the keys.
+        if (me.getAction() == MotionEvent.ACTION_DOWN && mBar.getPadActive()) {
+            mBar.padLeave();
+            invalidateBar();
+        }
+        if (mGridMode) {
+            return onGridTouch(me);
+        }
 
         if (mGestureDetector.onTouchEvent(me)) {
             return true;
@@ -440,7 +549,10 @@ public class CandidateView extends View {
             }
             break;
         case MotionEvent.ACTION_UP:
-            if (!mScrolled) {
+            if (!mScrolled && mShowingEngine && mBar.getExpandable() && x >= getWidth() - mExpandWidth) {
+                // The expand button (#903 H6).
+                toggleGrid();
+            } else if (!mScrolled) {
                 if (mSelectedString != null) {
                     if (mShowingAddToDictionary) {
                         longPressFirstWord();
@@ -518,5 +630,242 @@ public class CandidateView extends View {
     public void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         hidePreview();
+        hideGrid();
+    }
+
+    // droidtop patch (Droidtop/tracker#903 H6): the expand button, the grid, and the pad's route onto the bar.
+
+    private void drawRing(Canvas canvas, int x, int width, int height) {
+        final float inset = mRingPaint.getStrokeWidth() / 2f;
+        final float radius = mRingPaint.getStrokeWidth() * 2f;
+        canvas.drawRoundRect(x + inset, inset, x + width - inset, height - inset, radius, radius, mRingPaint);
+    }
+
+    /** The button over the row's right end, on the strip's own ground, so the words scroll under it. */
+    private void drawExpandButton(Canvas canvas, int scrollX, int height, boolean ringed) {
+        final int left = scrollX + getWidth() - mExpandWidth;
+        canvas.save();
+        canvas.clipRect(left, 0, left + mExpandWidth, height);
+        final View parent = getParent() instanceof View ? (View) getParent() : null;
+        final Drawable ground = parent != null ? parent.getBackground() : null;
+        if (ground != null) {
+            canvas.translate(scrollX - getLeft(), -getTop());
+            ground.draw(canvas);
+            canvas.translate(getLeft() - scrollX, getTop());
+        }
+        canvas.translate(left, 0);
+        mDivider.draw(canvas);
+        canvas.translate(-left, 0);
+        canvas.restore();
+        mPaint.setColor(mColorNormal);
+        mPaint.setAlpha(255);
+        final String glyph = mBar.getExpanded() ? COLLAPSE_GLYPH : EXPAND_GLYPH;
+        canvas.drawText(glyph, left + mExpandWidth / 2, (int) (height + mPaint.getTextSize() - mDescent) / 2, mPaint);
+        if (ringed) drawRing(canvas, left, mExpandWidth, height);
+    }
+
+    private void toggleGrid() {
+        mBar.toggle();
+        syncGrid();
+        invalidate();
+    }
+
+    /** Opens, updates or closes the grid to match the model. */
+    private void syncGrid() {
+        if (mGridMode) return;
+        if (!mShowingEngine || !mBar.getExpanded() || getWindowToken() == null || !isShown()) {
+            hideGrid();
+            invalidate();
+            return;
+        }
+        final int width = getWidth();
+        int height = mService != null ? mService.candidateGridHeight() : 0;
+        if (height <= 0) height = mRowHeight * 4;
+        if (mGrid == null) {
+            mGrid = new CandidateView(getContext(), null);
+            mGrid.mGridMode = true;
+            mGrid.setService(mService);
+            mGridPopup = new PopupWindow(getContext());
+            mGridPopup.setContentView(mGrid);
+            final View parent = getParent() instanceof View ? (View) getParent() : null;
+            final Drawable ground = parent != null && parent.getBackground() != null
+                    && parent.getBackground().getConstantState() != null
+                    ? parent.getBackground().getConstantState().newDrawable(getResources()) : null;
+            mGridPopup.setBackgroundDrawable(ground != null ? ground
+                    : new android.graphics.drawable.ColorDrawable(KeyboardAppearance.colors(getContext()).getGround()));
+            mGridPopup.setAnimationStyle(0);
+            mGridPopup.setClippingEnabled(false);
+        }
+        mGrid.mBar = mBar;
+        mGrid.mShowingEngine = true;
+        mGrid.invalidate();
+        final int[] at = new int[2];
+        getLocationInWindow(at);
+        if (mGridPopup.isShowing()) {
+            mGridPopup.update(at[0], at[1] + getHeight(), width, height);
+        } else {
+            mGridPopup.setWidth(width);
+            mGridPopup.setHeight(height);
+            mGridPopup.showAtLocation(this, Gravity.NO_GRAVITY, at[0], at[1] + getHeight());
+        }
+    }
+
+    private void hideGrid() {
+        if (mGridPopup != null && mGridPopup.isShowing()) mGridPopup.dismiss();
+    }
+
+    private void invalidateBar() {
+        invalidate();
+        if (mGrid != null) mGrid.invalidate();
+    }
+
+    /** The grid: the model's page, [columns] across and as many rows as fit, each candidate with its note under it. */
+    private void drawGrid(Canvas canvas) {
+        final List<InputEngine.Candidate> items = mBar.getItems();
+        final int width = getWidth();
+        int widest = mMinTouchableWidth;
+        for (InputEngine.Candidate candidate : items) {
+            widest = Math.max(widest, (int) mPaint.measureText(candidate.getText(), 0, candidate.getText().length()) + X_GAP * 2);
+        }
+        mBar.layoutGrid(Math.max(1, width / widest), Math.max(1, getHeight() / mRowHeight));
+        final int columns = mBar.getColumns();
+        final int cell = width / columns;
+        final kotlin.ranges.IntRange range = mBar.getPageRange();
+        final boolean ring = mBar.getPadActive();
+        if (ring) mRingPaint.setColor(KeyboardAppearance.colors(getContext()).getAccent());
+        for (int i = range.getFirst(); i <= range.getLast(); i++) {
+            final int slot = i - range.getFirst();
+            final int x = (slot % columns) * cell;
+            final int top = (slot / columns) * mRowHeight;
+            final InputEngine.Candidate candidate = items.get(i);
+            canvas.save();
+            canvas.translate(0, top);
+            if (i == mBar.getFocused()) {
+                canvas.translate(x, 0);
+                mSelectionHighlight.setBounds(0, 0, cell, mRowHeight);
+                mSelectionHighlight.draw(canvas);
+                canvas.translate(-x, 0);
+            }
+            final CharSequence text = candidate.getText();
+            final CharSequence note = candidate.getAnnotation();
+            mPaint.setColor(i == 0 ? mColorNormal : mColorOther);
+            final int baseline = note == null ? (int) (mRowHeight + mPaint.getTextSize() - mDescent) / 2
+                    : (int) (mRowHeight - mAnnotationPaint.getTextSize()) / 2 + mDescent;
+            canvas.drawText(text, 0, text.length(), x + cell / 2, baseline, mPaint);
+            if (note != null) {
+                mAnnotationPaint.setAlpha(255);
+                canvas.drawText(note, 0, note.length(), x + cell / 2, baseline + mAnnotationPaint.getTextSize() + mDescent, mAnnotationPaint);
+            }
+            if (ring && i == mBar.getSelected()) drawRing(canvas, x, cell, mRowHeight);
+            canvas.restore();
+        }
+        if (mBar.getPageCount() > 1) {
+            final String pages = (mBar.getPage() + 1) + "/" + mBar.getPageCount();
+            mAnnotationPaint.setAlpha(255);
+            canvas.drawText(pages, width - mExpandWidth / 2, getHeight() - mDescent, mAnnotationPaint);
+        }
+    }
+
+    /** A drag in the grid turns the page, once per drag: up for the next, down for the one before. */
+    private boolean onGridScroll(MotionEvent e1, MotionEvent e2) {
+        if (mGridPaged || e1 == null) return true;
+        final float dy = e2.getY() - e1.getY();
+        if (Math.abs(dy) < mMinTouchableWidth / 2f) return true;
+        mGridPaged = true;
+        if (dy < 0) mBar.nextPage(); else mBar.previousPage();
+        invalidate();
+        return true;
+    }
+
+    private boolean onGridTouch(MotionEvent me) {
+        if (me.getAction() == MotionEvent.ACTION_DOWN) mGridPaged = false;
+        mGestureDetector.onTouchEvent(me);
+        if (me.getAction() == MotionEvent.ACTION_UP && !mGridPaged && mService != null) {
+            final int columns = mBar.getColumns();
+            final int cell = Math.max(1, getWidth() / columns);
+            final int column = Math.min(columns - 1, (int) me.getX() / cell);
+            final int row = (int) me.getY() / mRowHeight;
+            final kotlin.ranges.IntRange range = mBar.getPageRange();
+            final int index = range.getFirst() + row * columns + column;
+            if (row >= 0 && index >= range.getFirst() && index <= range.getLast()) {
+                mService.pickSuggestionManually(index, mBar.getItems().get(index).getText());
+            }
+        }
+        return true;
+    }
+
+    /** The pad's ring onto the bar, at the engine's chosen candidate or the first: false when the bar is empty. */
+    boolean padEnter() {
+        if (mSuggestions.isEmpty() || !mBar.padEnter()) return false;
+        scrollToSelected();
+        invalidateBar();
+        return true;
+    }
+
+    void padLeave() {
+        if (!mBar.getPadActive()) return;
+        mBar.padLeave();
+        if (mBar.collapse()) syncGrid();
+        invalidateBar();
+    }
+
+    boolean isPadActive() {
+        return mBar.getPadActive();
+    }
+
+    /** A pad direction on the bar: false when it leaves the bar (Down from the row). */
+    boolean padMove(CandidateBar.Move move) {
+        if (!mBar.move(move)) {
+            padLeave();
+            return false;
+        }
+        scrollToSelected();
+        invalidateBar();
+        return true;
+    }
+
+    /** A on the bar: the selected candidate is picked as a tap picks it; on the expand button, the grid opens or closes. */
+    void padPress() {
+        if (mBar.getOnExpandButton()) {
+            toggleGrid();
+            invalidateBar();
+            return;
+        }
+        final int index = mBar.selectedCandidate();
+        if (index < 0) return;
+        if (mShowingAddToDictionary) {
+            longPressFirstWord();
+            clear();
+            return;
+        }
+        final CharSequence word = mShowingEngine ? mBar.getItems().get(index).getText()
+                : index < mSuggestions.size() ? mSuggestions.get(index) : null;
+        if (word != null) mService.pickSuggestionManually(index, word);
+    }
+
+    /** B on the bar: closes the grid, else gives the ring back (false). */
+    boolean padBack() {
+        if (mBar.collapse()) {
+            syncGrid();
+            invalidateBar();
+            return true;
+        }
+        padLeave();
+        return false;
+    }
+
+    /** Scrolls the row, as Hacker's own scroll does, so the pad's selection is in sight. */
+    private void scrollToSelected() {
+        final int index = mBar.getSelected();
+        final int visible = getWidth() - (mShowingEngine && mBar.getExpandable() ? mExpandWidth : 0);
+        if (index < 0 || index >= mSuggestions.size() || visible <= 0) return;
+        final int left = mWordX[index];
+        final int right = left + mWordWidth[index];
+        final int scrollX = getScrollX();
+        if (left < scrollX) {
+            mTargetScrollX = left;
+        } else if (right > scrollX + visible) {
+            mTargetScrollX = Math.min(Math.max(0, mTotalWidth - getWidth()), right - visible);
+        }
     }
 }
