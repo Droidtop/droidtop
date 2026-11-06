@@ -100,6 +100,10 @@ object ControllerLayouts {
     private var loading = false
     private var console: ConsoleDef? = null
     private var captures: Map<String, PadCapture> = emptyMap()
+
+    /** The button labels chosen per pad in Settings > Controls (Droidtop/tracker#723), by descriptor. */
+    private var glyphOverrides: Map<String, dev.droidtop.library.controller.GlyphFamily> = emptyMap()
+    private var glyphListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
     private var snapshot: Map<String, String> = emptyMap()
     private var signature = ""
     private var toggleValue: String? = null
@@ -309,11 +313,24 @@ object ControllerLayouts {
         scope.launch {
             val loadedState = withContext(Dispatchers.IO) {
                 val prefs = app.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+                glyphOverrides = dev.droidtop.library.controller.GlyphOverrides.parse(
+                    prefs.getString(dev.droidtop.library.controller.GlyphOverrides.KEY, null),
+                )
                 Triple(
                     ConsoleLookup.thisDevice(app),
                     CaptureStore.parse(prefs.getString(KEY_CAPTURES, null)),
                     parseSnapshot(prefs.getString(KEY_SNAPSHOT, null)),
                 )
+            }
+            // A change in Settings > Controls relabels at once.
+            if (glyphListener == null) {
+                val prefs = app.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+                glyphListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+                    if (key == dev.droidtop.library.controller.GlyphOverrides.KEY) {
+                        glyphOverrides = dev.droidtop.library.controller.GlyphOverrides.parse(p.getString(key, null))
+                        handler.post { recompute() }
+                    }
+                }.also { prefs.registerOnSharedPreferenceChangeListener(it) }
             }
             console = loadedState.first
             if (console == null) {
@@ -428,7 +445,11 @@ object ControllerLayouts {
             capture = pad?.let { captures[it.descriptor] },
             signature = signature,
         )
-        val resolved = LayoutResolver.resolve(facts)
+        // The person's own choice of labels for this pad, glyphs only (Droidtop/tracker#723).
+        val resolved = dev.droidtop.library.controller.GlyphOverrides.apply(
+            LayoutResolver.resolve(facts),
+            pad?.let { glyphOverrides[it.descriptor] },
+        )
         // Equal values do not invalidate a snapshot state, so a repeat check redraws nothing.
         layoutState = resolved
         recaptureState = LayoutResolver.needsRecapture(facts, resolved)

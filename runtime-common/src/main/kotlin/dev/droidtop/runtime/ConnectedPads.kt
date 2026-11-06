@@ -10,7 +10,8 @@ import android.view.InputDevice
  * when a surface shows, never polled; an input-manager query, so off the main thread where it can be.
  */
 object ConnectedPads {
-    data class Pad(val name: String, val percent: Int?)
+    /** [descriptor] is Android's stable id for the physical pad, what per-pad settings are kept by. */
+    data class Pad(val name: String, val percent: Int?, val descriptor: String = "")
 
     fun read(context: Context): List<Pad> {
         val manager = context.getSystemService(android.hardware.input.InputManager::class.java) ?: return emptyList()
@@ -19,7 +20,7 @@ object ConnectedPads {
             val pad = device.sources and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
                 device.sources and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
             if (!pad || device.isVirtual) return@mapNotNull null
-            Pad(device.name, batteryPercent(device))
+            Pad(device.name, batteryPercent(device), device.descriptor.orEmpty())
         }.distinctBy { it.name }
     }
 

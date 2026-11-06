@@ -20970,8 +20970,11 @@ controller connected". It is the companion's reader (`ConnectedPads`, runtime-co
 **Stick dead zone** (10 to 70%, 30 by default) sets how far the stick leans before it moves the cursor: the
 stick releases its direction under it and presses 0.2 past it, never under 0.5, so the default is the 0.3 / 0.5 band
 the pad's front always had (`StickDeadZone`, read by `PadGateCore` for the stick's directions only; the hat sends
-whole steps and the triggers keep the fixed band). It applies at once and from the next start. A live button and
-stick test and a glyph-family override per pad are still to build.
+whole steps and the triggers keep the fixed band). It applies at once and from the next start. Under each pad,
+**<pad>: button labels** (Automatic, Xbox, PlayStation or Nintendo) relabels its face buttons: it is kept by the
+pad's input-device descriptor (`GlyphOverrides`) and applied after the layout is resolved as `FaceLayout.copy(family
+=)`, so only the printed glyphs change and which key confirms stays the resolver's (`ControllerLayouts.recompute`,
+relabelled at once on change). A live button and stick test is still to build.
 
 **Accessibility is part of the system.** droidtop's chrome is driven by a pad, a finger or a
 screen reader through one focus order: every focusable is reachable by D-pad and by linear

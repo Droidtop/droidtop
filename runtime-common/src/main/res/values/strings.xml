@@ -241,6 +241,12 @@
     <string name="gaming_no_controller_connected">No controller connected</string>
     <string name="gaming_pad_connected">Connected</string>
     <string name="gaming_pad_battery">Battery %1$d%%</string>
+    <string name="gaming_pad_button_labels">%1$s: button labels</string>
+    <string name="gaming_pad_button_labels_subtitle">The glyphs shown for its face buttons; which button confirms stays the same</string>
+    <string name="gaming_pad_labels_auto">Automatic</string>
+    <string name="gaming_pad_labels_xbox">Xbox (A B X Y)</string>
+    <string name="gaming_pad_labels_playstation">PlayStation (shapes)</string>
+    <string name="gaming_pad_labels_nintendo">Nintendo (B A Y X)</string>
     <string name="gaming_stick_dead_zone">Stick dead zone</string>
     <string name="gaming_stick_dead_zone_subtitle">How far the stick leans before it moves in the menus; raise it if a worn stick drifts</string>
     <string name="gaming_screensaver_page_subtitle">When it shows, and what: covers, screenshots, a clock or black</string>

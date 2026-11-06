@@ -460,6 +460,27 @@ object GamingSettingsCatalog {
                                 value = pad.percent?.let { words(R.string.gaming_pad_battery, it) } ?: words(R.string.gaming_pad_connected),
                             ),
                         )
+                        // Its button labels: Automatic, or the glyphs printed on it (Droidtop/tracker#723).
+                        if (pad.descriptor.isNotEmpty()) {
+                            val chosen = dev.droidtop.library.controller.GlyphOverrides.get(context)[pad.descriptor]
+                            add(
+                                ChoiceItem(
+                                    id = "${ID_PADS_PREFIX}${index}_labels",
+                                    title = words(R.string.gaming_pad_button_labels, pad.name),
+                                    subtitle = words(R.string.gaming_pad_button_labels_subtitle),
+                                    options = listOf(ChoiceOption("", words(R.string.gaming_pad_labels_auto))) +
+                                        dev.droidtop.lib.input.PadFamily.entries.map { ChoiceOption(it.id, padFamilyName(it)) },
+                                    current = chosen?.id.orEmpty(),
+                                    onSelect = { ctx, value ->
+                                        dev.droidtop.library.controller.GlyphOverrides.set(
+                                            ctx,
+                                            pad.descriptor,
+                                            dev.droidtop.library.controller.GlyphFamily.fromId(value),
+                                        )
+                                    },
+                                ),
+                            )
+                        }
                     }
                 }
                 // How far the stick leans before it moves the cursor, against drift (Droidtop/tracker#723).
@@ -1123,6 +1144,13 @@ object GamingSettingsCatalog {
     /** Settings > Controls' rows for the connected pads (Droidtop/tracker#723): facts, not actions. */
     const val ID_PADS_PREFIX = "controls_pad_"
     const val ID_PADS_NONE = "controls_pad_none"
+
+    /** A pad family as its buttons are known. */
+    private fun padFamilyName(family: dev.droidtop.library.controller.GlyphFamily): String = when (family.id) {
+        "playstation" -> words(R.string.gaming_pad_labels_playstation)
+        "nintendo" -> words(R.string.gaming_pad_labels_nintendo)
+        else -> words(R.string.gaming_pad_labels_xbox)
+    }
     // 40, not 70 (owner on the console, dev.2778: "the nav noises are VERY harsh"): the bundled samples peak at
     // about -1 dBFS, and SoundPool's linear gain at 0.4 brings them to about -9 dBFS under game audio.
     private const val NAVIGATION_SOUNDS_DEFAULT = 40
