@@ -35,7 +35,7 @@ BANNED='sandbox|\broot\b|Shizuku|signing|fingerprint|helper|\bhost\b|\bindex\b|c
 # Each rule: name, on (1) or off (0), pattern, allowlist ('-' for none), what it means;
 # fields are separated by " @@ " because patterns and allowlists use "|".
 RULES=(
-"toast @@ 1 @@ Toast\.makeText @@ /Notices\.kt$ @@ an acknowledgement is Notices.flash, a failure a row notice or a dialog"
+"toast @@ 1 @@ Toast\.makeText @@ /Notices\.kt$|^shell-default/src/app/murinelauncher/hooks/MurineHooks\.kt$ @@ an acknowledgement is Notices.flash, a failure a row notice or a dialog; the Murine launcher's own default notice (MurineHooks) is a toast, and droidtop replaces it with Notices.flash (Droidtop/tracker#921)"
 "error-colour @@ 1 @@ colorScheme\.error @@ ^ui-shared/ @@ Material's error roles are set from the notice palette in :ui-shared only"
 "empty-run @@ 1 @@ run = \{\} @@ - @@ a row that does nothing is a value on another row, gone, or a NoticeItem"
 "warning-text @@ 1 @@ TextBlockItem\([^)]*\"WARNING|\(high risk\) @@ - @@ a warning is a notice, never a paragraph or a title suffix"
