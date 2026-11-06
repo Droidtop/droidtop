@@ -102,6 +102,27 @@ internal fun CompanionConnections() {
     }
 }
 
+/**
+ * Device > Controllers' pads (Droidtop/tracker#786 S9): each connected controller with its battery, through the one
+ * reader ([Controllers], `ConnectedPads`), read off the main thread when the page opens.
+ */
+@Composable
+internal fun CompanionControllerList() {
+    val context = LocalContext.current
+    val pads by produceState<List<Controllers.Pad>?>(null) { value = withContext(Dispatchers.IO) { Controllers.read(context.applicationContext) } }
+    val colors = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val list = pads ?: run { CompanionNote("Reading…"); return@Column }
+        if (list.isEmpty()) CompanionNote("None connected")
+        list.forEach { pad ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(pad.name, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface, modifier = Modifier.weight(1f))
+                pad.percent?.let { Text("$it%", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant) }
+            }
+        }
+    }
+}
+
 /** Paired Bluetooth devices by name, or null while droidtop lacks Bluetooth access (Android 12 and later). */
 @SuppressLint("MissingPermission")
 private fun bondedDevices(context: Context): List<String>? {

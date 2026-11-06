@@ -111,11 +111,13 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
         val STORAGE = CompanionTab(CompanionPrefs.pageId(ControlPanel.DEVICE, "storage"), "Storage", QuickGlyph.DOWNLOAD)
         val PRIVACY = CompanionTab(CompanionPrefs.pageId(ControlPanel.DEVICE, "privacy"), "Privacy", QuickGlyph.PROFILE)
         val ACCESSIBILITY = CompanionTab(CompanionPrefs.pageId(ControlPanel.DEVICE, "accessibility"), "Accessibility", QuickGlyph.PEOPLE)
+        val CONTROLLERS = CompanionTab(CompanionPrefs.pageId(ControlPanel.DEVICE, "controllers"), "Controllers", QuickGlyph.GAMEPAD)
 
         /** Which System-tab card each of those pages draws. */
         val CARD_OF_PAGE = mapOf(
             DISPLAY.id to "display", SOUND.id to "sound", BATTERY.id to "power",
             STORAGE.id to "storage", PRIVACY.id to "privacy", ACCESSIBILITY.id to "accessibility",
+            CONTROLLERS.id to "controllers",
         )
 
         /** Android's own pages, folded under one row until each has its own page (plan 4.1 rule 1). */
@@ -135,7 +137,7 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
         val CHOOSABLE = listOf(HOME, DEVICE, DROIDTOP, PERFORMANCE, INPUT, SOCIAL)
 
         /** Device's pages and droidtop's, in the order their tab lists them. */
-        val DEVICE_PAGES = listOf(SYSTEM, DISPLAY, SOUND, NETWORK, BATTERY, STORAGE, APPS, PRIVACY, ACCESSIBILITY, ANDROID_PAGES)
+        val DEVICE_PAGES = listOf(SYSTEM, DISPLAY, SOUND, NETWORK, CONTROLLERS, BATTERY, STORAGE, APPS, PRIVACY, ACCESSIBILITY, ANDROID_PAGES)
         val DROIDTOP_PAGES = listOf(COMPANION_SETTINGS, DOWNLOADS)
 
         /** Pages a person can choose as a tab of its own; they are never listed under More, their tab lists them. */
