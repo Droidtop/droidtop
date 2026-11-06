@@ -216,7 +216,7 @@ private fun readNetworks(context: Context): NetworkState {
         val wifi = if (kind == NetKind.WIFI) context.getSystemService(WifiManager::class.java)?.connectionInfo else null
         val name = when (kind) {
             // The network's name: Android shows it to apps only with location; the helper app reads `cmd wifi status`.
-            NetKind.WIFI -> if (helper) shellLine(listOf("cmd", "wifi", "status"))?.let { Regex("SSID: \"([^\"]+)\"").find(it)?.groupValues?.get(1) } else null
+            NetKind.WIFI -> if (helper) wifiNameWithHelper() else null
             // Which app provides the VPN, where Android says: the always-on VPN setting, read with the helper app.
             NetKind.VPN -> if (helper) shellLine(listOf("settings", "get", "secure", "always_on_vpn_app"))?.trim()
                 ?.takeIf { it.isNotBlank() && it != "null" }?.let { pkg -> appLabel(context, pkg) ?: pkg } else null
@@ -246,6 +246,10 @@ private fun readNetworks(context: Context): NetworkState {
     val adbWifi = if (helper) shellLine(listOf("settings", "get", "global", "adb_wifi_enabled"))?.trim()?.let { it == "1" } else null
     return NetworkState(networks, interfaces, helper, adbWifi)
 }
+
+/** The Wi-Fi network's name from `cmd wifi status`, through the helper app; null without it. Blocks: off the main thread. */
+internal fun wifiNameWithHelper(): String? =
+    shellLine(listOf("cmd", "wifi", "status"))?.let { Regex("SSID: \"([^\"]+)\"").find(it)?.groupValues?.get(1) }
 
 private fun shellLine(argv: List<String>): String? = runCatching { TaskManager.shell.exec(argv)?.stdout }.getOrNull()
 
