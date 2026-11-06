@@ -397,6 +397,13 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         val HIDE_STATUS_BAR = backedUpItem(SettingsHomeFragment.HIDE_STATUS_BAR, false)
         @JvmField
         val HIDE_NAVIGATION_BAR = backedUpItem(SettingsHomeFragment.HIDE_NAVIGATION_BAR, false)
+        // droidtop: the one search's providers, each on by default (Droidtop/tracker#704; Settings > Search bar).
+        @JvmField
+        val SEARCH_CALCULATOR = backedUpItem("pref_search_calculator", true)
+        @JvmField
+        val SEARCH_ANDROID_PAGES = backedUpItem("pref_search_android_pages", true)
+        @JvmField
+        val SEARCH_SHORTCUTS = backedUpItem("pref_search_shortcuts", true)
         @JvmField
         val ACCESSIBILITY_DISCLOSURE_ACCEPTED =
             backedUpItem("pref_accessibility_disclosure_accepted", false)

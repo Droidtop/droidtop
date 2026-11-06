@@ -56,9 +56,18 @@ class LauncherSearchActivity : ComponentActivity() {
         setContent {
             dev.droidtop.app.ui.DroidtopTheme {
                 val entries by games.collectAsStateWithLifecycle()
+                // Settings > Search bar's providers (Droidtop/tracker#704), read off the main thread; on until read.
+                val providers by androidx.compose.runtime.produceState(true to true) {
+                    value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        com.android.launcher3.LauncherPrefs.SEARCH_CALCULATOR.get(applicationContext) to
+                            com.android.launcher3.LauncherPrefs.SEARCH_ANDROID_PAGES.get(applicationContext)
+                    }
+                }
                 LauncherSearchScreen(
                     initialText = initialText,
                     games = entries,
+                    calculator = providers.first,
+                    androidPages = providers.second,
                     findApps = { query ->
                         LauncherSearch.findApps(applicationContext, query).map { hit ->
                             LauncherSearchApp(
@@ -70,7 +79,11 @@ class LauncherSearchActivity : ComponentActivity() {
                         } +
                             // The apps' own shortcuts (Droidtop/tracker#704), read off the main thread.
                             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                LauncherSearch.findShortcuts(applicationContext, query)
+                                if (com.android.launcher3.LauncherPrefs.SEARCH_SHORTCUTS.get(applicationContext)) {
+                                    LauncherSearch.findShortcuts(applicationContext, query)
+                                } else {
+                                    emptyList()
+                                }
                             }.map { hit ->
                                 LauncherSearchApp(
                                     key = "shortcut:${hit.info.`package`}/${hit.info.id}",

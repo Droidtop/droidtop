@@ -186,6 +186,14 @@
     <string name="pref_qsb_enable_lens_title">Enable Lens</string>
     <string name="pref_qsb_enable_lens_summary">Show Google Lens button in quick search</string>
     <string name="pref_qsb_bar_alpha">Search bar alpha</string>
+    <!-- The one search's providers (Droidtop/tracker#704). -->
+    <string name="pref_search_results_title">In search results</string>
+    <string name="pref_search_calculator_title">Calculator</string>
+    <string name="pref_search_calculator_summary">A sum answers first; press it to copy</string>
+    <string name="pref_search_android_pages_title">Android\'s Settings pages</string>
+    <string name="pref_search_android_pages_summary">Display, Battery saver and the rest, by name</string>
+    <string name="pref_search_shortcuts_title">App shortcuts</string>
+    <string name="pref_search_shortcuts_summary">The apps\' own shortcuts, while droidtop is your home screen</string>
     <string name="pref_qsb_custom_provider_title">Custom search URL</string>
 
     <!-- Murine smartspace / clock widget -->
