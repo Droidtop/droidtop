@@ -6,5 +6,5 @@
   feel different. The keyboard droidtop shows in its own screens follows Android's touch feedback setting.
 
 ### Changed
-- "Vibrate on keypress" and "Vibrate duration" are now one setting, "Vibration strength": Off, Light, Medium or
-  Strong. Your old choice carries over.
+- "Vibrate on keypress" is now "Vibration strength": Off, Light, Medium, Strong, or Custom, which buzzes every key for
+  your "Vibrate duration" as before. Your old choice carries over, duration included.

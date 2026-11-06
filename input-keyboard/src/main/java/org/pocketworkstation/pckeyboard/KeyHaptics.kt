@@ -3,7 +3,8 @@ package org.pocketworkstation.pckeyboard
 /**
  * Haptics per key class (Droidtop/tracker#903 H12a; docs/SPEC.md 6a, "Motion and haptics"): which class a key is, the
  * "Vibration strength" setting and its migration from Hacker's Keyboard's "Vibrate on keypress", and the effect each
- * class gets at each strength. Pure, so it is tested on the JVM; [KeyHapticsPlayer] turns these into the platform's
+ * class gets at each strength. Hacker's "Vibrate duration" is kept: [VibrationStrength.CUSTOM] buzzes every key for it,
+ * as Hacker's did. Pure, so it is tested on the JVM; [KeyHapticsPlayer] turns these into the platform's
  * VibrationEffect objects.
  *
  * Ported in part:
@@ -17,12 +18,16 @@ package org.pocketworkstation.pckeyboard
  */
 enum class HapticClass { LETTER, MODIFIER, DELETE, SPACE_ENTER }
 
-/** The setting's values, stored by [id]; [percent] is the amplitude a buzz is given below Android 10. */
+/**
+ * The setting's values, stored by [id]; [percent] is the amplitude a buzz is given below Android 10. [CUSTOM] is
+ * Hacker's Keyboard's own: one buzz of the "Vibrate duration" for every key, on every Android.
+ */
 enum class VibrationStrength(val id: String, val percent: Int) {
     OFF("off", 0),
     LIGHT("light", 35),
     MEDIUM("medium", 65),
     STRONG("strong", 100),
+    CUSTOM("custom", 0),
     ;
 
     companion object {
@@ -48,10 +53,18 @@ class Waveform(val timings: LongArray, val amplitudes: IntArray) {
 }
 
 object KeyHaptics {
-    /** The setting. It replaces Hacker's Keyboard's [OLD_ON] and [OLD_LEN], whose values [migrated] reads. */
+    /**
+     * The setting. It replaces Hacker's Keyboard's [OLD_ON], whose value [migrated] reads; Hacker's [LEN_PREF] ("Vibrate
+     * duration", in ms) stays, under its own key and default, and is what [VibrationStrength.CUSTOM] plays.
+     */
     const val PREF = "vibrate_strength"
     const val OLD_ON = "vibrate_on"
-    const val OLD_LEN = "vibrate_len"
+    const val LEN_PREF = "vibrate_len"
+
+    /** Hacker's default "Vibrate duration", and the range its slider offers. */
+    const val DEFAULT_LEN_MS = 40
+    const val MIN_LEN_MS = 5
+    const val MAX_LEN_MS = 200
 
     /** VibrationEffect.DEFAULT_AMPLITUDE: the vibrator's own, for one that cannot vary it. */
     const val DEFAULT_AMPLITUDE = -1
@@ -74,29 +87,37 @@ object KeyHaptics {
 
     /**
      * The strength an install that had Hacker's Keyboard's settings starts with: "Vibrate on keypress" off (or never
-     * set) is [VibrationStrength.OFF]; on, its "Vibrate duration" picks the level: up to 20 ms light, up to 60 ms
-     * medium (the old default was 40 ms), longer strong.
+     * set) is [VibrationStrength.OFF]; on with the default "Vibrate duration" (40 ms, or none stored) is
+     * [VibrationStrength.MEDIUM]; on with any other duration is [VibrationStrength.CUSTOM], which keeps that duration.
      */
     @JvmStatic
     fun migrated(vibrateOn: Boolean?, lengthMs: Int?): VibrationStrength {
         if (vibrateOn != true) return VibrationStrength.OFF
-        val len = lengthMs ?: return VibrationStrength.MEDIUM
-        return when {
-            len <= 20 -> VibrationStrength.LIGHT
-            len <= 60 -> VibrationStrength.MEDIUM
-            else -> VibrationStrength.STRONG
-        }
+        return if (lengthMs == null || lengthMs == DEFAULT_LEN_MS) VibrationStrength.MEDIUM else VibrationStrength.CUSTOM
     }
 
     /**
-     * Android 10 and later: the predefined effect for [cls] at [strength], null for [VibrationStrength.OFF]. A letter
+     * Whether the settings show "Vibrate duration": always in pro mode (Hacker's whole tree, [KeyboardProMode]), and
+     * otherwise only while the strength is Custom, the one strength that plays it.
+     */
+    @JvmStatic
+    fun showsDuration(strength: VibrationStrength, pro: Boolean): Boolean = pro || strength == VibrationStrength.CUSTOM
+
+    /** The "Vibrate duration" to play for [stored] ms: the default when nothing usable is stored, within the slider's range. */
+    @JvmStatic
+    fun customLengthMs(stored: Int?): Long =
+        (if (stored == null || stored <= 0) DEFAULT_LEN_MS else stored.coerceIn(MIN_LEN_MS, MAX_LEN_MS)).toLong()
+
+    /**
+     * Android 10 and later: the predefined effect for [cls] at [strength], null for [VibrationStrength.OFF] (and for
+     * [VibrationStrength.CUSTOM], a one-shot of the duration). A letter
      * steps tick, click, heavy click with the strength; space and enter sit a step heavier, delete a step lighter, and
      * a modifier is always a double click, the feel of a latch. Four effects cannot give four classes three steps
      * each, so at Light a letter and delete are both a tick, and at Strong a letter and space are both a heavy click.
      */
     @JvmStatic
     fun predefined(cls: HapticClass, strength: VibrationStrength): HapticEffect? = when (strength) {
-        VibrationStrength.OFF -> null
+        VibrationStrength.OFF, VibrationStrength.CUSTOM -> null
         VibrationStrength.LIGHT -> when (cls) {
             HapticClass.LETTER, HapticClass.DELETE -> HapticEffect.TICK
             HapticClass.SPACE_ENTER -> HapticEffect.CLICK
@@ -116,14 +137,15 @@ object KeyHaptics {
     }
 
     /**
-     * Android 8 and 9: the buzz for [cls] at [strength], null for [VibrationStrength.OFF]. A letter is one 14 ms pulse,
+     * Android 8 and 9: the buzz for [cls] at [strength], null for [VibrationStrength.OFF] and [VibrationStrength.CUSTOM]
+     * (a one-shot of the duration, on every Android). A letter is one 14 ms pulse,
      * space and enter a longer, firmer 22 ms, delete a short, soft 9 ms, and a modifier two 8 ms pulses 45 ms apart.
      * The strength lengthens the pulses (x0.75, x1, x1.35) and, where the vibrator can vary it ([amplitudeControl]),
      * sets their amplitude; where it cannot, the length alone carries the strength.
      */
     @JvmStatic
     fun waveform(cls: HapticClass, strength: VibrationStrength, amplitudeControl: Boolean): Waveform? {
-        if (strength == VibrationStrength.OFF) return null
+        if (strength == VibrationStrength.OFF || strength == VibrationStrength.CUSTOM) return null
         val stretch = when (strength) {
             VibrationStrength.LIGHT -> 0.75
             VibrationStrength.STRONG -> 1.35

@@ -418,6 +418,7 @@
     <string name="title_label_scale">Размер шрифта клавиш</string>
     <string name="title_candidate_scale">Размер шрифта вариантов</string>
 
+    <string name="title_vibrate_len">Длительность вибрации</string>
 
     <string name="title_click_volume">Громкость звука</string>
 
