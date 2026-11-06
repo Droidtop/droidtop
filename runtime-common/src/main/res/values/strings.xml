@@ -109,6 +109,8 @@
     <string name="gaming_in_kid_mode_no_slider_or">In Kid mode no slider or volume key goes past this</string>
     <string name="gaming_library">Library</string>
     <string name="gaming_scraper">Scraper</string>
+    <string name="gaming_import_from_another_frontend">Import from another frontend</string>
+    <string name="gaming_import_from_another_frontend_subtitle">Pegasus favourites and collections, matched to your games</string>
     <string name="gaming_artwork_and_metadata">Artwork and metadata</string>
     <string name="gaming_console_systems">Console systems</string>
     <string name="gaming_systems_and_folders">Systems and folders</string>

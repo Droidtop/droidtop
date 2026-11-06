@@ -14180,6 +14180,15 @@ toast and a notification, and the close timer runs through a second
 `PlayEnforcer`: the warning five minutes before, "Your time is up" with the same
 60 seconds, then `Library.quitRunning`. In Kid mode only Kid's limits apply.
 
+**Import from another frontend (Droidtop/tracker#724).** Settings > Library > Import from another frontend brings what
+another frontend kept into droidtop's own favourites and collections, matched against the games droidtop has found;
+it only reads (no ROM is touched, moved or copied, and the other frontend's files are never written) and each import
+says how many of its games were found ("12 of 15 games found; 3 not in your library"). A game is found by its file:
+the same absolute path, the same relative path inside a games folder, or the one game with that file name; a name
+that fits several is not guessed (`PegasusImport.match`). Slice 1 reads Pegasus: `metadata.pegasus.txt`'s
+collections (each becomes a collection of that name, with the games found) and its `favorites.txt` (the games found
+become favourites). Daijisho playlists, LaunchBox's Platforms XML and play time are still to build.
+
 **Your play (2026-10-29, Droidtop/tracker#597).** UI review 265: "There is no
 play-time summary anywhere: no total, no per-system, no 'this week'". Kid mode's
 ledger counts all play together, and only in Kid, for its limits. The same
