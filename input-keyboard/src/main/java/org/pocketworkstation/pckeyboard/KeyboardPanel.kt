@@ -48,8 +48,30 @@ class KeyboardPanel(
     private val keyboardView: LatinKeyboardView? = run {
         // The key grid reads the form and space-bar drag from the shared settings, which only the input method loads.
         ToolsPrefs.loadInto(LatinIME.sKeyboardSettings, context)
-        logged("key grid not built; the panel stays empty") { SecondScreenKeyboard.createView(context, listener, heightPercent) }
+        logged("key grid not built; the panel stays empty") { SecondScreenKeyboard.createView(context, FeedbackListener(listener), heightPercent) }
             .getOrNull()
+    }
+
+    /**
+     * The panel's keys with a haptic per key class (Droidtop/tracker#903 H12a). droidtop has no vibration setting of
+     * its own, and its text-entry slab follows Android's touch feedback ([SlabView]), so these keys do too
+     * ([KeyHapticsPlayer.viewFeedback]); the input method's "Vibration strength" is the input method's.
+     */
+    private inner class FeedbackListener(private val keys: SecondScreenKeyboardListener) : LatinKeyboardBaseView.OnKeyboardActionListener {
+        override fun onPress(primaryCode: Int) {
+            keyboardView?.let { KeyHapticsPlayer.viewFeedback(it, primaryCode) }
+            keys.onPress(primaryCode)
+        }
+
+        override fun onRelease(primaryCode: Int) = keys.onRelease(primaryCode)
+        override fun onKey(primaryCode: Int, keyCodes: IntArray?, x: Int, y: Int) = keys.onKey(primaryCode, keyCodes, x, y)
+        override fun onText(text: CharSequence?) = keys.onText(text)
+        override fun onCancel() = keys.onCancel()
+        override fun swipeLeft(): Boolean = keys.swipeLeft()
+        override fun swipeRight(): Boolean = keys.swipeRight()
+        override fun swipeDown(): Boolean = keys.swipeDown()
+        override fun swipeUp(): Boolean = keys.swipeUp()
+        override fun onCursorDrag(steps: Int) = keys.onCursorDrag(steps)
     }
 
     // The tool strip (clipboard history, macros, incognito) above the grid, or the grid alone when it is switched off.
@@ -94,6 +116,11 @@ class KeyboardPanel(
 
     private var countedForIme = false
 
+    /** The animation settings, read each time the panel comes on screen (Droidtop/tracker#903 H12a). */
+    private fun refreshMotion() {
+        if (isAttachedToWindow && windowVisibility == View.VISIBLE) KeyboardMotion.refresh(context)
+    }
+
     private fun syncImeSuppression() {
         if (!suppressImeView) return
         val shouldCount = isAttachedToWindow && windowVisibility == View.VISIBLE
@@ -105,11 +132,13 @@ class KeyboardPanel(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         syncImeSuppression()
+        refreshMotion()
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
         syncImeSuppression()
+        refreshMotion()
     }
 
     override fun onDetachedFromWindow() {

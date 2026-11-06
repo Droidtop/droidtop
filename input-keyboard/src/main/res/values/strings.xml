@@ -40,9 +40,6 @@
     <string name="title_swipe_gestures">Swipe gestures (experimental)</string>
     <string name="title_hardware_key_actions">Hardware key actions</string>
 
-    <!-- Option to provide vibrate/haptic feedback on keypress -->
-    <string name="vibrate_on_keypress">Vibrate on keypress</string>
-
     <!-- Option to play back sound on keypress in soft keyboard -->
     <string name="sound_on_keypress">Sound on keypress</string>
 
@@ -530,7 +527,21 @@
     <string name="title_label_scale">Key label scaling</string>
     <string name="title_candidate_scale">Suggestion label scaling</string>
 
-    <string name="title_vibrate_len">Vibrate duration</string>
+    <!-- droidtop patch (Droidtop/tracker#903 H12a): one setting in place of Vibrate on keypress and Vibrate duration;
+         each key class (letter, modifier, delete, space and enter) gets its own haptic at the strength chosen. -->
+    <string name="title_vibrate_strength">Vibration strength</string>
+    <string-array name="vibrate_strength_entries">
+        <item>Off</item>
+        <item>Light</item>
+        <item>Medium</item>
+        <item>Strong</item>
+    </string-array>
+    <string-array name="vibrate_strength_values" translatable="false">
+        <item>off</item>
+        <item>light</item>
+        <item>medium</item>
+        <item>strong</item>
+    </string-array>
 
     <string name="title_click_volume">Key click volume</string>
     <string name="default_click_volume">0.2</string>
