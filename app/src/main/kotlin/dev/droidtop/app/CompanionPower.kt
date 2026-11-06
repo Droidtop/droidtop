@@ -48,7 +48,7 @@ internal fun clusterLine(cluster: PowerProbe.Cluster): String =
 
 /**
  * System > Power (docs/SPEC.md "The companion's tabs", Power and performance; slice C16): the battery's health,
- * temperature and charge rate, Battery saver (Android's screen), the fan mode and charge limit where [PowerProbe]
+ * temperature and charge rate, the fan mode and charge limit where [PowerProbe]
  * finds them as device settings (shown with their values; the device's own page or Android's opens to change them),
  * each cluster's clock and the GPU's where readable, and with Root-level commands a cluster's governor and highest
  * clock. All reads off the main thread, once when the card opens and after a change.
@@ -74,16 +74,14 @@ internal fun CompanionPowerCard() {
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val facts = listOfNotNull(
+            // The level, which System's Battery row showed before that row became this page's (Droidtop/tracker#786 S10).
+            battery?.let { "${it.percent}%" + if (it.charging) " charging" else "" },
             health?.let { "Health $it" },
             battery?.tempTenthC?.let { "%.1f °C".format(it / 10.0) },
             battery?.watts?.let { "%.1f W".format(it) + if (battery?.charging == true) " charging" else " draw" },
         )
         if (facts.isNotEmpty()) Text(stringResource(R.string.companion_power_battery, facts.joinToString(", ")), style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CompanionPill("Battery saver") {
-                SettingsLaunch.start(context, dev.droidtop.runtime.systemstatus.SystemControls.batterySaverSettingsIntent())
-            }
-        }
+        // Battery saver is the card's catalog row under these (BatterySaver, Droidtop/tracker#786 S10).
         val v = visible ?: run { CompanionNote("Reading…"); return@Column }
         if (v.fan.isNotEmpty() || v.chargeLimit.isNotEmpty()) {
             v.fan.forEach { (key, value) -> Text(stringResource(R.string.companion_power_fan, key.substringAfter('/'), value), style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) }

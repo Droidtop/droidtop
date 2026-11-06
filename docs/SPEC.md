@@ -6123,7 +6123,7 @@ droidtop 0.2.0-dev.1931).
     rule as the companion's row (`GameRow.SCREENSHOT`, `ControlRow.GAME_SCREENSHOT`). A controller chord and clips
     are later work.
 - **Power and performance (slice C16).** System > Power keeps performance mode and adds: the battery's health,
-  temperature and charge rate (the battery broadcast), Battery saver (Android's screen), and what `PowerProbe` finds
+  temperature and charge rate (the battery broadcast), its level, and what `PowerProbe` finds
   on this device rather than assumes per model. A fan mode or a charge limit is shown with its value where the device
   keeps one as an Android setting (`settings list system|global|secure` through the helper app, keys naming a fan or a
   charge limit, stop or protection); changing it opens the device's own page where one resolves, else Android's
@@ -6131,7 +6131,11 @@ droidtop 0.2.0-dev.1931).
   where the kernel lets an app read them and left out where it does not. With Settings > Risky actions > Root-level
   commands and a root provider, each cluster has its governor and its highest clock to pick (cpufreq's own
   `scaling_governor` and `scaling_max_freq`, written as root, values checked against what the cluster lists). Owner
-  question 5's default (yes, behind Root-level commands, off by default).
+  question 5's default (yes, behind Root-level commands, off by default). Battery saver is one row (`BatterySaver`,
+  Droidtop/tracker#786 S10): a switch with the helper app and Risky actions > "Change system settings", read back after
+  each change and opening Android's screen when Android did not follow; otherwise Android's Battery Saver screen,
+  naming that switch. Home's low-battery line turns it on through the same path, and the companion's System card does
+  not draw the Quick Menu's Battery row again (its level is on this page).
 - **Privacy (slice C17).** System > Privacy has Android's privacy dashboard link, then, with the helper app, the
   apps that used the camera, microphone or location in the last 24 hours (`PrivacyAccess`, from Android's own record,
   `dumpsys appops --op CAMERA|RECORD_AUDIO|FINE_LOCATION`, each package's latest access), each opening its App info
@@ -13185,6 +13189,9 @@ or the system through the privileged helper:
   (`cmd display set-user-preferred-display-mode`, the companion's System > Display cards, Droidtop/tracker#414).
 - **Change accessibility settings** (`ACCESSIBILITY_SETTINGS`): the helper app setting Android's font size, display
   size, magnification, contrast, inversion and TalkBack for every app (the companion's System > Accessibility).
+- **Change system settings** (`SYSTEM_SETTINGS`): the helper app changing a system-wide setting Android keeps from
+  apps: battery saver (`settings put global low_power`, read back; `BatterySaver`, Droidtop/tracker#786 S10). Time,
+  location, dark theme and the plan's others join it as each gets its row.
 - **Root-level commands** (`ROOT_COMMANDS`): commands run as root through a provider that holds it: a CPU cluster's
   governor and highest clock from the companion's System > Power (`PowerProbe.write`), and
   placing a RetroArch core in RetroArch's private folder (`RetroArchCores`); with the class off droidtop does not

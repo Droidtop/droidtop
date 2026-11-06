@@ -90,13 +90,18 @@ internal fun companionSystemCards(
     dndCategories: List<CatalogItem> = emptyList(),
     dndHeading: String = "",
     controllers: List<CatalogItem> = emptyList(),
+    batterySaver: CatalogItem? = null,
 ): List<SystemCard> = listOf(
     // Without the Android settings row: on the companion its links are Device's "Android's pages", labelled as exits,
     // and an exit is on one page only (Droidtop/tracker#786 S3, plan 4.1 rule 2).
     SystemCard(
         "system",
         "System",
-        section(QuickSection.SYSTEM).filter { it.id != dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS },
+        // Battery is the Battery page's, with battery saver as a switch there (Droidtop/tracker#786 S10), when given.
+        section(QuickSection.SYSTEM).filter {
+            it.id != dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS &&
+                (batterySaver == null || it.id !in ON_BATTERY_PAGE)
+        },
         folded = false,
     ),
     // Font and display size have one place on the companion, Accessibility, when that card has them
@@ -127,7 +132,7 @@ internal fun companionSystemCards(
     // The connected pads, drawn by the card, then Controller buttons and Swap A and B, the Quick Menu's own pad rows
     // (`ControllerLayoutTiles`), which no companion page had (Droidtop/tracker#786 S9).
     SystemCard("controllers", "Controllers", controllers, folded = true),
-    SystemCard("power", "Power", listOfNotNull(performanceMode), folded = true),
+    SystemCard("power", "Power", listOfNotNull(batterySaver, performanceMode), folded = true),
     SystemCard("storage", "Storage", emptyList(), folded = true, storage = true),
     SystemCard("privacy", "Privacy", listOfNotNull(privacy), folded = true),
     // Android's accessibility settings (slice C22): written with the helper app, else opening Android's screens.
@@ -142,6 +147,9 @@ internal val ON_SCREEN_CARD = setOf(
     dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
     dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS_GRANT,
 )
+
+/** Rows the Battery page holds instead (its facts and the one battery saver). */
+internal val ON_BATTERY_PAGE = setOf(dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_BATTERY)
 
 /** Rows the Sound card's per-stream sliders draw themselves (`CompanionStreamVolumes`). */
 internal val ON_STREAM_SLIDERS = setOf(dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_VOLUME)
