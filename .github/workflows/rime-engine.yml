@@ -219,7 +219,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q ninja-build zstd libboost-dev libboost-regex-dev \
-            libyaml-cpp-dev libleveldb-dev libgoogle-glog-dev libgflags-dev
+            libyaml-cpp-dev libleveldb-dev libgoogle-glog-dev libgflags-dev libmarisa-dev
           cmake --version
           jni=trime/app/src/main/jni
           # OpenCC at librime's pin: opencc_dict compiles data/dictionary into
