@@ -54,7 +54,8 @@ internal fun CompanionSystemTab(only: Set<String>? = null) {
                 section = { section -> quickSectionGroups(catalog, section, uiMode).flatMap { it.items } },
                 performanceMode = GamingSettingsCatalog.performanceModeItem(),
                 privacy = GamingSettingsCatalog.privacyDashboardItem(),
-                accessibility = dev.droidtop.runtime.systemstatus.AccessibilityControls.items(context.applicationContext),
+                // Font and display size ask Keep here, where the Keep bar is drawn (Droidtop/tracker#786 S14).
+                accessibility = dev.droidtop.runtime.systemstatus.AccessibilityControls.items(context.applicationContext, askKeep = true),
                 dndCategories = dev.droidtop.runtime.systemstatus.DndCategories.items(context.applicationContext),
                 dndHeading = dev.droidtop.library.settings.words(dev.droidtop.runtime.R.string.dnd_lets_through),
                 controllers = dev.droidtop.shell.gamepad.ControllerLayoutTiles.items(),

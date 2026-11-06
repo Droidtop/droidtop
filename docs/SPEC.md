@@ -6190,7 +6190,10 @@ droidtop 0.2.0-dev.1931).
   high-contrast text, colour inversion and TalkBack (`AccessibilityControls`). With the helper app and Settings >
   Risky actions > "Change accessibility settings" droidtop writes them for every app (`settings put`, `wm density`
   as a factor of the panel's own density); otherwise each row opens Android's screen and says which switch would let
-  droidtop do it. Turning TalkBack or magnification off asks first, Cancel first. Font size and display size are the
+  droidtop do it. Turning TalkBack or magnification off asks first, Cancel first. On the companion, a font size or
+  display size change shows a Keep bar above every tab ("Font size 130%", Keep with the seconds left, Undo) and goes
+  back after 10 seconds without Keep (`ScreenShapeRevert`, Droidtop/tracker#786 S14); the Quick Menu's rows do not ask
+  yet, until the shell has a Keep a pad can reach. Font size and display size are the
   same catalog items in the Quick Menu's Display section, so the two surfaces always agree.
 - **Not built here:** the power menu (needs the accessibility service or a provider) and the "relaunch shell,
   companion, last app" actions of the original request.
