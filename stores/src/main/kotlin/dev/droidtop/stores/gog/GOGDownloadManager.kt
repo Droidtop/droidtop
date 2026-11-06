@@ -11,6 +11,8 @@ import dev.droidtop.stores.gog.api.GOGManifestMeta
 import dev.droidtop.stores.gog.api.GOGManifestParser
 import dev.droidtop.stores.gog.api.V1DepotFile
 import dev.droidtop.stores.util.CdnRankingUtils
+import dev.droidtop.stores.util.ChunkRetry
+import dev.droidtop.runtime.util.sizeOnDisk
 import dev.droidtop.stores.util.DownloadSpeedConfig
 import dev.droidtop.stores.util.Marker
 import dev.droidtop.stores.util.MarkerUtils
@@ -97,9 +99,7 @@ internal class GOGDownloadManager(
 
     companion object {
         private const val CHUNK_BUFFER_SIZE = 1024 * 1024 // 1MB buffer
-        private const val MAX_CHUNK_RETRIES = 3 // Maximum retries per chunk
         private const val MAX_CHUNK_ASSEMBLY_ATTEMPTS = 3 // Re-fetch+reassemble attempts before skipping a chunk
-        private const val RETRY_DELAY_MS = 1000L // Initial retry delay in milliseconds
         private const val DEPENDENCY_URL = "https://content-system.gog.com/dependencies/repository?generation=2"
         private const val STREAM_PROGRESS_TIME_INTERVAL_MS = 200L
         private const val USER_AGENT = "GOG Galaxy"
@@ -109,6 +109,13 @@ internal class GOGDownloadManager(
          * (one game's, or the dependencies'), so discarding one install deletes its own partial chunks and no other's. Pure.
          */
         fun areaPrefix(chunkCacheDir: File): String = "gog_" + Integer.toHexString(chunkCacheDir.absolutePath.hashCode()) + "_"
+
+        /**
+         * How many tries a chunk gets with [candidates] CDNs: one per CDN up to three, and at least [ChunkRetry.ATTEMPTS]
+         * (a single CDN still fetches a damaged chunk once more). Pure.
+         */
+        fun chunkAttempts(candidates: Int): Int = candidates.coerceIn(ChunkRetry.ATTEMPTS, 3)
+
         /**
          * Decompress a GOG chunk directly to file using zlib, streaming to avoid large memory allocations.
          * Calculates MD5 while decompressing and writes directly to the target file at the specified offset.
@@ -723,7 +730,7 @@ internal class GOGDownloadManager(
         try {
             val game = gogManager.getGameFromDbById(gameId)
             if (game != null) {
-                val installSize = calculateDirectorySize(installPath)
+                val installSize = installPath.sizeOnDisk()
                 gogManager.updateGame(
                     game.copy(
                         isInstalled = true,
@@ -1218,7 +1225,7 @@ internal class GOGDownloadManager(
                 }
 
                 // Calculate storage usage stats (only scan cache dir, not entire install dir)
-                val chunkCacheSize = calculateDirectorySize(chunkCacheDir)
+                val chunkCacheSize = chunkCacheDir.sizeOnDisk()
 
                 Timber.tag("GOG").d(
                     """Waiting for $currentPendingChunks pending chunks
@@ -1494,12 +1501,11 @@ internal class GOGDownloadManager(
     }
 
     /**
-     * Download a single chunk with retry logic
+     * One chunk, from each CDN candidate in turn ([ChunkRetry]: the engine retries a transfer itself, so another try
+     * here is another CDN, or the same chunk again when it arrived damaged).
      *
      * @param chunkMd5 Compressed MD5 hash (chunk identifier)
      * @param urlCandidates Ordered secure CDN URL candidates (fastest first)
-     * @param chunkCacheDir Cache directory
-     * @param downloadInfo Progress tracker
      */
     private suspend fun downloadChunkWithRetry(
         chunkMd5: String,
@@ -1511,38 +1517,12 @@ internal class GOGDownloadManager(
         if (urlCandidates.isEmpty()) {
             return@withContext Result.failure(Exception("No URL candidates for chunk $chunkMd5"))
         }
-
-        var lastException: Exception? = null
-
-        repeat(MAX_CHUNK_RETRIES) { attempt ->
-            if (!downloadInfo.isActive()) {
-                return@withContext Result.failure(Exception("Download cancelled"))
-            }
-
-            val url = urlCandidates[attempt % urlCandidates.size]
-            val result = downloadChunk(chunkMd5, url, chunkCacheDir, downloadInfo, areaPrefix)
-
-            if (result.isSuccess) {
-                if (attempt > 0) {
-                    Timber.tag("GOG").i("Chunk $chunkMd5 downloaded successfully after ${attempt + 1} attempts")
-                }
-                return@withContext result
-            }
-
-            lastException = result.exceptionOrNull() as? Exception
-
-            if (attempt < MAX_CHUNK_RETRIES - 1) {
-                val delay = RETRY_DELAY_MS * (1 shl attempt) // Exponential backoff: 1s, 2s, 4s
-                if (downloadInfo.isActive()) {
-                    Timber.tag("GOG")
-                        .w("Chunk $chunkMd5 download failed (attempt ${attempt + 1}/$MAX_CHUNK_RETRIES): ${lastException?.message}. Retrying in ${delay}ms...")
-                    delay(delay)
-                }
-            }
-        }
-
-        Timber.tag("GOG").e(lastException, "Failed to download chunk $chunkMd5 after $MAX_CHUNK_RETRIES attempts")
-        Result.failure(lastException ?: Exception("Failed to download chunk $chunkMd5"))
+        ChunkRetry.run(
+            tag = "GOG",
+            what = "Chunk $chunkMd5",
+            attempts = chunkAttempts(urlCandidates.size),
+            isActive = { downloadInfo.isActive() },
+        ) { attempt -> downloadChunk(chunkMd5, urlCandidates[attempt % urlCandidates.size], chunkCacheDir, downloadInfo, areaPrefix) }
     }
 
     /**
@@ -1732,33 +1712,5 @@ internal class GOGDownloadManager(
                 Timber.tag("GOG").w(e, "Failed to create symlink ${link.path} -> ${link.target}")
             }
         }
-    }
-
-    /**
-     * Total size under [directory]. Symlinks are skipped so GOG scriptinterpreter
-     * `rootdir` (symlink to install root) does not re-count the whole tree.
-     */
-    private fun calculateDirectorySize(directory: File): Long {
-        var size = 0L
-        try {
-            if (!directory.exists() || !directory.isDirectory) {
-                return 0L
-            }
-
-            val files = directory.listFiles() ?: return 0L
-            for (file in files) {
-                if (Files.isSymbolicLink(file.toPath())) {
-                    continue
-                }
-                size += if (file.isDirectory) {
-                    calculateDirectorySize(file)
-                } else {
-                    file.length()
-                }
-            }
-        } catch (e: Exception) {
-            Timber.tag("GOG").w(e, "Error calculating directory size for ${directory.name}")
-        }
-        return size
     }
 }
