@@ -1,7 +1,9 @@
 package org.pocketworkstation.pckeyboard
 
 import android.content.Context
+import android.view.Display
 import android.view.View
+import android.view.WindowManager
 import android.widget.FrameLayout
 
 /**
@@ -15,7 +17,10 @@ import android.widget.FrameLayout
  * method does not also put its own view up ([SecondScreenKeyboard.setAttached]). It follows window visibility,
  * not attachment, because a stopped Activity's views stay attached (Droidtop/tracker#156).
  *
- * [context] must belong to the display the panel is drawn on: the key grid sizes itself from its metrics.
+ * [context] must belong to the display the panel is drawn on: the key grid sizes itself from its metrics. On the add-on
+ * screen of a handheld (any display but the device's own, whose short side is a handheld's) the panel is compact
+ * (Droidtop/tracker#903 H12c): Hacker's Compact 5-row layout, at [KeyboardModes.compactHeightPercent] of the height
+ * asked for, never a row shorter than a finger's press target.
  */
 class KeyboardPanel(
     context: Context,
@@ -25,6 +30,19 @@ class KeyboardPanel(
 ) : FrameLayout(context) {
 
     private var functionLayer = false
+
+    // Compact on the add-on screen (Droidtop/tracker#903 H12c), decided once from the display the panel is built for.
+    private val compact: Boolean = context.resources.displayMetrics.let { metrics ->
+        KeyboardModes.compactPanel(
+            onDefaultDisplay(context),
+            KeyboardForm.handheld(metrics.widthPixels, metrics.heightPixels, metrics.xdpi, metrics.ydpi, context.resources.configuration.smallestScreenWidthDp),
+        )
+    }
+    private val keysHeightPercent: Float = if (compact) {
+        context.resources.displayMetrics.let { KeyboardModes.compactHeightPercent(heightPercent, it.heightPixels, it.ydpi) }
+    } else {
+        heightPercent
+    }
     private val spaceTimer = HandlerKeyTimer()
     private val repeats = HandlerKeyTimer()
     private val repeatTimer = object : KeyTimer {
@@ -48,7 +66,7 @@ class KeyboardPanel(
     private val keyboardView: LatinKeyboardView? = run {
         // The key grid reads the form and space-bar drag from the shared settings, which only the input method loads.
         ToolsPrefs.loadInto(LatinIME.sKeyboardSettings, context)
-        logged("key grid not built; the panel stays empty") { SecondScreenKeyboard.createView(context, FeedbackListener(listener), heightPercent) }
+        logged("key grid not built; the panel stays empty") { SecondScreenKeyboard.createView(context, FeedbackListener(listener), keysHeightPercent, compact) }
             .getOrNull()
     }
 
@@ -104,13 +122,13 @@ class KeyboardPanel(
     /** The key grid again, for a form that changed: the same layer, built with the new shape. */
     private fun rebuildKeys() {
         val view = keyboardView ?: return
-        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent)
+        SecondScreenKeyboard.applyLayout(view, context, functionLayer, keysHeightPercent, compact)
     }
 
     private fun toggleLayout() {
         val view = keyboardView ?: return
         functionLayer = !functionLayer
-        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent)
+        SecondScreenKeyboard.applyLayout(view, context, functionLayer, keysHeightPercent, compact)
     }
 
     private var countedForIme = false
@@ -148,5 +166,12 @@ class KeyboardPanel(
         // A modifier whose release never arrives leaves the far side holding Ctrl.
         listener.releaseEverything()
         super.onDetachedFromWindow()
+    }
+
+    private companion object {
+        /** Whether [context] draws on the device's own screen (any context that names no other display does). */
+        @Suppress("DEPRECATION") // Context.getDisplay is Android 11's; a display context's WindowManager answers on 8 too.
+        fun onDefaultDisplay(context: Context): Boolean =
+            (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)?.defaultDisplay?.displayId?.let { it == Display.DEFAULT_DISPLAY } ?: true
     }
 }

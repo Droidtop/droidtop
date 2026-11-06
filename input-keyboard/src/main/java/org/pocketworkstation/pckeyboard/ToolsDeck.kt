@@ -33,6 +33,8 @@ class ToolsDeck private constructor(
     private val relayout: Runnable?,
     /** The input method's own move to the next keyboard ([SwitchKeyboard]); null where droidtop is not the IME. */
     private val switchKeyboard: Runnable?,
+    /** Whether the strip of tools shows ("Tool strip"); off, the deck is only here for a mode's controls. */
+    val stripShown: Boolean,
 ) : LinearLayout(context) {
     // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, Droidtop/tracker#562).
     private val colors = KeyboardAppearance.colors(context)
@@ -53,6 +55,13 @@ class ToolsDeck private constructor(
     // Autofill chips are surfaces of another process; on Android 11 and later they are clipped to this host.
     private val inlineHost: ViewGroup = if (Build.VERSION.SDK_INT >= 30) InlineClipView(context) else FrameLayout(context)
 
+    // The input method's mode (Droidtop/tracker#903 H12c): one-handed puts its controls beside the keys. Embedded
+    // keyboards have no modes (KeyboardModes.current answers Normal there).
+    private val inputMethod = KeyboardAppearance.drawnByInputMethod(context)
+    private val mode = KeyboardModes.current(context)
+    private var stripTools: List<View> = emptyList()
+    private val modeControls = ArrayList<View>()
+
     init {
         orientation = VERTICAL
         setBackgroundColor(colors.ground)
@@ -64,7 +73,7 @@ class ToolsDeck private constructor(
             addView(emojiRow)
         }
         addView(emojiScroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-        addView(buildStrip(), LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        if (stripShown) addView(buildStrip(), LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         inlineScroll.apply {
             isHorizontalScrollBarEnabled = false
             isFocusable = false
@@ -80,8 +89,43 @@ class ToolsDeck private constructor(
             visibility = GONE
         }
         addView(notice)
-        stack.addView(keyboard, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, formGravity()))
+        if (mode == KeyboardModes.Mode.LEFT || mode == KeyboardModes.Mode.RIGHT) {
+            // One-handed: the keys at their edge, switch side, back to full and the resize handle on the free side.
+            val frame = OneHandedFrame(context, keyboard, mode == KeyboardModes.Mode.RIGHT, colors)
+            modeControls += frame.controls
+            stack.addView(frame, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+        } else {
+            stack.addView(keyboard, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, formGravity()))
+        }
         addView(stack, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+    }
+
+    /** Controls a mode adds around the deck (the floating frame's Dock), for the pad to reach after the strip's tools. */
+    fun addPadControls(controls: List<View>) {
+        modeControls += controls
+    }
+
+    /** Whether a panel (clipboard, emoji, macros, modes) is open over the keys. */
+    val panelOpen: Boolean get() = overlay != null
+
+    /**
+     * What a pad steps through above the keys (PadKeys, Droidtop/tracker#903 H12c): the open panel's buttons while one
+     * is open, else the strip's tools then the mode's controls. A tool is pressed as a tap presses it.
+     */
+    fun padTargets(): List<View> {
+        overlay?.let { panel -> return clickables(panel) }
+        return (stripTools + modeControls).filter { it.isShown }
+    }
+
+    private fun clickables(root: View): List<View> {
+        val out = ArrayList<View>()
+        fun walk(view: View) {
+            if (view.visibility != VISIBLE) return
+            if (view !== root && view.isClickable && view.isEnabled) out += view
+            if (view is ViewGroup) for (i in 0 until view.childCount) walk(view.getChildAt(i))
+        }
+        walk(root)
+        return out
     }
 
     /** A grid narrower than the screen sits at the edge the form names. */
@@ -98,10 +142,13 @@ class ToolsDeck private constructor(
         if (ToolsPrefs.clipboardHistory(context)) row.addView(tool(context.getString(R.string.tool_clipboard)) { toggle("clipboard") { clipboardPanel() } })
         if (ToolsPrefs.emoji(context)) row.addView(tool(context.getString(R.string.tool_emoji)) { toggle("emoji") { emojiPanel() } })
         row.addView(tool(context.getString(R.string.title_macros)) { toggle("macros") { macroPanel() } })
-        row.addView(formButton())
+        // The input method's modes (H12c) include the shapes the Layout button cycled; a keyboard droidtop embeds has no
+        // modes and keeps the Layout button.
+        row.addView(if (inputMethod) modesButton() else formButton())
         incognitoButton = tool("") { toggleIncognito() }
         row.addView(incognitoButton)
         updateIncognito()
+        stripTools = (0 until row.childCount).map { row.getChildAt(it) }
         return HorizontalScrollView(context).apply {
             isHorizontalScrollBarEnabled = false
             isFocusable = false
@@ -126,6 +173,50 @@ class ToolsDeck private constructor(
             keyboard.requestLayout()
         }
         return button
+    }
+
+    /** "Mode: Normal" and the like: opens the chooser of modes (Droidtop/tracker#903 H12c). */
+    private fun modesButton(): Button =
+        tool(context.getString(R.string.tool_mode, context.getString(modeName(mode)))) { toggle("modes") { modesPanel() } }
+
+    private fun modeName(mode: KeyboardModes.Mode): Int = when (mode) {
+        KeyboardModes.Mode.NORMAL -> R.string.mode_normal
+        KeyboardModes.Mode.LEFT -> R.string.mode_one_handed_left
+        KeyboardModes.Mode.RIGHT -> R.string.mode_one_handed_right
+        KeyboardModes.Mode.FLOATING -> R.string.mode_floating
+        KeyboardModes.Mode.THUMB -> R.string.mode_thumb_split
+        KeyboardModes.Mode.NUMBER_PAD -> R.string.mode_number_pad
+    }
+
+    /**
+     * The chooser: Normal, one-handed left and right, floating, the thumb split where the screen is wide enough, and the
+     * number pad; the current one lit. A choice is kept for this orientation and the input method builds itself again.
+     */
+    private fun modesPanel(): View {
+        val status = TextView(context)
+        val root = panelFrame(context.getString(R.string.title_modes), status)
+        status.text = context.getString(R.string.modes_status)
+        val rows = LinearLayout(context).apply { orientation = VERTICAL }
+        KeyboardModes.offered(KeyboardForm.thumbForScreen(context) != null).forEach { choice ->
+            rows.addView(
+                tool(context.getString(modeName(choice))) {
+                    hidePanel()
+                    if (choice != mode) KeyboardModes.choose(context, choice)
+                }.apply {
+                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                    if (choice == mode) setBackgroundColor(colors.accent)
+                },
+                LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
+            )
+        }
+        root.addView(
+            ScrollView(context).apply {
+                isFocusable = false
+                addView(rows)
+            },
+            LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f),
+        )
+        return root
     }
 
     private fun toggle(id: String, build: () -> View) {
@@ -158,6 +249,8 @@ class ToolsDeck private constructor(
      * The views belong to the autofill service's process and are only moved here.
      */
     fun showInlineSuggestions(views: List<View>) {
+        // With the strip off the deck is only a mode's frame, and the keys alone show, as before (H12c).
+        if (!stripShown) return
         inlineRow.removeAllViews()
         views.forEach { view ->
             (view.parent as? ViewGroup)?.removeView(view)
@@ -175,6 +268,7 @@ class ToolsDeck private constructor(
      * method as the text before the cursor changes.
      */
     fun offerEmoji(word: String, sensitive: Boolean) {
+        if (!stripShown) return
         val catalog = EmojiAssets.current()
         if (catalog == null && word.isNotEmpty() && !sensitive && ToolsPrefs.emoji(context)) EmojiAssets.load(context) { }
         val tone = ToolsPrefs.prefs(context).getInt(EmojiTones.PREF, 0)
@@ -429,10 +523,14 @@ class ToolsDeck private constructor(
             relayout: Runnable? = null,
             switchKeyboard: Runnable? = null,
         ): View {
-            if (!ToolsPrefs.strip(context)) return keyboard
+            val strip = ToolsPrefs.strip(context)
+            // One-handed keeps its controls beside the keys with the strip off (Droidtop/tracker#903 H12c).
+            val mode = KeyboardModes.current(context)
+            val controls = mode == KeyboardModes.Mode.LEFT || mode == KeyboardModes.Mode.RIGHT
+            if (!strip && !controls) return keyboard
             (keyboard.parent as? ViewGroup)?.removeView(keyboard)
-            ClipboardHistoryStore.start(context)
-            return ToolsDeck(context, keyboard, sink, typeText ?: { chars -> sink.text(chars) }, beforeInsert, relayout, switchKeyboard)
+            if (strip) ClipboardHistoryStore.start(context)
+            return ToolsDeck(context, keyboard, sink, typeText ?: { chars -> sink.text(chars) }, beforeInsert, relayout, switchKeyboard, strip)
         }
     }
 }

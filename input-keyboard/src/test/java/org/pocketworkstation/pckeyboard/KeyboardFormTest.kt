@@ -108,4 +108,47 @@ class KeyboardFormTest {
         assertNull(KeyboardForm.carriedToLandscape(null, landscapeSet = false))
         assertNull(KeyboardForm.carriedToLandscape("nonsense", landscapeSet = false))
     }
+
+    // Droidtop/tracker#903 H12c: the thumb split and the floating height.
+
+    @Test fun aWideScreenGetsAThumbSplitWithTheHalvesAtTheEdges() {
+        // A 10 inch wide tablet, 2560 px at 256 dpi: halves of 3 inches, a 40% gap.
+        val thumb = KeyboardForm.thumb(2560, 256f)!!
+        assertEquals("thumb", thumb.id)
+        assertEquals(0.4f, thumb.gapFraction, 1e-5f)
+        assertEquals(0.6f, thumb.widthFraction, 1e-5f)
+        // H1's split code lays it out: 1000 px, keys scaled to 60%, the right half moved past a 400 px gap.
+        val (x, w, g) = row()
+        assertEquals(1000, KeyboardForm.layout(x, w, g, 1000, thumb))
+        assertEquals(listOf(0, 150, 700, 850), x.toList())
+        assertEquals(listOf(150, 150, 150, 150), w.toList())
+    }
+
+    @Test fun aHandheldOrAPhoneHasNoThumbSplit() {
+        // The Retroid Pocket 5 sideways: 4.8 inches.
+        assertNull(KeyboardForm.thumb(1920, 401f))
+        // Just over the threshold opens a gap a little wider than H1's.
+        val inches = KeyboardForm.THUMB_MIN_WIDTH_INCHES
+        assertNull(KeyboardForm.thumb((inches * 200).toInt(), 200f))
+        val just = KeyboardForm.thumb(((inches + 0.5f) * 200).toInt(), 200f)!!
+        assertTrue(just.gapFraction > KeyboardForm.SPLIT.gapFraction)
+        // A huge display keeps the halves from shrinking to slivers.
+        assertEquals(KeyboardForm.THUMB_MAX_GAP, KeyboardForm.thumb(10000, 100f)!!.gapFraction, 0f)
+        assertNull(KeyboardForm.thumb(2560, 0f))
+    }
+
+    @Test fun theFloatingHeightScalesEveryRow() {
+        val y = intArrayOf(0, 100, 200)
+        val h = intArrayOf(100, 100, 100)
+        assertEquals(240, KeyboardForm.scaleHeights(y, h, 300, 0.8f))
+        assertEquals(listOf(0, 80, 160), y.toList())
+        assertEquals(listOf(80, 80, 80), h.toList())
+        assertEquals(300, KeyboardForm.scaleHeights(intArrayOf(0), intArrayOf(100), 300, 1f))
+        assertEquals(300, KeyboardForm.scaleHeights(intArrayOf(0), intArrayOf(100), 300, Float.NaN))
+    }
+
+    @Test fun oneHandedAtAnyWidthKeepsItsSide() {
+        assertEquals(KeyboardForm.Form("right", 0.85f, 0f, true), KeyboardForm.oneHanded(0.85f, atEnd = true))
+        assertEquals(KeyboardForm.LEFT, KeyboardForm.oneHanded(0.7f, atEnd = false))
+    }
 }

@@ -45,12 +45,15 @@ object ToolsPrefs {
 
     fun clipboardHistory(context: Context): Boolean = prefs(context).getBoolean(CLIPBOARD, true)
 
-    /** The key grid shape for [context]'s screen and orientation ([KeyboardForm.choose], Droidtop/tracker#903 H1). */
-    fun form(context: Context): KeyboardForm.Form = KeyboardForm.migrate(prefs(context)).let { KeyboardForm.forScreen(
+    /**
+     * The key grid's form for [context]'s screen and orientation: the shape setting's ([KeyboardForm.choose],
+     * Droidtop/tracker#903 H1), or the input method's mode's ([KeyboardModes.formFor], H12c).
+     */
+    fun form(context: Context): KeyboardForm.Form = KeyboardForm.migrate(prefs(context)).let { KeyboardModes.formFor(context, KeyboardForm.forScreen(
         prefs(context).getString(KeyboardForm.PREF, null),
         prefs(context).getString(KeyboardForm.PREF_LANDSCAPE, null),
         context,
-    ) }
+    )) }
 
     /** Keeps [form] as the choice for [context]'s current orientation, and in the shared settings. */
     fun setForm(context: Context, form: KeyboardForm.Form) {

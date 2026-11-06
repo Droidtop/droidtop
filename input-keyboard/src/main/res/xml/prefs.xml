@@ -387,6 +387,25 @@
             android:persistent="true"
             />
 
+    <!-- The input method's modes, one per orientation, also on the tool strip's Modes button (Droidtop/tracker#903 H12c). -->
+    <org.pocketworkstation.pckeyboard.AutoSummaryListPreference
+            android:key="pref_keyboard_view_mode"
+            android:title="@string/title_keyboard_view_mode"
+            android:entryValues="@array/keyboard_view_mode_values"
+            android:entries="@array/keyboard_view_mode_entries"
+            android:defaultValue="normal"
+            android:persistent="true"
+            />
+
+    <org.pocketworkstation.pckeyboard.AutoSummaryListPreference
+            android:key="pref_keyboard_view_mode_landscape"
+            android:title="@string/title_keyboard_view_mode_landscape"
+            android:entryValues="@array/keyboard_view_mode_values"
+            android:entries="@array/keyboard_view_mode_entries"
+            android:defaultValue="normal"
+            android:persistent="true"
+            />
+
     <CheckBoxPreference
             android:key="pref_emoji"
             android:title="@string/title_emoji"
