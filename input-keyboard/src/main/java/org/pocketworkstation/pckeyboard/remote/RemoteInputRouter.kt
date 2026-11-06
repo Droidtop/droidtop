@@ -82,6 +82,8 @@ class RemoteInputRouter(
     private val ime: () -> RemoteTarget?,
     private val imeSelected: () -> Boolean,
     private val fieldThread: FieldThread = FieldThread.Direct,
+    /** Told of each delivery on the field thread: what the edit was (null for a key) and what came of it. */
+    private val report: (shown: String?, delivery: Delivery) -> Unit = { _, _ -> },
 ) {
     fun route(): Route {
         ownField()?.let { return Route.OwnField(it) }
@@ -96,7 +98,7 @@ class RemoteInputRouter(
             is Route.Ime -> apply(route.target, back, text, enter)
             Route.SwitchKeyboard -> Delivery.Refused(SWITCH_KEYBOARD)
             Route.NoField -> Delivery.Refused(NO_FIELD)
-        }
+        }.also { report(describe(back, text, enter), it) }
     }
 
     /** Presses one key ([RemoteKeys]) in the field the route names. */
@@ -106,7 +108,7 @@ class RemoteInputRouter(
             is Route.Ime -> route.target.also { it.key(keyCode) }.let { Delivery.Sent(it.secret) }
             Route.SwitchKeyboard -> Delivery.Refused(SWITCH_KEYBOARD)
             Route.NoField -> Delivery.Refused(NO_FIELD)
-        }
+        }.also { report(null, it) }
     }
 
     /** Whether the field in focus is a password, for the phone's box; false when nothing is. */
@@ -126,6 +128,13 @@ class RemoteInputRouter(
     }
 
     companion object {
+        /** What an edit was, in a word when it had no text: the text, else "Enter", else "Backspace". */
+        fun describe(back: Int, text: String, enter: Boolean): String = when {
+            text.isNotEmpty() -> text
+            enter -> "Enter"
+            else -> "Backspace"
+        }
+
         const val SWITCH_KEYBOARD = "Switch to droidtop's keyboard to type from another device"
         const val NO_FIELD = "Tap a text field on this device first"
 

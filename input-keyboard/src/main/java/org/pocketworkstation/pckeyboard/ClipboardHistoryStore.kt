@@ -96,6 +96,31 @@ object ClipboardHistoryStore {
         listeners.remove(listener)
     }
 
+    /**
+     * A clip a paired device just put on the clipboard ([org.pocketworkstation.pckeyboard.remote.PairedClips]): kept
+     * from the text that was written, so it reaches the panel even when Android would not let droidtop read the
+     * clipboard back (droidtop not in front, its keyboard not the active one). Starts recording if nothing has yet.
+     * Main thread; the settings are read on the history's own thread, since a first read loads them from disk.
+     */
+    fun fromPairedDevice(context: Context, text: String, markedSensitive: Boolean = false) {
+        start(context)
+        val app = appContext
+        // Taken now: the field the keyboard serves when the clip arrives, not when the thread gets to it.
+        val sensitiveNow = fieldSensitive
+        io.execute {
+            val kept = synchronized(history) {
+                org.pocketworkstation.pckeyboard.remote.PairedClips.keep(
+                    history, text, System.currentTimeMillis(),
+                    historyOn = ToolsPrefs.clipboardHistory(app),
+                    incognito = ToolsPrefs.incognito(app),
+                    fieldSensitive = sensitiveNow,
+                    markedSensitive = markedSensitive,
+                )
+            }
+            if (kept) changed()
+        }
+    }
+
     private fun record() {
         val context = appContext
         if (!ToolsPrefs.clipboardHistory(context) || ToolsPrefs.incognito(context)) return

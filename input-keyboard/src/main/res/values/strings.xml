@@ -783,6 +783,10 @@
     <string name="tool_back">Back</string>
     <string name="tool_clear">Clear</string>
     <string name="tool_clipboard_empty">Nothing copied yet.</string>
+    <!-- The strip a phone typing into this device shows above the tools (Droidtop/tracker#903). -->
+    <string name="remote_typing">Phone connected · typing</string>
+    <string name="remote_typing_sent">Phone connected · typing · %1$s</string>
+    <string name="remote_not_received">Not received. %1$s</string>
     <string name="tool_pin">Pin</string>
     <string name="tool_unpin">Unpin</string>
     <string name="tool_delete">Delete</string>

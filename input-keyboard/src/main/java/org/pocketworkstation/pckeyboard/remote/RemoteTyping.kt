@@ -32,7 +32,16 @@ object RemoteTyping {
         ownField = provider
     }
 
-    /** The router: droidtop's own field first, else droidtop's input method's editor, else a notice. */
+    /**
+     * What the keyboard's strip shows of the phone session ([RemoteStrip]): the session says when it is paired
+     * ([RemoteStripModel.session], from `RemoteInputService`), and the router tells it of each delivery.
+     */
+    val strip = RemoteStripModel()
+
+    /**
+     * The router: droidtop's own field first, else droidtop's input method's editor, else a notice. Each delivery is
+     * told to [strip].
+     */
     fun router() = RemoteInputRouter(
         ownField = { ownField() },
         ime = {
@@ -42,6 +51,7 @@ object RemoteTyping {
         },
         imeSelected = { SecondScreenKeyboard.imeRunning },
         fieldThread = MainThread,
+        report = strip::delivered,
     )
 
     /** Delivers on the main thread, where the views and droidtop's input method live; the caller's thread waits for it. */

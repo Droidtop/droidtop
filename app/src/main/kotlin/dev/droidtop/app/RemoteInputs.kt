@@ -15,6 +15,7 @@ import dev.droidtop.library.credentials.handoff.RemoteInputEnd
 import dev.droidtop.library.credentials.handoff.RemoteInputState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.pocketworkstation.pckeyboard.ClipboardHistoryStore
 import org.pocketworkstation.pckeyboard.remote.RemoteTyping
 
 /**
@@ -95,8 +96,10 @@ object RemoteInputs {
 
 /**
  * The console's clipboard for the shared clipboard (docs/SPEC.md, "Type from another device", Droidtop/tracker#645),
- * both calls on the main thread. Reading follows what Android allows: only the app in front or the active input
- * method gets the clip, so from the background it is [ClipRead.Unavailable]. A clip marked sensitive
+ * both calls on the main thread. What a paired device writes (the phone page, KDE Connect) is also kept in the
+ * keyboard's clipboard history ([ClipboardHistoryStore.fromPairedDevice]). Reading follows what Android allows: only
+ * the app in front or the active input method gets the clip, so from the background it is [ClipRead.Unavailable]. A
+ * clip marked sensitive
  * (`ClipDescription.EXTRA_IS_SENSITIVE`) is classified before any of its content is read, and only plain text
  * is read (`ClipData.Item.text`, never `coerceToText`, which would query a content provider).
  */
@@ -107,10 +110,12 @@ internal class AndroidClipboard(private val context: Context) : ConsoleClipboard
         val clipboard = manager ?: return@call false
         try {
             clipboard.setPrimaryClip(ClipData.newPlainText("droidtop shared clipboard", text))
-            true
         } catch (e: SecurityException) {
-            false
+            return@call false
         }
+        // The paired device's clip also lands on the keyboard's clipboard panel, under its rules (Droidtop/tracker#903).
+        ClipboardHistoryStore.fromPairedDevice(context, text)
+        true
     }
 
     override fun read(): ClipRead = RemoteTyping.MainThread.call {

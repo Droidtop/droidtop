@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Build
 import android.text.TextUtils
 import android.view.Gravity
@@ -15,6 +16,8 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import org.pocketworkstation.pckeyboard.remote.RemoteStrip
+import org.pocketworkstation.pckeyboard.remote.RemoteTyping
 
 /**
  * The keyboard with its editing helpers (docs/SPEC.md 6a, "Editing helpers", Droidtop/tracker#340): a strip of tool
@@ -46,6 +49,12 @@ class ToolsDeck private constructor(
     private val notice = TextView(context)
     private val inlineRow = LinearLayout(context)
 
+    // A phone typing into this device through "Type from another device" (Droidtop/tracker#903), above the strip.
+    private val remoteRow = LinearLayout(context)
+    private val remoteLine = TextView(context)
+    private val remoteNotice = TextView(context)
+    private val remoteListener: (RemoteStrip) -> Unit = { state -> post { showRemote(state) } }
+
     // Emoji for the word just typed (Droidtop/tracker#903 H4), above the strip; hidden while there are none.
     private val emojiRow = LinearLayout(context)
     private val emojiScroll = HorizontalScrollView(context)
@@ -66,6 +75,27 @@ class ToolsDeck private constructor(
             addView(emojiRow)
         }
         addView(emojiScroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        remoteRow.apply {
+            orientation = VERTICAL
+            isFocusable = false
+            setPadding(dp(12), dp(2), dp(12), dp(2))
+            visibility = GONE
+        }
+        remoteLine.apply {
+            textSize = 12f
+            setTextColor(colors.muted)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        remoteNotice.apply {
+            textSize = 12f
+            setTextColor(colors.text)
+            setTypeface(typeface, Typeface.BOLD)
+            visibility = GONE
+        }
+        remoteRow.addView(remoteLine)
+        remoteRow.addView(remoteNotice)
+        addView(remoteRow, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         addView(buildStrip(), LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         inlineScroll.apply {
             isHorizontalScrollBarEnabled = false
@@ -337,9 +367,33 @@ class ToolsDeck private constructor(
         searchBar = null
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        RemoteTyping.strip.addListener(remoteListener)
+        showRemote(RemoteTyping.strip.state)
+    }
+
     override fun onDetachedFromWindow() {
+        RemoteTyping.strip.removeListener(remoteListener)
         hideSearch()
         super.onDetachedFromWindow()
+    }
+
+    /**
+     * The phone session's own strip (docs/SPEC.md, "Type from another device", "On the keyboard"): "Phone connected ·
+     * typing" with what it last typed, never a password field's text, and "Not received" with why, in place, until the
+     * next thing lands. Hidden while no phone is paired.
+     */
+    private fun showRemote(state: RemoteStrip) {
+        if (!state.live) {
+            remoteRow.visibility = GONE
+            return
+        }
+        remoteLine.text = state.sent?.let { context.getString(R.string.remote_typing_sent, it) }
+            ?: context.getString(R.string.remote_typing)
+        remoteNotice.text = state.notReceived?.let { context.getString(R.string.remote_not_received, it) }
+        remoteNotice.visibility = if (state.notReceived == null) GONE else VISIBLE
+        remoteRow.visibility = VISIBLE
     }
 
     private fun toggleIncognito() {

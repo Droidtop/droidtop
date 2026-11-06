@@ -17,6 +17,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.pocketworkstation.pckeyboard.remote.RemoteTyping
 
 /**
  * The foreground service that keeps "Type from another device" alive while the person is in another app (docs/SPEC.md,
@@ -45,6 +46,8 @@ class RemoteInputService : Service() {
             else -> if (watching == null) {
                 watching = scope.launch {
                     RemoteInputs.state.collect { state ->
+                        // The keyboard's own strip shows the session while a phone is paired (Droidtop/tracker#903).
+                        RemoteTyping.strip.session(state is RemoteInputState.Paired)
                         if (state is RemoteInputState.Closed) {
                             stopSelf()
                         } else {
@@ -64,6 +67,7 @@ class RemoteInputService : Service() {
     override fun onDestroy() {
         scope.cancel()
         RemoteInputs.close()
+        RemoteTyping.strip.session(false)
         super.onDestroy()
     }
 

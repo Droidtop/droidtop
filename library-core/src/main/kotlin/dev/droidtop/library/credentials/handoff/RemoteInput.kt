@@ -544,7 +544,7 @@ class RemoteInput(
             if (!closed && paired) {
                 when (delivery) {
                     is Delivery.Sent -> {
-                        lastSent = RemoteInputRouter.forConsole(describe(edit), delivery.secret)
+                        lastSent = RemoteInputRouter.forConsole(RemoteInputRouter.describe(edit.back, edit.text, edit.enter), delivery.secret)
                         publish(null)
                     }
                     is Delivery.Refused -> publish(delivery.notice)
@@ -555,12 +555,6 @@ class RemoteInput(
             is Delivery.Sent -> json("""{"ok":true,"secret":${delivery.secret}}""")
             is Delivery.Refused -> json("""{"ok":false,"notice":"${delivery.notice}"}""")
         }
-    }
-
-    private fun describe(edit: Verdict.Edit): String = when {
-        edit.text.isNotEmpty() -> edit.text
-        edit.enter -> "Enter"
-        else -> "Backspace"
     }
 
     private fun newCode(): String {

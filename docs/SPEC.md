@@ -17712,6 +17712,28 @@ again if a code is refused".
   arrive (text no field took, a file the console could not store or that came in part), the console shows why as a
   Caution notice, "Not received", in place on that screen (`NoticeCard`, as the companion's "Not sent"), never as a
   plain line among the facts and never as a passing flash; the next send clears it.
+- **On the keyboard (Droidtop/tracker#903; the coordinator: "The keyboard shows the remote session in its own strip
+  ("Phone connected · typing", password fields hidden, "Not received" in place)" and "A clip sent from the phone lands
+  on the keyboard's clipboard panel").** The input module shows the session where the person types, as well as on the
+  console:
+  - *The strip.* While a phone is paired, droidtop's keyboard (the input method and every `KeyboardPanel`: the
+    companion, the overlays, droidtop's own fields) has a row of its own above the tools (`ToolsDeck`, shown when the
+    tool strip is on): "Phone connected · typing", then what the phone last typed (one line; Enter and Backspace in a
+    word). In a password field the text is not shown: a delivery to a secret target drops it before the strip keeps it
+    (`RemoteStripModel.delivered`), so it is never held, not just hidden. When the router refused an edit (the same two
+    refusals as on the console: no field, or droidtop's keyboard not the active one) the row says "Not received." and
+    why, in place, until the next thing lands. The session says when it is paired (`RemoteInputService`, from
+    `RemoteInputState.Paired`) and the router tells the strip of each delivery (`RemoteTyping.strip`); KDE Connect's
+    typing on its own, with no phone paired, shows no strip. No new refusal is added: what the router delivers, and
+    what it refuses, are the rules above.
+  - *Clips.* Text a paired device puts on the console's clipboard (Send to console on the phone page; a KDE Connect
+    device's clip, 7q) is also kept in the keyboard's clipboard history, so it is on the clipboard panel
+    (`ClipboardHistoryStore.fromPairedDevice`, `PairedClips`), from the text written, so it arrives even when Android
+    would not let droidtop read the clipboard back. The history's own rules hold and no others (6a, "Editing
+    helpers"): nothing while the history is off or incognito, nothing while the keyboard serves a password or
+    no-learning field (`IncognitoRules.sensitiveField`), nothing blank or over its 5000 character limit, and never a
+    clip marked sensitive (neither the page nor KDE Connect can mark one today; the rule is there for a source that
+    can). The settings are read and the history written on the history's own thread.
 - **Ways in:** the **Type from another device** button on the companion's Keys screen (the Input tab, opened on the
   companion's own screen), the **Type from another device** row in the Quick Menu (a catalog item,
   `GamingSettingsCatalog.ID_TYPE_FROM_DEVICE`, in the Power and mode section), and the key setup screens (7h). All
@@ -23584,7 +23606,8 @@ client." The plan and its slices are on #645.
     another device's folder rather than a folder of their own.
   - **clipboard (slice 3)**, both ways, under the shared clipboard's rules (`ClipRules`, "Type from another
     device"): a paired device's clip is written to this one's (64 KB at most; nothing is shown, as in the official
-    apps). This device's clip is sent when it changes while Android lets droidtop see it (droidtop in front, or its
+    apps), and kept in the keyboard's clipboard history under its rules ("Type from another device", "On the
+    keyboard"). This device's clip is sent when it changes while Android lets droidtop see it (droidtop in front, or its
     input method active: `addPrimaryClipChangedListener`), and by **Send clipboard** under Paired; a clip marked
     sensitive, one that is not plain text, or one over 64 KB never leaves. On connecting, each side sends its clip
     with the time it changed, and the newer one wins (kdeconnect-android's rule). A clip that just arrived is not
