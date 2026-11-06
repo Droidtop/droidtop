@@ -1,0 +1,10 @@
+# Mozc for Japanese typing (Droidtop/tracker#903 H7b, H7c): google/mozc 3.35.6354, commit
+# 0136c35782536cb43d710575c311cd4185982738, built and released on this repository as the prerelease below.
+# tag and sha256: mozc-engine.tar.zst (libmozc.so for both ABIs, its licence and credits), fetched at build time by
+# build-scripts/fetch-mozc-engine.sh. data_*: mozc.data.gz from the same release, downloaded by the keyboard the first
+# time Japanese is used (MozcData): the archive's SHA-256, then the unpacked mozc.data's size and SHA-256.
+tag=mozc-engine-3.35.6354
+sha256=80d971c220b64cf956e937c7478c37810d0330493a9f7697ac4724b67b6486ca
+data_gz_sha256=a3b81db2ddbd5cccf8d14b182f9bc0940471b2d9e6a8c78abd94236bd5b5d620
+data_size=19001738
+data_sha256=7a47a2b3958baeb0796345aec2c3f380b1d783d6fa399c8a0c358a197bee6046

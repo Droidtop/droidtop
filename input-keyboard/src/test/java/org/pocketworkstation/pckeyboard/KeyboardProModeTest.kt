@@ -16,6 +16,12 @@ class KeyboardProModeTest {
     }
 
     @Test
+    fun aLanguageEnginesOwnRowStaysOnTheShortScreen() {
+        assertTrue(KeyboardProMode.keepsInSimple(InputEngines.KEY_PREFIX + "mozc"))
+        assertFalse(KeyboardProMode.keepsInSimple("pref_engin"))
+    }
+
+    @Test
     fun hackersKeyboardsDeeperOptionsWaitForProMode() {
         for (key in listOf("pref_chording_ctrl_key", "pref_slide_keys_int", "pref_popup_content", "fullscreen_override", "pref_touch_pos", "pref_macros", null)) {
             assertFalse(key ?: "a preference with no key", KeyboardProMode.keepsInSimple(key))

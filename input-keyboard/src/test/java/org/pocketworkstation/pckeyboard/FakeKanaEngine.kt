@@ -16,7 +16,8 @@ package org.pocketworkstation.pckeyboard
  *   given. Undo takes the last commit back into composing, asking the field to delete it.
  * - Its modes are hiragana, katakana and half-width letters. It learns the candidate last picked for a reading,
  *   offering it first after; [forgetLearned] drops that. It counts [finishField] calls.
- * - Its [state] is set by the test, and a change is reported through [watchState] as an engine would.
+ * - Its [state] (and its loading [progress]) is set by the test, and a change is reported through [watchState] as an
+ *   engine would.
  */
 class FakeKanaEngine(state: InputEngine.State = InputEngine.State.Ready) : InputEngine {
     private val romajiToKana = mapOf(
@@ -80,10 +81,15 @@ class FakeKanaEngine(state: InputEngine.State = InputEngine.State.Ready) : Input
     }
 
     /** The engine's data finished loading, or went missing. */
-    fun becomes(state: InputEngine.State) {
+    fun becomes(state: InputEngine.State, percent: Int = -1) {
         current = state
+        loaded = percent
         watcher?.run()
     }
+
+    private var loaded = -1
+
+    override val progress: Int get() = loaded
 
     override fun composes() = allowed
 

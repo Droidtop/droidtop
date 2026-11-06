@@ -46,6 +46,8 @@ public class LatinIMESettings extends PreferenceActivity
     private static final String VOICE_SETTINGS_KEY = "voice_mode";
     /* package */ static final String PREF_SETTINGS_KEY = "settings_key";
     static final String INPUT_CONNECTION_INFO = "input_connection_info";    
+    /** droidtop: the group that holds the languages, where a language engine adds its own rows (#903 H7c). */
+    private static final String ENGINE_ROWS_GROUP = "layout_settings";
 
     private static final String TAG = "LatinIMESettings";
 
@@ -109,6 +111,10 @@ public class LatinIMESettings extends PreferenceActivity
             });
             OfflineVoice.refresh(this, () -> runOnUiThread(() -> offlineVoice.setSummary(OfflineVoiceRow.summary(this))));
         }
+
+        // droidtop: a language engine's own rows (Japanese's dictionary), after the languages (Droidtop/tracker#903 H7c).
+        Preference layoutGroup = findPreference(ENGINE_ROWS_GROUP);
+        if (layoutGroup instanceof PreferenceGroup) EngineSettingsRows.addTo(this, (PreferenceGroup) layoutGroup);
 
         // droidtop: the short screen hides what it leaves out, after every field above is held (Droidtop/tracker#337).
         if (!pro) KeyboardProMode.applySimple(getPreferenceScreen());
@@ -179,6 +185,8 @@ public class LatinIMESettings extends PreferenceActivity
         updateSummaries();
         Preference offlineVoice = findPreference(OfflineVoiceRow.KEY);
         if (offlineVoice != null) offlineVoice.setSummary(OfflineVoiceRow.summary(this));
+        Preference layoutGroup = findPreference(ENGINE_ROWS_GROUP);
+        if (layoutGroup instanceof PreferenceGroup) EngineSettingsRows.refresh(this, (PreferenceGroup) layoutGroup);
 
         String version = "";
         try {

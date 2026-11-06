@@ -684,14 +684,22 @@ public class LatinIME extends InputMethodService implements
     private void useEngine(InputEngine engine) {
         if (mSession != null) mSession.close();
         mEngine = engine != null ? engine : mLatin;
-        mSession = mEngine == mLatin ? null : new EngineSession(mEngine, new SessionEditor(), gettingReadyLine());
+        mSession = null;
+        if (mEngine != mLatin) {
+            final String name = inputLanguageName();
+            mSession = new EngineSession(mEngine, new SessionEditor(), getString(R.string.engine_getting_ready, name),
+                    percent -> getString(R.string.engine_getting_ready_percent, name, percent));
+        }
     }
 
-    /** The strip's line while a language's own engine loads (#903 H7a): "Japanese is getting ready…". */
-    private CharSequence gettingReadyLine() {
+    /**
+     * The input language's name for the strip's line while its own engine loads (#903 H7a): "Japanese is getting
+     * ready…", with how far its data has come once the engine can say (#903 H7c): "Japanese is getting ready… 40%".
+     */
+    private String inputLanguageName() {
         final String language = mInputLocale == null ? "" : mInputLocale.split("_")[0];
         final String name = new Locale(language).getDisplayLanguage();
-        return getString(R.string.engine_getting_ready, name.isEmpty() ? language : name);
+        return name.isEmpty() ? language : name;
     }
 
     /** The strip's mode button (#903 H7a): the engine's next composition mode. */
