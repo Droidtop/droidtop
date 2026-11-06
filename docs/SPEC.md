@@ -1718,6 +1718,7 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
 | Plugin contributions in the launcher: status tiles (**built this change**), search providers and app actions (still not buildable -- see below) | PARTIAL | `PluginStatusWidgetProvider.kt`; see below |
 | Recent/frequently-used apps row in the app drawer | **built this change** | `RecentAppsStore`, `AlphabeticalAppsList.addRecentAppItems`; see below |
+| Suggested apps: the drawer's top row by time of day (built 2026-11-06, Droidtop/tracker#706) | HAVE (drawer) | Settings > App drawer > Suggested apps, off by default. Each launch is also counted by hour of the day (`RecentAppsStore`, `SuggestedApps.recordHour`, 600 keys at most), and the row then orders the recent apps by `SuggestedApps.rank`: three per launch this hour and one per launch in the hour either side, recency breaking ties, so with no history it is the Recent row. Its heading reads Suggested. No Usage Access grant. A dock or home-screen Suggested row and a list-style Home are not built |
 
 **Following Murine upstream (2026-10-16).** The fork's upstream base is
 Murine `081e840` (v1.1.2, 2026-07-18), found by comparing contents since the

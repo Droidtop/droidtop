@@ -364,7 +364,12 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
             case VIEW_TYPE_ALL_APPS_DIVIDER:
             case VIEW_TYPE_WORK_DISABLED_CARD:
             case VIEW_TYPE_RECENT_APPS_HEADER:
-                // nothing to do -- static text/dividers, nothing to bind
+                // droidtop patch (Droidtop/tracker#706): the row is named for its order, Recent or Suggested.
+                if (holder.itemView instanceof android.widget.TextView) {
+                    ((android.widget.TextView) holder.itemView).setText(
+                            com.android.launcher3.LauncherPrefs.DRAWER_SUGGESTED.get(holder.itemView.getContext())
+                                    ? R.string.all_apps_suggested_header : R.string.all_apps_recent_header);
+                }
                 break;
             case VIEW_TYPE_WORK_EDU_CARD:
                 ((WorkEduCard) holder.itemView).setPosition(position);

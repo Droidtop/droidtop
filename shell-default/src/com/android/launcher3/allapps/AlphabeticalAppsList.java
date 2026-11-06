@@ -603,7 +603,10 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
     }
 
     private int addRecentAppItems() {
-        List<ComponentName> recent = RecentAppsStore.current(mActivityContext);
+        // droidtop patch (Droidtop/tracker#706): Suggested orders the row by this hour's habit, then recency.
+        List<ComponentName> recent = LauncherPrefs.DRAWER_SUGGESTED.get(mActivityContext)
+                ? RecentAppsStore.suggested(mActivityContext)
+                : RecentAppsStore.current(mActivityContext);
         if (recent.isEmpty()) return 0;
         Map<ComponentName, AppInfo> byComponent = new HashMap<>();
         for (AppInfo info : mApps) {

@@ -318,6 +318,9 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         // droidtop patch (Droidtop/tracker#564): the drawer's order.
         @JvmField
         val DRAWER_SORT = backedUpItem(SettingsDrawerFragment.DRAWER_SORT, app.murinelauncher.settings.prefs.DrawerSort.ALPHABETICAL)
+        // droidtop patch (Droidtop/tracker#706): the drawer's top row as Suggested (this hour's habit) rather than Recent.
+        @JvmField
+        val DRAWER_SUGGESTED = backedUpItem("pref_drawer_suggested", false)
         @JvmField
         val ICON_SIZE = backedUpItem(SettingsIconsFragment.ICON_SIZE_KEY, 100)
         @JvmField

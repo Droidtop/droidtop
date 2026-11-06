@@ -24,6 +24,7 @@ import dev.droidtop.shell.standard.LauncherPrefsFile
 object RecentAppsStore {
     private const val KEY_RECENT_COMPONENTS = "droidtop_recent_app_components"
     private const val KEY_LAUNCH_COUNTS = "droidtop_app_launch_counts"
+    private const val KEY_LAUNCH_HOURS = "droidtop_app_launch_hours"
     private const val SEPARATOR = "|"
 
     /** How many apps' launch counts are kept; the least launched go first past it. */
@@ -51,6 +52,21 @@ object RecentAppsStore {
         { map -> map.entries.joinToString(SEPARATOR) { "${it.key}=${it.value}" } },
     )
 
+    private fun countCodec() = CachedPref<Map<String, Int>>(
+        KEY_LAUNCH_HOURS, emptyMap(),
+        { raw ->
+            raw.split(SEPARATOR).mapNotNull { entry ->
+                val name = entry.substringBeforeLast('=', "")
+                val count = entry.substringAfterLast('=', "").toIntOrNull()
+                if (name.isEmpty() || count == null) null else name to count
+            }.toMap()
+        },
+        { map -> map.entries.joinToString(SEPARATOR) { "${it.key}=${it.value}" } },
+    )
+
+    /** Launches per app and hour of the day, for the drawer's Suggested row (Droidtop/tracker#706). */
+    private val hours = countCodec()
+
     /**
      * Records [component] as just launched: most-recent-first, deduplicated. Called on an icon tap, so the lists are
      * changed and written on the module's executor, not the main thread (Droidtop/tracker#771).
@@ -65,6 +81,8 @@ object RecentAppsStore {
                 val next = map + (name to (map[name] ?: 0) + 1)
                 if (next.size <= MAX_COUNTED) next else next.entries.sortedByDescending { it.value }.take(MAX_COUNTED).associate { it.toPair() }
             }
+            val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+            hours.update(prefs) { map -> dev.droidtop.library.settings.SuggestedApps.recordHour(map, component.flattenToString(), hour) }
         }
     }
 
@@ -79,6 +97,19 @@ object RecentAppsStore {
     /** Whether a preferences change is to this list, for a surface that follows it (the companion's Recent apps). */
     @JvmStatic
     fun isRecentKey(key: String?): Boolean = key == KEY_RECENT_COMPONENTS
+
+    /**
+     * The tracked components in the Suggested order for now ([dev.droidtop.library.settings.SuggestedApps.rank]): what
+     * is opened at this time of day first, then by recency (Droidtop/tracker#706).
+     */
+    @JvmStatic
+    fun suggested(context: Context): List<ComponentName> {
+        val prefs = LauncherPrefsFile(context)
+        val recentList = recent.get(prefs)
+        val byName = recentList.associateBy { it.flattenToString() }
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        return dev.droidtop.library.settings.SuggestedApps.rank(byName.keys.toList(), hours.get(prefs), hour).mapNotNull { byName[it] }
+    }
 
     /** Every tracked component, most-recent-first. */
     @JvmStatic
