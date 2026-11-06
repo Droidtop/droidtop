@@ -41,9 +41,9 @@ object KeyboardProMode {
     /** The settings screens whose options a reset clears. */
     private val SCREENS = intArrayOf(R.xml.prefs, R.xml.prefs_view, R.xml.prefs_actions, R.xml.prefs_feedback)
 
-    /** Whether the short screen shows [key]. Pure. */
+    /** Whether the short screen shows [key]: one in [SIMPLE], or a language engine's own row (#903 H7c). Pure. */
     @JvmStatic
-    fun keepsInSimple(key: String?): Boolean = key != null && key in SIMPLE
+    fun keepsInSimple(key: String?): Boolean = key != null && (key in SIMPLE || key.startsWith(InputEngines.KEY_PREFIX))
 
     /** Pro mode for an install seen for the first time: on when the keyboard already holds settings. Pure. */
     @JvmStatic

@@ -33,6 +33,8 @@ runtime-windows/src/main/assets/pulseaudio-gamenative-*.tzst
 runtime-windows/components/
 # The lsfg-vk layer (build-scripts/fetch-lsfg-layer.sh).
 runtime-windows/lsfg/
+# Mozc's engine library for Japanese typing (build-scripts/fetch-mozc-engine.sh).
+input-japanese/mozc/
 # droidtop-agent's Android library (build-scripts/fetch-agent-lib.sh).
 net-core/agent/
 native/target/

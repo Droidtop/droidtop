@@ -63,6 +63,10 @@ internal object Seams {
                 )
             }
         }
+        // Japanese typing through Mozc (Droidtop/tracker#903 H7c): the engine for the input language "ja" and its
+        // settings row, registered with the keyboard's engine seam. Nothing loads or downloads here; the dictionary
+        // comes the first time Japanese is used.
+        dev.droidtop.input.japanese.MozcJapanese.install()
         // `library.read` `systems` (docs/plugin-api.md 3 A1): the broker runs on a binder thread, which may block here;
         // the answer comes from the library's in-memory index, never a folder walk.
         dev.droidtop.pluginhost.PluginBrokers.librarySystemsProvider = {

@@ -235,6 +235,10 @@ project(":terminal-view").projectDir = file("vendor/termux-terminal/terminal-vie
 // build.gradle.kts).
 include(":input-keyboard")
 
+// Japanese typing through Google's Mozc (docs/SPEC.md 6a, "The engine seam"; Droidtop/tracker#903 H7c): an engine
+// behind :input-keyboard's seam. :app depends on it and registers it at start; :input-keyboard does not depend on it.
+include(":input-japanese")
+
 // Desktop mode's Android-side half (docs/SPEC.md §2a): the cross-container
 // task manager and frame passthrough for the primary container's compositor
 // output (presented via :host-bridge). The taskbar and app launcher are

@@ -285,6 +285,20 @@ runs:
       shell: bash
       run: bash build-scripts/fetch-lsfg-layer.sh
 
+    - name: Cache Mozc's engine
+      id: mozc-cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: input-japanese/mozc
+        key: mozc-engine-${{ hashFiles('input-japanese/mozc-engine.pin') }}
+
+    - name: Fetch Mozc's engine
+      # libmozc.so for both ABIs (Japanese typing, Droidtop/tracker#903 H7c), from this repository's
+      # mozc-engine-<version> prerelease, checked against input-japanese/mozc-engine.pin.
+      if: steps.mozc-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash build-scripts/fetch-mozc-engine.sh
+
     - name: Install Rust with the Android targets
       # droidtop's native library (native/, docs/SPEC.md 7o) is built here, for both ABIs.
       uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable

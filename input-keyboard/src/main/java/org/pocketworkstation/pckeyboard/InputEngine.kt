@@ -150,6 +150,12 @@ interface InputEngine {
     val state: State get() = State.Ready
 
     /**
+     * How far its data has come while [State.Loading], 0 to 100, or -1 when it cannot say (#903 H7c: Mozc's dictionary
+     * downloading). The strip adds it to its "getting ready" line; a change is reported through [watchState].
+     */
+    val progress: Int get() = -1
+
+    /**
      * [onChange] runs, on the main thread, when [state] changes (its data finished loading). The engine posts it there
      * from its own thread. Null stops it.
      */

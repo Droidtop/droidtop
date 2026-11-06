@@ -266,6 +266,19 @@ class EngineSessionTest {
         assertEquals("漢字", field.text.toString())
     }
 
+    @Test fun `while its data downloads the strip says how far it has come`() {
+        val engine = FakeKanaEngine(InputEngine.State.Loading)
+        val field = Field()
+        val s = EngineSession(engine, field, "Japanese is getting ready…") { "Japanese is getting ready… $it%" }
+        s.startField(suggestionsAllowed = true, password = false)
+        assertEquals("no progress known: the plain line", "Japanese is getting ready…", field.bar!!.notice.toString())
+        engine.becomes(InputEngine.State.Loading, 40)
+        assertEquals("Japanese is getting ready… 40%", field.bar!!.notice.toString())
+        assertFalse(s.onChar('k'.code, null))
+        engine.becomes(InputEngine.State.Ready)
+        assertNull(field.bar!!.notice)
+    }
+
     @Test fun `an engine not ready lets keys type as plain text and the strip says so, until it is`() {
         val engine = FakeKanaEngine(InputEngine.State.Loading)
         val (s, field) = session(engine)

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Japanese typing through Mozc (Droidtop/tracker#903 H7c). The strip's lines while it cannot type yet, and its settings row. -->
+<resources>
+    <!-- One line on the candidate strip, in place of candidates, while Japanese cannot type. -->
+    <string name="mozc_unavailable_network">Japanese needs its %1$d MB dictionary first, and there is no connection. It tries again in the next text field.</string>
+    <string name="mozc_unavailable_server">Japanese could not download its dictionary (the server answered %1$d). It tries again in the next text field.</string>
+    <string name="mozc_unavailable_truncated">Japanese\'s dictionary download stopped partway. It tries again in the next text field.</string>
+    <string name="mozc_unavailable_checksum">Japanese\'s dictionary download was not the expected file, so it was not kept. It tries again in the next text field.</string>
+    <string name="mozc_unavailable_storage">There is no room for Japanese\'s %1$d MB dictionary.</string>
+    <string name="mozc_unavailable_library">Japanese typing could not start on this device.</string>
+    <string name="mozc_unavailable_data">Japanese typing could not read its dictionary.</string>
+
+    <!-- Keyboard settings: the Japanese row. -->
+    <string name="mozc_settings_title">Japanese</string>
+    <string name="mozc_settings_dictionary_present">Dictionary: Mozc open dictionary (downloaded, %1$d MB)</string>
+    <string name="mozc_settings_dictionary_absent">Dictionary: Mozc open dictionary (%1$d MB, downloaded the first time you type Japanese)</string>
+    <string name="mozc_settings_dictionary_deleted">Dictionary: deleted. Japanese types from what is loaded until the keyboard restarts, then downloads it again.</string>
+    <string name="mozc_settings_forget">Forget what it learned</string>
+    <string name="mozc_settings_forget_body">Japanese typing forgets every word and choice it learned from your typing. The dictionary stays.</string>
+    <string name="mozc_settings_forget_action">Forget</string>
+    <string name="mozc_settings_forgotten">Forgot what it learned.</string>
+    <string name="mozc_settings_delete">Delete the dictionary</string>
+    <string name="mozc_settings_deleted">Deleted the dictionary.</string>
+</resources>

@@ -18,7 +18,14 @@ class EngineSession @JvmOverloads constructor(
     val engine: InputEngine,
     private val editor: Editor,
     private val gettingReady: CharSequence = "",
+    /** The same line with the engine's [InputEngine.progress] in it (#903 H7c): "Japanese is getting ready… 40%". */
+    private val gettingReadyAt: Progress = Progress { gettingReady },
 ) {
+    /** The strip's line while the engine loads, for a progress of 0 to 100. */
+    fun interface Progress {
+        fun line(percent: Int): CharSequence
+    }
+
     /** Where the session writes: the field's composing region and text, and the candidate bar. */
     interface Editor {
         /** Shows [composing] as the field's composing text with the caret at its [InputEngine.Composing.caret] (an empty one removes it). */
@@ -173,7 +180,10 @@ class EngineSession @JvmOverloads constructor(
                 bar.showMode(engine.mode()?.label)
             }
             is InputEngine.State.Unavailable -> bar.showNotice(state.reason)
-            InputEngine.State.Loading -> bar.showNotice(gettingReady)
+            InputEngine.State.Loading -> {
+                val percent = engine.progress
+                bar.showNotice(if (percent in 0..100) gettingReadyAt.line(percent) else gettingReady)
+            }
         }
         editor.showCandidates(bar)
     }

@@ -9954,7 +9954,8 @@ that gradually". So this slice is a refactor behind seams, and **Latin typing do
     equal on every input. That covers the 64 combinations of field, settings and orientation; 1,920 suggestion cases
     (the words, typed-word validity, correction offered, next letters and the separator's word); and a script of
     typing, deleting, committing and resetting.
-- **A language's own engine** registers with `InputEngines` (none does yet). When the input language has one,
+- **A language's own engine** registers with `InputEngines` (since H7c, Mozc for Japanese: "Japanese through Mozc"
+  below). When the input language has one,
   LatinIME drives it through `EngineSession`:
   - character keys, Backspace, space and enter go to the engine first (not while Ctrl, Alt or Meta is held);
   - its composing text goes to the field, each clause underlined and the converted one on the accent's tint;
@@ -10000,10 +10001,85 @@ that gradually". So this slice is a refactor behind seams, and **Latin typing do
     declines, the classifier is used.
   - Nothing is bundled or downloaded for it. How a later library arrives (on request, never in the APK), and how it
     fits the licence rule at the top of 6a ("A closed library never is"), are decided when it comes.
-- **Not done here:** no conversion engine (H7 to H9). The pad does not reach the mode button yet, and a tap inside an
-  engine's composing text does not move the engine's caret (the next key draws it back where the engine has it; Mozc's
-  `SessionCommand.MOVE_CURSOR` is the way when an engine comes). Nothing above changes what a person sees with Hacker's
-  own typing.
+- **Not done here:** the conversion engines for Chinese and Korean (H8, H9); Japanese is H7c, below. The pad does not
+  reach the mode button yet, and a tap inside an engine's composing text does not move the engine's caret (the next key
+  draws it back where the engine has it; Mozc's `SessionCommand.MOVE_CURSOR` is the way). Nothing above changes what a
+  person sees with Hacker's own typing.
+
+### Japanese through Mozc (Droidtop/tracker#903 H7c, built 2026-11-06)
+
+Japanese types through Google's Mozc (BSD-3), behind the engine seam above. The engine itself was built and published
+by H7b, hosting approved by the owner: the prerelease `mozc-engine-3.35.6354` on Droidtop/droidtop, google/mozc
+3.35.6354 at commit `0136c35782536cb43d710575c311cd4185982738`. The coordinator's rulings for the owner (#903): "host on
+a droidtop prerelease; keep the zip-code data; the open Mozc dictionary is the default; the larger Mozc-UT dictionaries
+come later as optional downloads, each licence named. Not in this slice."
+
+- **Where it lives.** A module of its own, `:input-japanese`, which depends on `:input-keyboard` for the seam.
+  `:input-keyboard` does not depend on it: `:app` registers it at start (`MozcJapanese.install`, in `Seams.kt`), with
+  `InputEngines.register` and `InputEngines.registerSettings`. So the keyboard module stays free of every engine, and
+  the standalone Hacker Keyboard Reborn builds from it unchanged. There is no cycle: `:app` depends on both, and
+  `:input-japanese` on the keyboard alone.
+- **The library in the build.** `input-japanese/mozc-engine.pin` names the release and `mozc-engine.tar.zst`'s
+  SHA-256. `build-scripts/fetch-mozc-engine.sh`, run by the android-setup action before Gradle and cached by the pin,
+  checks it and unpacks `libmozc.so` for arm64-v8a and x86_64 into `input-japanese/mozc/jniLibs` (git-ignored), the
+  lsfg layer's arrangement (5c). The archive's `credits-mozc.html` is where NOTICE.md's Mozc entries come from. The
+  library is released unstripped (16.1 and 15.1 MB); AGP strips it when it packages the app (`:app:strip*DebugSymbols`,
+  with the NDK CI installs), to 5.3 MB (arm64-v8a) and 5.5 MB (x86_64), which the APK holds deflated (droidtop
+  packages native libraries compressed) as 1.85 and 1.89 MB: about 1.9 MB more in each per-ABI APK and 3.7 MB more in
+  the universal one. It links libc++ statically, needs only Android's own libraries, and its segments are 16 KB
+  aligned.
+- **Its JNI**, read from `src/android/jni/mozcjni.cc` at that commit. The library binds to Mozc's own class name,
+  `com.google.android.apps.inputmethod.libs.mozc.session.MozcJni`, which `:input-japanese` declares as Mozc has it:
+  `static native boolean initialize()` (the one exported symbol, found by name, which registers the rest),
+  `static native byte[] evalCommand(byte[])`, `static native boolean onPostLoad(String userProfileDir, String dataFilePath)`
+  and `static native String getDataVersion()`. A consumer R8 rule keeps the class and its natives' names.
+- **Its protocol.** Mozc's `protocol/commands.proto` and the three it imports (`candidate_window`, `config`,
+  `engine_builder`) are vendored unchanged from the same commit under `input-japanese/src/main/proto` (a README there
+  names each file's blob) and generated as protobuf lite Java, with the protobuf plugin shell-default uses and protoc
+  at the catalog's protobuf release.
+- **The dictionary is downloaded the first time Japanese is used**, never at app start and never in the APK. The
+  engine starts Loading. On the keyboard's worker thread (`MozcRuntime`), when `mozc.data` is not in the engine's
+  profile directory (`noBackupFilesDir/engine-mozc`): `mozc.data.gz` comes from the same release, its SHA-256 is
+  checked against the pin, it is unpacked, the 19,001,738-byte `mozc.data` is checked against its own SHA-256, and it
+  is renamed into place in the same directory (`MozcData`). Any failure leaves no partial file and makes the engine
+  Unavailable with one plain line on the strip ("Japanese needs its 19 MB dictionary first, and there is no
+  connection. It tries again in the next text field."); the next field tries again, no sooner than a minute later.
+  Then the library is loaded (`System.loadLibrary("mozc")`, off the main thread), `onPostLoad` gets the profile
+  directory and the dictionary, and `getDataVersion` must not be empty. Then Ready. Meanwhile the strip says
+  "Japanese is getting ready… 40%" (`InputEngine.progress`, the download's share when the server gives a length).
+  The download uses HttpURLConnection, as the keyboard's offline voice download does: the keyboard and its engines
+  depend on nothing of droidtop's, so they do not reach droidtop's download engine (12a).
+- **The session** (`MozcEngine`, `MozcCommands`, `MozcOutput`), each part of the seam as H7a's list above maps it:
+  - one session (CREATE_SESSION, able to delete before the caret), then SET_REQUEST with Mozc's mobile request for a
+    soft keyboard as Mozc's own Android client sent it (google/mozc at `afb03ddf`, `MozcUtil.setSoftwareKeyboardRequest`
+    and its QWERTY keyboards): mixed conversion, zero-query suggestions, auto partial suggestion, the mode not guessed
+    from the field, romaji by `QWERTY_MOBILE_TO_HIRAGANA` (space converts and keeps composing), and for half-width
+    letters `QWERTY_MOBILE_TO_HALFWIDTHASCII` (space commits);
+  - a character is SEND_KEY with its code point; Backspace, Space, Enter, Left, Right, Up, Down, Shift-Left and
+    Shift-Right (a clause one shorter or longer) and Esc are SEND_KEY special keys, read by Mozc's mobile keymap;
+    Undo is UNDO_OR_REWIND and Toggle STOP_KEY_TOGGLING; a key is the engine's when Mozc says it consumed it;
+  - a pick is SUBMIT_CANDIDATE with the candidate's id, commit is SUBMIT, reset is RESET_CONTEXT;
+  - `result` is what is committed; the preedit's segments are the clauses (code points to UTF-16 through
+    `CodePoints`), `highlighted_position` the focused clause and `cursor` the caret; `all_candidate_words` are the
+    candidates, each annotated with its prefix, suffix and description; `deletion_range` is deleteBefore;
+  - the modes are hiragana (あ), full-width katakana (ア) and half-width letters (A), by SWITCH_COMPOSITION_MODE;
+  - every command carries the field's context: the text before the caret (`preceding_text`), no suggestions where the
+    field asks for none, and password fields are not composed at all;
+  - a field's end is SYNC_DATA, and forgetting is CLEAR_USER_HISTORY then CLEAR_USER_PREDICTION, both on the worker.
+  Mozc's calls stay on the main thread under the threading rule above, with one lock around them so the worker's
+  saving and forgetting never run beside a key.
+- **The language.** Japanese (日本語, "ja") is in the keyboard's language list once an engine serves it
+  (`InputEngines.serves`; Hacker's list hid ja, ko and zh, and still hides a language no engine types). With it
+  chosen, `InputEngines.forLanguage` gives Mozc's engine, one for the process as Mozc has one session handler. The
+  layout is Hacker's QWERTY (no `xml-ja` layout), typed as romaji; Hacker's capitals are off for ja, since a capital
+  would type a full-width letter. Kana flick input comes later.
+- **Settings.** The keyboard's settings list each registered engine's row after the languages, on the short screen too
+  (`EngineSettingsRows`; keys `pref_engine_<id>`). Japanese's says "Dictionary: Mozc open dictionary (downloaded,
+  19 MB)", or that it downloads the first time Japanese is typed. Pressed, it offers "Forget what it learned" (which
+  asks first) and "Delete the dictionary". Mozc reads its dictionary mapped into memory, so a loaded engine keeps typing
+  until the keyboard's process ends; the next one downloads it again when Japanese is used.
+- **Not done here:** kana flick and 12-key layouts; the Mozc-UT dictionaries; a tap inside the composing text moving
+  Mozc's caret (MOVE_CURSOR); a hardware keyboard's own Japanese keys (Henkan, Muhenkan, Kana).
 
 ## 6b. Desktop surface input (built 2026-09-01)
 
