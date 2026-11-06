@@ -111,3 +111,7 @@ com.android.wm.shell.shared.TransitionUtil
 # override is @RequiresApi(30) and the class is a service the platform instantiates, not code that calls it.
 org.pocketworkstation.pckeyboard.InlineAutofill
 org.pocketworkstation.pckeyboard.LatinIME
+
+# ImageDecoder.OnHeaderDecodedListener (API 28) sizing the keyboard's GIF and sticker thumbnails, built only under the
+# SDK_INT >= 28 branch in GifThumbs.decode (input-keyboard GifLibraryStore.kt:285); below 28 BitmapFactory decodes.
+org.pocketworkstation.pckeyboard.GifThumbHeaderListener

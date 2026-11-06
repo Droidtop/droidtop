@@ -22,6 +22,7 @@ import android.os.Looper
 import android.provider.DocumentsContract
 import android.util.LruCache
 import android.widget.ImageView
+import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
@@ -283,11 +284,7 @@ object GifThumbs {
         val resolver = context.contentResolver
         if (Build.VERSION.SDK_INT >= 28) {
             // The first frame only: decodeBitmap never animates.
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, source)) { decoder, info, _ ->
-                val (w, h) = GifThumbSize.fit(info.size.width, info.size.height, size)
-                decoder.setTargetSize(w, h)
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            }
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, source), GifThumbHeaderListener(size))
         } else {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             resolver.openInputStream(source)?.use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -295,6 +292,20 @@ object GifThumbs {
             resolver.openInputStream(source)?.use { BitmapFactory.decodeStream(it, null, options) }
         }
     }.getOrNull()
+}
+
+/**
+ * Sizes a thumbnail's first frame as [ImageDecoder] reads its header. ImageDecoder.OnHeaderDecodedListener is API 28
+ * and minSdk is 26, so the interface lives in this class of its own, built only under the SDK_INT >= 28 branch of
+ * [GifThumbs.decode] (and listed in build-scripts/class_load_api_allowlist.txt).
+ */
+@RequiresApi(28)
+internal class GifThumbHeaderListener(private val size: Int) : ImageDecoder.OnHeaderDecodedListener {
+    override fun onHeaderDecoded(decoder: ImageDecoder, info: ImageDecoder.ImageInfo, source: ImageDecoder.Source) {
+        val (w, h) = GifThumbSize.fit(info.size.width, info.size.height, size)
+        decoder.setTargetSize(w, h)
+        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+    }
 }
 
 /**
