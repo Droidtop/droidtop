@@ -220,13 +220,14 @@ include(":ui-shared")
 // gamepad navigation, and the full library/settings surface.
 include(":shell-gamepad")
 
-// Termux's terminal-emulator and terminal-view libraries (vendor/termux-terminal/README.md, Apache-2.0), as
-// upstream wrote them: the VT parser, the pseudo-terminal and the terminal View under droidtop's own container
-// terminal (docs/SPEC.md 3d, "A terminal on Android"). droidtop hooks them from :app; it does not edit them.
+// Termux's terminal-emulator and terminal-view libraries (termux-terminal/README.md, Apache-2.0), as upstream wrote
+// them, from the vendor/termux-app submodule: the VT parser, the pseudo-terminal and the terminal View under
+// droidtop's own container terminal (docs/SPEC.md 3d, "A terminal on Android"). Only their build files are droidtop's
+// (termux-terminal/); droidtop hooks them from :app and does not edit them.
 include(":terminal-emulator")
-project(":terminal-emulator").projectDir = file("vendor/termux-terminal/terminal-emulator")
+project(":terminal-emulator").projectDir = file("termux-terminal/terminal-emulator")
 include(":terminal-view")
-project(":terminal-view").projectDir = file("vendor/termux-terminal/terminal-view")
+project(":terminal-view").projectDir = file("termux-terminal/terminal-view")
 
 // Second-screen persistent keyboard (docs/SPEC.md §4/§6) — forked from
 // Hacker's Keyboard (Apache-2.0), not built from scratch. Ships as a real

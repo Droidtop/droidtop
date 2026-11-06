@@ -195,13 +195,13 @@ This project is distributed under the GNU General Public License v3.0 (see
     `app/src/main/kotlin/dev/patrickgold/florisboard/ime/clipboard/ClipboardHistory.kt`, as `ClipGroups`; and from
     `ime/clipboard/ClipboardInputLayout.kt`, the clip's menu (the whole clip and its time, Pin or Unpin, Delete, Paste)
     and the clear question as a card over the history dimmed to 12%, closed by a tap outside it, as `ClipboardPanel`.
-- **Termux terminal-emulator and terminal-view** — `vendor/termux-terminal`, https://github.com/termux/termux-app
+- **Termux terminal-emulator and terminal-view** — `vendor/termux-app` (a submodule of https://github.com/termux/termux-app)
   at `v0.118.3` (`5b657c6a`) — Apache-2.0 (termux-app's own `LICENSE.md` names these two libraries, which carry
   Terminal Emulator for Android code, https://github.com/jackpal/Android-Terminal-Emulator, as Apache-2.0; the rest
-  of termux-app is GPLv3 and is not taken). Their `src/main` trees are copied unchanged and built as the
+  of termux-app is GPLv3 and is not built). Their `src/main` trees are built unchanged as the
   `:terminal-emulator` and `:terminal-view` modules: the VT parser, the pseudo-terminal JNI (`libtermux.so`) and the
-  terminal View under droidtop's container terminal. `WcWidth.java` follows jquast/wcwidth (MIT). The Apache
-  licence text and upstream's `LICENSE.md` travel with the tree.
+  terminal View under droidtop's container terminal. `WcWidth.java` follows jquast/wcwidth (MIT). Upstream's
+  `LICENSE.md` is in the submodule.
 - **Murine Launcher** — `shell-default`, https://github.com/alesimula/Murine-launcher — Apache-2.0.
   Itself derived from AOSP Launcher3 (Apache-2.0). Forked in as
   `shell-default` and its sub-projects (not a submodule) and edited

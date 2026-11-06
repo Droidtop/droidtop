@@ -3313,10 +3313,12 @@ the `ContainerRuntime` interface that already exists (§3):
       have no container (§5b), so they have no row.
     - *The emulator is Termux's, vendored, not written:* the
       `terminal-emulator` and `terminal-view` library modules of
-      termux-app `v0.118.3` (`vendor/termux-terminal`, Apache-2.0 under
-      termux-app's own licence exception; NOTICE.md), their `src/main`
-      copied unchanged and built as `:terminal-emulator` and
-      `:terminal-view` with droidtop's own build files. droidtop hooks them
+      termux-app `v0.118.3`, a plain submodule (`vendor/termux-app`,
+      Apache-2.0 under termux-app's own licence exception; NOTICE.md),
+      their `src/main` built unchanged as `:terminal-emulator` and
+      `:terminal-view` with droidtop's own build files
+      (`termux-terminal/`). Vendoring is a submodule, never a copied tree
+      (Droidtop/tracker#921). droidtop hooks them
       (a `TerminalViewClient`, a `TerminalSessionClient`) and edits none of
       their files.
     - *The pty is Termux's JNI* (`libtermux.so`, `JNI.createSubprocess`):

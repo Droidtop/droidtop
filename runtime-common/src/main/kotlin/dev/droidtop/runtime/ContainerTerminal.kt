@@ -18,7 +18,7 @@ package dev.droidtop.runtime
  *
  * A terminal that lives in the compositor is unreachable when the compositor is not running, which is when a shell
  * would help most. So droidtop also draws a terminal itself, on Android, desktop up or not: Termux's
- * terminal-emulator and terminal-view (vendor/termux-terminal) over a real pseudo-terminal, running the backend's
+ * terminal-emulator and terminal-view (vendor/termux-app) over a real pseudo-terminal, running the backend's
  * own enter command ([ContainerRuntime.interactiveShell], [InteractiveShell]) with [LOGIN_SHELL_COMMAND] and
  * [SHELL_ENVIRONMENT]. The pieces that made this "a larger project pretending to be a smaller one" when foot was
  * chosen are what Termux already wrote: the VT parser, the renderer and the pty. [ContainerRuntime.exec] stays
