@@ -73,17 +73,20 @@ jobs:
         working-directory: mozc/src
         run: |
           [ "$(git rev-parse HEAD)" = "$MOZC_REF" ] || { echo "Mozc is not at $MOZC_REF"; exit 1; }
-          bazelisk build --config oss_android --config release_build \
-            //android/jni:native_libs //data_manager/oss:mozc_dataset_for_oss
-          bazelisk cquery --config oss_android --config release_build \
-            --output=files //android/jni:native_libs //data_manager/oss:mozc_dataset_for_oss
+          # The engine for Android; the dictionary on the host, from the same checkout. The dataset's
+          # generators are host tools, which --config oss_android marks incompatible (run 42235712841:
+          # "//base:codegen_bytearray_stream ... didn't satisfy constraint @@platforms//:incompatible").
+          bazelisk build --config oss_android --config release_build //android/jni:native_libs
+          bazelisk build --config oss_linux --config release_build //data_manager/oss:mozc_dataset_for_oss
+          bazelisk cquery --config oss_android --config release_build --output=files //android/jni:native_libs
+          bazelisk cquery --config oss_linux --config release_build --output=files //data_manager/oss:mozc_dataset_for_oss
 
       - name: Stage
         run: |
           sudo apt-get install -y zstd
           src=mozc/src
           zip=$(cd "$src" && bazelisk cquery --config oss_android --config release_build --output=files //android/jni:native_libs 2>/dev/null | grep 'native_libs.zip$')
-          data=$(cd "$src" && bazelisk cquery --config oss_android --config release_build --output=files //data_manager/oss:mozc_dataset_for_oss 2>/dev/null | grep '/mozc.data$')
+          data=$(cd "$src" && bazelisk cquery --config oss_linux --config release_build --output=files //data_manager/oss:mozc_dataset_for_oss 2>/dev/null | grep '/mozc.data$')
           [ -n "$zip" ] && [ -n "$data" ] || { echo "no native_libs.zip or mozc.data"; exit 1; }
           mkdir -p out/stage/jniLibs work
           unzip -q "$src/$zip" -d work
