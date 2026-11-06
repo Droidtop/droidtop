@@ -935,6 +935,20 @@ public class Keyboard {
             key.width = widths[i];
             key.gap = gaps[i];
         }
+        // The floating mode's height (Droidtop/tracker#903 H12c): every row scaled alike, the total with them.
+        if (form.getHeightScale() != 1f) {
+            final int[] ys = new int[n];
+            final int[] heights = new int[n];
+            for (int i = 0; i < n; i++) {
+                ys[i] = mKeys.get(i).y;
+                heights[i] = mKeys.get(i).height;
+            }
+            mTotalHeight = KeyboardForm.scaleHeights(ys, heights, mTotalHeight, form.getHeightScale());
+            for (int i = 0; i < n; i++) {
+                mKeys.get(i).y = ys[i];
+                mKeys.get(i).height = heights[i];
+            }
+        }
     }
 
     private void setEdgeFlags() {

@@ -818,6 +818,46 @@
     <string name="tool_clipboard">Clipboard</string>
     <string name="tool_emoji">Emoji</string>
     <string name="tool_layout">Layout: %1$s</string>
+    <!-- The input method's modes (Droidtop/tracker#903 H12c). -->
+    <string name="tool_mode">Mode: %1$s</string>
+    <string name="title_modes">Modes</string>
+    <string name="modes_status">For this orientation. Normal gives back the keyboard as it was.</string>
+    <string name="mode_normal">Normal</string>
+    <string name="mode_one_handed_left">One-handed left</string>
+    <string name="mode_one_handed_right">One-handed right</string>
+    <string name="mode_floating">Floating</string>
+    <string name="mode_thumb_split">Thumb split</string>
+    <string name="mode_number_pad">Number pad</string>
+    <string name="mode_switch_side">Move the keys to the other side</string>
+    <string name="mode_switch_side_glyph" translatable="false">⇄</string>
+    <string name="mode_back_to_full">Back to the full keyboard</string>
+    <string name="mode_full_glyph" translatable="false">▭</string>
+    <string name="mode_resize">Drag sideways to make the keys wider or narrower</string>
+    <string name="mode_resize_glyph" translatable="false">↔</string>
+    <string name="mode_resize_percent">%1$d%%</string>
+    <string name="mode_float_move">Drag to move the keyboard</string>
+    <string name="mode_float_grip" translatable="false">≡</string>
+    <string name="mode_float_dock">Dock</string>
+    <string name="mode_float_corner" translatable="false">⇲</string>
+    <string name="mode_float_resize">Drag to resize the keyboard</string>
+    <string name="title_keyboard_view_mode">Keyboard mode, portrait</string>
+    <string name="title_keyboard_view_mode_landscape">Keyboard mode, landscape</string>
+    <string-array name="keyboard_view_mode_entries">
+        <item>Normal</item>
+        <item>One-handed, left</item>
+        <item>One-handed, right</item>
+        <item>Floating</item>
+        <item>Thumb split (a screen over 7.5 inches wide; split elsewhere)</item>
+        <item>Number pad</item>
+    </string-array>
+    <string-array name="keyboard_view_mode_values" translatable="false">
+        <item>normal</item>
+        <item>left</item>
+        <item>right</item>
+        <item>floating</item>
+        <item>thumb</item>
+        <item>numpad</item>
+    </string-array>
     <string name="tool_copied_for_terminal">Copied. Paste it in the terminal.</string>
     <string name="tool_incognito">Incognito</string>
     <string name="tool_incognito_on">Incognito: on</string>

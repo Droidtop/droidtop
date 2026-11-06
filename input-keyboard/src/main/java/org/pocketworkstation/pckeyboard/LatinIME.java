@@ -1037,8 +1037,43 @@ public class LatinIME extends InputMethodService implements
             }
         }, new ImeMediaTarget(this)); // GIFs and stickers go in through this editor's content channel (Droidtop/tracker#903 H5).
         mToolsDeck = view instanceof ToolsDeck ? (ToolsDeck) view : null;
+        // droidtop patch (Droidtop/tracker#903 H12c): the floating mode puts the keyboard in a frame over the app.
+        mFloatingFrame = null;
+        if (KeyboardModes.current(this) == KeyboardModes.Mode.FLOATING) {
+            mFloatingFrame = new FloatingKeyboardFrame(this, view, keyboard, KeyboardAppearance.colors(this));
+            if (mToolsDeck != null) mToolsDeck.addPadControls(mFloatingFrame.getControls());
+            return mFloatingFrame;
+        }
         return view;
     }
+
+    /** The floating mode's frame around the input view, or null in every other mode (Droidtop/tracker#903 H12c). */
+    private FloatingKeyboardFrame mFloatingFrame;
+
+    /** The tool strip around the input view, for the pad (PadKeys); null with the strip off. */
+    ToolsDeck getToolsDeck() {
+        return mToolsDeck;
+    }
+
+    /** Whether the keyboard floats over the app now (Droidtop/tracker#903 H12c). */
+    private boolean isFloating() {
+        return mFloatingFrame != null && KeyboardModes.current(this) == KeyboardModes.Mode.FLOATING;
+    }
+
+    /**
+     * droidtop patch (Droidtop/tracker#903 H12c): the number pad's "=" types the answer to the sum before the cursor,
+     * or a plain "=" when there is none (a division by zero, no sum).
+     */
+    private void typeCalculation() {
+        final InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+        commitTyped(ic, true);
+        final String answer = PadCalculator.answer(ic.getTextBeforeCursor(CALCULATION_LOOKBACK, 0));
+        ic.commitText(answer == null ? "=" : "=" + answer, 1);
+    }
+
+    /** How far back "=" looks for its sum. */
+    private static final int CALCULATION_LOOKBACK = 64;
 
     /**
      * droidtop patch (Droidtop/tracker#903 H4): emoji for the word just typed, on the tool strip. Only with a plain cursor
@@ -1072,7 +1107,7 @@ public class LatinIME extends InputMethodService implements
     @Override
     @RequiresApi(Build.VERSION_CODES.R)
     public boolean onInlineSuggestionsResponse(android.view.inputmethod.InlineSuggestionsResponse response) {
-        if (mToolsDeck == null || !ToolsPrefs.INSTANCE.inlineAutofill(this)) {
+        if (mToolsDeck == null || !mToolsDeck.getStripShown() || !ToolsPrefs.INSTANCE.inlineAutofill(this)) {
             return false;
         }
         InlineAutofill.show(this, response, mToolsDeck);
@@ -1269,7 +1304,10 @@ public class LatinIME extends InputMethodService implements
 //                " mPredicting=" + mPredicting
 //                );
         // TODO: Remove this if we support candidates with hard keyboard
+        // droidtop patch (Droidtop/tracker#903 H12c): the strip would sit at the top of the screen, away from a
+        // floating keyboard and outside the part of the window that takes touches, so it is not shown while floating.
         boolean visible = shown
+        && !isFloating()
         && onEvaluateInputViewShown()
         && mKeyboardSwitcher.getInputView() != null
         && isPredictionOn()
@@ -1328,6 +1366,12 @@ public class LatinIME extends InputMethodService implements
     @Override
     public void onComputeInsets(InputMethodService.Insets outInsets) {
         super.onComputeInsets(outInsets);
+        // droidtop patch (Droidtop/tracker#903 H12c): a floating keyboard leaves the app its whole screen and takes
+        // touches only inside its frame.
+        if (isFloating() && mFloatingFrame.isShown()) {
+            mFloatingFrame.computeInsets(outInsets);
+            return;
+        }
         if (!isFullscreenMode()) {
             outInsets.contentTopInsets = outInsets.visibleTopInsets;
         }
@@ -1341,7 +1385,9 @@ public class LatinIME extends InputMethodService implements
         // mode
         float dimen = getResources().getDimension(
                 R.dimen.max_height_for_fullscreen);
-        if (displayHeight > dimen || mFullscreenOverride || isConnectbot()) {
+        // droidtop patch (Droidtop/tracker#903 H12c): a floating keyboard never takes the screen for an extract view.
+        if (displayHeight > dimen || mFullscreenOverride || isConnectbot()
+                || KeyboardModes.current(this) == KeyboardModes.Mode.FLOATING) {
             return false;
         } else {
             return super.onEvaluateFullscreenMode();
@@ -2182,6 +2228,19 @@ public class LatinIME extends InputMethodService implements
             break;
         case SwitchKeyboard.CODE:
             switchToNextKeyboard();
+            break;
+        case PadCalculator.EQUALS_CODE:
+            // droidtop (Droidtop/tracker#903 H12c): the number pad's "=".
+            typeCalculation();
+            break;
+        case PadCalculator.LETTERS_CODE:
+            // droidtop (Droidtop/tracker#903 H12c): the number pad's ABC, back to Normal; the keyboard builds itself again,
+            // once this key's own press is over.
+            mHandler.post(new Runnable() {
+                public void run() {
+                    KeyboardModes.choose(LatinIME.this, KeyboardModes.Mode.NORMAL);
+                }
+            });
             break;
         case LatinKeyboardView.KEYCODE_COMPOSE:
             mComposeMode = !mComposeMode;

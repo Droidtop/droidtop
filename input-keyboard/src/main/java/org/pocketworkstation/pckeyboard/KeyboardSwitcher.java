@@ -92,6 +92,8 @@ public class KeyboardSwitcher implements
     private static final int KBD_FULL_FN = R.xml.kbd_full_fn;
     private static final int KBD_COMPACT = R.xml.kbd_compact;
     private static final int KBD_COMPACT_FN = R.xml.kbd_compact_fn;
+    // droidtop (Droidtop/tracker#903 H12c): the number and calculator pad mode's keys.
+    private static final int KBD_NUMPAD = R.xml.kbd_numpad;
 
     private LatinKeyboardView mInputView;
     private static final int[] ALPHABET_MODES = { KEYBOARDMODE_NORMAL,
@@ -373,6 +375,12 @@ public class KeyboardSwitcher implements
 
     private KeyboardId getKeyboardId(int mode, int imeOptions, boolean isSymbols) {
         boolean hasVoice = hasVoiceButton(isSymbols);
+        // droidtop (Droidtop/tracker#903 H12c): the number pad mode takes the place of the letters in any field Hacker's
+        // gives letters; Hacker's own phone pad stays for phone, number and date fields. Normal gives the letters back.
+        if (!isSymbols && mode != MODE_PHONE
+                && KeyboardModes.current(mInputMethodService) == KeyboardModes.Mode.NUMBER_PAD) {
+            return new KeyboardId(KBD_NUMPAD, 0, false, hasVoice);
+        }
         if (mFullMode > 0) {
             switch (mode) {
             case MODE_TEXT:
