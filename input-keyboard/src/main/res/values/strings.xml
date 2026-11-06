@@ -322,6 +322,9 @@
     <!-- Add to dictionary hint -->
     <string name="hint_add_to_dictionary">\u2190 Touch again to save</string>
     
+    <!-- droidtop (Droidtop/tracker#903 H7a): the suggestion strip while a language's own typing loads its data. -->
+    <string name="engine_getting_ready">%1$s is getting ready\u2026</string>
+
     <!-- Inform the user that a particular language has an available dictionary -->
     <string name="has_dictionary">Dictionary available</string>
 

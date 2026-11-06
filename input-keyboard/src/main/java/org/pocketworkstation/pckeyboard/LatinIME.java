@@ -682,9 +682,21 @@ public class LatinIME extends InputMethodService implements
 
     /** droidtop (Droidtop/tracker#903 H6): the engine keys go to; Hacker's Latin path when [engine] is null. */
     private void useEngine(InputEngine engine) {
-        if (mSession != null) mSession.leave();
+        if (mSession != null) mSession.close();
         mEngine = engine != null ? engine : mLatin;
-        mSession = mEngine == mLatin ? null : new EngineSession(mEngine, new SessionEditor());
+        mSession = mEngine == mLatin ? null : new EngineSession(mEngine, new SessionEditor(), gettingReadyLine());
+    }
+
+    /** The strip's line while a language's own engine loads (#903 H7a): "Japanese is getting ready…". */
+    private CharSequence gettingReadyLine() {
+        final String language = mInputLocale == null ? "" : mInputLocale.split("_")[0];
+        final String name = new Locale(language).getDisplayLanguage();
+        return getString(R.string.engine_getting_ready, name.isEmpty() ? language : name);
+    }
+
+    /** The strip's mode button (#903 H7a): the engine's next composition mode. */
+    void cycleEngineMode() {
+        if (mSession != null) mSession.cycleMode();
     }
 
     /** The field and the candidate bar, as a language's own engine writes them (EngineSession). */
@@ -696,8 +708,39 @@ public class LatinIME extends InputMethodService implements
             if (composing.isEmpty() && !mComposed) return;
             mComposed = !composing.isEmpty();
             InputConnection ic = getCurrentInputConnection();
-            // The caret is put after the composing text; an engine that moves it inside comes with its slice (H7).
-            if (ic != null) ic.setComposingText(styledComposing(composing), 1);
+            if (ic == null) return;
+            final CharSequence text = styledComposing(composing);
+            final int fromEnd = text.length() - composing.getCaret();
+            if (fromEnd <= 0) {
+                ic.setComposingText(text, 1);
+                return;
+            }
+            // The caret inside the composing text (#903 H7a): setComposingText's newCursorPosition reaches only its
+            // ends, so the caret is set after it, in one batch so the field reports one selection.
+            ic.beginBatchEdit();
+            ic.setComposingText(text, 1);
+            ExtractedText et = ic.getExtractedText(new ExtractedTextRequest(), 0);
+            if (et != null && et.selectionStart >= 0) {
+                final int caret = et.startOffset + et.selectionStart - fromEnd;
+                ic.setSelection(caret, caret);
+            }
+            ic.endBatchEdit();
+        }
+
+        public void deleteBefore(int count) {
+            InputConnection ic = getCurrentInputConnection();
+            if (ic == null) return;
+            // The count is from the composing text's start (Mozc's deletion_range), so what is composed goes first;
+            // the session draws it again after.
+            if (mComposed) ic.setComposingText("", 1);
+            mComposed = false;
+            ic.deleteSurroundingText(count, 0);
+        }
+
+        public CharSequence textBeforeCaret(int max) {
+            InputConnection ic = getCurrentInputConnection();
+            final CharSequence before = ic != null ? ic.getTextBeforeCursor(max, 0) : null;
+            return before != null ? before : "";
         }
 
         public void commit(CharSequence text) {
@@ -760,6 +803,39 @@ public class LatinIME extends InputMethodService implements
         }
         return taken;
     }
+
+    /**
+     * droidtop (Droidtop/tracker#903 H7a): an arrow or Escape, from the keys ([code] is the keyboard's own negative code)
+     * or a hardware keyboard (the negated KeyEvent code), to a language's own engine while it composes. False leaves it
+     * to do what it always did.
+     */
+    private boolean sessionNavigates(int code, boolean shifted) {
+        if (mSession == null || mModCtrl || mModAlt || mModMeta) return false;
+        final InputEngine.Key key;
+        switch (code) {
+        case LatinKeyboardView.KEYCODE_DPAD_LEFT:
+            key = shifted ? InputEngine.Key.SHIFT_LEFT : InputEngine.Key.LEFT;
+            break;
+        case LatinKeyboardView.KEYCODE_DPAD_RIGHT:
+            key = shifted ? InputEngine.Key.SHIFT_RIGHT : InputEngine.Key.RIGHT;
+            break;
+        case LatinKeyboardView.KEYCODE_DPAD_UP:
+            key = InputEngine.Key.UP;
+            break;
+        case LatinKeyboardView.KEYCODE_DPAD_DOWN:
+            key = InputEngine.Key.DOWN;
+            break;
+        case LatinKeyboardView.KEYCODE_ESCAPE:
+            key = InputEngine.Key.ESCAPE;
+            break;
+        default:
+            return false;
+        }
+        return mSession.onKey(key);
+    }
+
+    /** Hardware keys a language's own engine took on the way down, so their key up is its too. */
+    private final java.util.Set<Integer> mSessionKeysDown = new java.util.HashSet<Integer>();
 
     /** The candidate strip, while it is on screen: for the pad (PadKeys) to reach. */
     CandidateView candidateStrip() {
@@ -1055,9 +1131,14 @@ public class LatinIME extends InputMethodService implements
         }
         inputView.closing();
         resetPrediction();
-        // droidtop (Droidtop/tracker#903 H6): a new field for the engine; a language's own one forgets the last.
-        if (mSession != null) mSession.leave();
-        mEngine.startField(mPredictionOnForMode, mPasswordText);
+        // droidtop (Droidtop/tracker#903 H6): a new field for the engine; a language's own one forgets the last, and
+        // is given the text before the caret (H7a).
+        if (mSession != null) {
+            mSession.leave();
+            mSession.startField(mPredictionOnForMode, mPasswordText);
+        } else {
+            mEngine.startField(mPredictionOnForMode, mPasswordText);
+        }
         loadSettings();
         updateShiftKeyState(attribute);
 
@@ -1119,7 +1200,8 @@ public class LatinIME extends InputMethodService implements
         super.onFinishInput();
 
         onAutoCompletionStateChanged(false);
-        if (mSession != null) mSession.leave();
+        // A language's own engine keeps what it showed and saves what it learned (#903 H7a).
+        if (mSession != null) mSession.finishField();
 
         if (mKeyboardSwitcher.getInputView() != null) {
             mKeyboardSwitcher.getInputView().closing();
@@ -1276,8 +1358,10 @@ public class LatinIME extends InputMethodService implements
                 candidatesStart, candidatesEnd);
         offerEmojiForWord(newSelStart, newSelEnd);
         // droidtop (Droidtop/tracker#903 H6): the cursor left what a language's own engine composes; it stays as typed.
+        // The engine may put the caret inside its text (H7a), so only a selection or a caret outside it counts.
         if (mSession != null && mSession.getComposing()
-                && (newSelStart != candidatesEnd || newSelEnd != candidatesEnd) && mLastSelectionStart != newSelStart) {
+                && (newSelStart != newSelEnd || newSelStart < candidatesStart || newSelEnd > candidatesEnd)
+                && mLastSelectionStart != newSelStart) {
             mSession.leave();
         }
 
@@ -1522,6 +1606,12 @@ public class LatinIME extends InputMethodService implements
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         // droidtop: a pad drives the keyboard while it shows (Droidtop/tracker#338).
         if (mPadKeys.onKeyDown(keyCode, event)) return true;
+        // droidtop (Droidtop/tracker#903 H7a): a hardware keyboard's arrows and Esc reach a language's own engine
+        // while it composes.
+        if (mSession != null && sessionNavigates(-keyCode, event.isShiftPressed())) {
+            mSessionKeysDown.add(keyCode);
+            return true;
+        }
         switch (keyCode) {
         case KeyEvent.KEYCODE_BACK:
             if (event.getRepeatCount() == 0
@@ -1548,6 +1638,7 @@ public class LatinIME extends InputMethodService implements
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if (mPadKeys.onKeyUp(keyCode, event)) return true;
+        if (mSessionKeysDown.remove(keyCode)) return true;
         switch (keyCode) {
         case KeyEvent.KEYCODE_DPAD_DOWN:
         case KeyEvent.KEYCODE_DPAD_UP:
@@ -2389,6 +2480,10 @@ public class LatinIME extends InputMethodService implements
             sendTab();
             break;
         case LatinKeyboardView.KEYCODE_ESCAPE:
+            // droidtop (Droidtop/tracker#903 H7a): a language's own engine cancels what it composes.
+            if (mSession != null && sessionNavigates(primaryCode, false)) {
+                break;
+            }
             if (processMultiKey(primaryCode)) {
                 break;
             }
@@ -2421,6 +2516,10 @@ public class LatinIME extends InputMethodService implements
         case LatinKeyboardView.KEYCODE_BREAK:
         case LatinKeyboardView.KEYCODE_NUM_LOCK:
         case LatinKeyboardView.KEYCODE_SCROLL_LOCK:
+            // droidtop (Droidtop/tracker#903 H7a): the arrows move about what a language's own engine composes.
+            if (mSession != null && sessionNavigates(primaryCode, isShiftMod())) {
+                break;
+            }
             if (processMultiKey(primaryCode)) {
                 break;
             }

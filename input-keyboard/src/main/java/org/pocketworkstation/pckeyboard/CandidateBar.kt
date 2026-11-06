@@ -47,6 +47,17 @@ class CandidateBar {
     var selected = -1
         private set
 
+    /**
+     * One plain line shown in place of candidates, null for none (#903 H7a): the engine is getting ready, or the reason
+     * it cannot work here.
+     */
+    var notice: CharSequence? = null
+        private set
+
+    /** The engine's composition mode (hiragana, katakana), shown on a button at the row's left end that cycles it; null for none. */
+    var modeLabel: CharSequence? = null
+        private set
+
     private var enginePageSize = 0
 
     /** The expand button's place among the row's stops: after the last candidate. */
@@ -63,6 +74,7 @@ class CandidateBar {
 
     /** New candidates. The grid stays open only while it can; the pad stays on the bar, at the engine's choice or the first. */
     fun show(candidates: InputEngine.Candidates, expandable: Boolean) {
+        notice = null
         items = candidates.items
         focused = if (candidates.focused in items.indices) candidates.focused else -1
         enginePageSize = max(0, candidates.pageSize)
@@ -78,7 +90,20 @@ class CandidateBar {
         page = if (padActive || focused >= 0) pageOf(anchor()) else 0
     }
 
-    fun clear() = show(InputEngine.Candidates.NONE, false)
+    fun clear() {
+        show(InputEngine.Candidates.NONE, false)
+        modeLabel = null
+    }
+
+    /** No candidates, and [line] in their place; no mode button while it shows. */
+    fun showNotice(line: CharSequence) {
+        clear()
+        notice = line
+    }
+
+    fun showMode(label: CharSequence?) {
+        modeLabel = label
+    }
 
     /** The grid's shape, worked out by the view from its size; the page follows what is selected or chosen. */
     fun layoutGrid(columns: Int, rows: Int) {
