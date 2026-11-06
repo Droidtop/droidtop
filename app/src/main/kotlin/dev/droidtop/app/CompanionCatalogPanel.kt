@@ -72,6 +72,8 @@ internal data class SystemCard(
     val items: List<CatalogItem>,
     val folded: Boolean,
     val storage: Boolean = false,
+    /** Group titles over a row id, as [CompanionCatalogItems] draws them. */
+    val headings: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -85,6 +87,8 @@ internal fun companionSystemCards(
     performanceMode: CatalogItem?,
     privacy: CatalogItem?,
     accessibility: List<CatalogItem> = emptyList(),
+    dndCategories: List<CatalogItem> = emptyList(),
+    dndHeading: String = "",
 ): List<SystemCard> = listOf(
     // Without the Android settings row: on the companion its links are Device's "Android's pages", labelled as exits,
     // and an exit is on one page only (Droidtop/tracker#786 S3, plan 4.1 rule 2).
@@ -107,7 +111,16 @@ internal fun companionSystemCards(
     ),
     // Media volume is the card's own Media slider, one per stream through VolumeControl (slice C19), so the catalog's
     // copy is not drawn again (Droidtop/tracker#786 S8).
-    SystemCard("sound", "Sound", section(QuickSection.AUDIO).filter { it.id !in ON_STREAM_SLIDERS }, folded = true),
+    // What Do Not Disturb lets through sits under its row, titled, only with the access (Droidtop/tracker#786 S8).
+    SystemCard(
+        "sound",
+        "Sound",
+        section(QuickSection.AUDIO).filter { it.id !in ON_STREAM_SLIDERS }.flatMap { item ->
+            if (item.id == dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_DND) listOf(item) + dndCategories else listOf(item)
+        },
+        folded = true,
+        headings = dndCategories.firstOrNull()?.let { mapOf(it.id to dndHeading) }.orEmpty(),
+    ),
     // Network detail and Bluetooth devices, drawn by the card itself (slice C19).
     SystemCard("connections", "Connections", section(QuickSection.CONNECTIONS), folded = true),
     SystemCard("power", "Power", listOfNotNull(performanceMode), folded = true),

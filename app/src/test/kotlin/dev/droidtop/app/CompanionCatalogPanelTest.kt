@@ -77,6 +77,20 @@ class CompanionCatalogPanelTest {
         assertEquals(mapOf("b1" to "Keys"), companionHeadings(groups))
     }
 
+    // Droidtop/tracker#786 S8: what Do Not Disturb lets through sits right under its row, titled.
+    @Test fun dndCategoriesFollowTheDndRowUnderTheirHeading() {
+        val alarms = ActionItem(id = "pref_dnd_allows_alarms", title = "Alarms", run = {})
+        val calls = ActionItem(id = "pref_dnd_allows_calls", title = "Calls", run = {})
+        val sound = companionSystemCards(::quick, performance, privacy, dndCategories = listOf(alarms, calls), dndHeading = "Lets through")
+            .first { it.id == "sound" }
+        val order = sound.items.map { it.id }
+        val dnd = order.indexOf(GamingSettingsCatalog.ID_SYSTEM_DND)
+        assertEquals(listOf(alarms.id, calls.id), order.subList(dnd + 1, dnd + 3))
+        assertEquals(mapOf(alarms.id to "Lets through"), sound.headings)
+        // Without the access there are none and no heading.
+        assertTrue(companionSystemCards(::quick, performance, privacy).first { it.id == "sound" }.headings.isEmpty())
+    }
+
     // Droidtop/tracker#786 S7: font and display size are on Accessibility, not twice.
     @Test fun fontAndDisplaySizeAreOnAccessibilityOnly() {
         val font = ActionItem(id = dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_FONT, title = "Font size", run = {})

@@ -6144,7 +6144,10 @@ droidtop 0.2.0-dev.1931).
   mode's "Kid mode's highest volume", no limit by default, hidden in Kid and Kiosk) holds there for every stream; a
   settings observer turns a volume key that goes past it back down while Kid is on. On the companion's Sound, Media
   volume is drawn once (its stream slider; the Quick Menu's Volume row is not drawn again) and Android's output and
-  volume panel is the Audio output row, once (Droidtop/tracker#786 S8). System > Connections shows the paired Bluetooth devices, asking for Bluetooth
+  volume panel is the Audio output row, once (Droidtop/tracker#786 S8). Under the Do Not Disturb row, with its
+  access, "Do Not Disturb lets through" has a switch per priority category Android has (alarms, media and touch
+  sounds from Android 9, reminders, events, priority conversations from Android 11, messages, calls, repeat callers;
+  `DndCategories`), keeping who may call or message as it is. System > Connections shows the paired Bluetooth devices, asking for Bluetooth
   access (`BLUETOOTH_CONNECT`) when the card first opens (owner question 1's default), Android's Bluetooth settings,
   and a Network pill that opens the Network tab.
 - **The Network tab (Droidtop/tracker#583; owner, 2026-10-17: "Might actually be wise to put that in its own network

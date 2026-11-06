@@ -157,6 +157,16 @@
     <string name="gaming_brightness">Brightness</string>
     <string name="gaming_opens_the_system_screen_where_droidtop">Opens the system screen where droidtop can be granted Modify system settings</string>
     <string name="gaming_do_not_disturb">Do Not Disturb</string>
+    <string name="dnd_lets_through">Do Not Disturb lets through</string>
+    <string name="dnd_allows_alarms">Alarms</string>
+    <string name="dnd_allows_media">Media</string>
+    <string name="dnd_allows_touch_sounds">Touch sounds</string>
+    <string name="dnd_allows_reminders">Reminders</string>
+    <string name="dnd_allows_events">Events</string>
+    <string name="dnd_allows_conversations">Priority conversations</string>
+    <string name="dnd_allows_messages">Messages</string>
+    <string name="dnd_allows_calls">Calls</string>
+    <string name="dnd_allows_repeat_callers">Repeat callers</string>
     <string name="gaming_adaptive_brightness">Adaptive brightness</string>
     <string name="gaming_auto_rotate">Auto-rotate</string>
     <string name="gaming_screen_timeout">Screen timeout</string>
