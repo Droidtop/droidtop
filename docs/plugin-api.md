@@ -1946,6 +1946,21 @@ rule): the bar shows what the manifest says, and the plugin is asked `get` only 
   asked with `{type: "window", windowId, appId}` and admitted only about that window (`FacetGuards.admit`'s `asked`,
   now passed by every facet page, `PluginFacets.view`).
 
+**Open with, as built (slice 4, 2026-11-06).** A plugin provides `files.handler@1` (a high-risk point, so its own
+consent row) with `"associations": [{"ext": "AppImage", "mime": "application/vnd.appimage", "label": "Inspect with
+Acme"}]`, at most 32, each by extension (any case, no dot) or MIME type (exact, or a whole top-level type as
+`image/` and a star; a star alone takes nothing, so a plugin names what it opens) (`FileHandlers`). droidtop's own
+"Open with droidtop" (docs/SPEC.md 4b, `OpenWithActivity`) lists each running plugin whose association matches the
+file, in Desktop, with the consent granted, after droidtop's own choices, by the association's label. Nothing runs
+without a press, as for droidtop's own choices. Picking it makes a read-only token for the file, as a pick in the
+system picker does (D4, `PluginFileTokens`), and calls the plugin's `open {token, name, mime}`; the plugin reads the
+file with `files.open {token}` (so it declares `files.picker`) and should `files.forget` it when done, as a plugin
+keeps at most 256. Every hand-over is in the plugin's activity log (`provide:files.handler`, the file's name). Only
+the files Android already offers droidtop are offered (the five kinds of 4b's intent filters): a plugin association
+cannot make Android offer droidtop for other files, since an app's intent filters are fixed when it is installed.
+Whether droidtop should take every file while Desktop is on, so plugins can open any type, is a question for the
+owner (§10, Q6).
+
 **Not offered:** input into another application's window (a keylogger's and an autoclicker's tool; a `shortcut` on
 an action, below, covers the legitimate uses), and capturing a window's picture (windowcast's, by the standing rule).
 
@@ -1956,7 +1971,7 @@ use of them is in the audit log (§4.6, Droidtop/tracker#61); window events deli
 
 **Slices.** 1, the contract (this section, the `window` and `file` subjects, `desktop.window`, icons; built
 2026-11-06). 2, the host side over host-bridge (`windows.*` and the window events; built 2026-11-06, below). 3, the taskbar drawing
-`desktop.tray` and `desktop.window` (built 2026-11-06, below). 4, Open with. 5, the clipboard and notification bridges, each behind its own
+`desktop.tray` and `desktop.window` (built 2026-11-06, below). 4, Open with (built 2026-11-06, below). 5, the clipboard and notification bridges, each behind its own
 approval. 6, a test fixture plugin exercising each.
 
 **The facet vocabulary grows (owner, 2026-11-06).** The owner: "I think the current vocabularity is too limited". He
@@ -3711,7 +3726,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | E1 | Containers and lifecycle | see and drive the Linux/Wine containers (§3) | `containers.list()`, `containers.state {id}`; `start`, `stop`, `create {image ref}` (**jobs**); events `container.started` / `stopped` | D: Containers screen, taskbar; G: PC section | `containers.read` (normal) / `containers.manage` (dangerous) | medium / high | not built |
 | E2 | Container exec | run a command inside a container as the container user | `containers.exec {id, argv, env, cwd}` → a job with streamed stdout/stderr | data | `containers.exec` (critical: full access to the user's container home) | critical | not built |
 | E3 | Terminal | open a terminal for the user at a place (a container, a game's folder) | `terminal.open {container, cwd}`: the host opens its own terminal; the plugin never reads it | D: terminal window; A/G: a context action (C4) | `terminal.open` (normal: the user sees it and types) | low | not built |
-| E4 | File associations | declare that a container app or a plugin handles a MIME type | manifest static `associations: [{mime, ext, label}]` + EP C9 | D: the file manager's defaults; A: droidtop's file actions | `provide:files.handler` | medium | designed 2026-11-06 (§1.12, Droidtop/tracker#221); not built |
+| E4 | File associations | declare that a container app or a plugin handles a MIME type | manifest static `associations: [{mime, ext, label}]` + EP C9 | D: the file manager's defaults; A: droidtop's file actions | `provide:files.handler` | medium | built 2026-11-06 (§1.12, Droidtop/tracker#221): `files.handler@1` entries' `associations`, offered in droidtop's own Open with for the files it takes |
 | E5 | Windowing (through windowcast) | list, focus, move or close app windows; know which window a game runs in | `windows.list()` → [{id, app, title}]; `windows.focus/close {id}`; events `window.opened` / `closed`. **Streaming, capture and remote display are never in droidtop**: they are windowcast's (standing rule), and this API only manages windows droidtop already knows | D: taskbar menus (C8) | `windows.read` (dangerous: window titles leak content; narrowed by the manifest's `apps`) / `windows.control` (dangerous) | high | built 2026-11-06 (§1.12, Droidtop/tracker#221): `windows.list`, `windows.focus`, `windows.close` and the events `window.opened`, `window.closed`, `window.focused`, served from host-bridge's window list, nothing in the container; moving a window is not offered yet |
 | E6 | Printing bridge | print from a plugin, or add a printer (the CUPS bridge, §4b) | `print.submit {fd, mime, options}` → the host shows its own print dialog; `print.printers()` | D/A: the print dialog | `print.submit` (normal: the dialog is the consent) / `print.admin` (dangerous) | low / high | not built |
 | E7 | Container package bridge | an "app store" for containers: search and install packages (apt, pacman, Flathub-style) | EP `containers.packages@1`: `search`, `install` (**job**), `remove` (**job**), `updates`; the host runs the package manager through E2 on the provider's behalf | D: the app store or Start menu; G: the PC section's "Get apps" | `provide:containers.packages` + `containers.exec` | critical | not built |
@@ -5851,3 +5866,7 @@ answer.
   `org.freedesktop.Notifications` shown by droidtop and readable by plugins, needs a listener on the container's
   session bus, which is code in the container. The recommendation is a droidtop feature of its own if wanted, not a
   plugin permission.
+- **Q6. Should droidtop be offered for every file while Desktop is on?** (Droidtop/tracker#221, 2026-11-06.) Plugins'
+  Open with is offered for the files droidtop already takes (`.exe`, `.msi`, `.deb`, `.rpm`, `.AppImage`). For a
+  plugin to open other files, droidtop would declare a filter for any file, and appear in every app's Open with list
+  while Desktop is on. The recommendation is to wait for a real plugin that needs it.

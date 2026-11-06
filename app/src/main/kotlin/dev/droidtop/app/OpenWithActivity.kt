@@ -290,7 +290,29 @@ private suspend fun resolveState(context: Context, uri: Uri?, desktopConnected: 
             "droidtop couldn't read this file. Save it to your Download folder first, then open it from there.",
         )
     }
-    return if (kind.runsInWine) wineChoices(context, file, kind) else containerChoices(context, file, kind, desktopConnected)
+    val own = if (kind.runsInWine) wineChoices(context, file, kind) else containerChoices(context, file, kind, desktopConnected)
+    return withPlugins(context, own, uri)
+}
+
+/**
+ * [state] with the plugins that open its file after droidtop's own choices (docs/plugin-api.md 1.12,
+ * Droidtop/tracker#221): one row each, handing the plugin the file as a read-only token when it is picked.
+ */
+private fun withPlugins(context: Context, state: OpenWithState, uri: Uri?): OpenWithState {
+    val ready = state as? OpenWithState.Ready ?: return state
+    val mime = uri?.let { runCatching { context.contentResolver.getType(it) }.getOrNull() }
+    val handlers = runCatching { dev.droidtop.library.integrations.PluginOpenWith.handlersFor(context, ready.file.name, mime) }.getOrDefault(emptyList())
+    if (handlers.isEmpty()) return state
+    val plugins = handlers.map { handler ->
+        OpenWithChoice(
+            key = "plugin:${handler.record.manifest.id}",
+            title = handler.label,
+            supporting = "Plugin · ${handler.record.manifest.label} is given this file to read",
+            available = true,
+            open = { ctx -> dev.droidtop.library.integrations.PluginOpenWith.open(ctx, handler, ready.file, mime) },
+        )
+    }
+    return ready.copy(choices = ready.choices + plugins)
 }
 
 private fun wineChoices(context: Context, file: File, kind: OpenWithKind): OpenWithState {

@@ -958,6 +958,9 @@ functionality". The contract is docs/plugin-api.md 1.12; what it decides for Des
 - Slice 3 (2026-11-06) is the bar: a tray button per plugin with tray facets (`PluginTrayItems`, beside Plugins), and
   a row per plugin in a window's menu (`TaskbarWindowRow`), each opening the plugin's facets as a page drawn by the one
   renderer. The bar draws from manifests and grants only and asks a plugin only when its entry is opened.
+- Slice 4 (2026-11-06) is Open with: "Open with droidtop" (4b) lists, after droidtop's own choices, the plugins whose
+  `files.handler` associations take the file; picking one hands it a read-only token for the file (D4), never a path,
+  and is in its activity log. Only the five kinds 4b's filters take are offered (plugin-api.md 10, Q6).
 
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 
@@ -5592,6 +5595,9 @@ not settled designs):
   silent default; with "always" on, the file opens straight away and the
   chooser stays up with the way back. Nothing is copied: the file runs, or
   installs, from where it is.
+  **Plugins in the chooser (Droidtop/tracker#221, 2026-11-06):** after droidtop's own choices, a row per plugin whose
+  `files.handler` association takes the file (docs/plugin-api.md 1.12); picked, the plugin is handed a read-only
+  token for the file, never its path, and the hand-over is in its activity log.
 
 ## 4c. Multi-display: what iiSU does, and why droidtop fights the platform (2026-09-01)
 
