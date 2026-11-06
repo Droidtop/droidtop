@@ -228,7 +228,11 @@ interface ContainerRuntime {
      * majority of it for every backend, so this is the one implementation
      * every backend shares; a backend whose bookkeeping lives partly
      * outside the rootfs (droidspaces' side files) is close enough that a
-     * second, backend-specific walk isn't worth the duplication.
+     * second, backend-specific walk isn't worth the duplication. The
+     * Containers list's size per row is this same measurement, cached
+     * (`ContainerSizes` in :app). Throws [ContainerDiskUsage.Unreadable]
+     * when droidtop cannot read the whole tree (droidspaces' root-owned
+     * one), so no size is shown rather than a short one.
      */
     suspend fun diskUsageBytes(container: Container): Long = withContext(Dispatchers.IO) {
         ContainerDiskUsage.bytesUnder(File(container.rootfsPath))

@@ -13,6 +13,7 @@ import dev.droidtop.app.ContainerPrograms
 import dev.droidtop.app.ContainerBackups
 import dev.droidtop.app.ContainerRuntimeFactory
 import dev.droidtop.app.terminal.ContainerTerminalActivity
+import dev.droidtop.app.ContainerSizes
 import dev.droidtop.app.DesktopSessionService
 import dev.droidtop.app.DesktopSessionState
 import dev.droidtop.app.DesktopSetupPrefs
@@ -115,6 +116,17 @@ object ContainersCatalog {
         title = "Containers",
         subtitle = "The Linux systems on this device: the desktop's own, and any others you make",
         groups = { context -> rootGroups(context) },
+        // Read again as each container's size becomes known (Droidtop/tracker#911).
+        live = ContainerSizes.changes,
+        // Settings search finds these rows without listing, or measuring, every container (per-container rows belong to
+        // the screen, CatalogScreen.indexGroups).
+        indexGroups = { context ->
+            listOf(
+                CatalogGroup(id = "create", title = null, items = listOf(createItem())),
+                CatalogGroup(id = "images", title = null, items = listOf(imagesItem(null, null))),
+                CatalogGroup(id = "image_cache", title = "Downloaded images", items = imageCacheItems(context, null)),
+            )
+        },
     )
 
     /**
@@ -149,20 +161,26 @@ object ContainersCatalog {
         return short + (info.digest?.let { " · ${it.removePrefix("sha256:").take(12)}" } ?: "")
     }
 
+    private fun createItem() = NestedScreenItem(
+        id = "containers_create",
+        title = "Create a container",
+        subtitle = "From a distribution's releases, or any OCI image",
+        inline = createScreen(),
+    )
+
     private suspend fun rootGroups(context: Context): List<CatalogGroup> {
         val runtime = ContainerRuntimeFactory.select(context)
         val containers = runCatching { runtime.listContainers() }
-        val create = NestedScreenItem(
-            id = "containers_create",
-            title = "Create a container",
-            subtitle = "From a distribution's releases, or any OCI image",
-            inline = createScreen(),
-        )
+        val create = createItem()
         val rows: List<CatalogItem> = containers.fold(
             onSuccess = { list ->
+                ContainerSizes.keepOnly(list.map { it.container.id }.toSet())
                 list.sortedWith(compareBy({ it.container.role != ContainerRole.PRIMARY }, { it.displayName.lowercase() }))
                     .map { info ->
-                        val state = stateLabel(info, runtime)
+                        // Its size on disk beside its state: kept until it changes, measured off the main thread
+                        // (docs/SPEC.md 3d "The surface, precisely"; Droidtop/tracker#911).
+                        val state = listOfNotNull(stateLabel(info, runtime), ContainerSizes.label(runtime, info, isRunning(info)))
+                            .joinToString(" · ")
                         NestedScreenItem(
                             id = "container:${info.container.id}",
                             title = info.displayName,
@@ -188,20 +206,68 @@ object ContainersCatalog {
                 listOf(ActionItem(id = "containers_error", title = "Couldn't list the containers", subtitle = FailureText.of("Containers", error)))
             },
         )
+        val store = OciImageStore.of(context)
+        val count = runCatching { store.entries().size }.getOrNull()
+        val bytes = runCatching { store.diskBytes() }.getOrNull()
         return listOf(
             CatalogGroup(id = "create", title = null, items = listOf(create)),
             CatalogGroup(id = "containers", title = "Containers", items = rows),
-            CatalogGroup(id = "images", title = null, items = listOf(imagesItem(context))),
+            CatalogGroup(id = "images", title = null, items = listOf(imagesItem(count, bytes))),
+            CatalogGroup(id = "image_cache", title = "Downloaded images", items = imageCacheItems(context, bytes)),
+        )
+    }
+
+    // ---- the image cache (docs/SPEC.md 3, "Storage is checked before it is spent"; Droidtop/tracker#911) ----
+
+    /**
+     * Whether new downloads are kept, how much may be, and Clear. Read by both backends at each pull through
+     * [ContainerRuntimeFactory]; a lowered limit takes effect at once. Clear deletes kept images only, never a
+     * container, and never an image a container is being made from right now.
+     */
+    private suspend fun imageCacheItems(context: Context, bytes: Long?): List<CatalogItem> {
+        val policy = withContext(Dispatchers.IO) { DesktopSetupPrefs.imageCachePolicy(context) }
+        val size = bytes?.let { dev.droidtop.library.format.ValueFormat.size(it) }
+        return listOf(
+            ToggleItem(
+                id = "containers_image_cache_keep",
+                title = "Keep downloaded images",
+                subtitle = "Off keeps nothing new; what is kept stays until you clear it",
+                current = policy.enabled,
+                onToggle = { ctx, on -> withContext(Dispatchers.IO) { DesktopSetupPrefs.setImageCacheKeep(ctx, on) } },
+            ),
+            ChoiceItem(
+                id = "containers_image_cache_limit",
+                title = "Cache size limit",
+                subtitle = "Over it, the images used longest ago are removed first",
+                options = dev.droidtop.runtime.ImageCachePolicy.LIMITS.map {
+                    ChoiceOption(dev.droidtop.runtime.ImageCachePolicy.limitId(it), dev.droidtop.runtime.ImageCachePolicy.limitLabel(it))
+                },
+                current = dev.droidtop.runtime.ImageCachePolicy.limitId(policy.maxCacheBytes),
+                onSelect = { ctx, value ->
+                    val app = ctx.applicationContext
+                    DesktopSetupPrefs.setImageCacheLimit(app, dev.droidtop.runtime.ImageCachePolicy.limitFromId(value))
+                    // A lower limit applies now, not at the next download; off the main thread.
+                    dev.droidtop.runtime.util.AppScopes.io.launch { ContainerRuntimeFactory.fitImageCache(app) }
+                },
+            ),
+            AsyncActionItem(
+                id = "containers_image_cache_clear",
+                title = "Clear",
+                subtitle = "Deletes the kept images. Your containers stay; a new one downloads its image again",
+                value = size,
+                confirmTitle = "Delete the kept images${size?.let { " ($it)" }.orEmpty()}? Your containers are not touched",
+                run = { ctx, _ ->
+                    OciImageStore.of(ctx).clear()
+                    "Cleared."
+                },
+            ),
         )
     }
 
     // ---- images (Droidtop/tracker#757) ----
 
-    /** The images stored on this device, with how many and what they take on disk. */
-    private suspend fun imagesItem(context: Context): CatalogItem {
-        val store = OciImageStore.of(context)
-        val count = runCatching { store.entries().size }.getOrNull()
-        val bytes = runCatching { store.diskBytes() }.getOrNull()
+    /** The images stored on this device, with how many ([count]) and what they take on disk ([bytes]). */
+    private fun imagesItem(count: Int?, bytes: Long?): CatalogItem {
         val value = listOfNotNull(count?.toString(), bytes?.let { dev.droidtop.library.format.ValueFormat.size(it) }).joinToString(" · ")
         return NestedScreenItem(
             id = "containers_images",
@@ -336,6 +402,8 @@ object ContainersCatalog {
         // buildList's block below isn't suspend, so anything that needs a
         // suspend call (the real disk-usage walk) is computed up front.
         val diskUsageBytes = runCatching { runtime.diskUsageBytes(container) }.getOrNull()
+        // The list shows this answer too, so it does not walk the tree again (Droidtop/tracker#911).
+        ContainerSizes.record(info, running, diskUsageBytes)
         val usage = if (running) readUsage(runtime, container, PAGE_USAGE_SAMPLE_MS) else null
         val x11 = if (primary) null else readX11(runtime, info)
         val main = buildList<CatalogItem> {
@@ -507,6 +575,7 @@ object ContainersCatalog {
                             val input = ctx.contentResolver.openInputStream(uri) ?: throw PlainFailure("the file could not be opened")
                             input.use { runtime.importData(container, it) }
                         }
+                        ContainerSizes.forget(container.id)
                         "Restored."
                     }.getOrElse { "Not restored: ${FailureText.of("Containers", it)}" }
                 },
@@ -540,6 +609,7 @@ object ContainersCatalog {
                         "That file can't be read"
                     } else {
                         runCatching { withContext(Dispatchers.IO) { ContainerBackups.restore(ctx, runtime, info, name) } }
+                            .also { ContainerSizes.forget(id) }
                             .getOrElse { "Not restored: ${FailureText.of("Containers", it)}" }
                     }
                 },
@@ -606,7 +676,11 @@ object ContainersCatalog {
             confirmTitle = "Recreate ${info.displayName} from ${info.image}? Everything installed by hand in it is lost",
             run = { _, onStatus ->
                 onStatus("Downloading ${info.image}...")
-                runtime.recreateFromImage(info.container)
+                try {
+                    runtime.recreateFromImage(info.container)
+                } finally {
+                    ContainerSizes.forget(info.container.id)
+                }
                 "Recreated \"${info.displayName}\" from ${info.image}."
             },
         )
@@ -1207,11 +1281,16 @@ object ContainersCatalog {
                 val manager = PackageUpgrade.byId(found.stdout)
                     ?: error("it has none droidtop knows (apk, apt, dnf, pacman or zypper)")
                 var last = ""
-                for (step in manager.steps) {
-                    onStatus("${step.line} (${manager.label})")
-                    val result = runtime.exec(container, step.command, step.env, root)
-                    last = result.stdout + "\n" + result.stderr
-                    check(result.succeeded) { "${manager.label} stopped: ${PackageUpgrade.failureLine(last)}" }
+                // What it upgraded changes its size, even when a step fails part way (Droidtop/tracker#911).
+                try {
+                    for (step in manager.steps) {
+                        onStatus("${step.line} (${manager.label})")
+                        val result = runtime.exec(container, step.command, step.env, root)
+                        last = result.stdout + "\n" + result.stderr
+                        check(result.succeeded) { "${manager.label} stopped: ${PackageUpgrade.failureLine(last)}" }
+                    }
+                } finally {
+                    ContainerSizes.forget(container.id)
                 }
                 PackageUpgrade.summary(manager, last) ?: "Done (${manager.label})"
             },
@@ -1340,7 +1419,8 @@ object ContainersCatalog {
             run = { ctx, onStatus ->
                 if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart && !info.running) runtime.start(container)
                 onStatus("Getting a terminal ready (the first time installs one)...")
-                ContainerTerminal.ensureInstalled(runtime, container)?.let { error(it) }
+                // The first time installs a terminal into it, which changes its size (Droidtop/tracker#911).
+                ContainerTerminal.ensureInstalled(runtime, container).also { ContainerSizes.forget(container.id) }?.let { error(it) }
                 val started = DesktopSessionService.runInPrimary { sessionRuntime, _ ->
                     ContainerTerminal.failureMessage(ContainerTerminal.open(sessionRuntime, container, info.displayName))
                 }
