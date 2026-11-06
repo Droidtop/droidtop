@@ -35,6 +35,8 @@ runtime-windows/components/
 runtime-windows/lsfg/
 # Mozc's engine library for Japanese typing (build-scripts/fetch-mozc-engine.sh).
 input-japanese/mozc/
+# RIME's engine library and header for Chinese typing (build-scripts/fetch-rime-engine.sh).
+input-chinese/rime/
 # droidtop-agent's Android library (build-scripts/fetch-agent-lib.sh).
 net-core/agent/
 native/target/

@@ -240,6 +240,10 @@ include(":input-keyboard")
 // behind :input-keyboard's seam. :app depends on it and registers it at start; :input-keyboard does not depend on it.
 include(":input-japanese")
 
+// Chinese typing through RIME (docs/SPEC.md 6a, "Chinese through RIME"; Droidtop/tracker#903 H8b): an engine behind
+// :input-keyboard's seam, as :input-japanese is. :app depends on it and registers it at start.
+include(":input-chinese")
+
 // Desktop mode's Android-side half (docs/SPEC.md §2a): the cross-container
 // task manager and frame passthrough for the primary container's compositor
 // output (presented via :host-bridge). The taskbar and app launcher are

@@ -467,6 +467,265 @@ library also links LLVM's libc++ statically, from the Android NDK.
 - **LLVM libc++** (in the library, linked statically from the Android NDK) — https://libcxx.llvm.org — Apache-2.0
   with LLVM Exceptions (https://llvm.org/LICENSE.txt).
 
+## Chinese typing (RIME)
+
+The keyboard types Chinese through RIME (Droidtop/tracker#903 H8b, docs/SPEC.md 6a "Chinese through RIME").
+`librime.so`, for arm64-v8a and x86_64, ships inside the APK: librime (https://github.com/rime/librime, commit
+`56737cd29a4d393a104a2098ece3697aa2810465`) with its lua, octagram and predict plugins linked in, built by
+Droidtop/tracker#903 H8a (`.github/workflows/rime-engine.yml`) on the CMake recipe of Trime
+(https://github.com/osfans/trime, v3.3.13, GPL-3.0-or-later; the recipe only, nothing of Trime ships) and attached to
+this repository's `rime-engine-56737cd2` prerelease, from which `build-scripts/fetch-rime-engine.sh` fetches it
+against `input-chinese/rime-engine.pin`. droidtop's own JNI over it (`input-chinese/src/main/cpp`,
+`libdroidtop_rime.so`) is droidtop's, GPL-3.0. The archive carries each library's licence file (`LICENSE-*`), the NDK
+toolchain's notices and `VERSION`, which names every component's commit; the terms below are those files'.
+
+The data, `rime-data-luna.tar.gz` (朙月拼音 luna_pinyin with the 八股文 essay vocabulary, compiled by rime_deployer,
+and OpenCC's conversion data), is not in the APK: the keyboard downloads it from the same prerelease the first time
+Chinese is used. It is built from rime/rime-prelude (`082425ea0684bca36474415d4a0e8db9b016487e`), rime/rime-essay
+(`054920de4f54c9e5994276a96a4fc2a35cb51aa3`) and rime/rime-luna-pinyin (`56b934b099dfbeab842320f13aa8b461a6ab3e42`),
+each LGPL-3.0 (https://www.gnu.org/licenses/lgpl-3.0.html), with one change: `luna_pinyin.schema.yaml` loses its
+stroke reverse lookup. The exact sources it was compiled from, that change included, are published beside it as the
+release's `rime-data-luna-sources.tar.gz`
+(https://github.com/Droidtop/droidtop/releases/download/rime-engine-56737cd2/rime-data-luna-sources.tar.gz), and the
+downloaded data carries their licence (`LICENSE-rime-data`) and `SOURCES.txt`. OpenCC's data in it is Apache-2.0.
+
+- **librime** — https://github.com/rime/librime — BSD-3-Clause:
+
+  > Copyright (c) 2014, RIME Developers
+  > All rights reserved.
+  >
+  > Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+  > following conditions are met:
+  >
+  > * Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+  >   disclaimer.
+  >
+  > * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+  >   following disclaimer in the documentation and/or other materials provided with the distribution.
+  >
+  > * Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote
+  >   products derived from this software without specific prior written permission.
+  >
+  > THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  > INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  > DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  > SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  > SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  > WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+  > USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+- **librime-octagram** (in the library) — https://github.com/lotem/librime-octagram — GPL-3.0
+  (https://www.gnu.org/licenses/gpl-3.0.html; the full text is the archive's `LICENSE-librime-octagram`). droidtop is
+  GPL-3.0, so it may carry it; the library as a whole is distributed under GPL-3.0 as part of droidtop.
+- **librime-lua** (in the library) — https://github.com/hchunhui/librime-lua — BSD-3-Clause:
+
+  > Copyright (c) 2021, librime-lua Developers
+  > All rights reserved.
+  >
+  > Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+  > following conditions are met:
+  >
+  > * Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+  >   disclaimer.
+  >
+  > * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+  >   following disclaimer in the documentation and/or other materials provided with the distribution.
+  >
+  > * Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote
+  >   products derived from this software without specific prior written permission.
+  >
+  > THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  > INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  > DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  > SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  > SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  > WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+  > USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+- **librime-predict** (in the library) — https://github.com/rime/librime-predict — BSD-3-Clause:
+
+  > BSD 3-Clause License
+  >
+  > Copyright (c) 2023, RIME Developers
+  >
+  > Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+  > following conditions are met:
+  >
+  > 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the
+  >    following disclaimer.
+  >
+  > 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+  >    following disclaimer in the documentation and/or other materials provided with the distribution.
+  >
+  > 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote
+  >    products derived from this software without specific prior written permission.
+  >
+  > THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  > INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  > DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  > SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  > SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  > WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+  > USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+- **Lua 5.4** (in the library, compiled in by librime-lua) — https://www.lua.org — MIT:
+
+  > Copyright (C) 1994-2026 Lua.org, PUC-Rio.
+  >
+  > Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+  > documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+  > the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+  > to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+  >
+  > The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+  > the Software.
+  >
+  > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+  > THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  > AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+  > CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  > IN THE SOFTWARE.
+
+- **Boost** (in the library, the parts librime uses) — https://www.boost.org — Boost Software License 1.0:
+
+  > Boost Software License - Version 1.0 - August 17th, 2003
+  >
+  > Permission is hereby granted, free of charge, to any person or organization obtaining a copy of the software and
+  > accompanying documentation covered by this license (the "Software") to use, reproduce, display, distribute,
+  > execute, and transmit the Software, and to prepare derivative works of the Software, and to permit third-parties
+  > to whom the Software is furnished to do so, all subject to the following:
+  >
+  > The copyright notices in the Software and this entire statement, including the above license grant, this
+  > restriction and the following disclaimer, must be included in all copies of the Software, in whole or in part, and
+  > all derivative works of the Software, unless such copies or derivative works are solely in the form of
+  > machine-executable object code generated by a source language processor.
+  >
+  > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+  > THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT SHALL
+  > THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN
+  > CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  > IN THE SOFTWARE.
+
+- **glog** (in the library) — https://github.com/google/glog — BSD-3-Clause:
+
+  > Copyright (c) 2024, Google Inc.
+  > All rights reserved.
+  >
+  > Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+  > following conditions are met:
+  >
+  > * Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+  >   disclaimer.
+  >
+  > * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+  >   following disclaimer in the documentation and/or other materials provided with the distribution.
+  >
+  > * Neither the name of Google Inc. nor the names of its contributors may be used to endorse or promote products
+  >   derived from this software without specific prior written permission.
+  >
+  > THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  > INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  > DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  > SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  > SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  > WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+  > USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+- **LevelDB** (in the library) — https://github.com/google/leveldb — BSD-3-Clause:
+
+  > Copyright (c) 2011 The LevelDB Authors. All rights reserved.
+  >
+  > Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+  > following conditions are met:
+  >
+  > * Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+  >   disclaimer.
+  >
+  > * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+  >   following disclaimer in the documentation and/or other materials provided with the distribution.
+  >
+  > * Neither the name of Google Inc. nor the names of its contributors may be used to endorse or promote products
+  >   derived from this software without specific prior written permission.
+  >
+  > THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  > INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  > DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  > SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  > SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  > WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+  > USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+- **Snappy** (in the library) — https://github.com/google/snappy — BSD-3-Clause:
+
+  > Copyright 2011, Google Inc.
+  > All rights reserved.
+  >
+  > Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+  > following conditions are met:
+  >
+  > * Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+  >   disclaimer.
+  >
+  > * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+  >   following disclaimer in the documentation and/or other materials provided with the distribution.
+  >
+  > * Neither the name of Google Inc. nor the names of its contributors may be used to endorse or promote products
+  >   derived from this software without specific prior written permission.
+  >
+  > THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  > INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  > DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  > SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  > SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  > WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+  > USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+- **yaml-cpp** (in the library) — https://github.com/jbeder/yaml-cpp — MIT:
+
+  > Copyright (c) 2008-2015 Jesse Beder.
+  >
+  > Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+  > documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+  > the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+  > to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+  >
+  > The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+  > the Software.
+  >
+  > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+  > THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  > AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+  > CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  > IN THE SOFTWARE.
+
+- **marisa-trie** (in the library) — https://github.com/s-yata/marisa-trie — BSD-2-Clause OR LGPL-2.1-or-later; used
+  under BSD-2-Clause:
+
+  > Copyright (c) 2010-2025, Susumu Yata
+  > All rights reserved.
+  >
+  > Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+  > following conditions are met:
+  >
+  > - Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+  >   disclaimer.
+  >
+  > - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+  >   following disclaimer in the documentation and/or other materials provided with the distribution.
+  >
+  > THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  > INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  > DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  > SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  > SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+  > WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+  > USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+- **OpenCC** (in the library; and its data, in the download) — https://github.com/BYVoid/OpenCC — Apache-2.0
+  (https://www.apache.org/licenses/LICENSE-2.0; the full text is the archive's `LICENSE-opencc`).
+- **LLVM libc++** (in both libraries, linked statically from the Android NDK) — https://libcxx.llvm.org — Apache-2.0
+  with LLVM Exceptions (https://llvm.org/LICENSE.txt; the archive's `NOTICE-ndk-toolchain`).
+
 ## Interface sounds
 
 The shell menu, dialog and toast sounds in `shell-gamepad/src/main/assets/ui-sounds/` are
