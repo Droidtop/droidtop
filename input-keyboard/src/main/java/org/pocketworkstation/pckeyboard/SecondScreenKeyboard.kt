@@ -203,10 +203,11 @@ object SecondScreenKeyboard {
         context: Context,
         listener: LatinKeyboardBaseView.OnKeyboardActionListener,
         heightPercent: Float = DEFAULT_HEIGHT_PERCENT,
+        compact: Boolean = false,
     ): LatinKeyboardView {
         val view = LayoutInflater.from(context)
             .inflate(R.layout.input_material_dark, null) as LatinKeyboardView
-        applyLayout(view, context, functionLayer = false, heightPercent = heightPercent)
+        applyLayout(view, context, functionLayer = false, heightPercent = heightPercent, compact = compact)
         view.setOnKeyboardActionListener(listener)
         // No key-preview bubbles: they pop ABOVE the touched key, so the
         // top row's would be clipped by the display edge, and a keyboard
@@ -222,14 +223,23 @@ object SecondScreenKeyboard {
      * symbols and secondary keys live. Driven by the Fn and layout-switch
      * keys, which otherwise would do nothing at all on this surface,
      * because the [LatinIME] that normally handles them is not in the loop.
+     *
+     * [compact] draws Hacker's own Compact 5-row layout and its Fn layer instead (`kbd_compact`, the layout mode
+     * Hacker's offers as "Compact"): fewer, wider keys, for the add-on screen (Droidtop/tracker#903 H12c, KeyboardPanel).
      */
     fun applyLayout(
         view: LatinKeyboardView,
         context: Context,
         functionLayer: Boolean,
         heightPercent: Float = DEFAULT_HEIGHT_PERCENT,
+        compact: Boolean = false,
     ) {
-        val xml = if (functionLayer) R.xml.kbd_full_fn else R.xml.kbd_full
+        val xml = when {
+            compact && functionLayer -> R.xml.kbd_compact_fn
+            compact -> R.xml.kbd_compact
+            functionLayer -> R.xml.kbd_full_fn
+            else -> R.xml.kbd_full
+        }
         val mode = if (functionLayer) {
             KeyboardSwitcher.KEYBOARDMODE_SYMBOLS
         } else {

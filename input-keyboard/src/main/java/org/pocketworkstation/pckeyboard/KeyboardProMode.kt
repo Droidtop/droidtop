@@ -31,7 +31,8 @@ object KeyboardProMode {
         "auto_cap", "pref_screen_feedback",
         "show_suggestions", "pref_dictionaries", "pref_glide", "pref_offline_voice",
         "pref_tools_strip", "pref_keyboard_form", "pref_emoji", "pref_inline_autofill", "pref_incognito",
-        "pref_clipboard_history", "pref_space_drag", "pref_gif_folders",
+        "pref_clipboard_history", "pref_space_drag", "pref_gif_folders", "pref_keyboard_view_mode",
+        "pref_keyboard_view_mode_landscape",
     )
 
     /** Kept by a reset: the mode itself and what the person wrote or picked (their macros, their GIF folders). */

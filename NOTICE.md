@@ -170,6 +170,18 @@ This project is distributed under the GNU General Public License v3.0 (see
   (`DynamicColors`: the ground in neutral 50 or 900, keys in neutral 0 or 800, the accent in accent1 200 by night and
   600 by day), as `DynamicKeyColors.derive` in `input-keyboard`, whose header names it; and the rule of
   `KeyboardTheme.getAvailableDefaultColors` that offers dynamic colours only on Android 12 and later, in `ThemePresets`.
+- **Keyboard modes, ported in part** (Droidtop/tracker#903 H12c; docs/SPEC.md 6a, "Modes"). `KeyboardModeViews.kt` in
+  `input-keyboard` names both in its header.
+  - HeliBoard, https://github.com/Helium314/HeliBoard at `2d9869b2` — GPL-3.0-only, Copyright (C) HeliBoard
+    contributors: the one-handed mode's controls of `app/src/main/java/helium314/keyboard/latin/KeyboardWrapperView.kt`
+    (stop, switch side and resize buttons centred in the free side at 20%, 50% and 80% of the keys' height, the resize
+    button dragged sideways, a scale kept per orientation and clamped), as `OneHandedFrame` and the one-handed rules of
+    `KeyboardModes`.
+  - FlorisBoard, https://github.com/florisboard/florisboard at `bac346e8` — Apache-2.0, Copyright (C) The FlorisBoard
+    Contributors: the floating window's insets of `ime/window/ImeWindowController.kt` (`onComputeInsets`: content and
+    visible insets at the window's bottom, touches taken only inside the window by `TOUCHABLE_INSETS_REGION`) and the
+    clamp of `ime/window/ImeWindowProps.kt` (`Floating.constrained`: size between bounds, offsets kept inside the root),
+    as `FloatingKeyboardFrame` and `KeyboardModes.clampFrame`, with its phone minimum widths.
 - **Termux terminal-emulator and terminal-view** — `vendor/termux-terminal`, https://github.com/termux/termux-app
   at `v0.118.3` (`5b657c6a`) — Apache-2.0 (termux-app's own `LICENSE.md` names these two libraries, which carry
   Terminal Emulator for Android code, https://github.com/jackpal/Android-Terminal-Emulator, as Apache-2.0; the rest

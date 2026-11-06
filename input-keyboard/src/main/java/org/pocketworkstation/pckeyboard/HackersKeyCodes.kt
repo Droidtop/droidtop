@@ -47,6 +47,7 @@ object HackersKeyCodes {
         LatinKeyboardView.KEYCODE_OPTIONS, LatinKeyboardView.KEYCODE_OPTIONS_LONGPRESS, LatinKeyboardView.KEYCODE_VOICE,
         LatinKeyboardView.KEYCODE_F1, LatinKeyboardView.KEYCODE_NEXT_LANGUAGE, LatinKeyboardView.KEYCODE_PREV_LANGUAGE,
         SwitchKeyboard.CODE, LatinKeyboardView.KEYCODE_COMPOSE, LatinKeyboardView.KEYCODE_FN,
+        PadCalculator.EQUALS_CODE, PadCalculator.LETTERS_CODE,
     )
 
     /**

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The number and calculator pad mode (droidtop, Droidtop/tracker#903 H12c; docs/SPEC.md 6a, "Modes"):
+     the digits, a point, the four operators and = in a 4 by 4 grid, with Backspace, ABC (back to Normal),
+     a comma and Enter beside it. The operators type + - * / so a sum works in any field; = types the answer
+     to the sum before the cursor (PadCalculator). Keys as kbd_phone draws them. -->
+<Keyboard
+    xmlns:android="http://schemas.android.com/apk/res-auto"
+    android:keyWidth="20%p"
+    android:horizontalGap="0px"
+    android:verticalGap="@dimen/key_bottom_gap"
+>
+    <Row android:rowEdgeFlags="top">
+        <Key android:codes="55" android:keyLabel="7" android:keyEdgeFlags="left" />
+        <Key android:codes="56" android:keyLabel="8" />
+        <Key android:codes="57" android:keyLabel="9" />
+        <Key android:codes="47" android:keyLabel="÷" android:isModifier="true" />
+        <Key android:codes="@integer/key_delete" android:keyIcon="@drawable/sym_keyboard_delete"
+            android:iconPreview="@drawable/sym_keyboard_feedback_delete" android:isModifier="true"
+            android:isRepeatable="true" android:keyEdgeFlags="right" />
+    </Row>
+    <Row>
+        <Key android:codes="52" android:keyLabel="4" android:keyEdgeFlags="left" />
+        <Key android:codes="53" android:keyLabel="5" />
+        <Key android:codes="54" android:keyLabel="6" />
+        <Key android:codes="42" android:keyLabel="×" android:isModifier="true" />
+        <Key android:codes="-108" android:keyLabel="ABC" android:isModifier="true" android:keyEdgeFlags="right" />
+    </Row>
+    <Row>
+        <Key android:codes="49" android:keyLabel="1" android:keyEdgeFlags="left" />
+        <Key android:codes="50" android:keyLabel="2" />
+        <Key android:codes="51" android:keyLabel="3" />
+        <Key android:codes="45" android:keyLabel="−" android:isModifier="true" />
+        <Key android:codes="44" android:keyLabel="," android:isModifier="true" android:keyEdgeFlags="right" />
+    </Row>
+    <Row android:rowEdgeFlags="bottom">
+        <Key android:codes="48" android:keyLabel="0" android:keyEdgeFlags="left" />
+        <Key android:codes="46" android:keyLabel="." />
+        <Key android:codes="-107" android:keyLabel="=" />
+        <Key android:codes="43" android:keyLabel="+" android:isModifier="true" />
+        <Key android:codes="@integer/key_return" android:keyIcon="@drawable/sym_keyboard_return"
+            android:isModifier="true" android:keyEdgeFlags="right" />
+    </Row>
+</Keyboard>

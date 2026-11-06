@@ -9324,7 +9324,11 @@ Removing the download (the same row) frees the 75 MB, and the voice key falls ba
 
 **Hacker Keyboard Reborn's own look, and the theme seam (Droidtop/tracker#903 H2, decided 2026-11-05).** The owner: "Hacker Keyboard Reborn doesn't have to look like droidtop, it can look like a good, modern keyboard. The embedded keyboard droidtop vendors from it can import our styling." So the colours are chosen by where the keyboard is drawn (`KeyboardAppearance.colors`, the seam): **inside the input method** (any app's text field) they are always HKR's own (`KeyboardAppearance.LIGHT`, white keys on a light grey ground, or `DARK`), never the host's; **in a keyboard droidtop embeds** (`KeyboardPanel`: the in-window keyboard, the companion screen, overlays) they are the host's, droidtop's palette as above. Which is which is read from the drawing context (`drawnByInputMethod`: the input method's service, or a wrapper around it). Light or dark still follows droidtop's setting in both (#562). With HKR's own theme ("Follow light or dark", the default) and in every embedded keyboard, keys are drawn as flat rounded plates (`KeyPlates`, JVM tested; 6dp corners, a 2.5dp gap): letters in the key colour, function keys (modifiers, Esc, Tab, the F-keys, the icon keys; never the space bar) a shade toward the text colour, a latched modifier toward the accent, a pressed key in the focused shade; labels, hints and icons in the text and muted colours with no shadow. Every key, label, alt-key hint, layout and setting is drawn as before; a classic Hacker's Keyboard theme someone chose keeps its own 9-patch drawing. (H12b, below, adds Dynamic, High contrast and Match droidtop beside it, renames it Modern, and lets the input method take the host's colours when the person picks Match droidtop.)
 
-**A pad on the keyboard (Droidtop/tracker#338).** #338: "D-pad moves a focus ring over keys, A presses"; the slab (4c) had since given a pad its typing buttons, so the input method's own keyboard takes the same ones, one pad vocabulary for typing: while it shows, Android hands key events to the input method first, and `PadKeys` takes a pad's (source gamepad or joystick, or a gamepad button): the D-pad moves a focus ring over the keys (`KeyFocus`, pure: rows share a top edge, Left and Right wrap, Up and Down go to the nearest key across and stop at the top and bottom rows), A presses the key under it as a tap would, X is Backspace (held, it repeats), Y Space, L1 Shift, R1 the symbols, R2 or Start Enter, and B closes the keyboard; the face buttons go through `FaceKeys`, so a Nintendo-layout swap holds. The first A or D-pad press shows the ring in the middle of the keyboard; it is drawn only while the pad drives (DESIGN-LANGUAGE) and a touch removes it. The ring's place is a point, not a key, so it survives a layer switch by landing on the nearest key. A physical keyboard is not taken (lane default, 2026-10-28): it types, and its arrows move the app's caret, as before; its Ctrl, Alt and Fn keys already reach the app. The companion's and the second screen's keyboards are the slab, which a pad already drives.
+**A pad on the keyboard (Droidtop/tracker#338).** #338: "D-pad moves a focus ring over keys, A presses"; the slab (4c) had since given a pad its typing buttons, so the input method's own keyboard takes the same ones, one pad vocabulary for typing: while it shows, Android hands key events to the input method first, and `PadKeys` takes a pad's (source gamepad or joystick, or a gamepad button): the D-pad moves a focus ring over the keys (`KeyFocus`, pure: rows share a top edge, Left and Right wrap, Up and Down go to the nearest key across and stop at the top and bottom rows), A presses the key under it as a tap would, X is Backspace (held, it repeats), Y Space, L1 Shift, R1 the symbols, R2 or Start Enter, and B closes the keyboard; the face buttons go through `FaceKeys`, so a Nintendo-layout swap holds. The first A or D-pad press shows the ring in the middle of the keyboard; it is drawn only while the pad drives (DESIGN-LANGUAGE) and a touch removes it. The ring's place is a point, not a key, so it survives a layer switch by landing on the nearest key. Above the keys
+(Droidtop/tracker#903 H12c): Up from the top row takes the ring onto the tool strip and then a mode's own controls
+(one-handed's switch side and back to full, floating's Dock), Left and Right step along them, A presses one, Down or B
+returns to the keys; an open panel (Modes, clipboard, emoji, macros) takes the pad while it is open, every direction
+stepping through its buttons, A pressing, B closing it. No chord is added: none exists for the strip's other tools. A physical keyboard is not taken (lane default, 2026-10-28): it types, and its arrows move the app's caret, as before; its Ctrl, Alt and Fn keys already reach the app. The companion's and the second screen's keyboards are the slab, which a pad already drives.
 
 **Dictionaries (Droidtop/tracker#339).** The engine stays the one the keyboard has: AOSP's 2011 LatinIME dictionary reader (`src/main/cpp/dictionary.cpp`, Apache-2.0), which suggests, completes and answers bigrams for next-word; both repositories being GPL-3.0 (#344) settles the issue's licence gate, and porting a newer engine stays open for later (lane default, 2026-10-28). Its data are per-language wordlists in the open `.combined` text form, downloaded on request and never bundled (the issue's rule), each pack's licence checked before it is offered. The keyboard converts a wordlist on the device into the engine's binary format: `CombinedWordlist` reads it, `DictionaryWriter` writes version 200 with bigrams as the reader walks it (groups depth-first so its bigram search finds a word by address; a dictionary with a character past U+00FF is written without bigrams, since that search steps over characters as single bytes; at most 4 MB, the rarest words dropped until it fits). The layout was checked against the native reader itself, built on a host: 60,000 words and 8,000 bigrams all found again; `DictionaryWriterTest` holds that reader's verified bytes. A dictionary is kept per language in the keyboard's files (`keyboard-dictionaries/main_<language>.dict`) and, when the language's `Suggest` has no main dictionary of its own (the shipped one is a stub), loaded memory-mapped on a background thread and swapped in on the main thread (`KeyboardDictionaries.loadInto`); one added or removed is picked up on the next field. Until the download catalog is ready, a person adds one under Keyboard settings > Dictionaries > Add from a file (a `.combined` wordlist, plain or gzipped; its first line names the language), converted in the background with the result in a toast, and removes one there.
 
@@ -9466,7 +9470,8 @@ proposal) is not built; these helpers are in the one settings tree that already 
 ### One-handed and split (Droidtop/tracker#342)
 
 - **Four shapes, one setting per orientation.** "Key grid shape" (`KeyboardForm`, JVM tested): full width, split, or
-  one-handed at the left or right edge. The Layout button on the tool strip cycles the current orientation's shape.
+  one-handed at the left or right edge. The Layout button on the tool strip cycles the current orientation's shape (in a
+  keyboard droidtop embeds; in the input method the strip's Mode button replaces it, "Modes" below, H12c).
   Since 2026-11-05 (Droidtop/tracker#903 H1) portrait and landscape each have their own, as Hacker's Keyboard's height
   and mode settings always have ("Key grid shape, portrait" and "Key grid shape, landscape"). Each defaults to
   Automatic: full width, except landscape on a handheld, which is split, so on the console each thumb reaches its half
@@ -9543,8 +9548,10 @@ proposal) is not built; these helpers are in the one settings tree that already 
 - **More layouts.** Every locale Android reports is already selectable; the layouts are the existing `xml-*`
   folders and each locale's key text. Locales that have their own key text but were missing from the picker's
   5-row label list now carry it. A reader for HeliBoard-style text layouts is a later item on Droidtop/tracker#342.
-- **Floating is not built, by decision.** An input method cannot reliably own an overlay window, least of all on
-  a secondary display (the study's question 7).
+- **Floating was not built, by decision, until H12c.** An input method cannot reliably own an overlay window, least of
+  all on a secondary display (the study's question 7). H12c's floating mode ("Modes" below) needs none: it is drawn in
+  the input method's own window, wherever Android puts that window, which reports no inset and takes touches only
+  inside the frame.
 
 ### Inline autofill (Droidtop/tracker#342)
 
@@ -9692,6 +9699,87 @@ can look like a good, modern keyboard. The embedded keyboard droidtop vendors fr
   live Compose keyboard under a preview field, and derives Material You schemes through the materialkolor library.
   Neither draws a preview per row with its own key renderer in the View system, so the previews and the contrast rule
   are droidtop's own. Nothing of FlorisBoard's is taken in this slice.
+
+### Modes (Droidtop/tracker#903 H12c, built 2026-11-06)
+
+The owner, relayed by the coordinator for #903: "We want polish, new detailing, modern styling, extra modes, dynamic
+stuffs", and "Hacker's Keyboard is our foundation. If we can rebuild it while keeping ALL of hacker's functionality...".
+The approved H12 text for modes: one-handed, left or right, with a resize handle; floating, movable and resizable,
+remembered per orientation; a thumb-split mode on wide screens, beyond H1's landscape split; a compact mode for the
+add-on screen; a number and calculator pad mode. "Each mode is reachable from the tool strip and by the pad." The modes
+are in addition to Hacker's own layouts (4-row, 5-row, full), never replacing them.
+
+- **A mode is a presentation of the same keyboard** (`KeyboardModes`, JVM tested). The input method keeps one per
+  orientation (`pref_keyboard_view_mode`, `pref_keyboard_view_mode_landscape`): Normal (the default), One-handed left,
+  One-handed right, Floating, Thumb split, Number pad. Normal is the keyboard as it was: Hacker's layout mode, height,
+  every key and setting, and the key grid shape setting above (H1), none of which a mode writes. So choosing Normal
+  again gives back exactly what was there. A mode only changes where and how big the keys are drawn (a `KeyboardForm`
+  the same `Keyboard.applyForm` lays out, so every layout, locale and Fn layer has it), or, for the number pad, which
+  keys. A change rebuilds the keys and the view, as a shape change does (`GlobalKeyboardSettings`).
+- **Reached from the tool strip and by the pad.** In the input method the strip's Layout button becomes **Mode: Normal**
+  (or the mode's name), which opens a chooser over the keys listing the modes, the current one lit; the thumb split is
+  listed only where the screen is wide enough. The pad reaches it through the strip ("A pad on the keyboard" above). The
+  keyboard's settings also list both orientations' modes (Editing helpers; on the short screen too), so a mode is
+  reachable with the strip switched off. Keyboards droidtop embeds (`KeyboardPanel`) have no modes and keep the Layout
+  button; there `KeyboardModes.current` always answers Normal.
+- **One-handed** (`OneHandedFrame`, ported from HeliBoard's `KeyboardWrapperView`, GPL-3.0): the keys at the left or
+  right edge at a stored share of the width (80% by default, held between 50% and 90%,
+  `pref_keyboard_one_handed_width[_landscape]`), and on the free side three buttons, centred, at 20%, 50% and 80% of the
+  keys' height: back to the full keyboard (Normal), switch side, and a resize handle. The handle is dragged sideways;
+  it follows the finger and shows the width it would give, and on release the width is kept for this orientation and
+  the keys are built at it (HeliBoard rebuilds on every move; Hacker's keys are heavier to build). The strip, when on,
+  stays full width above. With the strip off the controls still show. The key grid shape setting's own one-handed
+  choices stay as they were, a fixed 70%, as Normal's shape and in droidtop's embedded keyboards.
+- **Floating** (`FloatingKeyboardFrame`, after FlorisBoard's floating window, Apache-2.0): the keys and their strip in a
+  rounded frame over the app, with a bar along its top (drag to move; Dock goes back to Normal) and a footer under the
+  keys whose corner is dragged to resize (an outline shows the new size; on release the keys are built at it). The
+  footer keeps the corner off the keys. The size is a share of the screen's width (55% to 100% upright, 30% to 75%
+  sideways, FlorisBoard's phone minimums made a little wider for Hacker's rows) and a share of Hacker's own key height
+  (50% to 120%), `pref_keyboard_float_size[_landscape]`; the place is the frame's top left corner as shares of the
+  screen, `pref_keyboard_float_place[_landscape]`, centred at the bottom until moved. Both are kept per orientation, and
+  the place is always clamped onto the screen (`KeyboardModes.clampFrame`, FlorisBoard's `Floating.constrained`), so a
+  place kept on another screen or before a resize can never leave the frame out of reach.
+  - **Insets.** The frame view fills the input method's window (the window wraps its content, so the view takes all the
+    height Android offers) and places the frame in it. `LatinIME.onComputeInsets` then reports, as FlorisBoard's
+    `ImeWindowController.onComputeInsets` does for floating: `contentTopInsets` and `visibleTopInsets` at the window's
+    bottom, so the app is neither resized nor panned and keeps its whole screen; `touchableInsets` =
+    `TOUCHABLE_INSETS_REGION` with `touchableRegion` the frame's rectangle, so a touch outside the frame reaches the
+    app. Key previews and long-press popups are windows of their own and are not clipped by it.
+  - Floating never goes fullscreen (the landscape extract view), and the suggestion strip is not shown while floating:
+    Android puts the candidates view above the input view, which would be the top of the screen, away from the keys and
+    outside the touchable frame. Suggestions, corrections and learning are otherwise unchanged; Normal brings the strip
+    back.
+- **Thumb split** (`KeyboardForm.thumb`): on a screen wider than 7.5 inches (`THUMB_MIN_WIDTH_INCHES`: two halves of
+  3 inches, about a thumb's reach from the edge of a tablet held in both hands, with H1's 20% between them), measured
+  in inches from its pixels and reported dpi as H1's handheld rule is, the halves go to the outer edges, each 3 inches
+  wide, and the middle is left open, at most 60% of the width. It is H1's split with a wider gap: the same `Form`
+  laid out by the same `KeyboardForm.layout` (the space bar spans the gap as in H1). On a narrower screen it is not
+  offered, and a thumb split kept for that orientation draws H1's split.
+- **Number pad** (`kbd_numpad.xml`): 7 8 9 ÷ / 4 5 6 × / 1 2 3 − / 0 . = + in a 4 by 4 grid, with Backspace, ABC
+  (back to Normal), a comma and Enter in a fifth column. The operators type `+ - * /`, so a sum works in any field.
+  **=** (code -107) finishes the composing word and types "=" and the answer to the sum just before the cursor
+  (`PadCalculator`, pure and JVM tested): the longest run of numbers, operators, brackets and spaces that works out,
+  multiplication and division before addition and subtraction, left to right, a leading minus, a decimal point or
+  comma, in decimal arithmetic (0.1 + 0.2 = 0.3; an endless division cut at 16 digits). A division by zero, a malformed
+  sum or a lone number has no answer, and "=" then types a plain "=". ABC is code -108. Both codes address the keyboard,
+  never a container (`HackersKeyCodes`). The pad takes the place of the letters in fields Hacker's gives letters; in
+  phone, number and date fields Hacker's own phone pad stays.
+  - **Not switched on by itself for number fields.** Hacker's already has a number layout there: number, date and phone
+    fields get its phone pad (`kbd_phone`: the digits, a minus, a point, Backspace, space, Enter and a symbols layer;
+    `LatinIME.onStartInputView`, the `TYPE_CLASS_NUMBER` and `TYPE_CLASS_DATETIME` cases, whose comment awaits "a
+    dedicated number entry keypad"). The ask was to offer the calculator pad only where Hacker's has none, so it is
+    offered from the chooser and never replaces that.
+- **Compact on the add-on screen** (`KeyboardPanel`; `KeyboardModes.compactPanel`, `compactHeightPercent`): a keyboard
+  droidtop embeds that is built for a display other than the device's own, when that display is a handheld's
+  (`KeyboardForm.handheld`; an external monitor is not), draws Hacker's own Compact 5-row layout and its Fn layer
+  (`kbd_compact`, Hacker's "Compact" layout mode: fewer, wider keys) instead of the Full one, at 80% of the height the
+  surface asked for, but never with a row shorter than a finger's press target: 0.3 inch, Android's 48dp at 160 dpi,
+  the finger size `ShellWindow.pressTarget` gives a touch-first target (Droidtop/tracker#740). Which display the panel
+  is on is read from the context it is built with, which the panel already requires to be that display's. Decided once
+  as the panel is built; nothing is stored.
+- **Ported where it fits** (NOTICE.md): HeliBoard's one-handed controls and per-orientation clamped scale (GPL-3.0),
+  FlorisBoard's floating insets and offset clamp (Apache-2.0). Neither has a thumb split, a calculator or a compact
+  layout picked by display, so those are droidtop's own. Both were cloned fresh for this.
 
 ## 6b. Desktop surface input (built 2026-09-01)
 

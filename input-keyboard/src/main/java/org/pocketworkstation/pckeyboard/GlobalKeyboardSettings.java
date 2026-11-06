@@ -72,9 +72,12 @@ public final class GlobalKeyboardSettings {
     /** The key grid shape chosen for landscape (Droidtop/tracker#903 H1); blank when unset. */
     public String formLandscapeChoice = "";
 
-    /** The key grid shape for the screen [context] draws on: {@link KeyboardForm#forScreen}. */
+    /**
+     * The key grid's form for the screen [context] draws on: the shape setting's ({@link KeyboardForm#forScreen}), or,
+     * in the input method, its mode's ({@link KeyboardModes#formFor}, Droidtop/tracker#903 H12c).
+     */
     public KeyboardForm.Form formFor(android.content.Context context) {
-        return KeyboardForm.forScreen(formChoice, formLandscapeChoice, context);
+        return KeyboardModes.formFor(context, KeyboardForm.forScreen(formChoice, formLandscapeChoice, context));
     }
     
     /* Updated by LatinIME */
@@ -166,6 +169,16 @@ public final class GlobalKeyboardSettings {
             public String getDefault() { return ""; }
             public int getFlags() { return FLAG_PREF_RESET_KEYBOARDS | FLAG_PREF_RECREATE_INPUT_VIEW; }
         });
+
+        // The input method's modes (Droidtop/tracker#903 H12c), each orientation's: a change builds the keys and the view
+        // again. The floating place only moves the frame, so it is not here.
+        for (String modeKey : KeyboardModes.REBUILDING_KEYS) {
+            addStringPref(modeKey, new StringPref() {
+                public void set(String val) { }
+                public String getDefault() { return ""; }
+                public int getFlags() { return FLAG_PREF_RESET_KEYBOARDS | FLAG_PREF_RECREATE_INPUT_VIEW; }
+            });
+        }
 
         addBooleanPref("pref_space_drag", new BooleanPref() {
             public void set(boolean val) { spaceDrag = val; }
