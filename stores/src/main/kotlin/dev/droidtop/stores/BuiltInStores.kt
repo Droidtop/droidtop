@@ -13,6 +13,7 @@ import dev.droidtop.stores.legacy.LegacyStore
 import dev.droidtop.stores.steam.SteamStore
 import dev.droidtop.stores.ubisoft.UbisoftStore
 import dev.droidtop.stores.xbox.XboxStore
+import dev.droidtop.stores.zoom.ZoomStore
 
 /**
  * The stores this module runs (docs/SPEC.md 7g, "Stores"), registered with
@@ -33,6 +34,7 @@ object BuiltInStores {
         StoreLibraries.register(UbisoftStore())
         StoreLibraries.register(XboxStore())
         StoreLibraries.register(LegacyStore())
+        StoreLibraries.register(ZoomStore())
     }
 
     /**
