@@ -12,7 +12,8 @@ import org.junit.Test
  * Where Standard's gesture targets land (docs/SPEC.md, Launcher mode "Gestures"; Droidtop/tracker#564). `:shell-default`
  * cannot depend on `:app`, so it opens droidtop's screens by class name or action; a renamed class would leave a
  * gesture that opens nothing, and the rig cannot inject the pinch, two-finger and Home gestures to notice
- * (2026-10-16). Which gesture is which slot is StandardGesturesTest in :runtime-common.
+ * (2026-10-16). Which gesture is which slot is StandardGesturesTest, beside StandardGestures in the Murine launcher
+ * (shell-default, app.murinelauncher.gestures).
  */
 class StandardGestureTargetsTest {
     private val manifest = File("src/main/AndroidManifest.xml").readText().replace(Regex("(?s)<!--.*?-->"), "")
