@@ -37,6 +37,28 @@
         android:title="@string/pref_qsb_custom_provider_title"
         android:persistent="false" />
 
+    <!-- droidtop: what the one search lists besides apps, games and sources (Droidtop/tracker#704). -->
+    <PreferenceCategory android:title="@string/pref_search_results_title">
+        <SwitchPreferenceCompat
+            android:key="pref_search_calculator"
+            android:title="@string/pref_search_calculator_title"
+            android:summary="@string/pref_search_calculator_summary"
+            android:defaultValue="true"
+            android:persistent="true" />
+        <SwitchPreferenceCompat
+            android:key="pref_search_android_pages"
+            android:title="@string/pref_search_android_pages_title"
+            android:summary="@string/pref_search_android_pages_summary"
+            android:defaultValue="true"
+            android:persistent="true" />
+        <SwitchPreferenceCompat
+            android:key="pref_search_shortcuts"
+            android:title="@string/pref_search_shortcuts_title"
+            android:summary="@string/pref_search_shortcuts_summary"
+            android:defaultValue="true"
+            android:persistent="true" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/pref_subcategory_appearance">
         <SwitchPreferenceCompat
             android:key="qsb_enable_lens"

@@ -104,6 +104,13 @@
     <string name="pref_home_button_action_title">Home button on the first page</string>
 
     <string name="pref_accessibility_disclosure_desc">droidtop needs accessibility access to lock the screen and open recent apps from gestures, and, on tablet-sized and external displays, to draw the taskbar.\n\nFor the taskbar it sees only the name of the app that comes to the front, never what is on screen, and it looks at key presses only to notice the Meta key or the Mode button, which move focus into the taskbar.\n\nNo data is collected, shared, or transmitted.</string>
+    <string name="pref_search_results_title">In search results</string>
+    <string name="pref_search_calculator_title">Calculator</string>
+    <string name="pref_search_calculator_summary">A sum answers first; press it to copy</string>
+    <string name="pref_search_android_pages_title">Android\'s Settings pages</string>
+    <string name="pref_search_android_pages_summary">Display, Battery saver and the rest, by name</string>
+    <string name="pref_search_shortcuts_title">App shortcuts</string>
+    <string name="pref_search_shortcuts_summary">The apps\' own shortcuts, while droidtop is your home screen</string>
     <string name="pref_taskbar_title">Taskbar on large screens</string>
     <string name="pref_hide_status_bar_title">Hide status bar</string>
     <string name="pref_hide_navigation_bar_title">Hide navigation bar</string>
