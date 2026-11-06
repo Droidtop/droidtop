@@ -1946,7 +1946,7 @@ since-uninstalled component is silently excluded.
 
 Mobile's own values kept as a string in its preferences (the widget
 stacks, the drawer tabs, the recent apps and their launch counts, the icon
-swipes) all use one store, `CachedPref` in `:runtime-common`, over
+swipes) all use one store, `CachedPref` in the Murine launcher (`app.murinelauncher.prefs`, with its test), over
 `LauncherPrefsFile` (decided 2026-10-30, Droidtop/tracker#771). Each is read
 once and then held in memory; every change goes through the store's one
 lock, so a change on the model thread and one on the main thread never
