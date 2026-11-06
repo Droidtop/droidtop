@@ -94,7 +94,14 @@ internal fun companionSystemCards(
         section(QuickSection.SYSTEM).filter { it.id != dev.droidtop.library.settings.GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS },
         folded = false,
     ),
-    SystemCard("display", "Display", section(QuickSection.DISPLAY), folded = true),
+    // Font and display size have one place on the companion, Accessibility, when that card has them
+    // (Droidtop/tracker#786 S7, plan 4.5); they were drawn on both cards.
+    SystemCard(
+        "display",
+        "Display",
+        section(QuickSection.DISPLAY).filter { item -> item.id !in ON_ACCESSIBILITY || accessibility.none { it.id == item.id } },
+        folded = true,
+    ),
     SystemCard("sound", "Sound", section(QuickSection.AUDIO), folded = true),
     // Network detail and Bluetooth devices, drawn by the card itself (slice C19).
     SystemCard("connections", "Connections", section(QuickSection.CONNECTIONS), folded = true),
@@ -107,6 +114,12 @@ internal fun companionSystemCards(
 
 /** Cards that draw rows of their own beside any catalog items, so they show even with none. */
 private val DRAWN_CARDS = setOf("display", "sound", "connections", "power", "privacy")
+
+/** Rows whose one place on the companion is Accessibility (plan 4.5). */
+private val ON_ACCESSIBILITY = setOf(
+    dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_FONT,
+    dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_DISPLAY_SIZE,
+)
 
 /**
  * Catalog items drawn for touch: the companion's half of "the Quick Menu and the companion draw the same control
