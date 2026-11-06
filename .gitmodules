@@ -91,3 +91,15 @@
 	branch = droidtop-lavapipe
 	shallow = true
 	update = none
+[submodule "vendor/virglrenderer"]
+	path = vendor/virglrenderer
+	url = https://github.com/Droidtop/virglrenderer
+	branch = droidtop
+	shallow = true
+	update = none
+[submodule "vendor/libepoxy"]
+	path = vendor/libepoxy
+	url = https://github.com/Droidtop/libepoxy
+	branch = droidtop
+	shallow = true
+	update = none
