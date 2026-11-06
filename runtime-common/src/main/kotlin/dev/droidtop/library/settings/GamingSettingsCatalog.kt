@@ -462,6 +462,18 @@ object GamingSettingsCatalog {
                         )
                     }
                 }
+                // How far the stick leans before it moves the cursor, against drift (Droidtop/tracker#723).
+                add(
+                    SliderItem(
+                        id = dev.droidtop.runtime.StickDeadZone.KEY,
+                        title = words(R.string.gaming_stick_dead_zone),
+                        subtitle = words(R.string.gaming_stick_dead_zone_subtitle),
+                        min = dev.droidtop.runtime.StickDeadZone.MIN_PERCENT,
+                        max = dev.droidtop.runtime.StickDeadZone.MAX_PERCENT,
+                        current = dev.droidtop.runtime.StickDeadZone.percent,
+                        onChange = { ctx, value -> dev.droidtop.runtime.StickDeadZone.set(ctx, value) },
+                    ),
+                )
                 // Onboarding's own Controller step, re-entered (docs/SPEC.md
                 // 7b: every step is re-enterable from the Settings row that
                 // owns it). Not a second screen asking the same question.

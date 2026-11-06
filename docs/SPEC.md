@@ -20726,7 +20726,11 @@ joined in Kotlin), and `%` is written `%%` since `words` always formats (Droidto
 **Connected controllers (Droidtop/tracker#723).** Settings > Controls opens with the controllers connected now, one row
 each with its battery where Android reports one ("Battery 80%", Android 12 and later; else "Connected"), or "No
 controller connected". It is the companion's reader (`ConnectedPads`, runtime-common), read when the page is built.
-A live button and stick test, a glyph-family override per pad and a stick dead zone are still to build.
+**Stick dead zone** (10 to 70%, 30 by default) sets how far the stick leans before it moves the cursor: the
+stick releases its direction under it and presses 0.2 past it, never under 0.5, so the default is the 0.3 / 0.5 band
+the pad's front always had (`StickDeadZone`, read by `PadGateCore` for the stick's directions only; the hat sends
+whole steps and the triggers keep the fixed band). It applies at once and from the next start. A live button and
+stick test and a glyph-family override per pad are still to build.
 
 **Accessibility is part of the system.** droidtop's chrome is driven by a pad, a finger or a
 screen reader through one focus order: every focusable is reachable by D-pad and by linear

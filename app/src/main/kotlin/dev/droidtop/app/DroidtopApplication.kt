@@ -92,6 +92,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         dev.droidtop.runtime.systemstatus.VolumeControl.watchKidCap(this)
         // Kid's play-time limits: counts play while a game runs and closes it at the limit (SPEC 7f, tracker#421).
         PlayTimeLimiter.install(this)
+        // The stick's dead zone (Settings > Controls, Droidtop/tracker#723), read off the main thread.
+        dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.runtime.StickDeadZone.load(this@DroidtopApplication) }
         // The power policy (docs/SPEC.md "Power policy", Droidtop/tracker#841): a game droidtop launches gets its level, off
         // the main thread; droidtop's own screen coming back puts every changed game back (onActivityResumed below).
         val powerApp = this
