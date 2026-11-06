@@ -5687,7 +5687,8 @@ droidtop 0.2.0-dev.1931).
   `CompanionAreaTab`). Device's pages: System, Display, Sound, Network, Battery, Storage, Apps, Privacy and Accessibility
   (Network and Apps the tabs they were; Display, Sound, Battery, Storage, Privacy and Accessibility the System tab's
   cards of those names, each a page of its own, open, while System keeps the Quick Menu's System section and
-  Connections; each later slice rebuilds its page) and
+  Connections; each later slice rebuilds its page; font and display size are on Accessibility only, not Display too,
+  whenever Accessibility has them, S7) and
   **Android's pages**, Android's own Settings pages droidtop has no page for yet, folded under one row, each labelled
   as the exit it is ("Android's Display", "Opens Android's Settings on this screen. Back returns here"; NFC and
   Printing only where the device has them); the System page's "Android settings" row is left out on the companion,

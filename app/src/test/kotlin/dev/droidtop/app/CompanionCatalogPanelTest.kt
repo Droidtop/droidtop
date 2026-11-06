@@ -74,4 +74,18 @@ class CompanionCatalogPanelTest {
         )
         assertEquals(mapOf("b1" to "Keys"), companionHeadings(groups))
     }
+
+    // Droidtop/tracker#786 S7: font and display size are on Accessibility, not twice.
+    @Test fun fontAndDisplaySizeAreOnAccessibilityOnly() {
+        val font = ActionItem(id = dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_FONT, title = "Font size", run = {})
+        val withFont: (QuickSection) -> List<dev.droidtop.library.settings.CatalogItem> = { section ->
+            if (section == QuickSection.DISPLAY) quick(section) + font else quick(section)
+        }
+        val cards = companionSystemCards(withFont, performance, privacy, accessibility = listOf(font))
+        val all = cards.flatMap { card -> card.items.map { it.id } }
+        assertEquals(1, all.count { it == font.id })
+        assertTrue(cards.first { it.id == "accessibility" }.items.any { it.id == font.id })
+        // Without the Accessibility card's own row, Display keeps it: nothing leaves the companion.
+        assertTrue(companionSystemCards(withFont, performance, privacy).first { it.id == "display" }.items.any { it.id == font.id })
+    }
 }
