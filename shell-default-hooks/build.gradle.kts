@@ -27,4 +27,5 @@ android {
 dependencies {
     implementation(project(":shell-default"))
     implementation(project(":runtime-common"))
+    implementation(project(":ui-shared"))
 }

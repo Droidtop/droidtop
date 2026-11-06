@@ -29400,12 +29400,17 @@ opens beside it; Home's shelves and the system view's Continue Playing row still
 Android app's, one of droidtop's own screens', the clipboard notice's) open beside their button: above the bar, or
 below it when the bar is at the top, since the placement takes the side with room. A right-click on those items opens
 the same menu as a long press, and is consumed there; only droidtop's bar has it, never the container's surface.
-Mobile's own menus open it too, from its View code through `MenuViews` (`:ui-shared`), beside the view they belong to
+Mobile's own menus open it too, from its View code through the Murine launcher's `MurineHooks.menus` hook, which
+droidtop answers with `MenuViews` (`:ui-shared`, from `:shell-default-hooks`; Murine on its own keeps the platform's
+`PopupMenu`), beside the view they belong to
 and in the colours outside Gaming (`GamingTheme(outsideGaming = true)`, 7k): a folder's options (its footer button),
 a drawer tab's (a long press on the tab) and an app's Drawer tabs (from its long-press menu in the drawer). They were
 the platform's `PopupMenu`, unlike everything beside them. An option a row turns on or off shows as a switch
 (`ActionRow.switchOn`); with the home screen locked a folder's rows only state, under a line saying why. Launcher3's
 own popups (an app's shortcuts, the home screen's long-press menu) stay Launcher3's.
+droidtop's entries on those two popups (Games, Quick Menu, the companion on one screen and plugins' entries on the
+home screen's; Plugin actions on an app's) come through the same hook as plain entries, an id and a label, which
+the launcher runs by id (Droidtop/tracker#921).
 
 **Run once with…, and Manage (owner, 2026-10-23, Droidtop/tracker#636).** The owner, asked to run MGQ Paradox's
 translation updater under Wine while Enginehost plays the game: "We can set the game type. We can probably also do a
