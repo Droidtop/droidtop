@@ -137,7 +137,7 @@ class DesktopSecondScreenActivity : ComponentActivity() {
                 DesktopSecondOutput(
                     hostBridge = session.hostBridge,
                     outputName = outputName,
-                    outputCount = session.outputs.size,
+                    outputs = session.outputs,
                     windows = session.windows,
                     onSurfaceSize = { width, height, dpi -> DesktopSecondScreen.surfaceSized(shownDisplay, width, height, dpi) },
                 )

@@ -517,7 +517,8 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   X its toggle, Y its menu, B closes, Start closes (the button that opened it), a long press is Y for a
   finger, and Gaming's `HintRow` sits inside it, where a tap on a hint presses the real button into the
   sheet's window. The Start menu and the windows list are two of them. A is "Bring to front" and X
-  "Close window" in the windows list.
+  "Close window" in the windows list, and Y "Move to another screen" while the desktop is on a second
+  screen (2b "The desktop on a second screen", Droidtop/tracker#908 step D4).
 - **The tray is the Quick Menu** (`QuickMenuStandalone`): the same sheet Gaming's R2 opens, with Running
   apps, Notifications, System, Audio, Display, Performance, Downloads and Plugins. The tray button keeps
   its readout (network, VPN, battery) and opens it. The tray's own drop-down (volume, brightness, Do Not
@@ -594,7 +595,8 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   resizes by its border, with no modifier key. Desktop settings > "Tile windows" (off) gives sway's
   tiling back, for keyboard use, from the next start. Sway's title bars have no buttons, so a window's bar
   menu (long press) has them: Minimize, Maximize, Snap left, Snap right, Restore size once one of those
-  was used, and Close. They are IPC commands on the window's container (`DesktopWindows.place`): it
+  was used, "Move to <screen>" per other screen while the desktop is on a second screen (2b "The desktop
+  on a second screen", Droidtop/tracker#908 step D4), and Close. They are IPC commands on the window's container (`DesktopWindows.place`): it
   floats, then `resize set` and `move position` in percent of the workspace, which is the desktop less
   Waybar, so the status strip stays visible. Restore size returns it to the size and absolute position it
   had before its first placement, or back into the tiling when it was tiled. Under labwc, whose windows
@@ -777,12 +779,12 @@ proposal issue in the tracker". This fills the first direction above.
   windowcast exactly as an Android app is. Never Android's freeform windows
   (2b "Launching from Desktop").
 
-### The desktop on a second screen (Droidtop/tracker#908, step D3, built 2026-11-05; asked per screen since D5, 2026-11-06)
+### The desktop on a second screen (Droidtop/tracker#908, step D3, built 2026-11-05; asked per screen since D5, 2026-11-06; windows per screen since D4, 2026-11-06)
 
 The Linux desktop can be drawn across two Android screens: the primary's
 output where Desktop runs, and a second output of the same compositor on
 another display (one desktop, windows move between them as on a PC with two
-monitors; moving them from the bar is D4). How it is put there:
+monitors, by dragging or from a window's menu, D4 below). How it is put there:
 
 - **`DesktopSecondScreen.show(context, display)`** (`:app`) has the session
   add an output for that display (`DesktopSessionService.extendTo`, step D2,
@@ -840,9 +842,9 @@ monitors; moving them from the bar is D4). How it is put there:
   showing that output (`HostBridge.presentOutput(name, surface)`, stopped
   with `stopPresenting(name)` before the surface goes, as the primary's is),
   and a bar of its own at the same edge as the primary's, built from the
-  primary bar's pieces. Its window list is every container window for now;
-  which output a window is on is D4. Start, the tray and Android's apps stay
-  on the primary's bar.
+  primary bar's pieces. Its window list is the container windows on its own
+  output, as the primary's bar lists those on the primary's (D4, below).
+  Start, the tray and Android's apps stay on the primary's bar.
 - **Its size.** The surface's pixels and density are handed back to
   `extendTo`, which sizes the output exactly as the primary's is sized
   (Desktop scale with the screen's own density, then the render resolution,
@@ -880,9 +882,54 @@ monitors; moving them from the bar is D4). How it is put there:
   display), and when the display goes (`CompanionSurfaceLifetime`, which
   also closes it if Android moves it to the built-in screen). Back does
   nothing on it.
-- **Not yet:** per-output window lists and "move to the other screen"
-  (D4). Under labwc no second output is made (D2), so a screen answered
-  Extend shows the second screen's window with nothing in it.
+- **Each bar lists the windows on its own screen (D4, 2026-11-06).**
+  host-bridge's native client follows wlr-foreign-toplevel-management's
+  `output_enter` and `output_leave` for every window, on the same
+  `wl_output`s it binds with their sway names (D1a), and each `Toplevel`
+  carries `output`, the name of the output it is listed on. The rule
+  (`output_match.h` `windowOutput`): the output it entered last
+  among those it is on, so a window across the edge of two screens is
+  listed on the one it entered last (the protocol says which outputs a
+  window is on, not how much of it is on each, so "the one holding most of
+  it" is not known); a window on none, such as one sway hid in its
+  scratchpad by Minimize, stays listed on the screen it was on last; an
+  output that goes is forgotten by every window. Which bar lists it is
+  `WindowOutputs.barFor` (`:host-bridge`, pure and tested): an added
+  output's own bar when the window is on it, otherwise the primary's, so a
+  window whose output is not known yet, not named or gone is on the
+  primary's bar. With one output every window is on the primary's bar,
+  the same list as before. The windows list a pad's L1 or Alt+Esc opens
+  holds every screen's windows, since the pad and the keys stay with the
+  primary's screen and it is their one way to a window on the other; with
+  two screens or more each line also names the screen the window is on
+  (owner to confirm: built so, rather than listing only the primary
+  screen's windows there).
+- **Moving a window to another screen (D4).** A window's bar menu has
+  "Move to <screen>", the screen's name from 4c ("Screen names"), one row
+  per other screen, only while the desktop has a second output and only
+  under sway; not for a minimized window, which is in sway's scratchpad
+  and on no screen. In the windows list Y, "Move to another screen", opens
+  the same rows for the chosen window, and the list comes back after the
+  move. The rows are `WindowOutputs.moveTargets` (every output but the one
+  whose bar lists the window, in the outputs' order; an output with no
+  name yet is left out, since sway is told the name). The move is sway's
+  `[con_id=N] move container to output <name>` over IPC
+  (`DesktopWindows.moveToOutput`, `moveCommand`): the window goes to that
+  output's visible workspace, tiled or floating as it was. The protocol has
+  no request that moves a window, and it names no sway container, so the
+  container is found as the bar's other window actions find it
+  (`DesktopWindows.findWindow`): by the app id and title the protocol
+  reported; two windows alike are told apart by the output each is on
+  (`SwayIpc.windows` with the output, the tree's output node), and only
+  when that does not tell them apart either is the window raised and the
+  focused one taken. sway's tree has a process id but the protocol does
+  not, and sway's own toplevel identifier belongs to
+  ext-foreign-toplevel-list, which host-bridge does not bind, so neither is
+  a key here. Nothing about the focus is asked: it stays where sway leaves
+  it. A move sway refused says "Couldn't move this window".
+- **Not yet:** under labwc no second output is made (D2), so a screen
+  answered Extend shows the second screen's window with nothing in it,
+  and no window offers a move.
 
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 
@@ -4029,12 +4076,13 @@ the `ContainerRuntime` interface that already exists (§3):
   container's compositor (whichever the user's configured — see §2).
 - **Every window is on the primary screen's output** unless the desktop
   was put on a second screen (D3 below): one shared desktop, nothing
-  hidden away. The taskbar has no "Move to another screen" (D4).
+  hidden away. With a second output each bar lists the windows on its own
+  screen and a window's menu moves it to another (D4 below).
 - **host-bridge tracks every compositor output (2026-11-05,
   Droidtop/tracker#908, step D1a).** The plan on #908: D1 many outputs in
   host-bridge, D2 the session creating a second sway headless output, D3
-  an Android surface on another display, D4 moving windows, D5 asking once
-  per display. D1a, built: the native client binds every `wl_output` (at
+  an Android surface on another display, D4 a window list per screen and
+  moving windows (built 2026-11-06), D5 asking once per display. D1a, built: the native client binds every `wl_output` (at
   version 4 when offered, so each carries its sway name, "HEADLESS-1"),
   drops one the compositor removes, and gives each output its own
   screencopy capture into its own `Surface`. `HostBridge.outputNames()`
@@ -4120,6 +4168,15 @@ the `ContainerRuntime` interface that already exists (§3):
   desktop there and publishes `DesktopExtension`; `SecondScreenPlan` keeps
   the companion's Presentation, the companion activity and the idle cover
   off those displays. The whole of it is in 2b.
+- **Windows per screen and moved between them (2026-11-06,
+  Droidtop/tracker#908, step D4).** host-bridge follows each window's
+  `output_enter` and `output_leave` (`Toplevel.output`: the output it
+  entered last among those it is on, or the one it was on last); each bar
+  lists the windows on its own output (`WindowOutputs`, a window on no
+  known output on the primary's), and a window's bar menu and the windows
+  list (Y) move it with "Move to <screen>", one row per other screen, while
+  a second output exists, through sway's `move container to output` over
+  IPC (`DesktopWindows.moveToOutput`). The whole of it is in 2b.
 - **Per-window placement is not built (corrected 2026-10-29,
   Droidtop/tracker#695).** This section used to promise that any window could
   be reassigned to a different `DisplayOutput` at runtime, sway moving a

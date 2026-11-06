@@ -638,21 +638,23 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeGetToplevels(JNIEnv* env, jobject 
         env->ExceptionClear();
         return env->NewObjectArray(0, env->FindClass("java/lang/Object"), nullptr);
     }
-    jmethodID ctor = env->GetMethodID(cls, "<init>", "(JLjava/lang/String;Ljava/lang/String;ZZZZ)V");
+    jmethodID ctor = env->GetMethodID(cls, "<init>", "(JLjava/lang/String;Ljava/lang/String;ZZZZLjava/lang/String;)V");
     jobjectArray result = env->NewObjectArray(static_cast<jsize>(snapshot.size()), cls, nullptr);
     for (size_t i = 0; i < snapshot.size(); i++) {
         const auto& e = snapshot[i];
         jstring title = env->NewStringUTF(e.title.c_str());
         jstring appId = env->NewStringUTF(e.appId.c_str());
+        jstring output = env->NewStringUTF(e.output.c_str());
         jobject obj = env->NewObject(cls, ctor, static_cast<jlong>(e.id), title, appId,
                                       e.activated ? JNI_TRUE : JNI_FALSE,
                                       e.minimized ? JNI_TRUE : JNI_FALSE,
                                       e.maximized ? JNI_TRUE : JNI_FALSE,
-                                      e.fullscreen ? JNI_TRUE : JNI_FALSE);
+                                      e.fullscreen ? JNI_TRUE : JNI_FALSE, output);
         env->SetObjectArrayElement(result, static_cast<jsize>(i), obj);
         env->DeleteLocalRef(obj);
         env->DeleteLocalRef(title);
         env->DeleteLocalRef(appId);
+        env->DeleteLocalRef(output);
     }
     env->DeleteLocalRef(cls);
     return result;

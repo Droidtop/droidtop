@@ -77,6 +77,10 @@ struct ToplevelInfo {
     bool minimized = false;
     bool maximized = false;
     bool fullscreen = false;
+    // The compositor's name for the output the window is listed on (Droidtop/tracker#908, step D4): the one it
+    // entered last among those it is on, or the one it was on last when it is on none (a window sway hid in its
+    // scratchpad); "" when there is none or the output gave no name. output_match.h's windowOutput is the rule.
+    std::string output;
 };
 
 /**

@@ -2,6 +2,7 @@ package dev.droidtop.hostbridge
 
 import dev.droidtop.hostbridge.DesktopWindows.Placement
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The bar's window controls under sway (docs/SPEC.md 2b "Window controls", Droidtop/tracker#686). */
@@ -40,5 +41,12 @@ class WindowPlacementTest {
                 """"rect":{"x":10,"y":26,"width":300,"height":200},"nodes":[],"floating_nodes":[]}]}""",
         )
         assertEquals(listOf(SwayWindow(9, floating = true, focused = true, rect = SwayRect(10, 26, 300, 200))), SwayIpc.windows(tree, "foot", "t"))
+    }
+
+    @Test
+    fun `a window moves to another output by its container and the output's name`() {
+        assertEquals("[con_id=7] move container to output HEADLESS-2", DesktopWindows.moveCommand(7, "HEADLESS-2"))
+        assertTrue(runCatching { DesktopWindows.moveCommand(7, "HEADLESS-2; exec rm") }.isFailure)
+        assertTrue(runCatching { DesktopWindows.moveCommand(7, "") }.isFailure)
     }
 }

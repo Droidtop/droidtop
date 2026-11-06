@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.droidtop.hostbridge.DesktopOutput
 import dev.droidtop.hostbridge.DesktopWindows
 import dev.droidtop.hostbridge.HostBridge
 import dev.droidtop.input.DesktopInputRouter
@@ -50,22 +51,30 @@ import kotlinx.coroutines.flow.flowOn
  * density, the same [dev.droidtop.runtime.DesktopScale] maths as [DesktopViewport]).
  *
  * [outputName] is null until the session has made the output, and again once it has removed it; nothing is presented
- * and no pointer motion is sent meanwhile ([PointerTarget.Nowhere]). [outputCount] is how many outputs the desktop
- * has. The pad and the keys stay with the primary surface (the host's window is touch-only, as the companion's is);
- * the bar lists every window for now, since which output a window is on is step D4.
+ * and no pointer motion is sent meanwhile ([PointerTarget.Nowhere]). [outputs] is the desktop's outputs, the primary's
+ * first. The pad and the keys stay with the primary surface (the host's window is touch-only, as the companion's is).
+ * The bar lists the windows on this output only (step D4, [WindowScreens.onBar]), and nothing while the output does
+ * not exist; each window's menu can move it to another screen, as on the primary's bar.
  */
 @Composable
 fun DesktopSecondOutput(
     hostBridge: HostBridge,
     outputName: String?,
-    outputCount: Int,
+    outputs: List<DesktopOutput>,
     windows: DesktopWindows?,
     onSurfaceSize: (width: Int, height: Int, densityDpi: Int) -> Unit,
 ) {
     val context = LocalContext.current
+    val outputCount = outputs.size
     val prefs by remember(context) { DesktopPrefs.changes(context).flowOn(Dispatchers.IO) }
         .collectAsState(initial = DesktopPrefs.Values())
-    val toplevels = rememberToplevels(hostBridge)
+    val allToplevels = rememberToplevels(hostBridge)
+    val screens = rememberWindowScreens(outputs)
+    // This output's own windows: its bar is the one at its place in the desktop's outputs.
+    val toplevels = remember(allToplevels, screens, outputName) {
+        val bar = outputName?.let { name -> screens.outputs.indexOf(name) } ?: -1
+        if (bar > 0) screens.onBar(allToplevels, bar) else emptyList()
+    }
     dev.droidtop.shell.gamepad.GamingTheme(outsideGaming = true) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             val density = LocalDensity.current
@@ -92,8 +101,8 @@ fun DesktopSecondOutput(
                         .background(dev.droidtop.shell.gamepad.MenuTokens.Ground),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // The container's windows, as the primary's bar lists them; Android's apps and droidtop's own
-                    // screens stay on the primary's bar, where Start opened them.
+                    // The container's windows on this output, listed as the primary's bar lists its own; Android's
+                    // apps and droidtop's own screens stay on the primary's bar, where Start opened them.
                     TaskbarWindowList(
                         hostBridge = hostBridge,
                         toplevels = toplevels,
@@ -102,6 +111,7 @@ fun DesktopSecondOutput(
                         windows = windows,
                         windowIcons = emptyMap(),
                         modifier = Modifier.weight(1f),
+                        screens = screens,
                     )
                 }
             }

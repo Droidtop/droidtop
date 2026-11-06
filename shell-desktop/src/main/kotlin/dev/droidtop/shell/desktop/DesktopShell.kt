@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.droidtop.hostbridge.DesktopOutput
 import dev.droidtop.hostbridge.DesktopWindows
 import dev.droidtop.hostbridge.HiddenWindow
 import dev.droidtop.hostbridge.HostBridge
@@ -167,10 +168,11 @@ fun DesktopShell(
     onStopSession: (() -> Unit)? = null,
     onLockScreen: (() -> Unit)? = null,
     /**
-     * The compositor's outputs by name, the primary's first ([dev.droidtop.hostbridge.DesktopOutput]): with more than
-     * one, the primary's touch names its own (Droidtop/tracker#908, step D3). Empty with no session.
+     * The desktop's outputs, the primary's first ([DesktopOutput]): with more than one, the primary's touch names its
+     * own (Droidtop/tracker#908, step D3), the bar lists only the windows on the primary's output, and a window can
+     * be moved to another screen (step D4). Empty with no session.
      */
-    outputNames: List<String> = emptyList(),
+    outputs: List<DesktopOutput> = emptyList(),
     /**
      * The primary's output was given a new size ([HostBridge.setOutputSize]): pixels and scale. The session places the
      * outputs right of it again (Droidtop/tracker#908, step D3).
@@ -205,6 +207,11 @@ fun DesktopShell(
     LaunchedEffect(focusedWindow) { dev.droidtop.runtime.DesktopFocus.changed() }
     FollowTextFields(hostBridge)
     LaunchedEffect(windows, toplevels) { windows?.forget(toplevels) }
+    // Which output each window is on (Droidtop/tracker#908, step D4): the bar lists the primary's, the second screen's
+    // bar its own; the windows sheet lists them all. With one output every window is the bar's, as before.
+    val outputNames = remember(outputs) { outputs.map { it.outputName } }
+    val screens = rememberWindowScreens(outputs)
+    val barToplevels = remember(toplevels, screens) { screens.onBar(toplevels, 0) }
     // What Android is running that droidtop started (a game or an app launched from here is a fullscreen
     // Activity over the desktop, not a window the compositor knows), polled only while Desktop shows.
     val androidApps = rememberAndroidApps()
@@ -335,7 +342,7 @@ fun DesktopShell(
             atTop = barAtTop,
             onHeight = { barHeightPx = it },
             hostBridge = hostBridge,
-            toplevels = toplevels,
+            toplevels = barToplevels,
             androidApps = androidApps,
             // A Linux pin made before its app had an icon takes the icon it has now (Droidtop/tracker#689).
             pins = remember(pins.list, linuxApps) { withLinuxIcons(pins.list, linuxApps) },
@@ -345,6 +352,7 @@ fun DesktopShell(
             windows = windows,
             onOpenStartMenu = { startMenuOpen = true },
             onOpenQuickMenu = { quickMenuOpen = true },
+            screens = screens,
         )
 
         launchFailure?.let { message ->
@@ -397,6 +405,7 @@ fun DesktopShell(
                 toplevels = toplevels,
                 androidApps = androidApps,
                 windows = windows,
+                screens = screens,
                 onDismiss = { windowsOpen = false },
             )
         }
@@ -492,6 +501,10 @@ private fun DesktopSearch(
 /**
  * The taskbar's window list as a sheet a pad drives (Droidtop/tracker#350): A raises a window (restoring it
  * first when it is minimized) or opens an Android app, X closes it, and the rest of the rules are the taskbar's own.
+ *
+ * It lists the windows of every screen. With the desktop on a second screen (Droidtop/tracker#908, step D4) each
+ * window's line also names the screen it is on, and Y offers "Move to <screen>", one row per other screen, in a list
+ * of its own that goes back to this one; with one screen there is no Y.
  */
 @Composable
 private fun WindowsSheet(
@@ -499,22 +512,53 @@ private fun WindowsSheet(
     toplevels: List<Toplevel>,
     androidApps: List<RunningApp>,
     windows: DesktopWindows?,
+    screens: WindowScreens,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val hidden by rememberHiddenWindows(windows)
     val ownScreens by dev.droidtop.runtime.tasks.OwnScreens.open.collectAsState()
-    val rows = remember(toplevels, androidApps, ownScreens, hidden) {
+    // The window whose moves are shown instead of the list, and where the list's cursor was.
+    var moving by remember { mutableStateOf<Toplevel?>(null) }
+    val cursor = remember { dev.droidtop.shell.gamepad.hosted.HostedCursor() }
+    val mover = windows?.takeIf { it.canMove }
+    moving?.let { toplevel ->
+        val moveRows = screens.moveTargets(toplevel).map { target ->
+            HostedRow(
+                key = "move:" + target.outputName,
+                title = context.getString(R.string.desktop_move_to, target.screenName),
+                onSelect = {
+                    // Back to the list once sway was asked: the window's line then names its new screen.
+                    scope.launch {
+                        mover?.let { moveWindow(context, it, toplevel, target) }
+                        moving = null
+                    }
+                },
+            )
+        }
+        HostedListSheet(
+            title = windowTitle(toplevel),
+            rows = moveRows,
+            onClose = { moving = null },
+            selectLabel = "Move",
+        )
+        return
+    }
+    val rows = remember(toplevels, androidApps, ownScreens, hidden, screens) {
         toplevels.map { toplevel ->
+            val minimized = windows?.isMinimized(toplevel, hidden) ?: toplevel.minimized
             HostedRow(
                 key = "window:" + toplevel.id,
                 title = toplevel.title.ifBlank { toplevel.appId.ifBlank { "(untitled window)" } },
-                subtitle = when {
-                    windows?.isMinimized(toplevel, hidden) ?: toplevel.minimized -> "Minimized"
-                    toplevel.activated -> "In front"
-                    else -> null
-                },
+                subtitle = listOfNotNull(
+                    when {
+                        minimized -> "Minimized"
+                        toplevel.activated -> "In front"
+                        else -> null
+                    },
+                    screens.screenOf(toplevel),
+                ).joinToString(", ").ifEmpty { null },
                 onSelect = {
                     // Dismissed after the raise: the sheet's scope ends with it.
                     scope.launch {
@@ -523,6 +567,12 @@ private fun WindowsSheet(
                     }
                 },
                 onToggle = { hostBridge?.closeToplevel(toplevel.id) },
+                // The taskbar menu's rule: not for a minimized window, which is on no screen while it is put away.
+                onDetail = if (mover != null && !minimized && screens.moveTargets(toplevel).isNotEmpty()) {
+                    { moving = toplevel }
+                } else {
+                    null
+                },
             )
         } + androidApps.map { app ->
             HostedRow(
@@ -555,6 +605,8 @@ private fun WindowsSheet(
         emptyText = "Nothing is open on the desktop.",
         selectLabel = "Bring to front",
         toggleLabel = "Close window",
+        detailLabel = stringResource(R.string.desktop_move_to_other),
+        cursor = cursor,
     )
 }
 

@@ -62,9 +62,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.droidtop.hostbridge.DesktopOutput
 import dev.droidtop.hostbridge.DesktopWindows
 import dev.droidtop.hostbridge.HiddenWindow
 import dev.droidtop.hostbridge.HostBridge
+import dev.droidtop.hostbridge.MoveTarget
+import dev.droidtop.hostbridge.WindowOutputs
 import dev.droidtop.hostbridge.SwayWindow
 import dev.droidtop.hostbridge.Toplevel
 import dev.droidtop.input.DesktopInputRouter
@@ -151,6 +154,7 @@ internal fun BoxScope.Taskbar(
     onOpenStartMenu: () -> Unit,
     windowIcons: Map<String, String> = emptyMap(),
     onOpenQuickMenu: () -> Unit,
+    screens: WindowScreens = WindowScreens.ONE,
 ) {
     val context = LocalContext.current
     // The bar's size follows the input mode (Droidtop/tracker#690), settled for a second first: each change resizes the
@@ -218,7 +222,7 @@ internal fun BoxScope.Taskbar(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     pinChips()
-                    TaskbarWindowList(hostBridge, toplevels, androidApps, ownScreens, windows, windowIcons, modifier = Modifier.weight(1f))
+                    TaskbarWindowList(hostBridge, toplevels, androidApps, ownScreens, windows, windowIcons, modifier = Modifier.weight(1f), screens = screens)
                 }
             }
         }
@@ -262,7 +266,7 @@ internal fun BoxScope.Taskbar(
                 }
                 if (oneRow) {
                     pinChips()
-                    TaskbarWindowList(hostBridge, toplevels, androidApps, ownScreens, windows, windowIcons, modifier = Modifier.weight(1f))
+                    TaskbarWindowList(hostBridge, toplevels, androidApps, ownScreens, windows, windowIcons, modifier = Modifier.weight(1f), screens = screens)
                     extras()
                 } else {
                     // On a narrow bar the buttons between Start and the tray take what is left and scroll, so the tray
@@ -341,15 +345,13 @@ internal fun TaskbarButton(onClick: () -> Unit, modifier: Modifier = Modifier, c
  * to a user with nothing open, and this row isn't where either gets
  * explained.
  *
- * "Move to another output" (an earlier draft of docs/SPEC.md's Desktop
- * section) is NOT built here: wlr-foreign-toplevel-management-unstable-v1
- * has no such request (only activate/set_minimized/unset_minimized/close/
- * set_fullscreen/set_rectangle -- checked against the protocol XML), and
- * while host-bridge now tracks and can capture every output
- * (HostBridge.outputNames, Droidtop/tracker#908), nothing shows a second
- * output on a screen yet. Real "move to output" is a later step of that
- * issue; SPEC.md is corrected alongside this change to stop claiming it as
- * already built.
+ * With the desktop on a second screen (Droidtop/tracker#908, step D4) each
+ * bar is given only the windows on its own output (the caller filters by
+ * [WindowScreens.onBar]), and a window's menu has "Move to <screen>" per
+ * other screen, from [screens]. wlr-foreign-toplevel-management has no
+ * request that moves a window to an output, so the move is sway's
+ * `move container to output` over IPC ([DesktopWindows.moveToOutput]); under
+ * labwc there is no second output and so no such row.
  */
 @Composable
 internal fun TaskbarWindowList(
@@ -360,6 +362,7 @@ internal fun TaskbarWindowList(
     windows: DesktopWindows?,
     windowIcons: Map<String, String>,
     modifier: Modifier = Modifier,
+    screens: WindowScreens = WindowScreens.ONE,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -392,9 +395,16 @@ internal fun TaskbarWindowList(
                     { placement: DesktopWindows.Placement ->
                         scope.launch {
                             if (!w.place(toplevel, placement)) {
-                                dev.droidtop.library.settings.Notices.flash("Couldn't move this window", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
+                                dev.droidtop.library.settings.Notices.flash(context.getString(R.string.desktop_move_failed), tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
                             }
                         }
+                        Unit
+                    }
+                },
+                moveTargets = screens.moveTargets(toplevel),
+                onMove = windows?.takeIf { it.canMove }?.let { w ->
+                    { target: MoveTarget ->
+                        scope.launch { moveWindow(context, w, toplevel, target) }
                         Unit
                     }
                 },
@@ -475,7 +485,10 @@ internal fun TaskbarWindowRow(
     onClose: () -> Unit,
     placed: Boolean = false,
     onPlace: ((DesktopWindows.Placement) -> Unit)? = null,
+    moveTargets: List<MoveTarget> = emptyList(),
+    onMove: ((MoveTarget) -> Unit)? = null,
 ) {
+    val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
     val anchor = rememberAnchor()
     Box {
@@ -540,10 +553,62 @@ internal fun TaskbarWindowRow(
                     add(ActionRow(snapRight, onSelect = { menuOpen = false; onPlace(DesktopWindows.Placement.SNAP_RIGHT) }))
                     if (placed) add(ActionRow(restoreSize, onSelect = { menuOpen = false; onPlace(DesktopWindows.Placement.RESTORE) }))
                 }
+                // To another screen, one row per other screen, only while the desktop has one (Droidtop/tracker#908,
+                // step D4). Not for a minimized window: it is in sway's scratchpad, on no screen.
+                if (onMove != null && !minimized) {
+                    moveTargets.forEach { target ->
+                        add(ActionRow(context.getString(R.string.desktop_move_to, target.screenName), onSelect = { menuOpen = false; onMove(target) }))
+                    }
+                }
                 add(ActionRow(close, onSelect = { menuOpen = false; onClose() }))
             }
             AnchoredMenu(anchor = anchor.value, title = windowTitle(toplevel), rows = rows, onDismiss = { menuOpen = false })
         }
+    }
+}
+
+/**
+ * The desktop's outputs as the bars and the window list read them (Droidtop/tracker#908, step D4): the compositor's
+ * names, the primary's first, and each one's screen name ([dev.droidtop.runtime.ScreenNaming]). [ONE] is a desktop on
+ * one screen, where every window is on the primary's bar and nothing offers a move.
+ */
+internal class WindowScreens(val outputs: List<String>, val screenNames: List<String>) {
+    /** The [toplevels] the bar of `outputs[bar]` lists (0 is the primary's). */
+    fun onBar(toplevels: List<Toplevel>, bar: Int): List<Toplevel> = WindowOutputs.onBar(toplevels, { it.output }, outputs, bar)
+
+    fun moveTargets(toplevel: Toplevel): List<MoveTarget> = WindowOutputs.moveTargets(toplevel.output, outputs, screenNames)
+
+    fun screenOf(toplevel: Toplevel): String? = WindowOutputs.screenOf(toplevel.output, outputs, screenNames)
+
+    companion object {
+        val ONE = WindowScreens(emptyList(), emptyList())
+    }
+}
+
+/** [outputs] as [WindowScreens], named again when a screen's name changes. Reads only names already worked out. */
+@Composable
+internal fun rememberWindowScreens(outputs: List<DesktopOutput>): WindowScreens {
+    val namesChanged by dev.droidtop.runtime.ScreenNaming.changes.collectAsState()
+    return remember(outputs, namesChanged) {
+        if (outputs.size <= 1) {
+            WindowScreens.ONE
+        } else {
+            WindowScreens(
+                outputs.map { it.outputName },
+                outputs.map { dev.droidtop.runtime.ScreenNaming.label(it.display.androidDisplayId) },
+            )
+        }
+    }
+}
+
+/** Moves [toplevel] to [target]'s output, saying so when sway could not do it. */
+internal suspend fun moveWindow(context: Context, windows: DesktopWindows, toplevel: Toplevel, target: MoveTarget) {
+    if (!windows.moveToOutput(toplevel, target.outputName)) {
+        dev.droidtop.library.settings.Notices.flash(
+            context.getString(R.string.desktop_move_failed),
+            tone = dev.droidtop.library.settings.NoticeTone.Caution,
+            context = context,
+        )
     }
 }
 

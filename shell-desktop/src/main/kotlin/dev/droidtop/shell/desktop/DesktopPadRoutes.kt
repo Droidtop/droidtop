@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.asSharedFlow
  * A keyboard's keys are the container's, but for three shortcuts to droidtop's chrome (docs/SPEC.md 6b "Where
  * Meta goes", Droidtop/tracker#697), read by [KeyShortcuts]: Ctrl+Esc opens Start, Alt+Esc the list of windows and
  * Alt+Space the search.
+ *
+ * The list of windows (L1, Alt+Esc) holds every screen's windows; with the desktop on a second screen its Y moves the
+ * chosen one to another screen (DesktopShell's WindowsSheet, Droidtop/tracker#908 step D4).
  */
 object DesktopPadRoutes {
     enum class Route { START_MENU, QUICK_MENU, WINDOWS, SEARCH }

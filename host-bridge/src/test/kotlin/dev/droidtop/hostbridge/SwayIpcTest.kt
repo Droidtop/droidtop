@@ -45,7 +45,32 @@ class SwayIpcTest {
         assertEquals(emptyList<SwayWindow>(), SwayIpc.windows(tree, "foot", "vim"))
     }
 
+    @Test
+    fun `two windows alike are told apart by the output each is on`() {
+        val tree = JSONObject(TWO_OUTPUTS)
+        assertEquals(2, SwayIpc.windows(tree, "foot", "~").size)
+        assertEquals(listOf(SwayWindow(20, floating = false, focused = false)), SwayIpc.windows(tree, "foot", "~", "HEADLESS-1"))
+        assertEquals(listOf(SwayWindow(21, floating = true, focused = true)), SwayIpc.windows(tree, "foot", "~", "HEADLESS-2"))
+        assertEquals(emptyList<SwayWindow>(), SwayIpc.windows(tree, "foot", "~", "HEADLESS-3"))
+    }
+
     private companion object {
+        // Two outputs, each with a foot window titled "~": a tiled one on the primary, a floating one on the second.
+        val TWO_OUTPUTS = """
+            {"id":1,"type":"root","name":"root","nodes":[
+              {"id":2,"type":"output","name":"HEADLESS-1","nodes":[
+                {"id":3,"type":"workspace","name":"1","nodes":[
+                  {"id":20,"type":"con","name":"~","app_id":"foot","pid":50,"focused":false,"nodes":[],"floating_nodes":[]}
+                ],"floating_nodes":[]}
+              ],"floating_nodes":[]},
+              {"id":4,"type":"output","name":"HEADLESS-2","nodes":[
+                {"id":5,"type":"workspace","name":"2","nodes":[],"floating_nodes":[
+                  {"id":21,"type":"floating_con","name":"~","app_id":"foot","pid":51,"focused":true,"nodes":[],"floating_nodes":[]}
+                ]}
+              ],"floating_nodes":[]}
+            ]}
+        """.trimIndent()
+
         // A trimmed GET_TREE: one output with a tiled foot and a floating calculator, two file managers alike,
         // and an Xwayland window (app_id null) hidden in the scratchpad.
         val TREE = """

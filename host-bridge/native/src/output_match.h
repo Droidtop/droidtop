@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,45 @@ inline int findHeadIndex(const std::string& wanted, const std::string& primaryNa
     }
     if (wanted.empty()) return headNames.empty() ? -1 : 0;
     return -1;
+}
+
+// Which output a window is listed on (Droidtop/tracker#908, step D4), from
+// wlr-foreign-toplevel-management's output_enter and output_leave, kept free
+// of Wayland types like the rules above. [on] is the outputs the window is
+// on now, in the order it entered them; [last] the output it was on most
+// recently, kept after it left every output (a window sway hides in its
+// scratchpad leaves its output, and stays listed on the bar it was on). An
+// Output{} is "none".
+//
+// A window on two outputs at once (dragged across the edge) is listed on the
+// one it entered last: the protocol says which outputs a window is on, not
+// how much of it is on each, so "the one holding most of it" is not known.
+template <typename Output>
+inline void windowEntered(std::vector<Output>& on, Output& last, Output output) {
+    on.erase(std::remove(on.begin(), on.end(), output), on.end());
+    on.push_back(output);
+    last = output;
+}
+
+template <typename Output>
+inline void windowLeft(std::vector<Output>& on, Output& last, Output output) {
+    on.erase(std::remove(on.begin(), on.end(), output), on.end());
+    last = on.empty() ? output : on.back();
+}
+
+// The output went away (the global was removed): no window is on it, and none
+// is listed by it any more.
+template <typename Output>
+inline void outputGone(std::vector<Output>& on, Output& last, Output output) {
+    on.erase(std::remove(on.begin(), on.end(), output), on.end());
+    if (last == output) last = on.empty() ? Output{} : on.back();
+}
+
+// The output the window is listed on: the one it entered last among those it
+// is on, or, on none, the one it was on last; Output{} when there is none.
+template <typename Output>
+inline Output windowOutput(const std::vector<Output>& on, Output last) {
+    return on.empty() ? last : on.back();
 }
 
 } // namespace hostbridge

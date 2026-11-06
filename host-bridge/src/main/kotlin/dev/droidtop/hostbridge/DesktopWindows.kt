@@ -21,7 +21,8 @@ import java.io.File
  * `floating disable` for a window that was tiled, so it comes back into the layout rather than floating
  * (sway's `floating disable` also takes it out of the scratchpad, container_set_floating). The protocol has
  * no request that names a sway container, so the window is found in sway's tree by the app id and title the
- * protocol reported; with two windows alike, the window is raised first and the focused one is taken.
+ * protocol reported, among the windows on the output it reported first (Droidtop/tracker#908, step D4); with two
+ * windows alike there too, the window is raised first and the focused one is taken.
  *
  * sway reports a scratchpad window to the protocol only as not activated, so the windows this minimized
  * are kept in [hidden], which the taskbar reads as minimized; a window that comes back to the front by any
@@ -50,6 +51,29 @@ class DesktopWindows(
 
     /** Whether the bar can place windows: sway only, as labwc draws its own maximize and close buttons. */
     val canPlace: Boolean get() = sway
+
+    /**
+     * Whether a window can be moved to another screen: sway only, the one compositor droidtop gives a second output
+     * (Droidtop/tracker#908, step D2). The action is offered only while a second output exists ([WindowOutputs]).
+     */
+    val canMove: Boolean get() = sway
+
+    /**
+     * Moves [toplevel] to the compositor output [outputName] (Droidtop/tracker#908, step D4): sway's
+     * `move container to output`, which puts it on that output's visible workspace, tiled or floating as it was.
+     * Nothing about the focus is asked: it stays where sway leaves it. False under labwc, for a name that is not an
+     * output's, or when sway could not be asked or found no such window.
+     */
+    suspend fun moveToOutput(toplevel: Toplevel, outputName: String): Boolean {
+        if (!sway || !DesktopOutputs.isOutputName(outputName)) return false
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val ipc = ipc() ?: return@runCatching false
+                val window = findWindow(ipc, toplevel) ?: return@runCatching false
+                ipc.run(moveCommand(window.conId, outputName))
+            }.onFailure { Log.w(TAG, "sway move to $outputName failed", it) }.getOrDefault(false)
+        }
+    }
 
     /**
      * Maximizes, snaps or restores [toplevel] (docs/SPEC.md 2b "Window controls", Droidtop/tracker#686): what a
@@ -149,10 +173,17 @@ class DesktopWindows(
 
     private fun ipc(): SwayIpc? = ContainerLayout.findSwayIpcSocket(hostSocketDir)?.let { SwayIpc(it.absolutePath) }
 
-    /** [toplevel]'s container in sway's tree: the one match, or, among several alike, the focused one after raising it. */
+    /**
+     * [toplevel]'s container in sway's tree: the one match, the one match on the output the protocol says it is on, or,
+     * among several alike, the focused one after raising it.
+     */
     private suspend fun findWindow(ipc: SwayIpc, toplevel: Toplevel): SwayWindow? {
-        val matches = SwayIpc.windows(ipc.tree(), toplevel.appId, toplevel.title)
+        val tree = ipc.tree()
+        val matches = SwayIpc.windows(tree, toplevel.appId, toplevel.title)
         if (matches.size == 1) return matches[0]
+        if (matches.size > 1 && toplevel.output.isNotEmpty()) {
+            SwayIpc.windows(tree, toplevel.appId, toplevel.title, toplevel.output).singleOrNull()?.let { return it }
+        }
         if (matches.isEmpty()) return null
         if (!toplevel.activated) bridge.activateToplevel(toplevel.id)
         repeat(FOCUS_POLLS) {
@@ -170,6 +201,12 @@ class DesktopWindows(
         const val FOCUS_POLLS = 10
         const val FOCUS_POLL_MS = 50L
         const val SETTLE_NS = 1_000_000_000L
+
+        /** The sway command that moves container [conId] to the output [outputName] (sway/commands/move.c). */
+        fun moveCommand(conId: Long, outputName: String): String {
+            require(DesktopOutputs.isOutputName(outputName)) { "not an output name: $outputName" }
+            return "[con_id=$conId] move container to output $outputName"
+        }
 
         /**
          * The sway command that puts container [conId] at [placement]. Sizes in `ppt` are of the workspace, the

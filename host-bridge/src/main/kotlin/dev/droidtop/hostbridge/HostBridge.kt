@@ -20,6 +20,11 @@ import kotlinx.coroutines.flow.SharedFlow
  * `Toplevel(...)` anywhere — [Keep] for the same reason
  * [HostBridge.onContainerClipboardText] carries it: R8 would otherwise be
  * free to rename this class or drop the "unused" constructor.
+ *
+ * [output] is the compositor's name for the output the window is listed on ("HEADLESS-2"), from the protocol's
+ * output_enter and output_leave (Droidtop/tracker#908, step D4): the one it entered last among those it is on, or
+ * the one it was on last while it is on none (a window sway hid in its scratchpad); "" when there is none. Which
+ * bar lists it follows from that ([WindowOutputs]).
  */
 @Keep
 data class Toplevel(
@@ -30,6 +35,7 @@ data class Toplevel(
     val minimized: Boolean,
     val maximized: Boolean,
     val fullscreen: Boolean,
+    val output: String = "",
 )
 
 /**

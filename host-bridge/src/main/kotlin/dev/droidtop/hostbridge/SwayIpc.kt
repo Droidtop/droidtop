@@ -83,21 +83,15 @@ class SwayIpc(private val socketPath: String) {
          * foreign-toplevel protocol tells droidtop about a window (sway sets both from the same view, see
          * sway/tree/view.c and ipc-json.c ipc_json_describe_view). A missing app id (an Xwayland window) is "".
          * The scratchpad's hidden windows are included, as sway lists them under its `__i3_scratch` workspace.
+         * With [output] given, only the windows under the output node of that name (Droidtop/tracker#908, step D4):
+         * the window's output from the same protocol, which tells two windows alike apart when they are on different
+         * screens. The scratchpad's are under sway's own `__i3` output.
          */
-        /** The focused view's `pid` in [tree], walking tiled and floating nodes alike. Pure. */
-        internal fun focusedPid(tree: JSONObject): Int? {
-            if (tree.optBoolean("focused") && tree.has("pid")) return tree.optInt("pid")
-            for (key in listOf("nodes", "floating_nodes")) {
-                val children = tree.optJSONArray(key) ?: continue
-                for (i in 0 until children.length()) focusedPid(children.getJSONObject(i))?.let { return it }
-            }
-            return null
-        }
-
-        internal fun windows(tree: JSONObject, appId: String, title: String): List<SwayWindow> = buildList {
-            fun walk(node: JSONObject, floating: Boolean) {
+        internal fun windows(tree: JSONObject, appId: String, title: String, output: String = ""): List<SwayWindow> = buildList {
+            fun walk(node: JSONObject, floating: Boolean, nodeOutput: String) {
+                val under = if (node.optString("type") == "output") node.optString("name") else nodeOutput
                 val isView = node.has("pid") || node.has("app_id")
-                if (isView) {
+                if (isView && (output.isEmpty() || under == output)) {
                     val nodeAppId = if (node.isNull("app_id")) "" else node.optString("app_id")
                     val nodeTitle = if (node.isNull("name")) "" else node.optString("name")
                     if (nodeAppId == appId && nodeTitle == title) {
@@ -108,13 +102,23 @@ class SwayIpc(private val socketPath: String) {
                     }
                 }
                 node.optJSONArray("nodes")?.let { children ->
-                    for (i in 0 until children.length()) walk(children.getJSONObject(i), floating)
+                    for (i in 0 until children.length()) walk(children.getJSONObject(i), floating, under)
                 }
                 node.optJSONArray("floating_nodes")?.let { children ->
-                    for (i in 0 until children.length()) walk(children.getJSONObject(i), true)
+                    for (i in 0 until children.length()) walk(children.getJSONObject(i), true, under)
                 }
             }
-            walk(tree, false)
+            walk(tree, false, "")
+        }
+
+        /** The focused view's `pid` in [tree], walking tiled and floating nodes alike. Pure. */
+        internal fun focusedPid(tree: JSONObject): Int? {
+            if (tree.optBoolean("focused") && tree.has("pid")) return tree.optInt("pid")
+            for (key in listOf("nodes", "floating_nodes")) {
+                val children = tree.optJSONArray(key) ?: continue
+                for (i in 0 until children.length()) focusedPid(children.getJSONObject(i))?.let { return it }
+            }
+            return null
         }
     }
 }

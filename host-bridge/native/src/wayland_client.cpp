@@ -307,6 +307,13 @@ struct ToplevelState {
         bool minimized = false;
         bool maximized = false;
         bool fullscreen = false;
+        // The compositor's name for the output the window is listed on ("" for none or unnamed), from `on` and
+        // `lastOutput` at each `done` (windowOutput in output_match.h, Droidtop/tracker#908 step D4).
+        std::string output;
+        // The outputs the window is on, in the order it entered them, and the one it was on last.
+        std::vector<wl_output*> on;
+        wl_output* lastOutput = nullptr;
+        bool havePendingOutput = false;
 
         std::string pendingTitle;
         std::string pendingAppId;
@@ -321,6 +328,10 @@ struct ToplevelState {
 
     std::mutex mutex;
     std::vector<std::unique_ptr<Entry>> entries; // dispatch-thread-owned; see class comment
+
+    // The connection's globals, for an output's name (WaylandGlobals::outputs). Read on the dispatch thread only,
+    // where every output event and every toplevel event is handled.
+    WaylandGlobals* globals = nullptr;
 
     ToplevelsChangedCallback callback = nullptr;
     void* callbackUserData = nullptr;
@@ -686,14 +697,36 @@ void toplevel_handle_app_id(void* data, zwlr_foreign_toplevel_handle_v1* handle,
     }
 }
 
-void toplevel_handle_output_enter(void*, zwlr_foreign_toplevel_handle_v1*, wl_output*) {
-    // Not tracked yet. host-bridge tracks and can capture every output
-    // (WaylandGlobals::outputs, Droidtop/tracker#908), but which output a
-    // window is on matters only once a window can be moved to another
-    // screen, a later step of that issue.
+// Which output a window is on (Droidtop/tracker#908, step D4): each bar lists the windows on its own output, and
+// the move to another screen offers the others. The rule is output_match.h's windowOutput; the name is resolved at
+// the handle's `done`, which the compositor sends after an enter or a leave as after any other change.
+void toplevel_handle_output_enter(void* data, zwlr_foreign_toplevel_handle_v1* handle, wl_output* output) {
+    auto* state = static_cast<ToplevelState*>(data);
+    std::lock_guard<std::mutex> lock(state->mutex);
+    if (auto* entry = findEntryLocked(state, handle)) {
+        windowEntered(entry->on, entry->lastOutput, output);
+        entry->havePendingOutput = true;
+    }
 }
 
-void toplevel_handle_output_leave(void*, zwlr_foreign_toplevel_handle_v1*, wl_output*) {}
+void toplevel_handle_output_leave(void* data, zwlr_foreign_toplevel_handle_v1* handle, wl_output* output) {
+    auto* state = static_cast<ToplevelState*>(data);
+    std::lock_guard<std::mutex> lock(state->mutex);
+    if (auto* entry = findEntryLocked(state, handle)) {
+        windowLeft(entry->on, entry->lastOutput, output);
+        entry->havePendingOutput = true;
+    }
+}
+
+// The name of [output] among the tracked outputs: "" when it is not one of them or never said its name. Dispatch
+// thread only.
+std::string trackedOutputName(WaylandGlobals* globals, wl_output* output);
+
+// [entry]'s output name from its outputs, under the state's mutex, on the dispatch thread.
+void resolveOutputLocked(ToplevelState* state, ToplevelState::Entry* entry) {
+    wl_output* output = windowOutput(entry->on, entry->lastOutput);
+    entry->output = output && state->globals ? trackedOutputName(state->globals, output) : std::string();
+}
 
 void toplevel_handle_state(void* data, zwlr_foreign_toplevel_handle_v1* handle, wl_array* states) {
     auto* state = static_cast<ToplevelState*>(data);
@@ -736,6 +769,10 @@ void toplevel_handle_done(void* data, zwlr_foreign_toplevel_handle_v1* handle) {
             entry->maximized = entry->pendingMaximized;
             entry->fullscreen = entry->pendingFullscreen;
             entry->havePendingState = false;
+        }
+        if (entry->havePendingOutput) {
+            resolveOutputLocked(state, entry);
+            entry->havePendingOutput = false;
         }
     }
     notifyToplevelsChanged(state);
@@ -958,6 +995,13 @@ constexpr zwp_input_method_v2_listener kInputMethodListener = {
     .unavailable = imUnavailable,
 };
 
+std::string trackedOutputName(WaylandGlobals* globals, wl_output* output) {
+    for (auto& tracked : globals->outputs) {
+        if (tracked->output == output) return tracked->name;
+    }
+    return std::string();
+}
+
 void registry_global_remove(void* data, wl_registry* /* registry */, uint32_t name) {
     // An output that goes (sway's `output X unplug`, a headless output
     // destroyed) stops its capture and leaves the list; if it was the
@@ -970,10 +1014,24 @@ void registry_global_remove(void* data, wl_registry* /* registry */, uint32_t na
         TrackedOutput* tracked = it->get();
         if (tracked->globalName != name) continue;
         LOGI("compositor output %s went away", tracked->name.empty() ? "(unnamed)" : tracked->name.c_str());
+        // No window is on it any more, and none keeps it as the output it was on last: its proxy is released
+        // below, and a later output could be given the same address.
+        if (auto* state = globals->toplevel_state) {
+            std::lock_guard<std::mutex> lock(state->mutex);
+            for (auto& entry : state->entries) outputGone(entry->on, entry->lastOutput, tracked->output);
+        }
         destroyCapture(tracked->capture);
         tracked->capture = nullptr;
         if (tracked->version >= 3) wl_output_release(tracked->output); else wl_output_destroy(tracked->output);
         globals->outputs.erase(it);
+        // Names again without it, so a window it held is listed by the output it is on now, or the primary's bar.
+        if (auto* state = globals->toplevel_state) {
+            {
+                std::lock_guard<std::mutex> lock(state->mutex);
+                for (auto& entry : state->entries) resolveOutputLocked(state, entry.get());
+            }
+            notifyToplevelsChanged(state);
+        }
         return;
     }
 }
@@ -1668,6 +1726,7 @@ bool WaylandClient::connect(const char* socketPath) {
     globals_ = new WaylandGlobals();
     if (!toplevels_) toplevels_ = new ToplevelState();
     globals_->toplevel_state = toplevels_;
+    toplevels_->globals = globals_;
     registry_ = wl_display_get_registry(display_);
     wl_registry_add_listener(registry_, &kRegistryListener, globals_);
 
@@ -2102,6 +2161,7 @@ std::vector<ToplevelInfo> WaylandClient::snapshotToplevels() {
         info.minimized = entry->minimized;
         info.maximized = entry->maximized;
         info.fullscreen = entry->fullscreen;
+        info.output = entry->output;
         result.push_back(std::move(info));
     }
     return result;
