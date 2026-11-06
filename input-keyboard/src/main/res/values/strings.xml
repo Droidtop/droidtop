@@ -354,15 +354,41 @@
 	<string name="layout_material_black" translatable="false">Material Black</string>
     <string name="layout_material_dark" translatable="false">Material Dark</string>
     <string name="layout_material_light" translatable="false">Material Light</string>
-    <string name="layout_follow_light_dark">Follow light or dark</string>
+    <!-- droidtop: Hacker Keyboard Reborn's modern themes (Droidtop/tracker#903 H12b). Modern is the old "Follow light or dark", id 8. -->
+    <string name="layout_modern">Modern</string>
+    <string name="layout_dynamic">Dynamic (wallpaper)</string>
+    <string name="layout_modern_high_contrast">High contrast</string>
+    <string name="layout_match_host">Match droidtop</string>
 
+    <!-- droidtop: "Light and dark" for the modern themes (Droidtop/tracker#903 H12b). -->
+    <string name="title_light_dark">Light and dark</string>
+    <string name="light_dark_follow_system">Follow the system</string>
+    <string name="light_dark_follow_host">Follow droidtop\'s Light or dark</string>
+    <string name="light_dark_always_light">Always light</string>
+    <string name="light_dark_always_dark">Always dark</string>
+    <string name="light_dark_fixed">This theme keeps its own look</string>
+    <string-array name="light_dark_entries">
+        <item>@string/light_dark_follow_system</item>
+        <item>@string/light_dark_always_light</item>
+        <item>@string/light_dark_always_dark</item>
+    </string-array>
+    <string-array name="light_dark_values" translatable="false">
+        <item>system</item>
+        <item>light</item>
+        <item>dark</item>
+    </string-array>
+
+    <!--
+    The theme setting builds its own list (ThemePreference, ThemePresets); this one is the debug screen's.
+    Its labels follow the layout each id draws: 5 is Material Light and 7 Material Black (KeyboardSwitcher.THEMES).
+    -->
     <string-array name="keyboard_layout_modes" translatable="false">
-        <item>@string/layout_follow_light_dark</item>
+        <item>@string/layout_modern</item>
         <item>@string/layout_ics</item>
         <item>@string/layout_ics_darker</item>
-		<item>@string/layout_material_black</item>
-        <item>@string/layout_material_dark</item>
         <item>@string/layout_material_light</item>
+        <item>@string/layout_material_dark</item>
+        <item>@string/layout_material_black</item>
         <item>@string/layout_gingerbread</item>
         <item>@string/layout_stone_bold</item>
         <item>@string/layout_trans_neon</item>

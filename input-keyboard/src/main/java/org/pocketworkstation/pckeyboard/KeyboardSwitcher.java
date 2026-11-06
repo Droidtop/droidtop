@@ -59,7 +59,8 @@ public class KeyboardSwitcher implements
     // Symbols keyboard layout with the settings key
     public static final int KEYBOARDMODE_SYMBOLS_WITH_SETTINGS_KEY = R.id.mode_symbols_with_settings_key;
 
-    // "Follow light or dark" (KeyboardAppearance.FOLLOW) for anyone who never chose a theme (Droidtop/tracker#562).
+    // Modern, once "Follow light or dark" (KeyboardAppearance.FOLLOW), for anyone who never chose a theme
+    // (Droidtop/tracker#562, #903 H12b).
     public static final String DEFAULT_LAYOUT_ID = "8";
     public static final String PREF_KEYBOARD_LAYOUT = "pref_keyboard_layout";
     private static final int[] THEMES = new int[] {
@@ -72,6 +73,14 @@ public class KeyboardSwitcher implements
         R.layout.input_ics_darker,
         R.layout.input_material_black,
     };
+
+    /**
+     * The layout a theme id draws with, Material dark for an id with none (droidtop, #903 H12b: the theme picker's
+     * previews read a classic theme's own key drawing from it).
+     */
+    static int themeLayout(int drawn) {
+        return drawn >= 0 && drawn < THEMES.length ? THEMES[drawn] : THEMES[KeyboardAppearance.MATERIAL_DARK];
+    }
 
     // Tables which contains resource ids for each character theme color
     private static final int KBD_PHONE = R.xml.kbd_phone;
@@ -617,14 +626,19 @@ public class KeyboardSwitcher implements
     }
 
     /**
-     * Draws the theme the stored choice means now: "Follow light or dark" changes with the host's
-     * or the system's Light or dark (Droidtop/tracker#562). Called as an editor starts.
+     * Draws the theme the stored choice means now: a modern theme changes with Light and dark (the
+     * setting, the host's or the system's; Droidtop/tracker#562, #903 H12b), and Dynamic with the
+     * wallpaper's palette. Called as an editor starts and after a configuration change (a new
+     * wallpaper's palette arrives as one); the view is built again only when the theme drawn or its
+     * colours differ from what is on screen.
      */
     public void refreshAppearance() {
         if (mInputMethodService == null) return;
         int drawn = KeyboardAppearance.resolve(mStoredLayoutId,
                 KeyboardAppearance.isLight(mInputMethodService));
-        if (drawn != mLayoutId) changeLatinKeyboardView(drawn, true);
+        boolean recolored = mInputView != null
+                && !java.util.Objects.equals(mInputView.getPlates(), KeyPlates.colorsFor(mInputMethodService));
+        if (drawn != mLayoutId || recolored) changeLatinKeyboardView(drawn, true);
     }
 
     private static int parseLayout(String value) {
@@ -677,8 +691,9 @@ public class KeyboardSwitcher implements
 
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
             String key) {
-        if (PREF_KEYBOARD_LAYOUT.equals(key)) {
-            mStoredLayoutId = parseLayout(sharedPreferences.getString(key, DEFAULT_LAYOUT_ID));
+        if (PREF_KEYBOARD_LAYOUT.equals(key) || KeyboardAppearance.KEY_LIGHT_DARK.equals(key)) {
+            // droidtop: "Light and dark" redraws a modern theme too (#903 H12b).
+            mStoredLayoutId = parseLayout(sharedPreferences.getString(PREF_KEYBOARD_LAYOUT, DEFAULT_LAYOUT_ID));
             changeLatinKeyboardView(KeyboardAppearance.resolve(mStoredLayoutId,
                     KeyboardAppearance.isLight(mInputMethodService)), true);
         } else if (LatinIMESettings.PREF_SETTINGS_KEY.equals(key)) {
