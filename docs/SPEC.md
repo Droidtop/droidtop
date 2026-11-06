@@ -6142,8 +6142,9 @@ droidtop 0.2.0-dev.1931).
   Quick Menu's slider (through `SystemControls.setVolume`), the companion's pins and System > Sound's slider per
   stream (media, ring, notifications, alarms, calls) all set volume there, and Kid's highest volume (Settings > UI
   mode's "Kid mode's highest volume", no limit by default, hidden in Kid and Kiosk) holds there for every stream; a
-  settings observer turns a volume key that goes past it back down while Kid is on. Sound also opens Android's
-  output and volume panel (Outputs). System > Connections shows the paired Bluetooth devices, asking for Bluetooth
+  settings observer turns a volume key that goes past it back down while Kid is on. On the companion's Sound, Media
+  volume is drawn once (its stream slider; the Quick Menu's Volume row is not drawn again) and Android's output and
+  volume panel is the Audio output row, once (Droidtop/tracker#786 S8). System > Connections shows the paired Bluetooth devices, asking for Bluetooth
   access (`BLUETOOTH_CONNECT`) when the card first opens (owner question 1's default), Android's Bluetooth settings,
   and a Network pill that opens the Network tab.
 - **The Network tab (Droidtop/tracker#583; owner, 2026-10-17: "Might actually be wise to put that in its own network
