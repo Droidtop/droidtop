@@ -1,0 +1,121 @@
+name: Mozc engine
+
+# Builds Google's open-source Japanese conversion engine, Mozc (BSD-3), for the
+# keyboard's Japanese input (Droidtop/tracker#903 H7; docs/SPEC.md 6a, "The
+# engine seam, the candidate bar and the gesture seam"), and publishes it as a
+# prerelease of this repository, the lsfg-vk-layer.yml precedent:
+#
+#  - mozc-engine.tar.zst: libmozc.so for arm64-v8a and x86_64, with Mozc's
+#    LICENSE and credits_en.html. The keyboard ships these in the APK (native
+#    code is never downloaded later); the build fetches them by a pin (tag and
+#    SHA-256), added with the engine itself in H7c.
+#  - mozc.data.gz: the open dictionary (//data_manager/oss:mozc_dataset_for_oss),
+#    which the engine memory-maps. It is never in the APK: the keyboard
+#    downloads it on the first use of Japanese and checks it against the SHA-256
+#    published here (mozc.data.sha256 is of the uncompressed file). gzip, so the
+#    phone unpacks it with the JDK alone.
+#
+# The engine and the dictionary come from the same Mozc commit, as they must:
+# with a dictionary from another commit the engine falls back to a minimal one.
+#
+# Upstream builds exactly this in its own CI (google/mozc
+# .github/workflows/android.yaml: update_deps.py, then bazelisk with
+# --config oss_android --config release_build); the Bazel version is Mozc's own
+# (src/.bazeliskrc). The coordinator, for the owner (#903, 2026-11-06): host it
+# on a droidtop prerelease as lsfg-vk is; keep the zip-code data; the open
+# dictionary is the default.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/mozc-engine.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # google/mozc tag 3.35.6354 (2026-10-16).
+  MOZC_TAG: 3.35.6354
+  MOZC_REF: 0136c35782536cb43d710575c311cd4185982738
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout Mozc
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: google/mozc
+          ref: ${{ env.MOZC_REF }}
+          path: mozc
+          submodules: false
+          persist-credentials: false
+
+      - name: Mozc's own dependencies cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: mozc/src/third_party_cache
+          key: mozc-update-deps-${{ env.MOZC_REF }}
+
+      - name: Mozc's own dependencies
+        working-directory: mozc/src
+        # Downloads the Android NDK and the rest Mozc pins, into third_party/.
+        run: python3 build_tools/update_deps.py
+
+      - name: Build
+        working-directory: mozc/src
+        run: |
+          [ "$(git rev-parse HEAD)" = "$MOZC_REF" ] || { echo "Mozc is not at $MOZC_REF"; exit 1; }
+          bazelisk build --config oss_android --config release_build \
+            //android/jni:native_libs //data_manager/oss:mozc_dataset_for_oss
+          bazelisk cquery --config oss_android --config release_build \
+            --output=files //android/jni:native_libs //data_manager/oss:mozc_dataset_for_oss
+
+      - name: Stage
+        run: |
+          sudo apt-get install -y zstd
+          src=mozc/src
+          zip=$(cd "$src" && bazelisk cquery --config oss_android --config release_build --output=files //android/jni:native_libs 2>/dev/null | grep 'native_libs.zip$')
+          data=$(cd "$src" && bazelisk cquery --config oss_android --config release_build --output=files //data_manager/oss:mozc_dataset_for_oss 2>/dev/null | grep '/mozc.data$')
+          [ -n "$zip" ] && [ -n "$data" ] || { echo "no native_libs.zip or mozc.data"; exit 1; }
+          mkdir -p out/stage/jniLibs work
+          unzip -q "$src/$zip" -d work
+          for abi in arm64-v8a x86_64; do
+            mkdir -p "out/stage/jniLibs/$abi"
+            cp "work/libs/$abi/libmozc.so" "out/stage/jniLibs/$abi/libmozc.so"
+            file "out/stage/jniLibs/$abi/libmozc.so"
+            ls -l "out/stage/jniLibs/$abi/libmozc.so"
+          done
+          cp mozc/LICENSE out/stage/LICENSE-mozc
+          cp "$src/data/installer/credits_en.html" out/stage/credits-mozc.html
+          echo "$MOZC_TAG $MOZC_REF" > out/stage/MOZC_VERSION
+          tar -C out/stage -cf - . | zstd -19 -T0 -q -o out/mozc-engine.tar.zst
+          cp "$src/$data" out/mozc.data
+          ls -l out/mozc.data
+          (cd out && sha256sum mozc.data | tee mozc.data.sha256)
+          gzip -9 -n -c out/mozc.data > out/mozc.data.gz
+          rm out/mozc.data
+          (cd out && sha256sum mozc-engine.tar.zst | tee mozc-engine.tar.zst.sha256 && sha256sum mozc.data.gz | tee mozc.data.gz.sha256)
+          ls -l out
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="mozc-engine-${MOZC_TAG}"
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$tag already published; a pin's release is never replaced"
+            exit 0
+          fi
+          gh release create "$tag" -R "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
+            --title "Mozc engine ${MOZC_TAG} (google/mozc ${MOZC_REF:0:8})" \
+            --notes "libmozc.so for arm64-v8a and x86_64 (mozc-engine.tar.zst) and the open dictionary (mozc.data.gz; mozc.data.sha256 is of the unpacked file), built by mozc-engine.yml from google/mozc ${MOZC_TAG} at ${MOZC_REF}. Mozc is BSD-3; the dictionary's sources and licences, including the IPAdic/ICOT terms and their NO WARRANTY section, are in credits-mozc.html inside the archive." \
+            out/mozc-engine.tar.zst out/mozc-engine.tar.zst.sha256 \
+            out/mozc.data.gz out/mozc.data.gz.sha256 out/mozc.data.sha256
