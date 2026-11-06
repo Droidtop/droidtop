@@ -202,10 +202,9 @@ This project is distributed under the GNU General Public License v3.0 (see
   `:terminal-emulator` and `:terminal-view` modules: the VT parser, the pseudo-terminal JNI (`libtermux.so`) and the
   terminal View under droidtop's container terminal. `WcWidth.java` follows jquast/wcwidth (MIT). Upstream's
   `LICENSE.md` is in the submodule.
-- **Murine Launcher** — `shell-default`, https://github.com/alesimula/Murine-launcher — Apache-2.0.
-  Itself derived from AOSP Launcher3 (Apache-2.0). Forked in as
-  `shell-default` and its sub-projects (not a submodule) and edited
-  directly; its `LICENSE` travels with it.
+- **Murine Launcher** — `shell-default`, a submodule of https://github.com/Droidtop/murine-launcher (branch `droidtop`),
+  droidtop's own fork of https://github.com/alesimula/Murine-launcher — Apache-2.0. Itself derived from AOSP
+  Launcher3 (Apache-2.0). Its `LICENSE` is in the submodule.
 - **droidtop-platforms** — `vendor/droidtop-platforms`, https://github.com/Droidtop/droidtop-platforms.
   droidtop's own platform, player, engine and BIOS database, kept in its
   own repository so it can be updated between builds. `library-core`

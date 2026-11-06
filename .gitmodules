@@ -103,3 +103,7 @@
 	branch = droidtop
 	shallow = true
 	update = none
+[submodule "shell-default"]
+	path = shell-default
+	url = https://github.com/Droidtop/murine-launcher
+	branch = droidtop
