@@ -9299,7 +9299,7 @@ compositor only ever sees one logical pointer and keyboard.
 
 **More layouts (Droidtop/tracker#342, lane default 2026-10-28).** New languages come from HeliBoard's layouts (GPL-3.0, as droidtop is): its simple text layouts are kept in `input-keyboard/layouts-src/heliboard/` with their revision, and `layouts-src/heliboard-to-kbd.py` writes each as a Hacker's Keyboard 4-row layout (`res/xml-<locale>/kbd_qwerty.xml`): HeliBoard's three letter rows, the digits on the top row's long press, and the Shift, Delete and bottom rows of an existing layout, so a new language behaves as the others do. The first three are Belarusian, Macedonian and Mongolian (`InputLanguageSelection`'s lists); `HeliBoardLayoutsTest` fails when a source and its generated file disagree. A 5-row layout for them, and HeliBoard's json layouts, are not converted yet.
 
-**Glide typing (Droidtop/tracker#341).** The word guesser is `GlideClassifier`, ported from AnySoftKeyboard's `GestureTypingDetector` (Apache-2.0) with its scoring unchanged; no closed library (HeliBoard's and OpenBoard's glide need Google's) is ever used. A finger's path is reduced to its corners; each dictionary word's corners are its letters' key centres; a word scores the direction-weighted distance between the two, less its frequency, plus penalties for starting or ending off its first or last key, and only words starting near the gesture are scored. It is pure and tested on drawn strokes. On the keys (`GlideTyping`, setting Editing helpers > Glide typing, on by default): a single finger that goes down on a letter and travels one key width becomes a glide, from which point the key it started on is not pressed and an azure trail follows the finger; on release the best word is typed, after a space when it follows a word and in the shift state's case, and the suggestion strip offers the others, one of which, picked, replaces it. The guesser is built in the background for each keyboard's letter keys from the language's glide words, the 40,000 most frequent single words kept beside its dictionary when it is added (`glide_<language>.txt`; a dictionary added before this has none until it is added again). With no words for the language nothing becomes a glide and the keys type as before. The Terminal preset turns it off (6a, pro mode).
+**Glide typing (Droidtop/tracker#341).** The word guesser is `GlideClassifier`, ported from AnySoftKeyboard's `GestureTypingDetector` (Apache-2.0) with its scoring unchanged; no closed library (HeliBoard's and OpenBoard's glide need Google's) is ever used. A finger's path is reduced to its corners; each dictionary word's corners are its letters' key centres; a word scores the direction-weighted distance between the two, less its frequency, plus penalties for starting or ending off its first or last key, and only words starting near the gesture are scored. It is pure and tested on drawn strokes. On the keys (`GlideTyping`, setting Editing helpers > Glide typing, on by default): a single finger that goes down on a letter and travels one key width becomes a glide, from which point the key it started on is not pressed and an azure trail follows the finger; on release the best word is typed, after a space when it follows a word and in the shift state's case, and the suggestion strip offers the others, one of which, picked, replaces it. The guesser is built in the background for each keyboard's letter keys from the language's glide words, the 40,000 most frequent single words kept beside its dictionary when it is added (`glide_<language>.txt`; a dictionary added before this has none until it is added again). With no words for the language nothing becomes a glide and the keys type as before. The Terminal preset turns it off (6a, pro mode). Since #903 H6 the guesser sits behind the gesture seam (`GestureEngine`, "The engine seam, the candidate bar and the gesture seam" below), with its results unchanged.
 
 **Voice input (Droidtop/tracker#343).** The voice key asks `VoiceInput`'s providers in order and uses the first that can dictate (`VoiceProvider`); with none, it does nothing. The one provider today is `SystemVoiceKeyboard`: another enabled keyboard's voice subtype (mode "voice", Gboard's voice typing for one), switched to and back as the prebuilt `libs/voiceimeutils.jar` (Google's 2011 VoiceRecognitionTrigger) did. That jar is gone, so the keyboard builds from source only; its other path, a RecognizerIntent activity, needed activities the manifest never declared and never ran. Ahead of it is offline voice typing, below.
 
@@ -9799,10 +9799,10 @@ are in addition to Hacker's own layouts (4-row, 5-row, full), never replacing th
   FlorisBoard's floating insets and offset clamp (Apache-2.0). Neither has a thumb split, a calculator or a compact
   layout picked by display, so those are droidtop's own. Both were cloned fresh for this.
 
-### The engine seam and the candidate bar (Droidtop/tracker#903 H6, built 2026-11-06)
+### The engine seam, the candidate bar and the gesture seam (Droidtop/tracker#903 H6, built 2026-11-06)
 
 The plan posted on #903, in the order the owner approved (H5, H12, H13, then H6): "H6: the engine seam and candidate
-bar, plus the gesture seam." This part is the engine seam and the candidate bar. It comes before the conversion engines, H7 to H9: Mozc for Japanese, librime for Chinese,
+bar, plus the gesture seam." It comes before the conversion engines, H7 to H9: Mozc for Japanese, librime for Chinese,
 libhangul for Korean. The owner's rule holds: "Hacker's Keyboard is our foundation. If we can rebuild it while keeping
 ALL of hacker's functionality (the full keyboard including functions and stuff, terminal mode, etc, etc), then we do
 that gradually". So this slice is a refactor behind seams, and **Latin typing does not change**.
@@ -9860,6 +9860,21 @@ that gradually". So this slice is a refactor behind seams, and **Latin typing do
     grid from the button.
   - In the grid every direction moves, and Up and Down cross pages.
   - Down from the row goes back to the tools; B closes the grid, then goes back to the keys. A touch takes the ring away.
+- **The gesture seam** (`GestureEngine`, pure). The owner: "Gesture typing: still a seam only. The official swipe
+  libraries come later."; the plan: "A `GestureEngine` interface: our classifier (#341) sits behind it today, and the
+  official library goes behind it later."
+  - In: the stroke (`GestureStroke`, every point the finger reported, with its time in ms) and the keys' geometry
+    (`GestureLayout`). Out: ranked words.
+  - droidtop's `GlideClassifier` is the first engine (`ClassifierGestureEngine`), built with the parameters glide typing
+    always gave it. `GlideTyping` now records the stroke and hands it, copied, to the engine at release.
+  - The classifier keeps a whole stroke's points as it kept them one by one (`GlideClassifier.pathOf`).
+    `GestureEngineTest` checks that every stroke ranks as before: 25 words, 3 key sizes, 9 stroke shapes, and a stroke
+    past the 1,024 points it keeps.
+  - **The loader slot** is `GestureLibrary`, set on `GestureEngines.library`. Its default, `GestureLibrary.NONE`, has no
+    engine, so the classifier is used. A library is used only when it gives an engine for the keyboard; when it
+    declines, the classifier is used.
+  - Nothing is bundled or downloaded for it. How a later library arrives (on request, never in the APK), and how it
+    fits the licence rule at the top of 6a ("A closed library never is"), are decided when it comes.
 - **Not done here:** no conversion engine (H7 to H9). The caret inside an engine's composing text is carried by the seam
   but drawn at the end until an engine needs it. Nothing above changes what a person sees with Hacker's own typing.
 
