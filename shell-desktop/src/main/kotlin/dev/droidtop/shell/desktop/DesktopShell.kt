@@ -328,7 +328,7 @@ fun DesktopShell(
                 .fillMaxSize()
                 .padding(top = if (barAtTop) barHeight else 0.dp, bottom = if (barAtTop) 0.dp else barHeight),
         ) {
-            DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup, prefs, outputNames, onPrimarySized)
+            DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup, prefs, outputNames, onPrimarySized, windows)
         }
 
         Taskbar(

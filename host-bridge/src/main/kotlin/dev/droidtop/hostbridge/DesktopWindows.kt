@@ -2,14 +2,30 @@ package dev.droidtop.hostbridge
 
 import android.util.Log
 import dev.droidtop.runtime.ContainerLayout
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * The taskbar's window actions for the session's compositor: raise, minimize and restore, one place for both
@@ -26,6 +42,10 @@ import java.io.File
  * sway reports a scratchpad window to the protocol only as not activated, so the windows this minimized
  * are kept in [hidden], which the taskbar reads as minimized; a window that comes back to the front by any
  * route (sway's own scratchpad key, a click in the desktop) leaves it ([forget]).
+ *
+ * The title-bar buttons droidtop draws over sway's windows (docs/SPEC.md 2b "Window controls", Droidtop/tracker#910)
+ * take the same actions by the window's container id, which sway's tree gives them ([frames], [close], [minimize],
+ * [toggleMaximize]); the bar, which knows a window only by the protocol, still finds it with [findWindow].
  */
 class DesktopWindows(
     private val bridge: HostBridge,
@@ -63,19 +83,140 @@ class DesktopWindows(
             runCatching {
                 val ipc = ipc() ?: return@runCatching false
                 val window = findWindow(ipc, toplevel) ?: return@runCatching false
-                val before = _placed.value[toplevel.id]
-                if (placement == Placement.RESTORE && before == null) return@runCatching false
-                ipc.run(placeCommand(window.conId, placement, before)).also { done ->
-                    if (!done) return@also
-                    _placed.update {
-                        when (placement) {
-                            Placement.RESTORE -> it - toplevel.id
-                            // The first placement remembers where the window was; snapping it again keeps that.
-                            else -> if (toplevel.id in it) it else it + (toplevel.id to window)
+                placeContainer(ipc, window, toplevel.id, placement)
+            }.onFailure { Log.w(TAG, "sway $placement failed", it) }.getOrDefault(false).also { refreshFrames() }
+        }
+    }
+
+    /**
+     * Puts the container [window] at [placement] and keeps where it was under [key], the toplevel the bar lists it as;
+     * with no key the window is placed and nothing is kept, so it has no Restore size. Blocking: on [Dispatchers.IO].
+     */
+    private fun placeContainer(ipc: SwayIpc, window: SwayWindow, key: Long?, placement: Placement): Boolean {
+        val before = key?.let { _placed.value[it] }
+        if (placement == Placement.RESTORE && before == null) return false
+        return ipc.run(placeCommand(window.conId, placement, before)).also { done ->
+            if (!done || key == null) return@also
+            _placed.update {
+                when (placement) {
+                    Placement.RESTORE -> it - key
+                    // The first placement remembers where the window was; snapping it again keeps that.
+                    else -> if (key in it) it else it + (key to window)
+                }
+            }
+        }
+    }
+
+    /** Moves the container [window] to the scratchpad and, under [key], keeps it as minimized. Blocking. */
+    private fun minimizeContainer(ipc: SwayIpc, window: SwayWindow, key: Long?): Boolean =
+        ipc.run("[con_id=${window.conId}] move scratchpad").also { moved ->
+            if (moved && key != null) _hidden.update { it + (key to HiddenWindow(window, System.nanoTime())) }
+        }
+
+    private val frameRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /**
+     * Where sway shows each window, read from its tree off the main thread while anything collects it (the desktop's
+     * surfaces, for their title-bar buttons and resize bands, Droidtop/tracker#910). Read again on every window,
+     * workspace and output event sway sends, on [refreshFrames], and every [FRAMES_POLL_MS] for what sway sends no
+     * event for (a window dragged or resized by the pointer, or resizing itself). Always [SwayFrames.NONE] under
+     * labwc, which draws its own title-bar buttons.
+     */
+    val frames: StateFlow<SwayFrames> by lazy {
+        if (!sway) {
+            MutableStateFlow(SwayFrames.NONE).asStateFlow()
+        } else {
+            watchFrames().flowOn(Dispatchers.IO).distinctUntilChanged()
+                .stateIn(CoroutineScope(SupervisorJob() + Dispatchers.IO), SharingStarted.WhileSubscribed(FRAMES_KEEP_MS), SwayFrames.NONE)
+        }
+    }
+
+    /** Has [frames] read sway's tree again soon: a press on the desktop ended, or droidtop moved a window itself. */
+    fun refreshFrames() {
+        frameRequests.tryEmit(Unit)
+    }
+
+    private fun watchFrames(): Flow<SwayFrames> = channelFlow {
+        val wake = Channel<Unit>(Channel.CONFLATED)
+        launch { frameRequests.collect { wake.trySend(Unit) } }
+        // next() blocks on the socket, which a cancellation does not interrupt: closing the socket ends the wait.
+        val open = AtomicReference<SwayEvents?>(null)
+        launch {
+            try {
+                awaitCancellation()
+            } finally {
+                open.getAndSet(null)?.close()
+            }
+        }
+        launch {
+            while (isActive) {
+                val events = runCatching { ipc()?.subscribe(FRAME_EVENTS) }
+                    .onFailure { Log.w(TAG, "sway event subscription failed", it) }.getOrNull()
+                if (events != null) {
+                    open.set(events)
+                    try {
+                        while (isActive) {
+                            events.next()
+                            wake.trySend(Unit)
                         }
+                    } catch (e: java.io.IOException) {
+                        if (isActive) Log.i(TAG, "sway events ended: ${e.message}")
+                    } finally {
+                        open.compareAndSet(events, null)
+                        events.close()
                     }
                 }
-            }.onFailure { Log.w(TAG, "sway $placement failed", it) }.getOrDefault(false)
+                delay(FRAMES_RETRY_MS)
+            }
+        }
+        while (isActive) {
+            send(readFrames())
+            withTimeoutOrNull(FRAMES_POLL_MS) { wake.receive() }
+            // A change comes in bursts (a window opening is new, focus, title): read once they have settled.
+            delay(FRAMES_SETTLE_MS)
+            wake.tryReceive()
+        }
+    }
+
+    private fun readFrames(): SwayFrames =
+        runCatching { ipc()?.tree()?.let { SwayFrames.parse(it) } }
+            .onFailure { Log.w(TAG, "sway tree read failed", it) }.getOrNull() ?: SwayFrames.NONE
+
+    /** The toplevels the bar was last given ([forget]), to tell which one a container is. */
+    @Volatile
+    private var toplevels: List<Toplevel> = emptyList()
+
+    /**
+     * The key [DesktopWindows] keeps [window]'s state under: the toplevel already kept for its container, else the one
+     * toplevel with its app id and title. Null when two windows alike leave it unknown: the action is taken all the
+     * same, the bar just does not show it minimized or offer Restore size.
+     */
+    private fun keyOf(window: WindowFrame): Long? =
+        _placed.value.entries.firstOrNull { it.value.conId == window.conId }?.key
+            ?: toplevels.filter { it.appId == window.appId && it.title == window.title }.singleOrNull()?.id
+
+    /** Whether the container [conId] was maximized or snapped by droidtop and can be restored. */
+    fun isPlaced(conId: Long, placed: Map<Long, SwayWindow>): Boolean = placed.values.any { it.conId == conId }
+
+    /** Closes the container [window] (its title bar's close), as the bar's Close does: sway asks the program to close. */
+    suspend fun close(window: WindowFrame): Boolean = byContainer("close") { ipc -> ipc.run("[con_id=${window.conId}] kill") }
+
+    /** Minimizes the container [window] (its title bar's minimise), as the bar's Minimize does. */
+    suspend fun minimize(window: WindowFrame): Boolean = byContainer("minimize") { ipc -> minimizeContainer(ipc, window.window, keyOf(window)) }
+
+    /** Maximizes the container [window], or restores it when droidtop maximized or snapped it (its title bar's button). */
+    suspend fun toggleMaximize(window: WindowFrame): Boolean = byContainer("maximize") { ipc ->
+        val key = keyOf(window)
+        val placement = if (key != null && key in _placed.value) Placement.RESTORE else Placement.MAXIMIZE
+        placeContainer(ipc, window.window, key, placement)
+    }
+
+    private suspend fun byContainer(what: String, action: (SwayIpc) -> Boolean): Boolean {
+        if (!sway) return false
+        return withContext(Dispatchers.IO) {
+            runCatching { ipc()?.let(action) ?: false }
+                .onFailure { Log.w(TAG, "sway $what failed", it) }.getOrDefault(false)
+                .also { refreshFrames() }
         }
     }
 
@@ -88,6 +229,7 @@ class DesktopWindows(
      * report from before the move, so a fresh entry outlives it for [SETTLE_NS].
      */
     fun forget(toplevels: List<Toplevel>) {
+        this.toplevels = toplevels
         val now = System.nanoTime()
         val byId = toplevels.associateBy { it.id }
         _hidden.update { current ->
@@ -106,10 +248,8 @@ class DesktopWindows(
             runCatching {
                 val ipc = ipc() ?: return@runCatching false
                 val window = findWindow(ipc, toplevel) ?: return@runCatching false
-                ipc.run("[con_id=${window.conId}] move scratchpad").also { moved ->
-                    if (moved) _hidden.update { it + (toplevel.id to HiddenWindow(window, System.nanoTime())) }
-                }
-            }.onFailure { Log.w(TAG, "sway minimize failed", it) }.getOrDefault(false)
+                minimizeContainer(ipc, window, toplevel.id)
+            }.onFailure { Log.w(TAG, "sway minimize failed", it) }.getOrDefault(false).also { refreshFrames() }
         }
     }
 
@@ -170,6 +310,17 @@ class DesktopWindows(
         const val FOCUS_POLLS = 10
         const val FOCUS_POLL_MS = 50L
         const val SETTLE_NS = 1_000_000_000L
+
+        /** What [frames] is read again for: a window, a workspace or an output changed. */
+        val FRAME_EVENTS = listOf("window", "workspace", "output")
+
+        /** How often [frames] reads the tree with no event, for what sway sends none for. */
+        const val FRAMES_POLL_MS = 2_000L
+        const val FRAMES_SETTLE_MS = 50L
+        const val FRAMES_RETRY_MS = 2_000L
+
+        /** How long [frames] keeps watching after its last collector goes: a rotation recreates the surface. */
+        const val FRAMES_KEEP_MS = 5_000L
 
         /**
          * The sway command that puts container [conId] at [placement]. Sizes in `ppt` are of the workspace, the

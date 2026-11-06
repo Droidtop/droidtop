@@ -175,6 +175,8 @@ internal fun BoxScope.DesktopViewport(
     prefs: DesktopPrefs.Values,
     outputNames: List<String> = emptyList(),
     onPrimarySized: (width: Int, height: Int, scale: Double) -> Unit = { _, _, _ -> },
+    /** The session's window actions, for the title-bar buttons over the surface (Droidtop/tracker#910); null with none. */
+    windows: DesktopWindows? = null,
 ) {
     if (hostBridge != null && primaryOutput != null) {
         var presentFailed by remember { mutableStateOf(false) }
@@ -293,6 +295,8 @@ internal fun BoxScope.DesktopViewport(
                 }
             },
         )
+        // Close, minimise and maximise on sway's title bars, and the resize band (docs/SPEC.md 2b "Window controls").
+        WindowControlsOverlay(windows, router, outputNames.firstOrNull(), primary = true)
 
         if (presentFailed) {
             Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {

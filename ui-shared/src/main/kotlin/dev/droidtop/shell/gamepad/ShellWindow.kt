@@ -79,6 +79,14 @@ data class ShellWindow(
     fun barTarget(padDriving: Boolean): Dp = if (padDriving) Measure.padTarget else minTouchTarget
 
     /**
+     * The title-bar buttons and resize band droidtop puts on the Linux desktop's windows (docs/SPEC.md 2b "Window
+     * controls", Droidtop/tracker#910): a finger's size ([minTouchTarget]) always, as only a finger or a mouse presses
+     * them, never the pad (whose route to a window is its bar menu). The buttons are drawn at the title bar's height
+     * and pressed over this.
+     */
+    val windowControlTarget: Dp get() = minTouchTarget
+
+    /**
      * A pane of a larger window ([pane]): the Quick Menu's catalog tabs. Its rows and section labels are compact
      * (DroidDeck's compact settings rows, Droidtop/tracker#363): a one-line row is [pressTarget] tall and no taller, and
      * a section label sits closer above its rows on a hairline.

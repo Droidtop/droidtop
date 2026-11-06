@@ -355,8 +355,10 @@ it. None and Waybar both start `sway -c
 droidtop rewrites before every start (`DesktopPanel`): it includes
 `/etc/sway/config` (every distro binding and config.d stays), makes the
 stock bar (`bar-0`) run `true` instead of swaybar, starts Waybar with
-droidtop's Waybar config when Waybar is the panel, and binds the stock launcher key (`$mod+d`) to
-`droidtop-open start`, which opens droidtop's Start menu. That Waybar config
+droidtop's Waybar config when Waybar is the panel, binds the stock launcher key (`$mod+d`) to
+`droidtop-open start`, which opens droidtop's Start menu, and says `floating_modifier $mod normal` (Super with the
+right button resizes a window), which droidtop's resize band relies on (#910, 2b "Title-bar buttons and the resize
+band"). That Waybar config
 is a 26 px status strip with only what droidtop's bar lacks: the
 workspaces and the tray of the Linux programs. Its clock went to droidtop's
 tray in #691 (2b "One bar, in droidtop's look").
@@ -592,18 +594,61 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   driven by a finger first. A new tiled window halved the others, and a finger could not move, resize,
   snap or maximize any of them. A floating window opens at its own size, moves by its title bar and
   resizes by its border, with no modifier key. Desktop settings > "Tile windows" (off) gives sway's
-  tiling back, for keyboard use, from the next start. Sway's title bars have no buttons, so a window's bar
-  menu (long press) has them: Minimize, Maximize, Snap left, Snap right, Restore size once one of those
+  tiling back, for keyboard use, from the next start. Sway's title bars have no buttons of their own (droidtop
+  draws them over the surface since #910, below), and a window's bar menu (long press) has the actions too: Minimize, Maximize, Snap left, Snap right, Restore size once one of those
   was used, and Close. They are IPC commands on the window's container (`DesktopWindows.place`): it
   floats, then `resize set` and `move position` in percent of the workspace, which is the desktop less
   Waybar, so the status strip stays visible. Restore size returns it to the size and absolute position it
   had before its first placement, or back into the tiling when it was tiled. Under labwc, whose windows
-  draw their own maximize and close buttons, the menu stays Minimize and Close. A finger-wide 48 dp grab
-  area on the edge is not possible in sway, whose resize area is the border itself. The 8 px border plus
-  Maximize and Snap are the compromise.
+  draw their own maximize and close buttons, the menu stays Minimize and Close. A finger-wide grab area on the
+  edge is not possible inside sway, whose resize area is the border itself; droidtop gives one from its own side
+  since #910 (below).
   Each window's button on the bar also carries a "⋯" (labelled "Window menu" for a screen reader) that opens the
   same sheet with a plain tap, so the menu does not depend on a long press (AVD rig 2936, 2026-11-05: a long press on
   the window's button did nothing, and it was the only touch route to Maximize, Snap and Close).
+- **Title-bar buttons and the resize band** (Droidtop/tracker#910, slice X2; the design posted on #910 by the
+  coordinator, 2026-11-06, "Draw it from droidtop's side; do NOT patch vendor/sway"; owner to confirm). Under sway,
+  droidtop draws close, minimise and maximise (restore once droidtop maximized or snapped it) at the right end of each
+  visible title bar, over the surface that shows the output, and a press near a window's edge or corner resizes it.
+  Nothing in sway changes, and the pad keeps its route (the bar's window menu).
+  - **Where the windows are** comes from sway's own tree over the IPC client the bar already uses
+    (`SwayFrames.parse`, `:host-bridge`, pure): each output's current workspace, each visible view's `rect` (which
+    sway moves down by the title bar) and the title bar right above it from `deco_rect`'s height, its container id,
+    its border width and whether it floats, bottom to top (tiled, then floating in stacking order). A border of
+    `pixel`, `none` or `csd`, a tab of a tabbed or stacked container, and any output showing a fullscreen
+    container have no buttons and no band. `DesktopWindows.frames` reads it off the main thread while a surface
+    shows: again on every window, workspace and output event sway sends (IPC SUBSCRIBE), after every press on the
+    surface is let go, after droidtop's own window actions, and every 2 s for what sway sends no event for (a window
+    dragged or resized by the pointer).
+  - **Geometry** (`WindowControls.layout`, pure): the output's box in the tree is the whole surface, so a layout
+    point maps by its offset into that box times the surface's view pixels per logical pixel on each axis. That
+    takes in Desktop scale, the render resolution (DesktopScale) and a second output's place in the layout (#908)
+    alike, and a rotation or a new scale is an output event that reads the tree again.
+  - **Buttons**: drawn a square of the title bar's height in droidtop's look (`MenuTokens.Card`, `RowShape`), each in
+    a slot a finger wide (`ShellWindow.windowControlTarget`, a finger's size always: only a finger or a mouse presses
+    them) and pressed over a finger's height centred on the title bar. A title bar too narrow for three and a slot of
+    title to drag by gets close alone, a narrower one none; a button under a window above, or off the surface, is not
+    drawn. They are `DesktopWindows.close`, `minimize` and `toggleMaximize` addressed by the container id the tree
+    gives (`[con_id=N] kill`, `move scratchpad`, and the bar's own Maximize and Restore size); the bar keeps finding
+    its windows by app id and title (`findWindow`). A minimise or maximise is kept against the bar's toplevel when one
+    toplevel has that app id and title; with two alike it is still done, the bar just does not grey it or offer
+    Restore size.
+  - **The band** is a window's border inside it and the rest of a finger's width outside it (at least half of one),
+    on every edge, a press near a corner along either edge being the corner; a title bar's top has no band inside,
+    since it moves the window. Who takes a press: a drawn button; then from the top down each floating window on its
+    own and the tiled ones together (button press areas, then a window the press is inside, whose content past the
+    border stays the program's, then the band outside). So a band reaches over what is below a window, never over a
+    window beside or above it. A press in the band starts sway's own resize the way sway's config gives it,
+    `floating_modifier $mod normal`, which droidtop's sway config now says explicitly (`DesktopPanel.swayConfig`):
+    `DesktopInputRouter` presses Super, puts the pointer just inside the window, presses the right button, moves the
+    pointer with the finger from there, and lets both go. sway then resizes floating and tiled windows alike, from
+    the corner of the quarter the pointer is in (sway/input/seatop_default.c), which is sway's rule, not droidtop's.
+    Nothing of a press on a button or in the band reaches the compositor as a click; every other press is sent
+    exactly as before. Touch and a mouse's primary button take it; a relative mouse and the pad's stick pointer do
+    not (they have no position on the surface).
+  - **labwc** draws its own decorations with buttons, so there `frames` is always empty: nothing is drawn and there
+    is no band. Sway's own bar (the person's own config) gets the buttons; its band works while that config keeps
+    the stock `floating_modifier $mod normal` with `$mod` as Super.
 - **Restart, Stop and Lock** (Droidtop/tracker#687, the coordinator's Desktop review, decided 2026-10-29).
   Start's System section ends with "Restart desktop" and "Stop desktop" while a session runs, and "Lock
   screen" always. Before, a setting that applies when the desktop next starts (scale, resolution, panel, Tile

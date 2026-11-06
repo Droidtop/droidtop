@@ -54,7 +54,11 @@ class CompositorProvisioningTest {
         // Windows float unless the person tiles them (#686).
         assertTrue("for_window [all] floating enable" in lines)
         assertTrue("default_floating_border normal 8" in lines)
-        assertFalse(DesktopPanel.swayConfig(tileWindows = true).contains("floating"))
+        val tiled = DesktopPanel.swayConfig(tileWindows = true).lines()
+        assertFalse(tiled.any { it.startsWith("for_window") || it.startsWith("default_floating_border") })
+        // Super and the right button resize any window, floating or tiled: droidtop's resize band sends that (#910).
+        assertTrue("floating_modifier \$mod normal" in lines)
+        assertTrue("floating_modifier \$mod normal" in tiled)
         // One bar by default: droidtop's, with no Waybar started (#683).
         assertEquals(DesktopPanel.NONE, DesktopPanel.fromId(null))
         // "swaybar_command" holds the letters "waybar", so the check is for Waybar's own start line.

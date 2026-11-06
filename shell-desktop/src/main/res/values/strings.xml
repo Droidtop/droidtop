@@ -31,5 +31,7 @@
     <string name="desktop_snap_left">Snap left</string>
     <string name="desktop_snap_right">Snap right</string>
     <string name="desktop_restore_size">Restore size</string>
+    <!-- A title-bar button droidtop draws on a Linux window could not reach it (Droidtop/tracker#910). -->
+    <string name="desktop_window_action_failed">Couldn\'t reach this window</string>
     <string name="desktop_tray_vpn">VPN</string>
 </resources>
