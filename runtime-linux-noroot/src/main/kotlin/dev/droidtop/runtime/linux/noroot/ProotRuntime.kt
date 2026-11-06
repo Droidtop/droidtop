@@ -765,7 +765,7 @@ class ProotRuntime(
         ids: String? = null,
         x11Display: Int? = null,
     ): Process {
-        val (argv, hostEnvironment) = sessionCommand(containerId, sessionId, guestCommand, env, ids)
+        val (argv, hostEnvironment) = sessionCommand(containerId, sessionId, guestCommand, env, ids, x11Display)
         val builder = ProcessBuilder(argv).directory(baseDir).redirectErrorStream(mergeStderr)
         builder.environment().putAll(hostEnvironment)
         return builder.start()
@@ -782,6 +782,7 @@ class ProotRuntime(
         guestCommand: List<String>,
         env: Map<String, String>,
         ids: String?,
+        x11Display: Int? = null,
     ): Pair<List<String>, Map<String, String>> {
         val rootfs = rootfsOf(containerId)
         val marker = ProotProcesses.sessionEnvironment(containerId, sessionId)
