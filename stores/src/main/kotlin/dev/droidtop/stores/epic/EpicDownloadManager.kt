@@ -5,6 +5,8 @@ import android.util.Log
 import dev.droidtop.stores.data.DownloadInfo
 import dev.droidtop.stores.util.Marker
 import dev.droidtop.stores.util.CdnRankingUtils
+import dev.droidtop.stores.util.ChunkRetry
+import dev.droidtop.runtime.util.sizeOnDisk
 import dev.droidtop.stores.util.MarkerUtils
 import dev.droidtop.stores.data.EpicGame
 import dev.droidtop.stores.util.StreamingAssembly
@@ -84,8 +86,6 @@ internal class EpicDownloadManager(
         private const val USER_AGENT = "UELauncher/11.0.1-14907503+++Portal+Release-Live Windows/10.0.19041.1.256.64bit"
 
         private const val CHUNK_BUFFER_SIZE = 1024 * 1024 // 1MB buffer for decompression
-        private const val MAX_CHUNK_RETRIES = 3 // Maximum retries per chunk
-        private const val RETRY_DELAY_MS = 1000L // Initial retry delay in milliseconds
         private const val STREAM_PROGRESS_TIME_INTERVAL_MS = 200L
 
         /**
@@ -518,9 +518,7 @@ internal class EpicDownloadManager(
 
             chunkCacheDir.deleteRecursively()
 
-            // Log final directory structure
             Timber.tag("Epic").i("Download completed successfully for ${game.title}")
-            logDirectoryStructure(installDir)
 
             // Download DLCs using pre-fetched manifest data
             if (dlcManifestData.isNotEmpty()) {
@@ -697,29 +695,11 @@ internal class EpicDownloadManager(
         downloadInfo: DownloadInfo,
         areaPrefix: String,
     ): Result<File> = withContext(Dispatchers.IO) {
-        var lastException: Exception? = null
-
-        repeat(MAX_CHUNK_RETRIES) { attempt ->
-            val result = downloadChunk(chunk, chunkCacheDir, chunkDir, cdnUrls, downloadInfo, areaPrefix)
-
-            if (result.isSuccess) {
-                if (attempt > 0) {
-                    Timber.tag("Epic").i("Chunk ${chunk.guidStr} downloaded successfully after ${attempt + 1} attempts")
-                }
-                return@withContext result
-            }
-
-            lastException = result.exceptionOrNull() as? Exception
-
-            if (attempt < MAX_CHUNK_RETRIES - 1) {
-                val delay = RETRY_DELAY_MS * (1 shl attempt) // Exponential backoff: 1s, 2s, 4s
-                Timber.tag("Epic").w("Chunk ${chunk.guidStr} download failed (attempt ${attempt + 1}/$MAX_CHUNK_RETRIES): ${lastException?.message}. Retrying in ${delay}ms...")
-                kotlinx.coroutines.delay(delay)
-            }
+        // downloadChunk already tries each CDN in its ranked order, and the engine retries each transfer: one more
+        // try here is for a chunk that arrived damaged or links that went stale ([ChunkRetry]).
+        ChunkRetry.run(tag = "Epic", what = "Chunk ${chunk.guidStr}", isActive = { downloadInfo.isActive() }) {
+            downloadChunk(chunk, chunkCacheDir, chunkDir, cdnUrls, downloadInfo, areaPrefix)
         }
-
-        Timber.tag("Epic").e(lastException, "Failed to download chunk ${chunk.guidStr} after $MAX_CHUNK_RETRIES attempts")
-        Result.failure(lastException ?: Exception("Failed to download chunk ${chunk.guidStr}"))
     }
 
     private suspend fun rankCdnUrlsByProbe(cdnUrls: List<EpicManager.CdnUrl>): List<EpicManager.CdnUrl> {
@@ -1085,7 +1065,7 @@ internal class EpicDownloadManager(
                 }
 
                 // Calculate storage usage stats (only scan cache dir, not entire install dir)
-                val chunkCacheSize = calculateDirectorySize(chunkCacheDir)
+                val chunkCacheSize = chunkCacheDir.sizeOnDisk()
 
                 Timber.tag("EPIC").d(
                     """Waiting for $currentPendingChunks pending chunks
@@ -1247,98 +1227,5 @@ internal class EpicDownloadManager(
             Timber.tag("Epic").e(e, "Failed to assemble file ${fileManifest.filename}")
             Result.failure(e)
         }
-    }
-
-    /**
-     * Log the directory structure of the installed game
-     */
-    private fun logDirectoryStructure(dir: File, prefix: String = "", isRoot: Boolean = true) {
-        if (!dir.exists()) {
-            Timber.tag("Epic").w("Directory does not exist: ${dir.absolutePath}")
-            return
-        }
-
-        if (isRoot) {
-            Timber.tag("Epic").i("=== Installation Directory Structure ===")
-            Timber.tag("Epic").i("Root: ${dir.absolutePath}")
-        }
-
-        val files = dir.listFiles()?.sortedWith(compareBy({ !it.isDirectory }, { it.name })) ?: emptyList()
-
-        files.forEachIndexed { index, file ->
-            val isLast = index == files.lastIndex
-            val connector = if (isLast) "└── " else "├── "
-            val fileInfo = if (file.isDirectory) {
-                "${file.name}/"
-            } else {
-                val size = formatFileSize(file.length())
-                "${file.name} ($size)"
-            }
-
-            Timber.tag("Epic").i("$prefix$connector$fileInfo")
-
-            // Recursively log subdirectories
-            if (file.isDirectory) {
-                val newPrefix = prefix + if (isLast) "    " else "│   "
-                logDirectoryStructure(file, newPrefix, isRoot = false)
-            }
-        }
-
-        if (isRoot) {
-            val totalSize = calculateDirectorySize(dir)
-            val fileCount = countFiles(dir)
-            Timber.tag("Epic").i("=== Summary ===")
-            Timber.tag("Epic").i("Total files: $fileCount")
-            Timber.tag("Epic").i("Total size: ${formatFileSize(totalSize)}")
-            Timber.tag("Epic").i("==================")
-        }
-    }
-
-    /**
-     * Format file size in human-readable format
-     */
-    private fun formatFileSize(bytes: Long): String {
-        return when {
-            bytes < 1024 -> "$bytes B"
-            bytes < 1024 * 1024 -> "%.2f KB".format(bytes / 1024.0)
-            bytes < 1024 * 1024 * 1024 -> "%.2f MB".format(bytes / (1024.0 * 1024.0))
-            else -> "%.2f GB".format(bytes / (1024.0 * 1024.0 * 1024.0))
-        }
-    }
-
-    /**
-     * Count total number of files in a directory recursively
-     */
-    private fun countFiles(dir: File): Int {
-        if (!dir.exists()) return 0
-        if (dir.isFile) return 1
-        return dir.listFiles()?.sumOf { countFiles(it) } ?: 0
-    }
-
-    /**
-     * Total size under [directory]. Symlinks are skipped to avoid double-counting.
-     */
-    private fun calculateDirectorySize(directory: File): Long {
-        var size = 0L
-        try {
-            if (!directory.exists() || !directory.isDirectory) {
-                return 0L
-            }
-
-            val files = directory.listFiles() ?: return 0L
-            for (file in files) {
-                if (java.nio.file.Files.isSymbolicLink(file.toPath())) {
-                    continue
-                }
-                size += if (file.isDirectory) {
-                    calculateDirectorySize(file)
-                } else {
-                    file.length()
-                }
-            }
-        } catch (e: Exception) {
-            Timber.tag("Epic").w(e, "Error calculating directory size for ${directory.name}")
-        }
-        return size
     }
 }

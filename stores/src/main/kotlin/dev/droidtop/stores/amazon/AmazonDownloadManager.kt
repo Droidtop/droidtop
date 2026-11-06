@@ -5,17 +5,21 @@ import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.stores.data.AmazonGame
 import dev.droidtop.stores.data.DownloadInfo
 import dev.droidtop.stores.util.Marker
+import dev.droidtop.stores.util.ChunkRetry
 import dev.droidtop.stores.util.MarkerUtils
+import dev.droidtop.stores.util.StoreHttp
 import java.io.File
 import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import timber.log.Timber
 
@@ -24,16 +28,8 @@ internal class AmazonDownloadManager(
     private val amazonManager: AmazonManager,
 ) {
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
-        .connectionPool(okhttp3.ConnectionPool(16, 5, TimeUnit.MINUTES))
-        .build()
-
     companion object {
         private const val MAX_PARALLEL_DOWNLOADS = 6
-        private const val MAX_RETRIES = 3
-        private const val RETRY_DELAY_MS = 1000L
         private const val TAG = "Amazon"
 
         /**
@@ -118,43 +114,41 @@ internal class AmazonDownloadManager(
             downloadInfo.setProgress(0f)
             downloadInfo.emitProgressChange()
 
-            // ── 5. Download files in parallel batches ────────────────────────
+            // ── 5. Download files, six at a time ─────────────────────────────
+            // A file starts as soon as any of the six before it ends: one slow file never holds back the rest.
             val installDir = File(installPath)
             val baseUrl = spec.downloadUrl
-            var completedFiles = 0
+            val completedFiles = AtomicInteger(0)
             val totalFiles = files.size
-
-            for (batch in files.chunked(MAX_PARALLEL_DOWNLOADS)) {
-                if (!downloadInfo.isActive()) {
-                    Timber.tag(TAG).w("Download cancelled by user")
-                    throw CancellationException("Download cancelled")
-                }
-
-                val results = batch.map { file ->
+            val slots = Semaphore(MAX_PARALLEL_DOWNLOADS)
+            // After one file fails the install has failed: the files still waiting are not started.
+            val firstError = AtomicReference<Throwable?>(null)
+            coroutineScope {
+                files.map { file ->
                     async {
-                        downloadFileWithRetry(
-                            context = context,
-                            productId = productId,
-                            baseUrl = baseUrl,
-                            file = file,
-                            installDir = installDir,
-                            downloadInfo = downloadInfo,
-                        )
+                        slots.withPermit {
+                            if (!downloadInfo.isActive()) throw CancellationException("Download cancelled")
+                            if (firstError.get() != null) return@withPermit
+                            downloadFileWithRetry(
+                                context = context,
+                                productId = productId,
+                                baseUrl = baseUrl,
+                                file = file,
+                                installDir = installDir,
+                                downloadInfo = downloadInfo,
+                            ).onSuccess {
+                                downloadInfo.updateStatusMessage("Downloading (${completedFiles.incrementAndGet()}/$totalFiles files)…")
+                                downloadInfo.emitProgressChange()
+                                downloadInfo.persistProgressSnapshot()
+                            }.onFailure { firstError.compareAndSet(null, it) }
+                            Unit
+                        }
                     }
                 }.awaitAll()
-
-                val failure = results.firstOrNull { it.isFailure }
-                if (failure != null) {
-                    MarkerUtils.removeMarker(installPath, Marker.DOWNLOAD_IN_PROGRESS_MARKER)
-                    return@withContext Result.failure(
-                        failure.exceptionOrNull() ?: Exception("File download failed")
-                    )
-                }
-
-                completedFiles += batch.size
-                downloadInfo.updateStatusMessage("Downloading ($completedFiles/$totalFiles files)…")
-                downloadInfo.emitProgressChange()
-                downloadInfo.persistProgressSnapshot()
+            }
+            firstError.get()?.let { error ->
+                MarkerUtils.removeMarker(installPath, Marker.DOWNLOAD_IN_PROGRESS_MARKER)
+                return@withContext Result.failure(error)
             }
 
             // ── 6. Cache manifest ────────────────────────────────────────
@@ -204,6 +198,7 @@ internal class AmazonDownloadManager(
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
+    /** One file, once more if it arrived damaged ([ChunkRetry]: the engine has already retried the transfer). */
     private suspend fun downloadFileWithRetry(
         context: Context,
         productId: String,
@@ -211,29 +206,8 @@ internal class AmazonDownloadManager(
         file: AmazonManifest.ManifestFile,
         installDir: File,
         downloadInfo: DownloadInfo,
-    ): Result<Unit> {
-        var lastException: Exception? = null
-        repeat(MAX_RETRIES) { attempt ->
-            if (!downloadInfo.isActive()) {
-                throw CancellationException("Download cancelled")
-            }
-
-            val result = downloadFile(context, productId, baseUrl, file, installDir, downloadInfo)
-            if (result.isSuccess) return result
-
-            lastException = result.exceptionOrNull() as? Exception
-            if (attempt < MAX_RETRIES - 1) {
-                val backoffMs = RETRY_DELAY_MS * (1 shl attempt) // 1s, 2s, 4s
-                Timber.tag(TAG).w(
-                    "File ${file.unixPath} failed (attempt ${attempt + 1}/$MAX_RETRIES): " +
-                        "${lastException?.message}. Retrying in ${backoffMs}ms…"
-                )
-                delay(backoffMs)
-            }
-        }
-        return Result.failure(
-            lastException ?: Exception("Failed to download ${file.unixPath} after $MAX_RETRIES attempts")
-        )
+    ): Result<Unit> = ChunkRetry.run(tag = TAG, what = "File ${file.unixPath}", isActive = { downloadInfo.isActive() }) {
+        downloadFile(context, productId, baseUrl, file, installDir, downloadInfo)
     }
 
     /**
@@ -336,10 +310,10 @@ internal class AmazonDownloadManager(
         }
     }
 
-    /** Download raw bytes from [url], returning null on error. */
+    /** Download raw bytes from [url] on droidtop's shared store client, returning null on error. */
     private fun fetchBytes(url: String): ByteArray? = try {
         val request = Request.Builder().url(url).build()
-        okHttpClient.newCall(request).execute().use { response ->
+        StoreHttp.http.newCall(request).execute().use { response ->
             if (!response.isSuccessful) null else response.body.bytes()
         }
     } catch (e: Exception) {
