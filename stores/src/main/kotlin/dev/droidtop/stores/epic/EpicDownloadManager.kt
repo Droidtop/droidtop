@@ -5,6 +5,7 @@ import android.util.Log
 import dev.droidtop.stores.data.DownloadInfo
 import dev.droidtop.stores.util.Marker
 import dev.droidtop.stores.util.CdnRankingUtils
+import dev.droidtop.stores.util.ChunkAssembler
 import dev.droidtop.stores.util.ChunkRetry
 import dev.droidtop.runtime.util.sizeOnDisk
 import dev.droidtop.stores.util.MarkerUtils
@@ -839,7 +840,6 @@ internal class EpicDownloadManager(
 
             val totalChunks = chunkQueue.size
             val totalFiles = files.size
-            val chunkUsageCounts = ConcurrentHashMap<String, AtomicInteger>()
             val downloadedChunkIds = newKeySet<String>()
             val pendingChunks = AtomicInteger(chunkQueue.size)
 
@@ -856,58 +856,26 @@ internal class EpicDownloadManager(
                 return@withContext Result.failure(IOException(it))
             }
 
-            chunkQueue.forEach { chunkInfo ->
-                chunkUsageCounts[chunkInfo.guidStr] = AtomicInteger(
-                    files.sumOf { file -> file.chunkParts.count { chunk -> chunk.guidStr == chunkInfo.guidStr } }
-                )
-            }
+            // Where each chunk goes, built once; a chunk written everywhere it is used leaves the cache. Each position
+            // written counts, as before: a position that failed is logged, not retried ([ChunkAssembler]).
+            val assembler = ChunkAssembler(
+                files = files,
+                chunksOf = { it.chunkParts },
+                chunkId = { it.guidStr },
+                fileKey = { it.filename },
+                allOrNothing = false,
+                write = { file, chunk, _ ->
+                    assembleFileParallel(file, chunk, chunkCacheDir, installDir)
+                        .onFailure { Timber.tag("EPIC").d(it.message ?: "Failed to assemble ${file.filename}") }
+                },
+                freeChunk = { id -> File(chunkCacheDir, id).delete() },
+            )
 
             val networkChunkFlow = MutableSharedFlow<dev.droidtop.stores.epic.manifest.ChunkInfo>(extraBufferCapacity = Int.MAX_VALUE)
             val assembleFlow =
                 MutableSharedFlow<Pair<dev.droidtop.stores.epic.manifest.ChunkInfo, Result<File>>>(extraBufferCapacity = Int.MAX_VALUE)
 
             var assemblyFailure: Throwable? = null
-
-            // Assemble every file whose chunks are all present, as soon as it becomes ready.
-            suspend fun assembleReady(finishChunk: dev.droidtop.stores.epic.manifest.ChunkInfo): Result<Unit> {
-                val guidStr = finishChunk.guidStr
-                if (!downloadInfo.isActive()) {
-                    return Result.failure(Exception("Download cancelled"))
-                }
-
-                // 1. Find all files that contain this chunk
-                val matchedFiles = files.filter { file ->
-                    file.chunkParts.any { chunk -> chunk.guidStr == guidStr }
-                }
-
-                // 2. For each file found, try to assemble if all chunks are ready
-                var assemblySuccessCount = 0
-
-                matchedFiles.forEach { file ->
-                    file.chunkParts.withIndex()
-                        .filter { (_, chunk) -> chunk.guidStr == guidStr }
-                        .forEach { (chunkIndex, chunk) ->
-                            val result = assembleFileParallel(file, chunk, chunkCacheDir, installDir)
-                            if (result.isSuccess) {
-                                // 3. If assembly is successful and all chunks in downloadedChunkIds, increment file counter
-                                assemblySuccessCount++
-                            } else {
-                                Timber.tag("EPIC").d(result.exceptionOrNull()?.message ?: "Failed to assemble ${file.filename}")
-                            }
-                        }
-                }
-
-                // 4. Decrement usage count only when assembly is successful
-                if (assemblySuccessCount > 0) {
-                    val usageCount = chunkUsageCounts[guidStr]?.addAndGet(-assemblySuccessCount)
-                    if (usageCount != null && usageCount <= 0) {
-                        val cacheFile = File(chunkCacheDir, guidStr)
-                        cacheFile.delete()
-                    }
-                }
-
-                return Result.success(Unit)
-            }
 
             val networkChunkJob: Job = scope.launch {
                 networkChunkFlow
@@ -947,7 +915,7 @@ internal class EpicDownloadManager(
                                 // Successful download - add to completed set and try assembly
                                 downloadedChunkIds.add(chunk.guidStr)
 
-                                val assembleResult = assembleReady(chunk)
+                                val assembleResult = assembler.place(chunk.guidStr) { downloadInfo.isActive() }
                                 if (assembleResult.isFailure) {
                                     assemblyFailure = assembleResult.exceptionOrNull()
                                         ?: Exception("Failed to assemble ready files")
@@ -1005,7 +973,7 @@ internal class EpicDownloadManager(
                 // Sort files by total chunk usage (lowest first) - files with less-shared chunks complete faster and free cache sooner
                 val sortedFiles = files.sortedBy { file ->
                     file.chunkParts.sumOf { chunk ->
-                        chunkUsageCounts[chunk.guidStr]?.get() ?: 0
+                        assembler.usesOf(chunk.guidStr)
                     }
                 }
                 Timber.tag("EPIC").d("Processing ${sortedFiles.size} files sorted by chunk usage (least shared first)")
