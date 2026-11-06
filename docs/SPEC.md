@@ -3329,7 +3329,7 @@ the `ContainerRuntime` interface that already exists (§3):
   already does ... Measure off the main thread and cache per container
   until it changes ... Reopening the list must not re-measure
   everything. Show 'Measuring…' until known." The size is the page's own
-  `ContainerRuntime.diskUsageBytes` (`ContainerDiskUsage`), run on the IO
+  `ContainerRuntime.diskUsage` (`ContainerDiskUsage`), run on the IO
   scope one container at a time (`ContainerSizes` in :app) and kept per
   container (`ContainerSizeCache`); the row says "Measuring…" until it is
   known, and the screen is read again as each one arrives
@@ -3340,13 +3340,23 @@ the `ContainerRuntime` interface that already exists (§3):
   again; "Update its software", Terminal's first install, a restore, a
   copy, Recreate and Delete forget it, and a walk begun before one of
   those is thrown away. Opening the container's page measures it as
-  always and the list keeps that answer. Where droidtop cannot read the
-  whole tree (droidspaces' is root's, and folders such as `/root` are
-  closed to the app) the walk fails rather than return a short total, so
-  the row shows no size and "Storage used" says Unknown: no size rather
-  than a wrong one, and no root route is added for it (non-root first).
-  Settings search reads Create, Images and the image cache rows
-  (`indexGroups`), not the container rows, so indexing measures nothing.
+  always and the list keeps that answer. How it is measured, per backend
+  (coordinator, after review: "'Storage used' must not get worse
+  there"):
+  - **droidspaces**, whose tree is root's (folders such as `/root` are
+    closed to the app), measures as root through the root shell its
+    `exec` and `usage` already use: `du -sxk` of the rootfs on the
+    device's side, whether or not the container runs
+    (`DroidSpacesRuntime.diskUsage`, read by `ContainerDiskUsage.fromDu`).
+    A du that met errors gives a floor. Without the root shell it fails
+    with a sentence: the row shows no size, and "Storage used" says why
+    on its line, as "Memory and processor" does.
+  - **proot** keeps the app's own walk. A folder it cannot list is left
+    out and the size is a floor, said as one: "at least 1.2 GB" on the row
+    and on the page, whose line says some folders could not be read.
+  Settings search reads every row of the list and of each container's
+  page as before, through `indexGroups` builders that measure nothing
+  (no size, no memory and processor reading, no image store walk).
   A container's page: the primary action (Start the desktop, which
   opens Desktop; Stop the desktop, which ends the session; Start or Stop
   for a sibling), Terminal (and Terminal here while the desktop is up, "A terminal on
@@ -3809,10 +3819,11 @@ the `ContainerRuntime` interface that already exists (§3):
   and re-create from the SAME recorded image reference, name and role,
   the PRIMARY's provisioning plan carried over -- each backend implements
   it itself, since where the plan lives differs), `diskUsageBytes` (a
-  real recursive walk of the rootfs tree, `ContainerDiskUsage`, which
-  fails rather than skip a folder it cannot read, since 2026-11-06,
-  Droidtop/tracker#911, and is also the list's size per row; shared by
-  both backends as a default method), `sockets`/`setSockets`
+  real recursive walk of the rootfs tree, `ContainerDiskUsage`, shared by
+  both backends as a default method; since 2026-11-06,
+  Droidtop/tracker#911, it is `diskUsage`, also the list's size per row,
+  a floor when a folder cannot be read, and droidspaces measures as root
+  with `du` instead, under "Its size in the list" above), `sockets`/`setSockets`
   (`ContainerSockets(waylandShared, audioShared)`) and
   `mounts`/`setMounts` (`EnvironmentMounts`: the home, below, and the
   `ExtraMount` folders, each a host folder bound at its own path under
