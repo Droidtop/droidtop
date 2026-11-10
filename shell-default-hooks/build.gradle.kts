@@ -28,6 +28,11 @@ dependencies {
     implementation(project(":shell-default"))
     implementation(project(":runtime-common"))
     implementation(project(":ui-shared"))
+    // The moved launcher code uses these directly (icon BitmapInfo and ComponentKey, PluginListener as a supertype of
+    // Launcher, CustomSeekBarPreference's base); :shell-default declares them as implementation, so they are not exposed.
+    implementation(project(":IconLoader"))
+    implementation(project(":systemUIPluginCore"))
+    implementation(project(":SettingsLib-SliderPreference"))
     // The droidtop screens and services of the Standard launcher that live here (Droidtop/tracker#921 slice 9):
     // catalog settings drawn as preferences, the taskbar, Clear all apps, the Nova and Apex import.
     implementation(libs.androidx.core.ktx)
