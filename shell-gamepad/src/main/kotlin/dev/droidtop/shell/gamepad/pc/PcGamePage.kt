@@ -1062,7 +1062,7 @@ private fun pageRows(
         entry.pcInfo?.marker?.let { add(PageFact("Store id", it.key, subtitle = words(R.string.gamepad_from_the_store_s_files_in), tab = PageTab.DETAILS)) }
         entry.pcInfo?.installedVersion?.let { add(PageFact("Installed build", it, tab = PageTab.DETAILS)) }
         // Where it lives as a person names it; the whole path is the tooltip.
-        folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it, tab = PageTab.DETAILS)) }
+        folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it, tab = PageTab.DETAILS, path = true)) }
         shownVersion?.let { (version, from) -> add(PageFact("Version from", from.words, subtitle = version, tab = PageTab.DETAILS)) }
     }
     if (more.isNotEmpty()) {

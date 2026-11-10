@@ -443,6 +443,7 @@ internal fun GamePageFrame(
                                 subtitle = fact.subtitle,
                                 value = fact.value,
                                 switchOn = fact.on,
+                                valuePath = fact.path,
                                 statusMark = fact.mark,
                                 chevron = fact.onActivate != null,
                                 selected = zone == PageZone.CONTENT && row == index,
@@ -592,6 +593,8 @@ internal data class PageFact(
     val onOptions: (() -> Unit)? = null,
     /** An on/off row's state, drawn as a switch (show, then say: Droidtop/tracker#738); null for any other row. */
     val on: Boolean? = null,
+    /** The value is a place: one line, cut in the middle so the folder at its end shows (Droidtop/tracker#672). */
+    val path: Boolean = false,
     /** A state drawn as its glyph beside the title (synced, offline, working); null for none. */
     val mark: dev.droidtop.library.settings.StatusMark? = null,
 )
