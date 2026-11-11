@@ -63,7 +63,14 @@ class UpdateRelaunchReceiver : BroadcastReceiver() {
             return
         }
         Log.i(UpdateNow.TAG, "droidtop was updated: opening Home again, as a Home press would")
-        runCatching { application.startActivity(UpdateRelaunch.homeIntent(application)) }
-            .onFailure { Log.w(UpdateNow.TAG, "could not open Home after the update", it) }
+        // droidtop's Home activity answers only while droidtop is the Home app (or its Home entry is on). Where it is
+        // not (the BlueStacks rig, 3257: "No Activity found to handle Intent { act=MAIN cat=[HOME] pkg=dev.droidtop.app }"),
+        // the update left the person on another launcher; droidtop opens as from its own icon instead.
+        val opened = runCatching { application.startActivity(UpdateRelaunch.homeIntent(application)) }
+            .recoverCatching { notHome ->
+                val launch = application.packageManager.getLaunchIntentForPackage(application.packageName) ?: throw notHome
+                application.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        opened.onFailure { Log.w(UpdateNow.TAG, "could not open droidtop after the update", it) }
     }
 }
