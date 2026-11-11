@@ -4,6 +4,7 @@ import android.util.SparseArray;
 
 import com.winlator.core.Callback;
 import com.winlator.renderer.Texture;
+import com.winlator.renderer.XServerRenderer;
 import com.winlator.xenvironment.components.VortekRendererComponent;
 
 import java.util.Objects;
@@ -35,6 +36,7 @@ public class DrawableManager extends XResourceManager implements XResourceManage
 
     public void removeDrawable(int id) {
         Drawable drawable = drawables.get(id);
+        if (drawable == null) return;
 
         final Texture texture = drawable.getTexture();
 //        if (texture != null) {
@@ -42,7 +44,10 @@ public class DrawableManager extends XResourceManager implements XResourceManage
 //            Objects.requireNonNull(texture);
 //            xServerView.queueEvent(() -> VortekRendererComponent.destroyTexture(texture));
 //        }
-        if (texture != null) xServer.getRenderer().getRendererView().queueEvent(texture::destroy);
+        // A session with no renderer (the hidden one a redistributable installs in, Droidtop/tracker#899) never
+        // uploaded a texture, so there is nothing on a GL thread to free; queueing on it crashed droidtop.
+        XServerRenderer renderer = xServer.getRenderer();
+        if (texture != null && renderer != null) renderer.getRendererView().queueEvent(texture::destroy);
 
         Callback<Drawable> onDestroyListener = drawable.getOnDestroyListener();
         if (onDestroyListener != null) onDestroyListener.call(drawable);
