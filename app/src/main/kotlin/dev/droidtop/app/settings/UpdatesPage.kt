@@ -347,9 +347,11 @@ object UpdatesPage {
         val checked = UpdateChecks.lastCheck(context)
         val lastLine = checked?.let { "Last checked " + ValueFormat.ago(System.currentTimeMillis(), it).replaceFirstChar { c -> c.lowercase() } }
         val jobs = DownloadJobs.updateJobs()
-        // What Update all starts: every row that is not already under way.
+        // What Update all starts: every row that is not already under way, except droidtop's own. Installing droidtop
+        // replaces it and ends every other update mid-way, and on the Plugins tab it updated droidtop although no row
+        // there named it (Droidtop/tracker#506); droidtop's row keeps its own Update.
         val installable = updates.mapNotNull { update ->
-            update.install?.takeIf { stateOf(update, jobs).first.let { it == State.AVAILABLE || it == State.FAILED } }
+            update.install?.takeIf { update.kind != Kind.DROIDTOP && stateOf(update, jobs).first.let { it == State.AVAILABLE || it == State.FAILED } }
         }
         val checkingRows = unread.associate { section ->
             section.kind to ActionItem(id = "updates_checking_${section.name.lowercase()}", title = section.checking, progress = -1f)
@@ -432,6 +434,7 @@ object UpdatesPage {
                     // already started: the button says so, never "Nothing to update" beside rows (Droidtop/tracker#837).
                     disabledReason = when {
                         updates.isEmpty() -> "Nothing to update"
+                        updates.all { it.kind == Kind.DROIDTOP } -> "droidtop updates from its own row"
                         updates.any { it.install != null } -> "Every update is under way"
                         else -> "Each one opens its own page"
                     },
