@@ -59,6 +59,32 @@ object ApkInstaller {
         runCatching { outcomes[sessionId]?.get(timeoutMs, TimeUnit.MILLISECONDS) }.getOrNull()
 
     /**
+     * The APK's own baseline profile as a dex metadata file (`base.dm`: a zip whose `primary.prof` and `primary.profm`
+     * are the APK's `assets/dexopt/baseline.prof` and `.profm`), or null when the APK carries none. Given with the APK,
+     * Android compiles the profiled code at install, as it does for an app from a store that sends one. Without it a
+     * sideloaded or self-updated droidtop ran at `[status=verify]` until idle maintenance, which is what the console's
+     * 2-4 s per key press (Droidtop/tracker#925) and a 27 s ANR on BlueStacks right after updating to 3257 came from.
+     */
+    internal fun dexMetadata(apk: File): ByteArray? = runCatching {
+        java.util.zip.ZipFile(apk).use { zip ->
+            val prof = zip.getEntry("assets/dexopt/baseline.prof") ?: return@use null
+            val profm = zip.getEntry("assets/dexopt/baseline.profm")
+            val out = java.io.ByteArrayOutputStream()
+            java.util.zip.ZipOutputStream(out).use { dm ->
+                dm.putNextEntry(java.util.zip.ZipEntry("primary.prof"))
+                zip.getInputStream(prof).use { it.copyTo(dm) }
+                dm.closeEntry()
+                if (profm != null) {
+                    dm.putNextEntry(java.util.zip.ZipEntry("primary.profm"))
+                    zip.getInputStream(profm).use { it.copyTo(dm) }
+                    dm.closeEntry()
+                }
+            }
+            out.toByteArray()
+        }
+    }.getOrNull()
+
+    /**
      * Writes [apk] into a new session for [packageName] and commits it; returns the session. Blocking: a worker
      * thread only. [silent] asks Android to skip its confirmation where it allows that; [requestOwnership] asks to be
      * the app's update owner (Android 14+). Android checks the signing key itself: an APK signed by another key than
@@ -89,6 +115,15 @@ object ApkInstaller {
                         input.copyTo(output)
                         session.fsync(output)
                     }
+                }
+                val dm = dexMetadata(apk)
+                if (dm != null) {
+                    session.openWrite("base.dm", 0, dm.size.toLong()).use { output ->
+                        output.write(dm)
+                        session.fsync(output)
+                    }
+                } else {
+                    Log.i(TAG, "${apk.name} carries no baseline profile: installed without one")
                 }
                 val intent = Intent(context, ApkInstallStatusReceiver::class.java).setPackage(context.packageName)
                 val flags = PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
