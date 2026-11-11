@@ -321,9 +321,9 @@ object WineOptions {
 
     private fun prefixLabel(container: Container, ownId: String): String {
         val name = container.name?.takeIf { it.isNotBlank() } ?: container.id
-        return when (container.id) {
-            DroidtopPcGameRuntime.CONTAINER_ID -> "Shared"
-            ownId -> "$name (this game's own)"
+        return when {
+            PcContainers.isShared(container) -> "Shared"
+            container.id == ownId -> "$name (this game's own)"
             else -> name
         } + " · " + container.wineVersion.orEmpty()
     }
@@ -341,7 +341,7 @@ object WineOptions {
      */
     private fun grantRows(context: Context, entryId: String?): List<WineOptionRow> {
         val prefix = runCatching {
-            if (entryId == null) ContainerManager(context).getContainerById(DroidtopPcGameRuntime.CONTAINER_ID) else PcContainers.forGame(context, entryId)
+            PcContainers.forGame(context, entryId)
         }.getOrNull()
         val own = entryId?.let { WineGameOptionsPrefs.get(context, it) }.orEmpty()
         return GRANTS.map { (rowId, key, title) ->
@@ -489,7 +489,7 @@ object WineOptions {
                 }
                 GRANTS.firstOrNull { it.first == rowId }?.let { (_, key, _) ->
                     if (entryId == null) {
-                        ContainerManager(app).getContainerById(DroidtopPcGameRuntime.CONTAINER_ID)?.let { shared ->
+                        PcContainers.forGame(app, null)?.let { shared ->
                             shared.putExtra(key, if (value == GRANT_ALLOW) "1" else null)
                             shared.saveData()
                         }

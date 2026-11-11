@@ -92,9 +92,12 @@ class DroidtopPcGameRuntime(
             return X86_64GuestLibs.isInstalled(context) && WineOptionPlan.runsOnX86Host(shared.wineVersion.orEmpty())
         }
 
-    /** droidtop's own environment: the one every game without a prefix of its own runs in. */
+    /**
+     * droidtop's own environment: the one every game without a prefix of its own runs in ([PcContainers.sharedId]).
+     * Never another game's prefix: with none, setup makes it (Droidtop/tracker#928).
+     */
     private fun sharedContainer(manager: ContainerManager): Container? =
-        manager.containers.let { all -> all.firstOrNull { it.id == CONTAINER_ID } ?: all.firstOrNull() }
+        manager.containers.let { all -> PcContainers.sharedId(all.map { it.id to it.name })?.let { id -> all.firstOrNull { it.id == id } } }
 
     /**
      * A failed setup step: the whole exception goes to the log (the screen
@@ -749,6 +752,7 @@ object PcContainers {
             chosen = entryId?.let { chosenId(context, it) },
             ownId = entryId?.let { ownId(it) },
             existing = containers.map { it.id },
+            shared = sharedId(containers.map { it.id to it.name }),
         ) ?: return null
         return containers.firstOrNull { it.id == id }
     }
@@ -756,15 +760,26 @@ object PcContainers {
     /**
      * The one rule a game's prefix is resolved by, from the ids of the prefixes on the device ([existing], in their
      * order): the managed prefix the person chose (docs/SPEC.md 5a "Per-game prefixes", piece 1; Droidtop/tracker#584)
-     * when it still exists, else the game's own, else the shared one, else the first. [forGame] and [usage] both read
-     * it, so the Prefixes list counts exactly the games that launch in each. Pure.
+     * when it still exists, else the game's own, else the [shared] one ([sharedId]), else none: never whichever prefix
+     * is listed first, which was another game's own (Droidtop/tracker#928). [forGame] and [usage] both read it, so the
+     * Prefixes list counts exactly the games that launch in each. Pure.
      */
-    internal fun resolveId(chosen: String?, ownId: String?, existing: List<String>): String? = when {
+    internal fun resolveId(chosen: String?, ownId: String?, existing: List<String>, shared: String?): String? = when {
         chosen != null && chosen in existing -> chosen
         ownId != null && ownId in existing -> ownId
-        DroidtopPcGameRuntime.CONTAINER_ID in existing -> DroidtopPcGameRuntime.CONTAINER_ID
-        else -> existing.firstOrNull()
+        shared != null && shared in existing -> shared
+        else -> null
     }
+
+    /**
+     * The shared prefix among [containers] (each one's id and name): the one setup made, id
+     * [DroidtopPcGameRuntime.CONTAINER_ID]; on a device whose shared prefix has another id, the one setup named
+     * [DroidtopPcGameRuntime.CONTAINER_NAME]. A game's own prefix is named after the game, so it is never taken for
+     * the shared one. Pure.
+     */
+    internal fun sharedId(containers: List<Pair<String, String?>>): String? =
+        containers.firstOrNull { it.first == DroidtopPcGameRuntime.CONTAINER_ID }?.first
+            ?: containers.firstOrNull { it.second == DroidtopPcGameRuntime.CONTAINER_NAME }?.first
 
     /**
      * Which library games run in each prefix, by container id (a prefix no game runs in is absent): the Prefixes list's
@@ -772,9 +787,11 @@ object PcContainers {
      * library's store reads: never on the main thread.
      */
     suspend fun usage(context: Context): Map<String, List<String>> = withContext(Dispatchers.IO) {
-        val ids = runCatching { ContainerManager(context).containers }.getOrNull().orEmpty().map { it.id }
+        val containers = runCatching { ContainerManager(context).containers }.getOrNull().orEmpty()
+        val ids = containers.map { it.id }
+        val shared = sharedId(containers.map { it.id to it.name })
         PcLibrary.allGames(context)
-            .mapNotNull { game -> resolveId(chosenId(context, game.id), ownId(game.id), ids)?.let { it to game.title } }
+            .mapNotNull { game -> resolveId(chosenId(context, game.id), ownId(game.id), ids, shared)?.let { it to game.title } }
             .groupBy({ it.first }, { it.second })
     }
 
@@ -785,9 +802,9 @@ object PcContainers {
      * dosdevices links to drives and to the device's storage (the 2026-09-02 incident). Returns the sentence to show.
      */
     suspend fun remove(context: Context, containerId: String): String = withContext(Dispatchers.IO) {
-        if (containerId == DroidtopPcGameRuntime.CONTAINER_ID) return@withContext "The shared prefix is never removed."
         val container = runCatching { ContainerManager(context).getContainerById(containerId) }.getOrNull()
             ?: return@withContext "That prefix is already gone."
+        if (isShared(container)) return@withContext "The shared prefix is never removed."
         val users = usage(context)[containerId].orEmpty()
         if (users.isNotEmpty()) return@withContext "Not removed: ${users.joinToString(", ")} still run in it."
         val name = container.name?.takeIf { it.isNotBlank() } ?: containerId
@@ -825,8 +842,8 @@ object PcContainers {
         WineGameOptionsPrefs.set(context, entryId, WineGameOptionsPrefs.get(context, entryId) + (PREFIX_KEY to containerId))
     }
 
-    /** Whether [containerId] is the shared prefix every game without a choice or a prefix of its own runs in. */
-    fun isShared(containerId: String): Boolean = containerId == DroidtopPcGameRuntime.CONTAINER_ID
+    /** Whether [container] is the shared prefix every game without a choice or a prefix of its own runs in. */
+    fun isShared(container: Container): Boolean = sharedId(listOf(container.id to container.name)) == container.id
 
     /** The id [entryId]'s own prefix has, or would have once made. */
     fun ownIdOf(entryId: String): String = ownId(entryId)
@@ -965,7 +982,7 @@ object WinePrefixes {
     fun list(context: Context): List<Prefix> {
         val containers = runCatching { ContainerManager(context).containers }.getOrNull().orEmpty()
         return containers
-            .sortedBy { if (it.id == DroidtopPcGameRuntime.CONTAINER_ID) 0 else 1 }
+            .sortedBy { if (PcContainers.isShared(it)) 0 else 1 }
             .map { Prefix(it.id, it.name?.takeIf(String::isNotBlank) ?: it.id) }
     }
 
@@ -998,7 +1015,7 @@ object WinePrefixes {
             .map { container ->
                 val role = when {
                     PcContainers.isOwnPrefix(entryId, container) -> Role.OWN
-                    container.id == DroidtopPcGameRuntime.CONTAINER_ID -> Role.SHARED
+                    PcContainers.isShared(container) -> Role.SHARED
                     else -> Role.OTHER
                 }
                 Choice(container.id, container.name?.takeIf(String::isNotBlank) ?: container.id, role)

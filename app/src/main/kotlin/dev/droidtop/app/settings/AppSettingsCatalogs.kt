@@ -865,7 +865,7 @@ object AppSettingsCatalogs {
             id = "windows_prefixes",
             title = "Prefixes",
             items = containers.flatMap { container ->
-                val shared = dev.droidtop.runtime.windows.PcContainers.isShared(container.id)
+                val shared = dev.droidtop.runtime.windows.PcContainers.isShared(container)
                 val name = if (shared) "Shared" else container.name?.takeIf { it.isNotBlank() } ?: container.id
                 val users = usage[container.id].orEmpty()
                 val size = dev.droidtop.library.format.ValueFormat.size(dev.droidtop.runtime.windows.PcContainers.sizeOf(container))

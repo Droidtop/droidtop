@@ -7920,6 +7920,17 @@ choice (a stored prefix id per game) instead of "own id, else the first";
 the id scheme of today's own prefixes (`ownId`) is kept, so a prefix a game
 already has is simply an entry that game points at.
 
+**Which prefix is the shared one (Droidtop/tracker#928).** The shared prefix is
+the one setup made: id `1`, or, on a device whose shared prefix has another id
+(the BlueStacks rig's is `STEAM_1`), the one setup named `droidtop`. A game's
+own prefix is named after the game, so it is never taken for the shared one.
+A game with no choice and no prefix of its own runs in the shared prefix, and
+never in whichever prefix happens to be listed first: that put every such game
+into the first game that got a prefix of its own. With no shared prefix there
+is none, and the game asks for "Set up Windows games". The Prefixes list's
+"Used by", the shared row's label, its Remove refusal and setup's own check
+all read the same rule (`PcContainers.sharedId`).
+
 A prefix has its own Wine build; a game moved to an entry runs on that
 entry's build, and the row says so in one line when the build differs from
 the one it ran on.
