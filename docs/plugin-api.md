@@ -900,6 +900,13 @@ no destination, such as the PC library). Ops:
   `acquire` and never parses it (12a checklist point 5). droidtop renders a
   result as a `row` that opens `detail`. At most 200 results are shown (on the source's own page under Game
   sources, which asks without a `limit`).
+- `index {limit, cursor?}` → `{results: [result], next?}` (optional, Droidtop/tracker#937): the source's whole list,
+  a page at a time, the same results as `search`. Declared with `"bulkIndex": true` on the `library.sources` entry;
+  droidtop asks for it weekly as an automatic download (on Wi-Fi, never while a game runs) and keeps the results in
+  the source's own index, which typing searches without asking the source. `next` is the cursor of the next page;
+  none ends the list. A source that answers UNSUPPORTED is indexed from its searches only. Every source's index is
+  also filled by what its `search` and `featured` answer; `"index": false` on the entry opts out of both, and the
+  source is then asked only when the person presses "Search the sources".
 - `featured {platform?, limit, context}` → `{results: [result]}`, the same results as `search`: what the source
   features now (a site's latest updates, its new or popular games), best first, scoped to `platform` (droidtop's
   system id) when given (proposed and approved 2026-10-23, Droidtop/tracker#612). Optional and additive (§7): a

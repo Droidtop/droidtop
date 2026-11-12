@@ -110,6 +110,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
             dev.droidtop.library.integrations.AcquireQueue.RESOLVER,
             dev.droidtop.library.integrations.AcquireQueue.resolver,
         )
+        // A source's whole list, read into its index on the download policy (Droidtop/tracker#937).
+        dev.droidtop.library.integrations.SourceIndexRefresh.register(appContext)
         dev.droidtop.library.integrations.PluginCatalog.registerDownloadPost()
         dev.droidtop.library.integrations.PluginBios.registerDownloadPost()
         // The one APK install path's post step: a catalog's app is checked, then installed (docs/SPEC.md 10b).
