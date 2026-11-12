@@ -21,6 +21,16 @@ object AmazonManifest {
     ) {
         /** Returns the path with backslashes replaced. */
         val unixPath: String get() = path.replace('\\', '/')
+
+        /** The file's hash as lower-case hex: its name on the CDN (`files/<hex>`). */
+        val hashHex: String get() = hashBytes.joinToString("") { "%02x".format(it) }
+
+        /**
+         * Whether [file] is this entry by its SHA-256, or true when the manifest gives no SHA-256 to check (Droidtop/tracker#766:
+         * one file hash, [dev.droidtop.shared.trust.Sha256.hex], for the download's check and verify's).
+         */
+        fun matches(file: java.io.File): Boolean =
+            hashAlgorithm != 0 || hashBytes.isEmpty() || dev.droidtop.shared.trust.Sha256.hex(file).equals(hashHex, ignoreCase = true)
     }
 
     data class ManifestPackage(
