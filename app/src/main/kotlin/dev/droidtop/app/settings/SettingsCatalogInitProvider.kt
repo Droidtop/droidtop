@@ -105,6 +105,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // The one single-file download runner and the post step of the plugin catalog's bundles; a
         // download that finished while the process was dead is re-attached and finished by these.
         dev.droidtop.pluginhost.DownloadJobs.register(appContext)
+        // A source's whole list, read into its index on the download policy (Droidtop/tracker#937).
+        dev.droidtop.library.integrations.SourceIndexRefresh.register(appContext)
         dev.droidtop.library.integrations.PluginCatalog.registerDownloadPost()
         dev.droidtop.library.integrations.PluginBios.registerDownloadPost()
         // The one APK install path's post step: a catalog's app is checked, then installed (docs/SPEC.md 10b).

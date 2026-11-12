@@ -182,6 +182,9 @@ object UpdateChecks {
         )
         if (!due) return@withContext
         checkAll(app) {}
+        // The sources that publish their whole list refresh their index weekly, as automatic downloads the policy holds
+        // to Wi-Fi and to when no game runs (Droidtop/tracker#937: "bulk refresh on by default").
+        runCatching { dev.droidtop.library.integrations.SourceIndexRefresh.startDue(app) }
         notifyAsking(app, applyPolicies(app, includeDroidtop = true))
     }
 
