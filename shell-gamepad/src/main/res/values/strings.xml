@@ -166,6 +166,10 @@
     <string name="gamepad_next_track">Next track</string>
     <string name="gamepad_previous_track">Previous track</string>
     <string name="gamepad_sources_unreachable">You\'re offline</string>
+    <!-- The entry that asks the live sources (Droidtop/tracker#937): typing alone searches the library and each source's own index. -->
+    <string name="gamepad_sources_featured_now">See what your sources feature now</string>
+    <string name="gamepad_search_the_sources_for">Search the sources for \u201C%1$s\u201D</string>
+    <string name="gamepad_asks_each_source_that_is_on">Asks each source that is on</string>
     <string name="gamepad_sources_unreachable_line">Get games needs a connection. Try again once you\'re back online</string>
     <string name="gamepad_bring_back_saves_from_x">Bring back saves from %1$s</string>
     <string name="gamepad_bring_back_saves_from_x_question">Bring back the saves from %1$s?</string>
