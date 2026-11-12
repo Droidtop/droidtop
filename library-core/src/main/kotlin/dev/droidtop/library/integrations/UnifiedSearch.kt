@@ -239,8 +239,27 @@ object UnifiedSearch {
         carry: List<SourceHit> = emptyList(),
         keep: (AcquireContentResult) -> Boolean = { true },
         featuredWhenEmpty: Boolean = false,
+        /**
+         * Ask the live sources (the person pressed "Search the sources", Droidtop/tracker#937). Without it, each source
+         * that is on answers from its own index ([SourceIndex]): no plugin is called and nothing goes over the network.
+         */
+        live: Boolean = false,
     ): Flow<UnifiedState> {
         val off = SourceSelection.off(context)
+        if (!live) {
+            return stream(
+                query = query,
+                local = local,
+                carry = emptyList(),
+                keep = keep,
+                debounceMs = 0L,
+                loadSources = {
+                    withContext(Dispatchers.IO) { GameSources.plugins(context, platform) to emptyList<UnavailableSource>() }
+                },
+                fetch = { source -> Result.success(source.indexed(context, query.trim(), platform, MAX_ROWS_PER_SOURCE)) },
+                isOff = { it.id in off },
+            )
+        }
         return stream(
             query = query,
             local = local,
