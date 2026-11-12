@@ -941,7 +941,9 @@ no destination, such as the PC library). Ops:
   `size` is a positive byte count used as a size cap. droidtop's download engine (aria2) fetches it
   into its own downloads area, then places it in `context.destination` and
   indexes that file, from the download job, so the game appears even if the
-  page that started it was closed or droidtop restarted meanwhile. Credential headers (Authorization, cookies, token and key
+  page that started it was closed or droidtop restarted meanwhile. The `acquire` job itself runs inside that
+  Downloads job (Droidtop/tracker#354): the person's Download is one row in Downloads from the press, and a page
+  only watches it. Credential headers (Authorization, cookies, token and key
   headers) remain in memory only. A plugin may omit `download` and continue
   doing its own transfer as before. **Engine hint** (2026-10-09,
   Droidtop/tracker#380, #355): with `download`, a job may return `engine`,

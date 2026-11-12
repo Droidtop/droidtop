@@ -393,6 +393,42 @@ object PluginJobsCenter {
     }
 
     /**
+     * Runs a plugin's job as one step of a job droidtop already shows (a download whose source is asked first,
+     * Droidtop/tracker#354: "the actual task sits on the other side of" the download queue): it has no row of its own,
+     * its progress goes to [onProgress] for the outer job to say, and it ends with that job. A cancelled caller (the
+     * outer job cancelled or paused) asks the plugin to stop. Returns the plugin's result.
+     */
+    suspend fun runInside(
+        context: Context?,
+        record: PluginRecord,
+        capability: PluginCapability,
+        args: Map<String, String>,
+        onProgress: (percent: Int, statusLine: String) -> Unit,
+        /** The person started the outer job: it counts as their call while it runs ([PluginBrokers.jobRunning]). */
+        userInitiated: Boolean = true,
+    ): PluginResult {
+        context?.let(::attach)
+        val jobId = UUID.randomUUID().toString()
+        val deferred = CompletableDeferred<PluginResult>()
+        val runner = runnerFactory(
+            context,
+            { _, eventJobId, percent, statusLine, _ -> if (eventJobId == jobId) onProgress(percent, statusLine) },
+            { _, eventJobId, result -> if (eventJobId == jobId && !deferred.isCompleted) deferred.complete(result) },
+        )
+        if (userInitiated) PluginBrokers.jobRunning(record.manifest.id, jobId)
+        try {
+            if (!runner.startJob(record, capability, args, jobId)) {
+                return PluginResult.failure("${record.manifest.label} could not start this task")
+            }
+            return deferred.await()
+        } finally {
+            if (!deferred.isCompleted) runCatching { runner.cancelJob(record.manifest.id, jobId) }
+            PluginBrokers.jobEnded(jobId)
+            runner.shutdown()
+        }
+    }
+
+    /**
      * Registers how a job droidtop runs itself of [kind] is run (SPEC 12a "Jobs"); called once at
      * process start, before [attach] restores anything. [onCancel] runs (off the main thread) when
      * the person cancels a job of this kind, running or paused or restored, with its arguments and

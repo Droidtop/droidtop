@@ -33,6 +33,9 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.currentCoroutineContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -48,6 +51,29 @@ fun interface DownloadPost {
  */
 fun interface DownloadMultiPost {
     suspend fun process(context: Context, files: List<File>, parts: List<Map<String, String>>): String
+}
+
+/**
+ * The first stage of a download whose address nobody knows yet (Droidtop/tracker#354; the owner: "the button should
+ * send the download call over the downloader API, so the actual task sits on the other side of it"): a source is asked
+ * for it inside the download's own job, in Downloads from the press. [resolve] runs with [stage] in its coroutine; what
+ * it hands to [DownloadJobs.run] there becomes this job's download ([DownloadStage.fetch]), and what it returns is the
+ * job's outcome when it fetched nothing itself (a source that placed its file). Throws a sentence to fail the job.
+ */
+fun interface DownloadResolver {
+    suspend fun resolve(context: Context, args: Map<String, String>, stage: DownloadStage): String
+}
+
+/** The download job a resolver runs in: [report] says its progress, and [fetch] is the download it handed over. */
+class DownloadStage internal constructor(val report: (percent: Int, statusLine: String) -> Unit) :
+    AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<DownloadStage> {
+        /** The download job this coroutine resolves for, or null outside one. */
+        suspend fun current(): DownloadStage? = currentCoroutineContext()[Key]
+    }
+
+    @Volatile
+    internal var fetch: Map<String, String>? = null
 }
 
 /** One file of a download job that has several: the first is the job's own, the others travel in its `more` argument. */
@@ -231,7 +257,11 @@ object DownloadJobs {
         PythonRuntimeManager.registerDownloadPost()
         PluginJobsCenter.registerNative(
             KIND,
-            onCancel = { args, checkpoint -> cancelDownload(appContext, args, checkpoint) },
+            onCancel = { args, checkpoint ->
+                // A resolved job's files are named by the download it was handed, kept in its checkpoint.
+                val (download, inner) = ResolvedCheckpoint.decode(checkpoint)
+                cancelDownload(appContext, download ?: args, if (download != null) inner else checkpoint)
+            },
             reattachOnRestart = true,
             download = true,
         ) { args, checkpoint, report -> execute(appContext, args, checkpoint, report) }
@@ -636,9 +666,60 @@ object DownloadJobs {
             if (sizeBytes > 0) put(DownloadGate.ARG_BYTES, sizeBytes.toString())
             if (automatic) put(DownloadGate.ARG_AUTOMATIC, "1")
         }
+        // Asked from a download whose source was asked first (Droidtop/tracker#354): this is that job's download, not
+        // a second job. Its secrets stay held until that job ends.
+        DownloadStage.current()?.let { stage ->
+            stage.fetch = args
+            return PluginResult.success()
+        }
+        return startAndWatch(context, title, args, onStatus, onPercent) {
+            secretHeaders.remove(name)
+            more.forEach { secretHeaders.remove(it.name) }
+        }
+    }
+
+    /**
+     * Starts a download whose address a [DownloadResolver] registered as [resolver] finds first, inside the job
+     * (Droidtop/tracker#354): it is in Downloads from this call, whoever asked for it and whether or not they stay. Waits
+     * for it and says its progress through [onStatus]; a caller that stops waiting leaves it running. [args] reach the
+     * resolver unchanged.
+     */
+    suspend fun runResolved(
+        context: Context,
+        title: String,
+        resolver: String,
+        args: Map<String, String>,
+        category: DownloadCategory = DownloadCategory.GAMES,
+        onStatus: (String) -> Unit = {},
+        onPercent: (Int) -> Unit = {},
+    ): PluginResult = startAndWatch(
+        context,
+        title,
+        args + mapOf(ARG_RESOLVE to resolver, ARG_TITLE to title, DownloadPools.ARG_CATEGORY to category.key),
+        onStatus,
+        onPercent,
+    ) {}
+
+    /** Registers the resolver [runResolved] names; called once at process start, before jobs are restored. */
+    fun registerResolver(name: String, resolver: DownloadResolver) {
+        resolvers[name] = resolver
+    }
+
+    /**
+     * Starts the download job with [args] and waits for it, saying its progress. [onEnd] runs when the job itself ends,
+     * not when a caller stops waiting: a page closed mid-download must not take the download's secrets with it.
+     */
+    private suspend fun startAndWatch(
+        context: Context,
+        title: String,
+        args: Map<String, String>,
+        onStatus: (String) -> Unit,
+        onPercent: (Int) -> Unit,
+        onEnd: () -> Unit,
+    ): PluginResult {
         val finished = CompletableDeferred<PluginResult>()
         val jobId = PluginJobsCenter.startNative(
-            context, KIND, title, args, onComplete = { finished.complete(it) }, owner = OWNER,
+            context, KIND, title, args, onComplete = { finished.complete(it); onEnd() }, owner = OWNER,
         ) ?: return PluginResult.failure("downloads are not available in this build")
         return coroutineScope {
             val narrator = launch {
@@ -653,8 +734,6 @@ object DownloadJobs {
                 finished.await()
             } finally {
                 narrator.cancel()
-                secretHeaders.remove(name)
-                more.forEach { secretHeaders.remove(it.name) }
             }
         }
     }
@@ -724,6 +803,74 @@ object DownloadJobs {
     /** The checkpoint once every byte is in the file: a restart then goes on to the post step and never downloads again. */
     private const val FETCHED = "fetched"
 
+    /** The resolver a resolved download job names ([runResolved]). */
+    private const val ARG_RESOLVE = "resolve"
+
+    private val resolvers = ConcurrentHashMap<String, DownloadResolver>()
+
+    /** Each resolved job's download in this process, by job id: a pause and Resume go on with it and its held secrets. */
+    private val resolvedHere = ConcurrentHashMap<String, Map<String, String>>()
+
+    /**
+     * A resolved job's checkpoint: the download its resolver handed over and that download's own checkpoint, so a
+     * restart with every byte already here places the file without asking the source again. Pure.
+     */
+    internal object ResolvedCheckpoint {
+        fun encode(download: Map<String, String>, inner: String?): String =
+            JSONObject().put("download", JSONObject(download)).apply { inner?.let { put("inner", it) } }.toString()
+
+        /** The download and its inner checkpoint, or (null, [checkpoint]) for one that is not a resolved job's. */
+        fun decode(checkpoint: String?): Pair<Map<String, String>?, String?> {
+            val whole = checkpoint?.takeIf { it.startsWith("{") }?.let { runCatching { JSONObject(it) }.getOrNull() }
+            val json = whole?.optJSONObject("download") ?: return null to checkpoint
+            val download = json.keys().asSequence().associateWith { json.getString(it) }
+            return download to whole.optString("inner").takeIf { it.isNotEmpty() }
+        }
+    }
+
+    /**
+     * A resolved job (Droidtop/tracker#354): the source is asked for the download inside this job, then the download
+     * runs here as any other. A Resume in this process goes on with the same download; a restart goes on only when
+     * every byte had arrived, and otherwise drops what the old answer left and asks the source again.
+     */
+    private suspend fun executeResolved(
+        context: Context,
+        resolverName: String,
+        args: Map<String, String>,
+        checkpoint: String?,
+        report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
+    ): String {
+        val resolver = resolvers[resolverName] ?: throw IllegalStateException("this version of droidtop cannot finish that download")
+        val jobId = JobHandle.current()?.jobId
+        val (kept, inner) = ResolvedCheckpoint.decode(checkpoint)
+        val known = jobId?.let { resolvedHere[it] } ?: kept?.takeIf { inner == FETCHED }
+        val download = known ?: run {
+            kept?.let { runCatching { cancelDownload(context, it, inner) } }
+            val stage = DownloadStage { percent, line -> report(percent, line, null) }
+            val summary = withContext(stage) { resolver.resolve(context, args, stage) }
+            stage.fetch ?: return summary
+        }
+        jobId?.let { resolvedHere[it] = download }
+        val from = if (known != null) inner else null
+        report(-1, "Downloading…", ResolvedCheckpoint.encode(download, from))
+        var ended = false
+        try {
+            return execute(context, download, from) { percent, line, next ->
+                report(percent, line, ResolvedCheckpoint.encode(download, next))
+            }.also { ended = true }
+        } catch (stopped: kotlinx.coroutines.CancellationException) {
+            throw stopped
+        } catch (failed: Throwable) {
+            ended = true
+            throw failed
+        } finally {
+            if (ended) {
+                jobId?.let { resolvedHere.remove(it) }
+                partsOf(download).forEach { part -> part[ARG_NAME]?.let { secretHeaders.remove(it) } }
+            }
+        }
+    }
+
     private fun cancelDownload(context: Context, args: Map<String, String>, checkpoint: String?) {
         if (args[ARG_SWARM] != null) {
             args[ARG_NAME]?.let { name ->
@@ -757,6 +904,7 @@ object DownloadJobs {
         checkpoint: String?,
         report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
     ): String {
+        args[ARG_RESOLVE]?.let { return executeResolved(context, it, args, checkpoint, report) }
         val parts = partsOf(args)
         if (parts.size > 1) return executeMany(context, parts, checkpoint, report)
         if (args[ARG_SWARM] != null) return executeSwarm(context, args, checkpoint, report)

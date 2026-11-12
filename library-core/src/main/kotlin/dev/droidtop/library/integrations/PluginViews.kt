@@ -269,6 +269,29 @@ object PluginViews {
         hostContext: JSONObject,
         callArgs: JSONObject,
         onStatus: (String) -> Unit,
+    ): PluginResult = dev.droidtop.pluginhost.DownloadJobs.runResolved(
+        // The press only asks the download queue (Droidtop/tracker#354; the owner: "the button should send the download
+        // call over the downloader API, so the actual task sits on the other side of it"). The source is asked, the file
+        // fetched and placed, all in one Downloads job from this moment; the page only watches it, and leaving the page
+        // leaves the job running.
+        context = context,
+        title = title,
+        resolver = AcquireQueue.RESOLVER,
+        args = AcquireQueue.argsOf(record, hostContext, callArgs),
+        onStatus = onStatus,
+    )
+
+    /**
+     * The acquire itself, run inside its Downloads job by [AcquireQueue]: the source's `acquire` job, then the download
+     * its answer describes (which, inside that job, is that same job's download) or the files it placed itself indexed.
+     */
+    internal suspend fun acquireInQueue(
+        context: Context,
+        record: PluginRecord,
+        title: String,
+        hostContext: JSONObject,
+        callArgs: JSONObject,
+        onStatus: (String) -> Unit,
     ): PluginResult {
         val startedAt = System.currentTimeMillis()
         val result = runJob(context, record, "library.sources", "acquire", callArgs, title, onStatus)
@@ -300,6 +323,20 @@ object PluginViews {
     ): PluginResult {
         val capability = LegacyManifest.jobCapabilityFor(point)
         val call = newCall(point, op, SURFACE, args, 0L)
+        // Inside a download job that asks its source first (Droidtop/tracker#354): the plugin's job is that job's first
+        // step, said on its row, with no row of its own.
+        dev.droidtop.pluginhost.DownloadStage.current()?.let { stage ->
+            return PluginJobsCenter.runInside(
+                context = context,
+                record = record,
+                capability = capability,
+                args = mapOf("call" to call.toJson().toString()),
+                onProgress = { percent, statusLine ->
+                    stage.report(percent, statusLine)
+                    onStatus(if (percent >= 0) "$statusLine ($percent%)" else statusLine)
+                },
+            )
+        }
         val done = CompletableDeferred<PluginResult>()
         val jobId = PluginJobsCenter.start(
             context = context,
