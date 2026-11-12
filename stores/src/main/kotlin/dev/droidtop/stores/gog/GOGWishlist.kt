@@ -3,10 +3,8 @@ package dev.droidtop.stores.gog
 import android.content.Context
 import dev.droidtop.library.stores.Wishlist
 import dev.droidtop.library.stores.WishlistGame
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import timber.log.Timber
@@ -21,10 +19,8 @@ import timber.log.Timber
 internal object GOGWishlist {
     private const val TAG = "GOG"
 
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    // The stores' shared client (Droidtop/tracker#766: one HTTP client per job in this module).
+    private val http get() = dev.droidtop.stores.util.StoreHttp.http
 
     /** The wished product ids in a `wishlist.json` body: `{"wishlist":{"1207658691":true,...}}`. Sorted, so the order is the same every sync. */
     internal fun parseIds(body: String): List<String> {

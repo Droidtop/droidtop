@@ -101,7 +101,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines)
     implementation(libs.timber)
     implementation(libs.okhttp)
-    implementation(libs.okhttp.dnsoverhttps)
     // TarCompressorUtils' .tzst and .txz streams (commons-compress comes
     // from :runtime-common, which exposes it).
     implementation(libs.zstd.jni) { artifact { type = "aar" } }

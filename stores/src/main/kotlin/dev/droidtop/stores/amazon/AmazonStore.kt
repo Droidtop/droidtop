@@ -19,7 +19,6 @@ import dev.droidtop.stores.util.StoreFiles
 import dev.droidtop.stores.util.newDownloadInfo
 import dev.droidtop.stores.util.runJobDownload
 import java.io.File
-import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -177,7 +176,7 @@ class AmazonStore : StoreLibrary {
                 when {
                     !local.isFile -> missing++
                     local.length() != file.size -> changed++
-                    file.hashAlgorithm == 0 && file.hashBytes.isNotEmpty() && !sha256(local).contentEquals(file.hashBytes) -> changed++
+                    !file.matches(local) -> changed++
                 }
             }
             verifyLine(files.size, missing, changed)
@@ -200,19 +199,6 @@ class AmazonStore : StoreLibrary {
 
     /** Where the install's manifest is kept, the file list verify and uninstall read (GameNative's place for it). */
     private fun manifestFile(context: Context, productId: String) = File(context.filesDir, "manifests/amazon/$productId.proto")
-
-    private fun sha256(file: File): ByteArray {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().buffered().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest()
-    }
 
     internal companion object {
         private const val TAG = "AmazonStore"
