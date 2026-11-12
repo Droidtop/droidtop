@@ -9,7 +9,6 @@ import dev.droidtop.stores.util.ChunkRetry
 import dev.droidtop.stores.util.MarkerUtils
 import dev.droidtop.stores.util.StoreHttp
 import java.io.File
-import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
@@ -245,7 +244,7 @@ internal class AmazonDownloadManager(
             tmpFile.parentFile?.mkdirs()
 
             // nile uses /files/{hash_hex} per downloading/manager.py, NOT the unix path
-            val hashHex = file.hashBytes.joinToString("") { "%02x".format(it) }
+            val hashHex = file.hashHex
             val url = appendPath(baseUrl, "files/$hashHex")
             val areaName = areaName(productId, hashHex)
             var counted = 0L
@@ -266,22 +265,9 @@ internal class AmazonDownloadManager(
             DownloadJobs.discardForJob(context, areaName)
 
             // Verify SHA-256 hash (algorithm 0) when present
-            if (file.hashAlgorithm == 0 && file.hashBytes.isNotEmpty()) {
-                val digest = MessageDigest.getInstance("SHA-256")
-                tmpFile.inputStream().buffered().use { input ->
-                    val buf = ByteArray(8192)
-                    var read: Int
-                    while (input.read(buf).also { read = it } != -1) {
-                        digest.update(buf, 0, read)
-                    }
-                }
-                val computed = digest.digest()
-                if (!computed.contentEquals(file.hashBytes)) {
-                    tmpFile.delete()
-                    return@withContext Result.failure(
-                        Exception("SHA-256 mismatch for ${file.unixPath}")
-                    )
-                }
+            if (!file.matches(tmpFile)) {
+                tmpFile.delete()
+                return@withContext Result.failure(Exception("SHA-256 mismatch for ${file.unixPath}"))
             }
 
             if (destFile.exists()) destFile.delete()

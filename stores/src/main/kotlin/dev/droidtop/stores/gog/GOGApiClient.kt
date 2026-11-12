@@ -4,12 +4,10 @@ import android.content.Context
 import dev.droidtop.stores.data.GOGGame
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
-import java.util.concurrent.TimeUnit
 
 /**
  * Parsed/Formartted details returned by GOGApiClient.
@@ -38,10 +36,8 @@ data class ParsedGogGame(
  */
 object GOGApiClient {
 
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    // The stores' shared client (Droidtop/tracker#766: one HTTP client per job in this module).
+    private val httpClient get() = dev.droidtop.stores.util.StoreHttp.http
 
     /**
      * Fetch list of game IDs owned by the user
