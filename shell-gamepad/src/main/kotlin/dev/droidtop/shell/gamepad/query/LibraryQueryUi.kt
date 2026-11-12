@@ -806,8 +806,8 @@ internal fun LibrarySearchDialog(
                 add(
                     SearchLine.Entry(
                         "search_sources",
-                        if (text.isBlank()) "See what your sources feature now" else "Search the sources for \u201C${text.trim()}\u201D",
-                        subtitle = "Asks each source that is on",
+                        if (text.isBlank()) words(R.string.gamepad_sources_featured_now) else words(R.string.gamepad_search_the_sources_for, text.trim()),
+                        subtitle = words(R.string.gamepad_asks_each_source_that_is_on),
                     ) {
                         live = true
                         searchTick++
