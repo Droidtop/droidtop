@@ -1621,6 +1621,7 @@ private fun CatalogMenuRow(
         title = if (confirmArmed) "${item.title}: ${PressWords.again} to confirm" else item.title,
         value = if (locked) "Read it first" else status ?: value ?: if (placeholder) "Type here" else null,
         chip = item.chip?.label,
+        chipTone = item.chip?.tone,
         // A state with a tone (a plugin's Allowed / Ask first / Blocked) is a chip in that tone (tracker#519).
         valueChip = status == null && !locked && (item as? ChoiceItem)?.toned == true,
         valueTone = (item as? ChoiceItem)?.currentTone(),

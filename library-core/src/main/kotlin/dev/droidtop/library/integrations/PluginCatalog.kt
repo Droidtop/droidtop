@@ -314,6 +314,8 @@ object PluginCatalog {
     fun updateFor(plugin: PluginCatalogPlugin, record: PluginRecord, channel: PluginChannel): PluginCatalogRelease? {
         val latest = latest(plugin, channel) ?: return null
         if (latest.manifestSha256.equals(record.archiveDigest, ignoreCase = true)) return null
+        // A newer release this droidtop cannot run is not an update (Droidtop/tracker#932).
+        if (latest.incompatibility() != null) return null
         val installed = plugin.releases.firstOrNull { it.manifestSha256.equals(record.archiveDigest, ignoreCase = true) }
         if (installed != null && (compareReleases(latest, installed) ?: 0) <= 0) return null
         // A build the catalog does not list (from a repository's unstable line, a file) is judged by its own version:
@@ -525,7 +527,8 @@ object PluginCatalog {
         val have = installed.map { it.manifest.id }.toSet()
         return index.origins.filter { originOffered(source, it, userKeys) }.flatMap { origin ->
             origin.plugins.mapNotNull { plugin ->
-                if (plugin.id in have) null else latest(plugin, channelFor(source, plugin.id))?.let { plugin to it }
+                // A release this droidtop cannot run is shown with its reason, never installed by Install all (#932).
+                if (plugin.id in have) null else latest(plugin, channelFor(source, plugin.id))?.takeIf { it.incompatibility() == null }?.let { plugin to it }
             }
         }
     }

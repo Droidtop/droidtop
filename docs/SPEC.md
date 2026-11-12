@@ -27812,7 +27812,14 @@ what the index says is display data, never a trust decision.
   <version> (an update is available), or no action at all with
   "Installed <version>" in the value column (current); unpinned-origin
   plugins and plugins with no stable release yet are listed without an
-  action and say why. Above the rows, when there is something to do,
+  action and say why. A plugin whose newest release this droidtop cannot run
+  (its plugin contract, which the index lists for every release, is older than
+  droidtop runs or newer than it knows) is listed too, with a red
+  "Incompatible with your version" tag and its reason on the row and its page
+  ("made for an older droidtop (plugin contract 1)", or "needs a newer
+  droidtop"; owner, 2026-11-12, Droidtop/tracker#932: "include incompatible
+  modules, add a red 'Incompatible with your version : (reason)' tag"); it has
+  no Install, and Install all and Update all leave it out. Above the rows, when there is something to do,
   **Install all** (every plugin the catalog offers that is not installed:
   an origin it offers, a newest stable release it is consistent about;
   `PluginCatalog.installable`) and **Update all** (every installed plugin

@@ -235,6 +235,8 @@ fun MenuRow(
     // A short tag on the row beside its title (CatalogItem.chip, one of RowTag's words): "Unofficial". A fact, drawn on
     // the row, not a tooltip.
     chip: String? = null,
+    // The tag's tone (RowTag.tone): a red "Incompatible with your version" (Droidtop/tracker#932); neutral when null.
+    chipTone: NoticeTone? = null,
     // The value drawn as a state chip (ChoiceItem.toned): in [valueTone]'s colours, or neutral when it has none
     // (Droidtop/tracker#519).
     valueChip: Boolean = false,
@@ -342,7 +344,13 @@ fun MenuRow(
                 if (chip != null) {
                     Spacer(Modifier.width(Space.Sm))
                     // Capped, so a tag never takes the title's room (Droidtop/tracker#677); the words are RowTag's.
-                    StatusChip(chip, ink = MenuTokens.OnSurface, fill = MenuTokens.SurfaceSelected, modifier = Modifier.widthIn(max = ROW_TAG_MAX_WIDTH))
+                    val palette = LocalNoticePalette.current
+                    StatusChip(
+                        chip,
+                        ink = chipTone?.let { palette.on(it) } ?: MenuTokens.OnSurface,
+                        fill = chipTone?.let { palette.plate(it) } ?: MenuTokens.SurfaceSelected,
+                        modifier = Modifier.widthIn(max = ROW_TAG_MAX_WIDTH),
+                    )
                 }
             }
             if (progress != null) {

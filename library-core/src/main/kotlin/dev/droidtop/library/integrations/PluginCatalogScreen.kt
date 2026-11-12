@@ -635,6 +635,7 @@ object PluginCatalogScreen {
         val action = actionFor(source, state, plugin, installed)
         val id = "plugins_catalog_${plugin.id}"
         val conflict = PluginCatalog.hasOrderConflict(plugin)
+        val incompatible = PluginCatalog.latest(plugin, PluginCatalog.channelFor(source, plugin.id))?.incompatibility()
         val page = CatalogScreen(
             id = "${id}_page",
             title = plugin.label,
@@ -648,6 +649,12 @@ object PluginCatalogScreen {
                             (plugin.description ?: plugin.summary)?.let { TextBlockItem(id = "${id}_description", text = it) },
                             ActionItem(id = "${id}_maker", title = "Made by", value = plugin.publisher ?: origin.origin),
                             ActionItem(id = "${id}_from", title = "Listed in", value = if (source.official) "droidtop's catalog" else source.name, chip = chipFor(source)),
+                            incompatible?.let { why ->
+                                NoticeItem(
+                                    id = "${id}_incompatible",
+                                    notice = Notice(tone = NoticeTone.Danger, title = "Incompatible with your version", body = "This droidtop can't run it: $why."),
+                                )
+                            },
                             if (conflict) {
                                 NoticeItem(
                                     id = "${id}_conflict",
@@ -672,7 +679,7 @@ object PluginCatalogScreen {
             subtitle = plugin.summary ?: plugin.description?.substringBefore(". ")?.take(120) ?: "No description",
             inline = page,
             valueLabel = { action.value },
-            chip = chipFor(source),
+            chip = if (incompatible != null) dev.droidtop.library.settings.RowTag.INCOMPATIBLE else chipFor(source),
             iconFile = iconFile,
             // The summary is always under the name (#514), not only in Info.
             summaryShown = true,
@@ -699,6 +706,12 @@ object PluginCatalogScreen {
                 run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, latest!!, onStatus) },
             )
             installed != null -> ActionItem(id = id, title = "Installed", value = "Installed ${installed.manifest.version}")
+            latest?.incompatibility() != null -> ActionItem(
+                id = id,
+                title = "Incompatible with your version",
+                subtitle = latest.incompatibility()!!.replaceFirstChar { it.uppercase() },
+                value = "Can't install ${latest.version}",
+            )
             offered && latest != null -> AsyncActionItem(
                 id = id,
                 title = "Install",

@@ -63,7 +63,7 @@ enum class CatalogIcon {
  * The words a row's tag may say ([CatalogItem.chip]): a short, fixed set, so every tag is a word or two and the same
  * fact always reads the same (Droidtop/tracker#677). The sentence behind a tag belongs in the row's subtitle.
  */
-enum class RowTag(val label: String) {
+enum class RowTag(val label: String, val tone: NoticeTone? = null) {
     /** A plugin from a catalog or an app that is not droidtop's own. */
     UNOFFICIAL("Unofficial"),
 
@@ -72,6 +72,12 @@ enum class RowTag(val label: String) {
 
     /** A setting the Gaming theme's own colour scheme overrides. */
     SET_BY_THEME("Set by theme"),
+
+    /**
+     * A catalog plugin whose release this droidtop cannot run (owner, 2026-11-12, Droidtop/tracker#932: "include
+     * incompatible modules, add a red 'Incompatible with your version : (reason)' tag"); the reason is on the row.
+     */
+    INCOMPATIBLE("Incompatible with your version", NoticeTone.Danger),
 }
 
 sealed interface CatalogItem {

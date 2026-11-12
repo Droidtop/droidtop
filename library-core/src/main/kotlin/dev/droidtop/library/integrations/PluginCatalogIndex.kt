@@ -26,7 +26,24 @@ data class PluginCatalogRelease(
     /** SHA-256 of the signed manifest.json bytes inside the bundle -- what "an update is available" compares against the installed record's digest. */
     val manifestSha256: String,
     val bundle: PluginCatalogBundle,
+    /** The manifest's plugin contract, as the index lists it; null for an index that does not say. */
+    val contractVersion: Int? = null,
 ) {
+    /**
+     * Why this droidtop cannot run this release, in words for the row's red tag (Droidtop/tracker#932), or null when it
+     * can, or the index does not say. The manifest is checked again at install whatever this says.
+     */
+    fun incompatibility(): String? {
+        val contract = contractVersion ?: return null
+        return when {
+            contract < dev.droidtop.pluginhost.PLUGIN_MANIFEST_MIN_CONTRACT_VERSION ->
+                "it was made for an older droidtop (plugin contract $contract) and needs an update from its maker"
+            contract > dev.droidtop.pluginhost.PLUGIN_MANIFEST_CONTRACT_VERSION ->
+                "it needs a newer droidtop (plugin contract $contract); update droidtop"
+            else -> null
+        }
+    }
+
     /** Newer first; missing/unparseable stamps sort as oldest, list order breaks ties. */
     fun publishedAtMillis(): Long =
         if (publishedAt == null) 0L else runCatching { Instant.parse(publishedAt).toEpochMilli() }.getOrDefault(0L)
@@ -193,6 +210,7 @@ object PluginCatalogIndexParser {
                             publishedAt = nullableText(releaseJson, "publishedAt"),
                             manifestSha256 = manifestSha256,
                             bundle = PluginCatalogBundle(name, url, size, sha256),
+                            contractVersion = releaseJson.optInt("contractVersion", 0).takeIf { it > 0 },
                         ),
                     )
                 }
