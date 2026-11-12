@@ -74,6 +74,12 @@ interface GameSourceProvider {
     suspend fun featured(context: Context, platform: String?, limit: Int): Result<List<AcquireContentResult>> = Result.success(emptyList())
 
     /**
+     * What this source's own index ([SourceIndex]) has for [query], with no call to the source and no network
+     * (Droidtop/tracker#937): what typing shows. A source with no index has nothing.
+     */
+    suspend fun indexed(context: Context, query: String, platform: String?, limit: Int): List<AcquireContentResult> = emptyList()
+
+    /**
      * Gets the source ready to answer, before it is asked (Droidtop/tracker#848): a plugin source is started in its
      * process, held by [SourceWarmth], so a cold start is not spent out of [search]'s own budget. Null when it is
      * ready, else why not. A source that needs nothing started has nothing to do.
@@ -143,7 +149,19 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         // A slow site is slow, not broken: a search that misses its budget is "didn't answer in time", not a crash.
         val reply = PluginViews.call(context, source.record, "library.sources", "search", args, timeoutMs = SEARCH_TIMEOUT_MS)
         if (!reply.ok) return Result.failure(SourceReplyFailure(reply.code ?: dev.droidtop.pluginhost.PluginErrorCode.FAILED, reply.message, reply.detail))
+        remember(context, reply.data)
         return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).let { rows -> if (limit != null) rows.take(limit) else rows }.map(::resultOf))
+    }
+
+    /** What the source answered, added to its own index, unless it opted out (Droidtop/tracker#937). */
+    private fun remember(context: Context, data: org.json.JSONObject) {
+        if (SourceIndex.allowed(source.record)) runCatching { SourceIndex.record(context, id, data) }
+    }
+
+    override suspend fun indexed(context: Context, query: String, platform: String?, limit: Int): List<AcquireContentResult> {
+        if (!SourceIndex.allowed(source.record)) return emptyList()
+        val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { SourceIndex.search(context, id, query, platform, limit) }
+        return dev.droidtop.pluginhost.SourceResultProtocol.results(data).take(limit).map(::resultOf)
     }
 
     /**
@@ -160,6 +178,7 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
             if (reply.code == dev.droidtop.pluginhost.PluginErrorCode.UNSUPPORTED) return Result.success(emptyList())
             return Result.failure(SourceReplyFailure(reply.code ?: dev.droidtop.pluginhost.PluginErrorCode.FAILED, reply.message, reply.detail))
         }
+        remember(context, reply.data)
         return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).take(limit).map(::resultOf))
     }
 

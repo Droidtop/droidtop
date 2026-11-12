@@ -218,8 +218,15 @@ object PluginStore {
     fun disabledDetail(context: Context, pluginId: String): String? =
         PluginBundleInstaller.readRecord(root(context), pluginId)?.disabledDetail
 
+    /**
+     * :app sets this at start: what droidtop keeps about a plugin outside this module, removed with it (a source's own
+     * index, Droidtop/tracker#937).
+     */
+    @Volatile var onUninstalled: (context: Context, pluginId: String) -> Unit = { _, _ -> }
+
     /** Removes the plugin, its data and its grants; its activity ring is kept 7 days and marked removed (docs/plugin-api.md 1.5, 4.6). */
     fun uninstall(context: Context, pluginId: String) {
+        runCatching { onUninstalled(context, pluginId) }
         val audit = PluginAudit.forContext(context)
         audit.markRemoved(pluginId)
         audit.purgeExpired()

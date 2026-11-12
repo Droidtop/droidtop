@@ -572,6 +572,9 @@ internal fun LibrarySearchDialog(
     var statusLine by remember { mutableStateOf<String?>(null) }
     // Bumped to search again after the person fixed something (installed a runtime, approved a plugin).
     var searchTick by remember { mutableIntStateOf(0) }
+    // The live sources are asked only on a press (owner, 2026-11-12, Droidtop/tracker#937); typing new text goes back
+    // to the library and each source's own index.
+    var live by remember { mutableStateOf(false) }
     // Whether the device has no network at all (the one status source, read off the main thread): every source then
     // fails for the same reason, and the page says so once.
     val offline by dev.droidtop.ui.shared.rememberOffline()
@@ -605,6 +608,7 @@ internal fun LibrarySearchDialog(
     LaunchedEffect(text) {
         focusKey = null
         choosing = null
+        live = false
     }
 
     // JSON acquire_content integrations, read once off the main thread: each is one hand-off row, after every source's
@@ -625,14 +629,15 @@ internal fun LibrarySearchDialog(
 
     // The sources are started as the screen opens, while the person types, and held until it closes
     // (Droidtop/tracker#848): a search then asks sources that are already up.
-    DisposableEffect(sourcePlatform ?: systemId) {
-        dev.droidtop.library.integrations.SourceWarmth.prewarm(context, sourcePlatform ?: systemId)
-        onDispose { dev.droidtop.library.integrations.SourceWarmth.release() }
+    // Only once the person asks the sources (Droidtop/tracker#937): typing alone starts no source.
+    DisposableEffect(sourcePlatform ?: systemId, live) {
+        if (live) dev.droidtop.library.integrations.SourceWarmth.prewarm(context, sourcePlatform ?: systemId)
+        onDispose { if (live) dev.droidtop.library.integrations.SourceWarmth.release() }
     }
 
     // Restarted by every keystroke: the previous query is cancelled, the device's rows are back at once and the sources
     // are asked only once the text rests (UnifiedSearch.SOURCE_DEBOUNCE_MS).
-    LaunchedEffect(text, systemId, sourcePlatform, searchTick, localKey, handoffs) {
+    LaunchedEffect(text, systemId, sourcePlatform, searchTick, localKey, handoffs, live) {
         // Set up off the main thread: it reads the source filter's preferences (SourceSelection).
         withContext(Dispatchers.IO) {
             UnifiedSearch.search(
@@ -643,6 +648,7 @@ internal fun LibrarySearchDialog(
                 carry = state.sourceHits,
                 keep = { result -> currentFilter?.invoke(result) ?: true },
                 featuredWhenEmpty = getGames,
+                live = live,
             )
         }
             // At most one new state every 150 ms, always the newest (UnifiedSearch.pacedAtMost, Droidtop/tracker#915): every
@@ -793,6 +799,20 @@ internal fun LibrarySearchDialog(
                 settingsHits.forEach { hit ->
                     add(SearchLine.Entry("setting:${hit.itemId}", hit.itemTitle, subtitle = hit.screenTitle) { activeCatalog = hit.target })
                 }
+            }
+            // The live sources, on a press (owner, 2026-11-12, Droidtop/tracker#937): what is above is the library and
+            // each source's own index; this asks the sources that are on, over the network, and adds what they answer.
+            if (!live) {
+                add(
+                    SearchLine.Entry(
+                        "search_sources",
+                        if (text.isBlank()) "See what your sources feature now" else "Search the sources for \u201C${text.trim()}\u201D",
+                        subtitle = "Asks each source that is on",
+                    ) {
+                        live = true
+                        searchTick++
+                    },
+                )
             }
             when {
                 !state.settled -> add(SearchLine.Note(if (text.isBlank()) "Asking your sources" else "Searching", busy = true))
