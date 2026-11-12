@@ -89,6 +89,19 @@ object SourceIndex {
         return JSONObject().put("results", results)
     }
 
+    /** When [sourceId]'s whole list was last read in ([SourceIndexRefresh]); null when never. */
+    fun refreshedAt(context: Context, sourceId: String): Long? {
+        if (!File(dir(context), fileName(sourceId)).isFile) return null
+        val db = db(context, sourceId) ?: return null
+        return db.rawQuery("SELECT v FROM meta WHERE k = 'refreshed'", null).use { if (it.moveToFirst()) it.getString(0).toLongOrNull() else null }
+    }
+
+    /** Records that [sourceId]'s whole list was read in at [at]. */
+    fun markRefreshed(context: Context, sourceId: String, at: Long) {
+        val db = db(context, sourceId) ?: return
+        db.insertWithOnConflict("meta", null, ContentValues().apply { put("k", "refreshed"); put("v", at.toString()) }, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
     /** How many entries [sourceId]'s index has; 0 when it has none yet. */
     fun size(context: Context, sourceId: String): Long {
         if (!File(dir(context), fileName(sourceId)).isFile) return 0
@@ -124,6 +137,7 @@ object SourceIndex {
             SQLiteDatabase.openOrCreateDatabase(file, null).apply {
                 execSQL("CREATE TABLE IF NOT EXISTS items (id TEXT PRIMARY KEY, fold TEXT NOT NULL, platform TEXT, item TEXT NOT NULL, seen INTEGER NOT NULL)")
                 execSQL("CREATE INDEX IF NOT EXISTS items_seen ON items (seen)")
+                execSQL("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)")
             }
         }.getOrNull() ?: return null
     }
