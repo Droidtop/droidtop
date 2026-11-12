@@ -108,6 +108,10 @@ internal object Seams {
         }
         dev.droidtop.pluginhost.debrid.DebridChoice.spreadMode = { dev.droidtop.library.debrid.DebridAccounts.spread(app) }
         dev.droidtop.pluginhost.debrid.DebridChoice.onKeyRefused = { id, message -> dev.droidtop.library.debrid.DebridAccounts.refused(app, id, message) }
+        // A source's own index goes with its plugin (Droidtop/tracker#937).
+        dev.droidtop.pluginhost.PluginStore.onUninstalled = { context, pluginId ->
+            dev.droidtop.library.integrations.SourceIndex.forgetPlugin(context, pluginId)
+        }
         dev.droidtop.pluginhost.DownloadJobs.onPlaced = { context, placed, args ->
             dev.droidtop.library.integrations.AcquireEngineHint.apply(context, placed, args[dev.droidtop.library.integrations.AcquireEngineHint.KEY])
             listOfNotNull(

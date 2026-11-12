@@ -28963,8 +28963,24 @@ match" for games Gaming listed (console, 2026-10-17).
   row says what it is in its detail line ("App", "Game", the source's name
   with its columns, system and size), never by sitting under a heading. No
   "Get more" group and no plugin mode exist.
+- **The sources are asked on a press; typing reads their indexes** (owner,
+  2026-11-12, Droidtop/tracker#937: "tie 'get games' sources to a button press,
+  so searches don't query external sources by default", "per-source indexes
+  that are built dynamically from searches", "indexes are per-source. This is
+  because sources can be individually toggled"). Typing searches the library
+  and each source's own index (`SourceIndex`, one SQLite file per source in
+  droidtop's storage), read only for the sources that are on; no plugin is
+  started and nothing goes over the network. "Search the sources for ..." (or,
+  in Get games with nothing typed, "See what your sources feature now") is a
+  row of the list: pressing it asks the live sources as described below, and
+  every answer, search or featured, is added to that source's index. New text
+  goes back to the indexes. A source opts out of being indexed with
+  `"index": false` on its `library.sources` entry and is then found only on
+  the press; its index goes when its plugin is removed. A source that
+  publishes its whole list fills its index in bulk on a refresh that is on by
+  default.
 - **Streaming, off the main thread.** The device's rows are emitted at once.
-  The sources are asked only after the text has rested 350 ms, concurrently,
+  Once asked, the sources answer after the text has rested 350 ms, concurrently,
   each bounded by `PER_SOURCE_TIMEOUT_MS`, and a source's rows join the list
   the moment it answers; the list ends in "Searching" until every source has
   answered or timed out. The previous query's source rows stay (while they
