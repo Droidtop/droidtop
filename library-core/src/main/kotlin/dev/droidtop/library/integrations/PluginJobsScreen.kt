@@ -90,7 +90,6 @@ object PluginJobsScreen {
         return CatalogScreen(
             id = ID,
             title = Place.DOWNLOADS.title,
-            subtitle = "Getting games, plugin downloads, library scrapes, updates and other long-running work".takeIf { headed },
             groups = { context ->
                 val nowMs = System.currentTimeMillis()
                 val extra = kept.read(context, nowMs)
@@ -185,7 +184,7 @@ object PluginJobsScreen {
                     id = "plugin_jobs_list",
                     title = null,
                     // A short title: the navigator's detail strip repeats any title longer than a row shows.
-                    items = listOf(ActionItem(id = "plugin_jobs_none", title = "Nothing running", subtitle = "No jobs running or recently finished")),
+                    items = listOf(ActionItem(id = "plugin_jobs_none", title = "Nothing running")),
                 ),
             )
         }
@@ -209,8 +208,7 @@ object PluginJobsScreen {
     private fun clearFinishedItem(count: Int): CatalogItem = ActionItem(
         id = "plugin_jobs_clear_finished",
         title = "Clear finished",
-        subtitle = "Removes the $count finished from this list; droidtop's log keeps what each did",
-        confirmTitle = "Clear every finished job from this list?",
+        confirmTitle = "Clear finished?",
         run = { PluginJobsCenter.clearFinished() },
     )
 
@@ -228,7 +226,6 @@ object PluginJobsScreen {
             NestedScreenItem(
                 id = "plugin_jobs_rules_link",
                 title = "Download rules",
-                subtitle = "Which network downloads use, when updates run, and which games update themselves",
                 registryId = RULES_SCREEN_ID,
             ),
         ),
@@ -476,7 +473,7 @@ object PluginJobsScreen {
 
     private fun jobControls(jobId: String, entry: PluginJobsCenter.Entry?): List<CatalogItem> {
         if (entry == null) {
-            val said = if (PluginJobsCenter.wasCleared(jobId)) "This job was cleared" else "This job is no longer tracked"
+            val said = if (PluginJobsCenter.wasCleared(jobId)) "Cleared" else "Gone"
             return listOf(ActionItem(id = "plugin_job_${jobId}_gone", title = said))
         }
         if (entry.done) return finishedControls(jobId, entry)
@@ -505,7 +502,7 @@ object PluginJobsScreen {
                     NestedScreenItem(
                         id = "plugin_job_${jobId}_metered",
                         title = "Downloads on this connection",
-                        subtitle = "This connection is metered. You can allow it for every download, never for one",
+                        subtitle = "Metered connection",
                         registryId = METERED_SCREEN_ID,
                     ),
                 )
@@ -515,7 +512,7 @@ object PluginJobsScreen {
                     ActionItem(
                         id = "plugin_job_${jobId}_${if (entry.paused) "resume" else "pause"}",
                         title = if (entry.hold != null) "Download now" else if (entry.paused) "Resume" else "Pause",
-                        subtitle = if (networkHold) "Goes first. It starts when there is a connection downloads may use" else null,
+                        subtitle = if (networkHold) "Goes first when connected" else null,
                         run = { if (entry.paused) PluginJobsCenter.resume(jobId) else PluginJobsCenter.pause(jobId) },
                     ),
                 )
@@ -527,9 +524,8 @@ object PluginJobsScreen {
                     AsyncActionItem(
                         id = "plugin_job_${jobId}_restart",
                         title = "Start over",
-                        subtitle = "Deletes what was downloaded so far and downloads the game again",
-                        confirmTitle = "Start this download over? What was downloaded so far is deleted.",
-                        run = { ctx, _ -> if (dev.droidtop.library.stores.StoreInstallJob.restart(ctx, jobId)) "Starting over" else "This download can no longer be started over" },
+                        confirmTitle = "Start over? The partial download is deleted.",
+                        run = { ctx, _ -> if (dev.droidtop.library.stores.StoreInstallJob.restart(ctx, jobId)) "Starting over" else "Can't start over" },
                     ),
                 )
             }
@@ -542,9 +538,9 @@ object PluginJobsScreen {
                     title = if (dev.droidtop.pluginhost.PluginJobsCenter.isDownloadKind(entry.nativeKind)) "Cancel download" else "Cancel job",
                     confirmKeep = if (dev.droidtop.pluginhost.PluginJobsCenter.isDownloadKind(entry.nativeKind)) "Keep downloading" else "Keep it running",
                     subtitle = when (entry.nativeKind) {
-                        null -> "Best effort: the plugin decides whether it actually stops"
+                        null -> "The plugin may not stop"
                         // A store install's cancel deletes its partial files too (StoreInstallJob.discard).
-                        DownloadJobs.KIND, dev.droidtop.library.stores.StoreInstallJob.KIND -> "Stops the download and deletes what was downloaded so far"
+                        DownloadJobs.KIND, dev.droidtop.library.stores.StoreInstallJob.KIND -> "Deletes the partial download"
                         else -> "Stops at the next game"
                     },
                     confirmTitle = if (dev.droidtop.pluginhost.PluginJobsCenter.isDownloadKind(entry.nativeKind)) "Cancel this download?" else "Cancel this job?",
@@ -577,7 +573,6 @@ object PluginJobsScreen {
                 ActionItem(
                     id = "plugin_job_${jobId}_retry",
                     title = "Retry",
-                    subtitle = "Runs it again the same way",
                     run = { ctx -> PluginJobsCenter.retry(ctx, jobId) },
                 ),
             )
@@ -586,7 +581,6 @@ object PluginJobsScreen {
             ActionItem(
                 id = "plugin_job_${jobId}_clear",
                 title = "Clear",
-                subtitle = "Forgets this job and what it did",
                 run = { PluginJobsCenter.clear(jobId) },
             ),
         )

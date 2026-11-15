@@ -75,10 +75,10 @@ object UpdatesPage {
             // key, so Check now finds and installs the faster release build either way.
             subtitle = when {
                 update.debugBuilds(context) ->
-                    "Debug builds run several times slower. Turn this off and check again to go back"
+                    "Debug builds are much slower"
                 AppSettingsCatalogs.ctxIsDebuggable(context) ->
-                    "Currently running a debug build. Update installs the faster release build with this off"
-                else -> "Much slower builds for debugging droidtop itself. Leave this off to play"
+                    "Running a debug build"
+                else -> "Much slower; for finding droidtop bugs"
             },
             current = update.debugBuilds(context),
             onToggle = { ctx, value -> update.setDebugBuilds(ctx, value) },
@@ -93,7 +93,6 @@ object UpdatesPage {
     fun quickMenuScreen() = CatalogScreen(
         id = PluginJobsScreen.QUICK_MENU_ID,
         title = "Downloads",
-        subtitle = "What is downloading, and the way to Updates",
         groups = { context ->
             UpdatesWaiting.refresh?.invoke(context)
             listOf(PluginJobsScreen.updatesGroup()) + PluginJobsScreen.jobGroups()
@@ -105,7 +104,6 @@ object UpdatesPage {
     fun screen() = CatalogScreen(
         id = AppSettingsCatalogs.SCREEN_UPDATES,
         title = "Updates",
-        subtitle = "What has a newer version",
         needsNetwork = true,
         layout = CatalogLayout.STRIP,
         // Off the main thread as a whole: the rows read preferences and what the slow kinds last read.
@@ -118,7 +116,6 @@ object UpdatesPage {
     private fun settingsRow() = NestedScreenItem(
         id = "updates_settings",
         title = "Update settings",
-        subtitle = "How often droidtop checks, which builds it follows, and what updates without asking",
         inline = settingsScreen(),
     )
 
@@ -132,7 +129,6 @@ object UpdatesPage {
         return ActionItem(
             id = GetGamesEntry.UPDATES_ROW_ID,
             title = GetGamesEntry.NEW_GAMES,
-            subtitle = "Search the sources your plugins add for games to download",
             run = { ctx ->
                 ctx.startActivity(
                     Intent(ctx, MainActivity::class.java)
@@ -376,7 +372,7 @@ object UpdatesPage {
                         }
                     }
                     if (kind == null && updates.isEmpty() && checked != null && failure == null && unread.isEmpty()) {
-                        add(TextBlockItem(id = "updates_none", text = "Everything is up to date."))
+                        add(TextBlockItem(id = "updates_none", text = "Up to date"))
                     }
                     shown.forEach { add(rowOf(it, jobs)) }
                     // What is out but held back, and why (Droidtop/tracker#882): never an update, so not counted and not in
@@ -396,7 +392,7 @@ object UpdatesPage {
         return CatalogPage(
             header = PageHeader(
                 title = "Updates",
-                byline = listOfNotNull(lastLine ?: "Not checked yet", failure?.let { "The last check of droidtop failed: $it" }).joinToString(". "),
+                byline = listOfNotNull(lastLine ?: "Not checked yet", failure?.let { "Check failed: $it" }).joinToString(". "),
             ),
             buttons = listOf(
                 // Its progress and its answer are a line at the top of the page, in place: the press was easy to miss when
@@ -410,7 +406,7 @@ object UpdatesPage {
                 ) { ctx ->
                     if (checkRunning) return@PageButton
                     checkRunning = true
-                    checkLine = "Checking..."
+                    checkLine = "Checking"
                     changes.value++
                     scope.launch {
                         val said = try {
@@ -482,7 +478,7 @@ object UpdatesPage {
         },
         value = if (failure != null) "Try again" else "Check",
         run = { ctx, onStatus ->
-            onStatus("Checking droidtop's releases...")
+            onStatus("Checking")
             // A network call: never on the main thread.
             val said = withContext(Dispatchers.IO) { AppSelfUpdate.check(ctx) }
             changes.value++
@@ -559,8 +555,7 @@ object UpdatesPage {
             ActionItem(
                 id = "updates_plugin_held_${held.installed.manifest.id}",
                 title = held.installed.manifest.label,
-                subtitle = "${held.version} is out in ${held.repo}, but droidtop won't take it: ${held.reason}. " +
-                    "Check its key in Settings > Plugins > Keys you trust",
+                subtitle = "${held.version} held back: ${held.reason}",
                 iconFile = PluginStore.iconFile(context, held.installed),
             )
         }
@@ -617,7 +612,7 @@ object UpdatesPage {
                         title = state.offer.name,
                         subtitle = "${state.offer.version} from ${state.offer.source ?: state.pluginLabel} is signed by a different key than the installed app",
                         value = "Different key",
-                        run = { _, _ -> "Android refuses an update signed by a different key. Uninstall the app first to install this version" },
+                        run = { _, _ -> "Signed with a different key. Uninstall it first" },
                     ),
                 )
             }
@@ -723,10 +718,10 @@ object UpdatesPage {
                                 id = "updates_policy_${kind.name.lowercase()}",
                                 title = kind.label,
                                 subtitle = when (kind) {
-                                    UpdateKinds.Kind.DROIDTOP -> "Installing droidtop always ends with Android asking you to confirm"
-                                    UpdateKinds.Kind.PLUGINS -> "An update that asks for more access still waits for your approval"
-                                    UpdateKinds.Kind.APPS -> "Android may still ask, unless updating apps without asking is on below"
-                                    UpdateKinds.Kind.GAMES -> "Follows Download rules: the network, the update window, and not while playing"
+                                    UpdateKinds.Kind.DROIDTOP -> "Android asks to confirm"
+                                    UpdateKinds.Kind.PLUGINS -> "Asks first if it wants more access"
+                                    UpdateKinds.Kind.APPS -> "Android may ask"
+                                    UpdateKinds.Kind.GAMES -> "Follows Download rules"
                                 },
                                 options = UpdateKinds.Policy.entries.map { ChoiceOption(it.name, it.label) },
                                 current = UpdateKinds.policy(context, kind).name,
@@ -741,7 +736,6 @@ object UpdatesPage {
                             ChoiceItem(
                                 id = "updates_frequency",
                                 title = "Check for updates",
-                                subtitle = "How often droidtop, the catalogs and the stores are checked. Nothing about you is sent",
                                 options = AppSelfUpdate.Frequency.entries.map { ChoiceOption(it.name, it.label) },
                                 current = update.frequency(context).name,
                                 onSelect = { ctx, value ->
@@ -752,8 +746,6 @@ object UpdatesPage {
                             ChoiceItem(
                                 id = "updates_channel",
                                 title = "Build channel",
-                                subtitle = "Which builds this device follows. Unstable gets every new build; the others get a " +
-                                    "build once it has been promoted to them",
                                 options = AppSelfUpdate.Channel.entries.map { ChoiceOption(it.name, it.label) },
                                 current = update.channel(context).name,
                                 onSelect = { ctx, value -> update.setChannel(ctx, AppSelfUpdate.Channel.valueOf(value)) },
@@ -761,7 +753,7 @@ object UpdatesPage {
                             ToggleItem(
                                 id = "updates_apps_silent",
                                 title = "Update apps without asking",
-                                subtitle = "On Android 12 and later, for apps droidtop installed. Elsewhere Android asks each time",
+                                subtitle = "Android 12 and later",
                                 current = dev.droidtop.app.apps.ApkInstaller.silentUpdates(context),
                                 onToggle = { ctx, value -> dev.droidtop.app.apps.ApkInstaller.setSilentUpdates(ctx, value) },
                             ),
