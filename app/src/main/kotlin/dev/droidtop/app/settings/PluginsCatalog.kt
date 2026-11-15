@@ -208,7 +208,7 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                         ActionItem(
                             id = "plugins_none",
                             title = "No plugins installed",
-                            subtitle = "Get one above; each waits for your approval before it runs",
+                            subtitle = "Each asks before it runs",
                         ),
                     )
                     return@buildList
@@ -234,7 +234,7 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                         NestedScreenItem(
                             id = "plugins_updates",
                             title = "$updates ${if (updates == 1) "update" else "updates"}",
-                            subtitle = "In Updates, with everything else that has a newer version",
+                            subtitle = "In Updates",
                             registryId = SCREEN_UPDATES,
                         ),
                     )
@@ -290,21 +290,21 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                 NestedScreenItem(
                     id = "plugins_link_handlers",
                     title = "Link handlers",
-                    subtitle = "Which plugin or app opens which kind of link, and sending a kind of link to an app",
+                    subtitle = "Which app opens which link",
                     registryId = dev.droidtop.library.integrations.LinkRouter.HANDLERS_ID,
                 ),
                 // Other apps that asked to start a game (Droidtop/tracker#124): their answers live with the plugins' grants.
                 NestedScreenItem(
                     id = "plugins_external_launch",
                     title = "Apps that start games",
-                    subtitle = "Other apps that asked droidtop to start a game from your library",
+                    subtitle = "Apps that start your games",
                     inline = externalLaunchScreen(),
                 ),
                 // One place for where plugins come from (#513): catalogs, repositories and keys, side by side.
                 NestedScreenItem(
                     id = "plugins_sources",
                     title = "Where plugins come from",
-                    subtitle = "Catalogs, plugin repositories and the keys droidtop trusts",
+                    subtitle = "Catalogs and trusted keys",
                     inline = pluginSourcesScreen(),
                     valueLabel = { if (userKeys.isEmpty()) "Official only" else "Official + ${userKeys.size} more" },
                 ),
@@ -321,7 +321,7 @@ private fun catalogSearchGroup(context: Context): CatalogGroup? {
         id = "plugins_search_catalogs",
         title = "In catalogs",
         items = rows.ifEmpty {
-            listOf(ActionItem(id = "plugins_search_catalogs_none", title = "No catalog plugin matches \"$query\"", subtitle = "Searched as each catalog was last fetched"))
+            listOf(ActionItem(id = "plugins_search_catalogs_none", title = "No catalog plugin matches \"$query\""))
         },
     )
 }
@@ -422,20 +422,20 @@ internal fun AppSettingsCatalogs.getPluginsGroup(catalogsSummary: String?) = Cat
         NestedScreenItem(
             id = "plugins_add_official",
             title = "droidtop plugins",
-            subtitle = "Made by droidtop. Install one with a press, or all of them",
+            subtitle = "Official",
             inline = PluginCatalogScreen.officialScreen(),
         ),
         NestedScreenItem(
             id = "plugins_add_catalog",
             title = "More catalogs",
-            subtitle = "From other people: switch one on, or add one by address, QR code or link",
+            subtitle = "Unofficial",
             inline = PluginCatalogScreen.screen(),
             valueLabel = { catalogsSummary },
         ),
         DocumentPickItem(
             id = "plugins_add_file",
             title = "Install plugin file",
-            subtitle = "A signed .droidplugin.tar.xz bundle",
+            subtitle = ".droidplugin.tar.xz",
             mimeType = "*/*",
             // A downloaded bundle is in Downloads; the picker otherwise opened on an empty Documents (rig, build 1535).
             startIn = "Download",
@@ -470,7 +470,7 @@ internal fun AppSettingsCatalogs.pluginSourcesScreen() = CatalogScreen(
                     NestedScreenItem(
                         id = "plugins_keys_you_trust",
                         title = "Keys you trust",
-                        subtitle = "Every origin whose plugins droidtop accepts: from a catalog, a repository or added by hand",
+                        subtitle = "Who may sign plugins",
                         registryId = SCREEN_PLUGIN_KEYS,
                         valueLabel = { if (userKeys.isEmpty()) "Official only" else "Official + ${userKeys.size} more" },
                     ),
@@ -808,7 +808,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 ActionItem(
                     id = "plugin_${m.id}_new_access",
                     title = "Wants new access",
-                    subtitle = "An update asks for more; nothing new is on until you choose",
+                    subtitle = "The update asks for more",
                 ),
             )
         }
@@ -924,7 +924,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 NestedScreenItem(
                     id = "plugin_${m.id}_permissions",
                     title = "Permissions",
-                    subtitle = "What it may do, and when it last did",
+                    subtitle = null,
                     inline = pluginPermissionsScreen(m.id),
                     valueLabel = { summary },
                 ),
@@ -935,7 +935,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                         NestedScreenItem(
                             id = "plugin_${m.id}_messages",
                             title = "Plugin messages",
-                            subtitle = "What droidtop changed to draw its pages",
+                            subtitle = null,
                             inline = pluginMessagesScreen(m.id, m.label),
                             valueLabel = { count.toString() },
                         ),
@@ -944,7 +944,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 NestedScreenItem(
                     id = "plugin_${m.id}_activity",
                     title = "Activity",
-                    subtitle = "What it asked droidtop to do, newest first",
+                    subtitle = null,
                     inline = pluginActivityScreen(m.id),
                 ),
             ),
@@ -977,7 +977,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 NestedScreenItem(
                     id = "plugin_${m.id}_facets_page",
                     title = "Status and actions",
-                    subtitle = "What ${m.label} shows on its page",
+                    subtitle = null,
                     inline = PluginFacets.pageScreen(record),
                 ),
             )
@@ -988,7 +988,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                     NestedScreenItem(
                         id = "plugin_${m.id}_panel",
                         title = "Panel",
-                        subtitle = "What the plugin shows in the Quick Menu",
+                        subtitle = null,
                         inline = PluginPanels.panelScreen(context, panel, PluginPanels.SURFACE_SETTINGS, game = null, withMore = false),
                     ),
                 )
@@ -999,7 +999,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 NestedScreenItem(
                     id = "plugin_${m.id}_settings_rows",
                     title = "Settings",
-                    subtitle = "Settings this plugin contributes",
+                    subtitle = null,
                     inline = PluginSettingsRows.screenFor(record),
                 ),
             )
@@ -1010,7 +1010,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 AsyncActionItem(
                     id = "plugin_${m.id}_open_main",
                     title = "Open ${m.label}",
-                    subtitle = "Its own screen, full-screen. Back returns here",
+                    subtitle = null,
                     run = { ctx, _ -> PluginMainUi.open(ctx, record) ?: "Opened" },
                 ),
             )
@@ -1031,7 +1031,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                         AsyncActionItem(
                             id = "plugin_${m.id}_store_${store.id}_sync",
                             title = "${store.label}: read your games",
-                            subtitle = "Adds the games your ${store.label} account holds to your library. Sign in with the account row first",
+                            subtitle = null,
                             run = { ctx, _ ->
                                 if (!withContext(Dispatchers.IO) { store.signedIn(ctx) }) {
                                     "Sign in to ${store.label} first"
@@ -1048,7 +1048,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 NestedScreenItem(
                     id = "plugin_${m.id}_app_status",
                     title = "App status",
-                    subtitle = "Status and actions for the app this plugin manages",
+                    subtitle = null,
                     inline = PluginAppStatus.screenFor(record),
                 ),
             )
@@ -1075,7 +1075,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 AsyncActionItem(
                     id = "plugin_${m.id}_update",
                     title = "Version ${m.version}",
-                    subtitle = if (offer.source.official) "An update is available in the catalog" else "An update is available in \"${offer.source.name}\" (unofficial)",
+                    subtitle = if (offer.source.official) null else "From \"${offer.source.name}\" (unofficial)",
                     value = "Update to ${offer.release.version}",
                     run = { ctx, onStatus -> PluginCatalog.install(ctx, offer.plugin, offer.release, onStatus) },
                 )
@@ -1083,7 +1083,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 ActionItem(
                     id = "plugin_${m.id}_version",
                     title = "Version ${m.version}",
-                    subtitle = if (listings.isEmpty()) "Checking the catalogs for a newer version" else "No newer version on its channel in your catalogs",
+                    subtitle = if (listings.isEmpty()) "Checking" else "Up to date",
                 )
             },
         )
@@ -1096,7 +1096,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 ChoiceItem(
                     id = "plugin_${m.id}_channel",
                     title = "Channel",
-                    subtitle = "Testing and Unstable get new versions sooner and may not work as well",
+                    subtitle = null,
                     options = listOf(dev.droidtop.library.settings.ChoiceOption(CATALOG_CHANNEL, "As its catalog (${catalogs.label})")) +
                         dev.droidtop.library.integrations.PluginChannel.entries.map { dev.droidtop.library.settings.ChoiceOption(it.id, it.label) },
                     current = channels.plugin(m.id)?.id ?: CATALOG_CHANNEL,
@@ -1135,7 +1135,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         AsyncActionItem(
             id = "plugin_${m.id}_containment",
             title = "Containment check",
-            subtitle = "Where it runs, and whether it can reach the network, droidtop's files or shared storage",
+            subtitle = null,
             run = { ctx, _ ->
                 val policy = PluginCrashPolicy(ctx.applicationContext)
                 try {
@@ -1242,7 +1242,7 @@ internal fun AppSettingsCatalogs.pluginAccountRow(record: dev.droidtop.pluginhos
         return AsyncActionItem(
             id = "plugin_${m.id}_web_account",
             title = title,
-            subtitle = if (account.allowed) "Your sign-in stays in droidtop: ${m.label} never sees your password" else "Sign-in is turned off for ${m.label} in its Permissions",
+            subtitle = if (account.allowed) "${m.label} never sees your password" else "Sign-in is off in its Permissions",
             value = account.state,
             run = { ctx, _ -> signInFromRow(ctx, record, switch = false) },
         )
@@ -1250,7 +1250,7 @@ internal fun AppSettingsCatalogs.pluginAccountRow(record: dev.droidtop.pluginhos
     return NestedScreenItem(
         id = "plugin_${m.id}_web_account",
         title = title,
-        subtitle = "Your sign-in stays in droidtop: ${m.label} never sees your password",
+        subtitle = "${m.label} never sees your password",
         valueLabel = { account.state },
         inline = CatalogScreen(
             id = "plugin_${m.id}_web_account_screen",
@@ -1281,7 +1281,7 @@ internal fun AppSettingsCatalogs.pluginAccountRow(record: dev.droidtop.pluginhos
                                         AsyncActionItem(
                                             id = "plugin_${m.id}_web_switch",
                                             title = "Switch account",
-                                            subtitle = "Signs out, then opens ${now.site}'s sign-in for another account",
+                                            subtitle = null,
                                             run = { ctx, _ -> signInFromRow(ctx, record, switch = true) },
                                         ),
                                     )
@@ -1370,7 +1370,7 @@ internal fun AppSettingsCatalogs.pluginPageTop(
             // install were over, and a refusal read like any other line (Droidtop/tracker#882).
             run = {
                 later { ctx ->
-                    Notices.flash("Updating ${m.label} to ${offer.release.version}. Its bar is in Downloads and installs", source = m.label, context = ctx)
+                    Notices.flash("Updating", source = m.label, context = ctx)
                     val outcome = withContext(Dispatchers.IO) { PluginCatalog.installOutcome(ctx, offer.plugin, offer.release) }
                     if (outcome.installed) {
                         outcome.line
@@ -1525,7 +1525,7 @@ internal fun AppSettingsCatalogs.permissionRows(
 internal fun AppSettingsCatalogs.pluginPermissionsScreen(pluginId: String) = CatalogScreen(
     id = "plugin_permissions_$pluginId",
     title = "Permissions",
-    subtitle = "A change takes effect on the plugin's next call",
+    subtitle = null,
     groups = { context -> withContext(Dispatchers.IO) { pluginPermissionGroups(context, pluginId) } },
     live = PluginGrants.changes,
 )
@@ -1810,7 +1810,7 @@ internal fun AppSettingsCatalogs.providedByGroups(resolution: ApiResolution, cho
                 dev.droidtop.library.settings.ChoiceItem(
                     id = "plugins_provided_by_$api",
                     title = api,
-                    subtitle = "Which plugin answers this for the plugins that use it",
+                    subtitle = null,
                     options = list.map { dev.droidtop.library.settings.ChoiceOption(it.plugin.manifest.id, it.plugin.manifest.label) },
                     current = chosen[api]?.takeIf { id -> list.any { it.plugin.manifest.id == id } } ?: list.first().plugin.manifest.id,
                     onSelect = { ctx, value -> PluginProviderChoices.forContext(ctx).choose(api, value) },
@@ -1959,7 +1959,7 @@ internal suspend fun AppSettingsCatalogs.appKeysGroup(context: Context): Catalog
         id = "plugin_keys_apps",
         title = "Apps you trust",
         items = if (apps.isEmpty()) {
-            listOf(ActionItem(id = "plugin_keys_apps_none", title = "No app keys added by you", subtitle = "An app's plugin signed by its maker's official key needs none"))
+            listOf(ActionItem(id = "plugin_keys_apps_none", title = "No app keys added by you", subtitle = null))
         } else {
             apps.entries.sortedBy { it.key }.flatMap { (packageName, cert) ->
                 listOf(
@@ -2004,7 +2004,7 @@ internal fun AppSettingsCatalogs.stopTrustingApp(context: Context, packageName: 
 internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
     id = SCREEN_PLUGIN_KEYS,
     title = "Keys you trust",
-    subtitle = "Signers droidtop checks plugins against. Any but the official one is yours, not vetted",
+    subtitle = null,
     groups = { context ->
         val userKeys = withContext(Dispatchers.IO) { UserOriginKeys.load(UserOriginKeys.storeFile(context)) }
         // The pinned signing root is read from the APK's resources on first use: off the main thread.
@@ -2067,14 +2067,14 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                     TextInputItem(
                         id = "plugin_keys_source_url",
                         title = "Source address",
-                        subtitle = "A GitHub repo, a catalog's .json index or an https address; its key is fetched to trust",
+                        subtitle = "GitHub repo, catalog index or https address",
                         value = pendingKeySourceUrl,
                         onChange = { _, v -> pendingKeySourceUrl = v.trim() },
                     ),
                     AsyncActionItem(
                         id = "plugin_keys_source_fetch",
                         title = "Fetch this source's key",
-                        subtitle = "Trust-on-first-use: nothing is trusted until you confirm it below",
+                        subtitle = null,
                         run = { ctx, onStatus -> fetchSourceKey(ctx, pendingKeySourceUrl, onStatus) },
                     ),
                 ),
@@ -2088,14 +2088,14 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                     TextInputItem(
                         id = "plugin_keys_manual_origin",
                         title = "Origin id",
-                        subtitle = "The id in its plugins' names (<origin>.<name>), e.g. acme",
+                        subtitle = "e.g. acme",
                         value = pendingKeyManualOrigin,
                         onChange = { _, v -> pendingKeyManualOrigin = v.trim() },
                     ),
                     TextInputItem(
                         id = "plugin_keys_manual_key",
                         title = "Certificate or public key",
-                        subtitle = "The origin's certificate (or its public key), pasted exactly as its author publishes it",
+                        subtitle = null,
                         // The value column beside a row's title is narrow:
                         // the whole ~124-char base64 squeezed this row's
                         // title and description out of the row once one
@@ -2116,7 +2116,7 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                     DocumentPickItem(
                         id = "plugin_keys_manual_file",
                         title = "Add key from a file",
-                        subtitle = "A droidtop-plugin-key.json file, or a plain key file with the Origin id filled in above",
+                        subtitle = "droidtop-plugin-key.json or a key file",
                         // Not application/json: many file managers label a
                         // .json as octet-stream, which a narrower filter
                         // would hide. The file is parsed before it is kept.
@@ -2193,7 +2193,7 @@ internal fun AppSettingsCatalogs.proposedKeyGroup(proposal: ProposedKey): Catalo
  * action on this screen.
  */
 internal fun AppSettingsCatalogs.fetchSourceKey(context: Context, url: String, onStatus: (String) -> Unit): String {
-    if (url.isBlank()) return "Type the source's address first"
+    if (url.isBlank()) return "Enter an address first"
     onStatus("Fetching $url...")
     return when (val fetched = PluginSourceKeys.fetchKey(url, dev.droidtop.net.GitHubTokenStore.get(context))) {
         is PluginSourceKeys.FetchResult.Failed -> fetched.reason
@@ -2245,7 +2245,7 @@ internal fun AppSettingsCatalogs.commitTrustedKey(context: Context, proposal: Pr
 
 internal fun AppSettingsCatalogs.addManualKey(context: Context, origin: String, key: String): String {
     if (origin.isBlank()) return "Type the origin's id first"
-    if (key.isBlank()) return "Paste the origin's public key first"
+    if (key.isBlank()) return "Paste a key first"
     return addKeyOutcomeMessage(UserOriginKeys.add(UserOriginKeys.storeFile(context), origin, key, source = null))
 }
 
