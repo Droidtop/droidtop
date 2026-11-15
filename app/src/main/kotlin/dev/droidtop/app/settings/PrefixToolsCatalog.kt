@@ -100,7 +100,7 @@ object PrefixToolsCatalog {
                         DocumentPickItem(
                             id = "wine_prefix_run_pick",
                             title = "Choose a program",
-                            subtitle = "An .exe, .msi, .bat or .cmd on this device. It runs where it is; nothing is copied",
+                            subtitle = ".exe, .msi, .bat or .cmd",
                             mimeType = "*/*",
                             onPicked = { ctx, uri ->
                                 val file = withContext(Dispatchers.IO) { PickedFiles.fileOf(uri) }
@@ -111,7 +111,6 @@ object PrefixToolsCatalog {
                         TextInputItem(
                             id = "wine_prefix_run_path",
                             title = "Path to a program",
-                            subtitle = "For a file the picker cannot reach, such as a shared folder",
                             value = typedPath,
                             onChange = { _, text -> typedPath = text.trim() },
                         ),
@@ -135,7 +134,7 @@ object PrefixToolsCatalog {
                         NestedScreenItem(
                             id = "wine_prefix_files",
                             title = "Look inside the prefix",
-                            subtitle = "Its folders and files, read only: nothing here can be changed or deleted",
+                            subtitle = "Read only",
                             inline = PrefixFolderCatalog.screen(entryId, title),
                         ),
                     ),
@@ -147,7 +146,7 @@ object PrefixToolsCatalog {
                         AsyncActionItem(
                             id = "wine_prefix_kill",
                             title = "Stop every Wine process",
-                            subtitle = "For a hung program or a game left running: ends every Windows program, in any prefix",
+                            subtitle = "Ends every Windows program",
                             confirmTitle = "Stop every Wine process?",
                             run = { _, _ -> WinePrefixTools.killAll() },
                         ),

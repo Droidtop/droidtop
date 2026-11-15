@@ -28,7 +28,7 @@ object MeteredConnectionCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Downloads on this connection",
-        subtitle = "This connection is metered: it may cost you money or use up a data allowance",
+        subtitle = "Metered: may cost money",
         groups = { context -> groups(context) },
         live = combine(MeteredGrants.once, MeteredGrants.always) { once, always -> once to always },
     )
@@ -55,7 +55,7 @@ object MeteredConnectionCatalog {
                     ActionItem(
                         id = "metered_once",
                         title = "Allow downloads until you disconnect",
-                        subtitle = "Every waiting download starts now. When you disconnect, downloads wait again",
+                        subtitle = "Until you disconnect",
                         run = { MeteredGrants.allowOnce(connection) },
                     ),
                 )
@@ -67,7 +67,7 @@ object MeteredConnectionCatalog {
                         ActionItem(
                             id = "metered_wifi_settings",
                             title = "This network is not metered",
-                            subtitle = "Opens Android's settings for this Wi-Fi to set it not metered. droidtop never changes it",
+                            subtitle = "In Android's Wi-Fi settings",
                             run = { ctx -> ctx.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                         ),
                     )
@@ -78,7 +78,7 @@ object MeteredConnectionCatalog {
                         ActionItem(
                             id = "metered_always_sim",
                             title = "Always allow downloads on ${connection.label}",
-                            subtitle = "Every download uses this SIM's data from now on. You can take it back in Download rules",
+                            subtitle = "Undo in Download rules",
                             confirmTitle = "Let every download use ${connection.label} from now on? This may cost you money.",
                             run = { ctx -> MeteredGrants.allowAlways(ctx, connection) },
                         ),
@@ -100,7 +100,7 @@ object MeteredConnectionCatalog {
             ActionItem(
                 id = "metered_always_wifi",
                 title = "Always allow downloads on ${connection.label}",
-                subtitle = "Every download uses this Wi-Fi from now on. You can take it back in Download rules",
+                subtitle = "Undo in Download rules",
                 confirmTitle = "Let every download use ${connection.label} from now on? It is metered: this may cost you money.",
                 run = { ctx -> MeteredGrants.allowAlways(ctx, connection) },
             )
@@ -108,7 +108,7 @@ object MeteredConnectionCatalog {
             ActionItem(
                 id = "metered_always_wifi_permission",
                 title = "Always allow on this Wi-Fi",
-                subtitle = "Needs location, only to know this Wi-Fi. Not recommended: use \"not metered\" above",
+                subtitle = "Needs location. Not recommended",
                 confirmTitle = "Ask Android for the location permission, only to remember this Wi-Fi for downloads? Not recommended.",
                 run = { ctx ->
                     if (MeteredGrants.canNameWifi(ctx)) {
@@ -130,7 +130,7 @@ object MeteredConnectionCatalog {
                 ActionItem(
                     id = "download_rules_metered_$key",
                     title = label,
-                    subtitle = "Every download may use it. Select to take this back",
+                    subtitle = "Select to undo",
                     confirmTitle = "Stop letting downloads use $label?",
                     run = { ctx -> MeteredGrants.remove(ctx, key) },
                 )

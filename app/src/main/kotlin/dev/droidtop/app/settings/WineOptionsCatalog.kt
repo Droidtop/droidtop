@@ -72,14 +72,14 @@ object WineOptionsCatalog {
                         ActionItem(
                             id = "wine_options_where",
                             title = "Runs in its own prefix",
-                            subtitle = "This game has its own Wine build and prefix; changes here apply to it alone",
+                            subtitle = "This game's own",
                             value = state.prefixName,
                         )
                     } else {
                         ActionItem(
                             id = "wine_options_where",
                             title = "Runs in the shared prefix",
-                            subtitle = "This game's own changes, from its next start. Another Wine build gives it its own prefix",
+                            subtitle = "From its next start",
                             // A count of this game's own settings over the
                             // shared prefix, not of prefixes: "1 of its own"
                             // under this title read as if a prefix had been
@@ -100,7 +100,6 @@ object WineOptionsCatalog {
                     NestedScreenItem(
                         id = WindowsPrograms.SCREEN_ID,
                         title = "Program",
-                        subtitle = "Which program in the game's folder starts it",
                         inline = WindowsPrograms.screen(entryId, title ?: entryId, gameRoot),
                     ),
                 )
@@ -112,7 +111,7 @@ object WineOptionsCatalog {
                     ActionItem(
                         id = "wine_options_other_builds",
                         title = "Games on another Wine build",
-                        subtitle = "Games on their own Wine build use their own prefix; change it in the game's Wine settings",
+                        subtitle = null,
                         value = state.otherBuilds.entries.joinToString(", ") { (build, games) -> if (games > 1) "$build x$games" else build },
                     ),
                 )
@@ -121,7 +120,6 @@ object WineOptionsCatalog {
                 NestedScreenItem(
                     id = "wine_component_sources",
                     title = "Wine builds and sources",
-                    subtitle = "Add any Wine build by link or file; choose which sources the rows above offer",
                     inline = ComponentSourcesCatalog.screen(),
                 ),
             )
@@ -130,7 +128,7 @@ object WineOptionsCatalog {
                     AsyncActionItem(
                         id = "wine_options_use_shared",
                         title = "Use the shared settings again",
-                        subtitle = "Drops this game's own choices; nothing is downloaded or deleted",
+                        subtitle = null,
                         run = { ctx, _ -> WineOptions.useShared(ctx, entryId!!) },
                     ),
                 )
@@ -161,7 +159,6 @@ object WineOptionsCatalog {
                 NestedScreenItem(
                     id = "wine_options_tools",
                     title = "Prefix tools",
-                    subtitle = "Wine configuration, registry editor, command prompt, running a program and stopping Wine",
                     inline = PrefixToolsCatalog.screen(null, title, shared = true),
                 ),
             )
@@ -194,7 +191,7 @@ object WineOptionsCatalog {
         return NestedScreenItem(
             id = "wine_options_touchscreen",
             title = "Touchscreen",
-            subtitle = "What each touch gesture does in this game: $summary",
+            subtitle = "$summary",
             inline = CatalogScreen(
                 id = "wine_options_touchscreen_screen",
                 title = "Touchscreen",
@@ -265,7 +262,7 @@ object WineOptionsCatalog {
 internal fun windowsSetupItem(provisioned: Boolean, state: WindowsSetup.State): AsyncActionItem = AsyncActionItem(
     id = "windows_provision",
     title = if (provisioned) "Reinstall the Windows environment" else "Set up Windows games",
-    subtitle = "Downloads Wine, a graphics driver and Windows files to run Windows games. Asks first",
+    subtitle = "Asks first",
     value = WindowsSetup.label(state),
     confirmTitle = if (provisioned) "Reinstall the Windows environment?" else "Download Windows system files?",
     run = { ctx, onStatus ->

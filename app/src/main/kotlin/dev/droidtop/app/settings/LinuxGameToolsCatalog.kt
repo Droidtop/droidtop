@@ -68,7 +68,7 @@ object LinuxGameToolsCatalog {
                     ToggleItem(
                         id = "linux_tools_own_home",
                         title = "Give this game its own home folder",
-                        subtitle = "On: from its next start this game has its own home folder. Existing saves stay put",
+                        subtitle = "From its next start",
                         current = ownHome,
                         onToggle = { ctx, on -> withContext(Dispatchers.IO) { LinuxGameOptionsPrefs.setOwnHome(ctx, target.entryId, on) } },
                     ),
@@ -81,7 +81,6 @@ object LinuxGameToolsCatalog {
                     DocumentPickItem(
                         id = "linux_tools_run_pick",
                         title = "Choose a program",
-                        subtitle = "A file inside the game's folder, run where it is in the same environment as the game",
                         mimeType = "*/*",
                         onPicked = { ctx, uri ->
                             val file = withContext(Dispatchers.IO) { PickedFiles.fileOf(uri) }
@@ -92,7 +91,6 @@ object LinuxGameToolsCatalog {
                     TextInputItem(
                         id = "linux_tools_run_path",
                         title = "Path to a program",
-                        subtitle = "Inside the game's folder",
                         value = typedPath,
                         onChange = { _, text -> typedPath = text.trim() },
                     ),
@@ -112,7 +110,6 @@ object LinuxGameToolsCatalog {
                     AsyncActionItem(
                         id = "linux_tools_stop",
                         title = "Stop this game's processes",
-                        subtitle = "Ends every program in the container that was started from this game's folder",
                         confirmTitle = "Stop this game's processes?",
                         run = { _, _ -> runtime?.stopLinuxProcesses(gameRoot) ?: "Windows and Linux support isn't loaded" },
                     ),

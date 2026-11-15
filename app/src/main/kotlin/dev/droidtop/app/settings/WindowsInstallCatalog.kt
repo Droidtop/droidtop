@@ -37,7 +37,6 @@ object WindowsInstallCatalog {
     fun screen(): CatalogScreen = CatalogScreen(
         id = SCREEN_ID,
         title = "Install a Windows game",
-        subtitle = "Unpack an installer, or run it in a new Windows prefix, and add the game to your library",
         groups = { context ->
             val started = WindowsInstalls.pending(context)
             val chosen = target
@@ -50,7 +49,7 @@ object WindowsInstallCatalog {
                             FolderPickItem(
                                 id = "windows_install_target",
                                 title = if (chosen == null) "Install into a folder of mine (optional)" else "Install into: ${chosen.path}",
-                                subtitle = "The installer sees it as a drive. Without one, the game goes in the new prefix",
+                                subtitle = "Seen as a drive by the installer",
                                 onPicked = { _, uri ->
                                     val folder = withContext(Dispatchers.IO) { GamesRootPrefs.resolveStoragePath(uri) }
                                     if (folder == null) {
@@ -75,7 +74,6 @@ object WindowsInstallCatalog {
                             DocumentPickItem(
                                 id = "windows_install_pick",
                                 title = "Choose the installer",
-                                subtitle = "A GOG offline installer (setup_*.exe) or any setup program, unpacked if it can be",
                                 mimeType = "*/*",
                                 onPicked = { ctx, uri ->
                                     val file = withContext(Dispatchers.IO) { PickedFiles.fileOf(uri) }
@@ -88,7 +86,6 @@ object WindowsInstallCatalog {
                             TextInputItem(
                                 id = "windows_install_path",
                                 title = "Path to the installer",
-                                subtitle = "For a file the picker cannot reach, such as a shared folder",
                                 value = typedInstaller,
                                 onChange = { _, text -> typedInstaller = text.trim() },
                             ),
@@ -117,7 +114,6 @@ object WindowsInstallCatalog {
                             AsyncActionItem(
                                 id = "windows_unpack_check",
                                 title = "Check the unpacker",
-                                subtitle = "innoextract from droidtop's component catalog, fetched when needed and checked by SHA-256",
                                 run = { ctx, onStatus -> InnoExtract.version(ctx, onStatus) },
                             ),
                         ),
@@ -148,7 +144,6 @@ object WindowsInstallCatalog {
     private fun pendingScreen(pending: WindowsInstalls.Pending): CatalogScreen = CatalogScreen(
         id = "windows_install_" + pending.id,
         title = pending.title,
-        subtitle = "Installed in its own prefix",
         groups = { context ->
             val folders = WindowsInstalls.candidates(context, pending.id)
             listOf(
@@ -160,7 +155,7 @@ object WindowsInstallCatalog {
                             ActionItem(
                                 id = "windows_install_nothing",
                                 title = "Nothing new found yet",
-                                subtitle = "Let the installer finish, then open this screen again. Its folders appear here",
+                                subtitle = "Let the installer finish first",
                             ),
                         )
                     } else {
@@ -186,13 +181,12 @@ object WindowsInstallCatalog {
                         NestedScreenItem(
                             id = "windows_install_tools",
                             title = "Prefix tools",
-                            subtitle = "Wine configuration, registry editor, command prompt, Windows components and the files",
                             inline = PrefixToolsCatalog.screen(PcContainers.ofContainer(pending.id), pending.title, shared = false),
                         ),
                         AsyncActionItem(
                             id = "windows_install_discard",
                             title = "Throw this install away",
-                            subtitle = "Deletes the new prefix and all in it. The installer and your folders are not touched",
+                            subtitle = "Deletes the new prefix",
                             confirmTitle = "Throw this install away?",
                             run = { ctx, _ -> WindowsInstalls.discard(ctx, pending.id) },
                         ),

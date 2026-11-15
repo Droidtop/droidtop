@@ -62,7 +62,6 @@ internal object FoldersCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Game folders",
-        subtitle = "Where droidtop looks for games. Console games go in a folder per system (snes, psx) inside",
         groups = { context -> groups(context) },
         // The search index must not read the library: it gets the rows that never change.
         indexGroups = { listOf(actionsGroup(shortcuts = null), byPathGroup()) },
@@ -80,7 +79,6 @@ internal object FoldersCatalog {
     fun addFolderItem(id: String) = FolderPickItem(
         id = id,
         title = "Add a folder",
-        subtitle = "An SD card, a second internal folder, anywhere games live",
         onPicked = { ctx, uri: Uri ->
             val resolved = GamesRootPrefs.resolveStoragePath(uri)
             if (resolved != null) {
@@ -182,7 +180,7 @@ internal object FoldersCatalog {
                         ActionItem(
                             id = "folders_root_remove_${root.path}",
                             title = "Remove this folder",
-                            subtitle = "Its games leave the library until you add it back. Nothing on the device is deleted",
+                            subtitle = "Nothing is deleted",
                             confirmTitle = "Stop looking in ${root.path}?",
                             run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, root.path) },
                         ),
@@ -237,7 +235,7 @@ internal object FoldersCatalog {
                     // The Gaming shell opens PC Games on the Wine shortcuts (PcSource.LIBRARY_ITEM_PREFIX).
                     id = "${PcSource.LIBRARY_ITEM_PREFIX}${PcSource.WineShortcut.id}",
                     title = PcSource.WineShortcut.label(),
-                    subtitle = "Shortcuts made by hand in a Wine prefix. PC Games lists them",
+                    subtitle = null,
                     value = gamesWord(count),
                 )
             },
@@ -261,7 +259,7 @@ internal object FoldersCatalog {
             AsyncActionItem(
                 id = "folders_path_add",
                 title = "Add this folder",
-                subtitle = "Checked for real before it is stored: it must exist, be a folder, and be readable",
+                subtitle = null,
                 run = { ctx, _ ->
                     val typed = pendingPath
                     val error = withContext(Dispatchers.IO) { GamesRootPrefs.addGamesRootByPath(ctx, typed) }

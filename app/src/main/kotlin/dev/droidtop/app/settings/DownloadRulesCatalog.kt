@@ -26,7 +26,6 @@ object DownloadRulesCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Download rules",
-        subtitle = "Which network downloads use, when updates run, and whether games update themselves",
         groups = { context -> groups(context) },
     )
 
@@ -45,7 +44,7 @@ object DownloadRulesCatalog {
                     ChoiceItem(
                         id = "download_rules_network_rule",
                         title = "Download over",
-                        subtitle = "Update checks follow it too. On a metered network you allow the network, not one download",
+                        subtitle = null,
                         options = NetworkRule.values().map { ChoiceOption(it.key, it.label) },
                         current = s.network.key,
                         onSelect = { ctx, value ->
@@ -84,7 +83,7 @@ object DownloadRulesCatalog {
                     ToggleItem(
                         id = "download_rules_engine_isolation",
                         title = "Isolate the download engine with Android",
-                        subtitle = "Android 11+. The engine runs apart with no file access; this also gives it its own user",
+                        subtitle = "Android 11 and later",
                         current = isolated,
                         onToggle = { ctx, value -> withContext(Dispatchers.IO) { EnginePrefs.setAndroidIsolation(ctx, value) } },
                     ),
@@ -97,7 +96,6 @@ object DownloadRulesCatalog {
                     dev.droidtop.library.settings.NestedScreenItem(
                         id = "download_rules_host_order",
                         title = "Host order",
-                        subtitle = "Which host droidtop tries first when it gets an update for you",
                         inline = HostOrderCatalog.screen(),
                     ),
                 ),
@@ -109,14 +107,14 @@ object DownloadRulesCatalog {
                     ToggleItem(
                         id = "download_rules_auto_default",
                         title = "Keep installed store games up to date",
-                        subtitle = "The default for games that follow it. A game's own menu can turn it on or off for itself",
+                        subtitle = null,
                         current = s.autoUpdateDefault,
                         onToggle = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(autoUpdateDefault = value) } },
                     ),
                     ToggleItem(
                         id = "download_rules_window_on",
                         title = "Update only during a set time",
-                        subtitle = "Automatic updates wait for this time of day. A download you start yourself does not",
+                        subtitle = "For automatic updates",
                         current = s.windowEnabled,
                         onToggle = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(windowEnabled = value) } },
                     ),
@@ -137,7 +135,7 @@ object DownloadRulesCatalog {
                     ToggleItem(
                         id = "download_rules_while_playing",
                         title = "Update while a game is running",
-                        subtitle = "Off: automatic updates wait until you stop playing",
+                        subtitle = null,
                         current = s.whilePlaying,
                         onToggle = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(whilePlaying = value) } },
                     ),
