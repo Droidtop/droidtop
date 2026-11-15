@@ -29,7 +29,6 @@ object KdeConnectCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "KDE Connect",
-        subtitle = "Pair phones and computers running KDE Connect, or Pythia",
         groups = { context ->
             // Opening the screen is how find my device's sound is stopped.
             dev.droidtop.app.KdeConnectNotification.stopRinging(context)
@@ -42,7 +41,6 @@ object KdeConnectCatalog {
     fun linkRow(on: Boolean) = NestedScreenItem(
         id = "accounts_kdeconnect_link",
         title = "KDE Connect",
-        subtitle = "Phones and computers with the KDE Connect app, or Pythia",
         registryId = SCREEN_ID,
         valueLabel = { if (on) "on" else "off" },
         icon = CatalogIcon.DESKTOP,
@@ -75,7 +73,7 @@ object KdeConnectCatalog {
                             ActionItem(
                                 id = "kdeconnect_none",
                                 title = "No other devices found yet",
-                                subtitle = "Open KDE Connect on the phone or computer, on the same network",
+                                subtitle = "Same network",
                             ),
                         )
                     } + refreshRow(),
@@ -114,7 +112,7 @@ object KdeConnectCatalog {
                 ActionItem(
                     id = "kdeconnect_notification_access",
                     title = "Send this device's notifications",
-                    subtitle = "Needs notification access. Press to allow it",
+                    subtitle = "Needs notification access",
                     run = { ctx -> dev.droidtop.runtime.systemstatus.NotificationsStore.openGrantScreen(ctx) },
                 ),
             )
@@ -148,7 +146,6 @@ object KdeConnectCatalog {
             TextInputItem(
                 id = "kdeconnect_name",
                 title = "Name",
-                subtitle = "What other devices show for this one",
                 value = KdeConnect.name(context),
                 onChange = { ctx, text -> KdeConnect.setName(ctx, text) },
             ),
@@ -157,7 +154,7 @@ object KdeConnectCatalog {
             TextInputItem(
                 id = "kdeconnect_addresses",
                 title = "Devices by address",
-                subtitle = "IP addresses of devices this network does not find, separated by commas",
+                subtitle = "Comma-separated IPs",
                 value = KdeConnect.addresses(context).joinToString(", "),
                 onChange = { ctx, text -> KdeConnect.setAddresses(ctx, text) },
             ),
@@ -199,7 +196,7 @@ object KdeConnectCatalog {
         AsyncActionItem(
             id = "kdeconnect_unpair_${d.id}",
             title = "Unpair ${d.name}",
-            confirmTitle = "Unpair ${d.name}? It has to be paired again before it can reach this device.",
+            confirmTitle = "Unpair ${d.name}?",
             confirmKeep = "Keep it paired",
             run = { _, _ -> KdeConnect.unpair(d.id) ?: "Unpaired ${d.name}" },
         ),
@@ -210,7 +207,7 @@ object KdeConnectCatalog {
         ActionItem(
             id = "kdeconnect_touchpad_${d.id}",
             title = "Control ${d.name}",
-            subtitle = "This screen and the sticks move its pointer and click",
+            subtitle = null,
             run = { ctx ->
                 ctx.startActivity(dev.droidtop.app.KdeConnectTouchpadActivity.intent(ctx, d.id, d.name).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
             },
@@ -218,7 +215,7 @@ object KdeConnectCatalog {
         AsyncActionItem(
             id = "kdeconnect_ring_${d.id}",
             title = "Ring ${d.name}",
-            subtitle = "Plays a sound there until it is stopped, to find it",
+            subtitle = null,
             run = { _, _ -> KdeConnect.ring(d.id) ?: "Ringing ${d.name}" },
         ),
         DocumentPickItem(
@@ -230,7 +227,7 @@ object KdeConnectCatalog {
         TextInputItem(
             id = "kdeconnect_type_${d.id}",
             title = "Type on ${d.name}",
-            subtitle = "Typed into the field in focus there, then Enter",
+            subtitle = null,
             value = "",
             onChange = { _, text -> if (text.isNotEmpty()) KdeConnect.type(d.id, text, enter = true) },
         ),
@@ -264,7 +261,7 @@ object KdeConnectCatalog {
     private fun refreshRow() = AsyncActionItem(
         id = "kdeconnect_refresh",
         title = "Look again",
-        subtitle = "Tells the devices on this network that this one is here",
+        subtitle = null,
         run = { _, _ -> KdeConnect.refresh() ?: "Asked again" },
     )
 }

@@ -48,7 +48,6 @@ object ComputersCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Computers",
-        subtitle = "Your computers running droidtop-agent: saves, games and plugin data kept in step with them",
         groups = { context -> groups(context) },
     )
 
@@ -56,7 +55,6 @@ object ComputersCatalog {
     fun linkRow(paired: Int) = NestedScreenItem(
         id = "accounts_computers_link",
         title = "Computers",
-        subtitle = "Pair a computer to keep saves, games and plugin data in step with it",
         registryId = SCREEN_ID,
         valueLabel = { if (paired == 0) "none paired" else "$paired paired" },
         icon = CatalogIcon.DESKTOP,
@@ -77,7 +75,7 @@ object ComputersCatalog {
                             ActionItem(
                                 id = "computers_pair_one",
                                 title = "Pair a computer",
-                                subtitle = "Shows a code to type into droidtop-agent on the computer",
+                                subtitle = "Shows a code",
                                 run = { ctx -> ctx.startActivity(PairComputerActivity.intent(ctx).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                             ),
                         )
@@ -85,7 +83,7 @@ object ComputersCatalog {
                             ActionItem(
                                 id = "computers_pair_handheld",
                                 title = "Pair a handheld",
-                                subtitle = "Another handheld running droidtop, for plugins that keep the two in step, like Syncthing",
+                                subtitle = "Another handheld with droidtop",
                                 run = { ctx -> ctx.startActivity(PairComputerActivity.intent(ctx, handheld = true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                             ),
                         )
@@ -93,7 +91,7 @@ object ComputersCatalog {
                             ActionItem(
                                 id = "computers_get_agent",
                                 title = "Get droidtop-agent",
-                                subtitle = "For Windows, Linux and macOS: the program the computer runs",
+                                subtitle = "Windows, Linux, macOS",
                                 run = { ctx ->
                                     dev.droidtop.library.Links.open(ctx, PairComputerActivity.AGENT_RELEASES)
                                 },
@@ -124,14 +122,12 @@ object ComputersCatalog {
         ToggleItem(
             id = "computers_show_games",
             title = "Show computers' games",
-            subtitle = "Games on a computer you turned on appear in the library, marked with the computer's name",
             current = Computers.gamesShown(context),
             onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setGamesShown(ctx, on) }.also { refreshLibrary(ctx) } },
         ),
         ToggleItem(
             id = "computers_show_apps",
             title = "Show computers' apps",
-            subtitle = "Programs on a computer you turned on appear in Apps",
             current = Computers.appsShown(context),
             onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setAppsShown(ctx, on) }.also { refreshLibrary(ctx) } },
         ),
@@ -161,7 +157,7 @@ object ComputersCatalog {
                 ToggleItem(
                     id = "computers_rendezvous",
                     title = "Find computers away from home",
-                    subtitle = "By Syncthing's global discovery: only addresses go there; syncing is direct and encrypted",
+                    subtitle = "Only addresses are shared",
                     current = Computers.rendezvousOn(context),
                     onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setRendezvousOn(ctx, on) } },
                 ),
@@ -170,7 +166,7 @@ object ComputersCatalog {
                 TextInputItem(
                     id = "computers_discovery_server",
                     title = "Discovery server",
-                    subtitle = "default is Syncthing's global discovery; or the https address of another discovery server",
+                    subtitle = "Blank for the default",
                     value = server,
                     onChange = { ctx, text -> withContext(Dispatchers.IO) { Computers.setDiscoveryServer(ctx, text) } },
                 ),
@@ -269,7 +265,7 @@ object ComputersCatalog {
                             ActionItem(
                                 id = "handheld_forget_row",
                                 title = "Forget this handheld",
-                                subtitle = "Plugins stop seeing it; to use it again, pair it again",
+                                subtitle = "Pair again to use it",
                                 confirmTitle = "Forget ${device.name}?",
                                 run = { ctx ->
                                     dev.droidtop.runtime.util.AppScopes.io.launch {
@@ -312,7 +308,6 @@ object ComputersCatalog {
                     AsyncActionItem(
                         id = "computer_sync_library",
                         title = "Sync the library now",
-                        subtitle = "This device's games go to ${computer.name}, and its games come here",
                         run = { ctx, onStatus ->
                             onStatus("Reading this device's games…")
                             val entries = libraryGames(ctx) ?: return@AsyncActionItem "The library is still being scanned; try again in a moment"
@@ -349,14 +344,14 @@ object ComputersCatalog {
                     ToggleItem(
                         id = "computer_show_games",
                         title = "Show this computer's games",
-                        subtitle = "Its games that are not on this device appear in the library, marked \"On ${computer.name}\". A game on both stays one entry",
+                        subtitle = null,
                         current = computer.showGames,
                         onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setShown(ctx, computer.id, games = on) }.also { refreshLibrary(ctx) } },
                     ),
                     ToggleItem(
                         id = "computer_show_apps",
                         title = "Show this computer's apps",
-                        subtitle = "Its installed programs appear in Apps",
+                        subtitle = null,
                         current = computer.showApps,
                         onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setShown(ctx, computer.id, apps = on) }.also { refreshLibrary(ctx) } },
                     ),
@@ -369,7 +364,7 @@ object ComputersCatalog {
                     ActionItem(
                         id = "computer_forget_row",
                         title = "Forget this computer",
-                        subtitle = "Stops syncing with it; to sync again, pair it again",
+                        subtitle = "Pair again to sync",
                         confirmTitle = "Forget ${computer.name}?",
                         run = { ctx ->
                             dev.droidtop.runtime.util.AppScopes.io.launch {
