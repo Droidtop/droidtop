@@ -114,7 +114,6 @@ object ContainersCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Containers",
-        subtitle = "The Linux systems on this device: the desktop's own, and any others you make",
         groups = { context -> rootGroups(context) },
         // Read again as each container's size becomes known (Droidtop/tracker#911).
         live = ContainerSizes.changes,
@@ -158,7 +157,6 @@ object ContainersCatalog {
     private fun createItem() = NestedScreenItem(
         id = "containers_create",
         title = "Create a container",
-        subtitle = "From a distribution's releases, or any OCI image",
         inline = createScreen(),
     )
 
@@ -192,7 +190,6 @@ object ContainersCatalog {
                             ActionItem(
                                 id = "containers_none",
                                 title = "No containers yet",
-                                subtitle = "The desktop makes its own when it first starts; create others with the row above",
                             ),
                         )
                     }
@@ -226,14 +223,14 @@ object ContainersCatalog {
             ToggleItem(
                 id = "containers_image_cache_keep",
                 title = "Keep downloaded images",
-                subtitle = "Off keeps nothing new; what is kept stays until you clear it",
+                subtitle = null,
                 current = policy.enabled,
                 onToggle = { ctx, on -> withContext(Dispatchers.IO) { DesktopSetupPrefs.setImageCacheKeep(ctx, on) } },
             ),
             ChoiceItem(
                 id = "containers_image_cache_limit",
                 title = "Cache size limit",
-                subtitle = "Over it, the images used longest ago are removed first",
+                subtitle = null,
                 options = dev.droidtop.runtime.ImageCachePolicy.LIMITS.map {
                     ChoiceOption(dev.droidtop.runtime.ImageCachePolicy.limitId(it), dev.droidtop.runtime.ImageCachePolicy.limitLabel(it))
                 },
@@ -248,9 +245,9 @@ object ContainersCatalog {
             AsyncActionItem(
                 id = "containers_image_cache_clear",
                 title = "Clear",
-                subtitle = "Deletes the kept images. Your containers stay; a new one downloads its image again",
+                subtitle = "Containers stay",
                 value = size,
-                confirmTitle = "Delete the kept images${size?.let { " ($it)" }.orEmpty()}? Your containers are not touched",
+                confirmTitle = "Delete the kept images${size?.let { " ($it)" }.orEmpty()}?",
                 run = { ctx, _ ->
                     OciImageStore.of(ctx).clear()
                     "Cleared."
@@ -267,7 +264,6 @@ object ContainersCatalog {
         return NestedScreenItem(
             id = "containers_images",
             title = "Images",
-            subtitle = "What containers are made from, kept so a new one needs no download",
             inline = imagesScreen(),
             valueLabel = { value.ifEmpty { null } },
         )
@@ -276,7 +272,6 @@ object ContainersCatalog {
     private fun imagesScreen() = CatalogScreen(
         id = "containers_images",
         title = "Images",
-        subtitle = "Each container keeps its own copy of its image's files, so removing one breaks nothing",
         groups = { context ->
             val runtime = ContainerRuntimeFactory.select(context)
             val listed = runCatching { ImageListing.rows(OciImageStore.of(context).entries(), runtime.listContainers()) }
@@ -333,14 +328,12 @@ object ContainersCatalog {
             TextInputItem(
                 id = "image_create_name",
                 title = "Name",
-                subtitle = "What droidtop calls it; you can rename it later",
                 value = newName,
                 onChange = { _, value -> form.name = value.trim().ifEmpty { null } },
             ),
             AsyncActionItem(
                 id = "image_create",
                 title = "Create a container",
-                subtitle = "Makes \"$newName\" from this image, with nothing to download",
                 run = { ctx, onStatus ->
                     onStatus("Making \"$newName\"...")
                     val created = runtime.createSibling(RootfsImage(row.entry.reference, row.entry.digest), newName)
@@ -412,7 +405,6 @@ object ContainersCatalog {
                     AsyncActionItem(
                         id = "container_stop",
                         title = "Stop the desktop",
-                        subtitle = "Ends the desktop and every program on it",
                         value = stateLabel(info, runtime),
                         run = { ctx, _ ->
                             DesktopSessionService.stop(ctx)
@@ -425,7 +417,6 @@ object ContainersCatalog {
                     ActionItem(
                         id = "container_start",
                         title = "Open Desktop",
-                        subtitle = "Switches to Desktop mode, which starts the desktop",
                         value = stateLabel(info, runtime),
                         run = { ctx -> openDesktop(ctx) },
                     ),
@@ -434,7 +425,6 @@ object ContainersCatalog {
                     AsyncActionItem(
                         id = "container_stop",
                         title = "Stop",
-                        subtitle = "Ends every program running in it",
                         value = stateLabel(info, runtime),
                         run = { _, _ ->
                             runtime.stop(container)
@@ -464,7 +454,6 @@ object ContainersCatalog {
                     ToggleItem(
                         id = "container_autostart",
                         title = "Start with the desktop",
-                        subtitle = "Starts it each time the desktop starts",
                         current = withContext(Dispatchers.IO) { ContainerPrograms.autostart(app, container.id) },
                         onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerPrograms.setAutostart(app, container.id, on) } },
                     ),
@@ -535,7 +524,7 @@ object ContainersCatalog {
                 ActionItem(
                     id = "container_backup_stop_first",
                     title = "Back up or restore its data",
-                    subtitle = "Stop it first: a running container's files are changing",
+                    subtitle = "Stop it first",
                 ),
             )
         }
@@ -545,7 +534,6 @@ object ContainersCatalog {
             DocumentPickItem(
                 id = "container_backup_export",
                 title = "Back up its data",
-                subtitle = "Saves everything in it to a file you choose, to restore later or on another device",
                 mimeType = "application/x-tar",
                 createName = "$fileName-container.tar",
                 onPicked = { ctx, uri ->
@@ -566,7 +554,7 @@ object ContainersCatalog {
             DocumentPickItem(
                 id = "container_backup_import",
                 title = "Restore its data from a backup",
-                subtitle = "Replaces everything in it with a backup made by \"Back up its data\"; what is in it now is lost",
+                subtitle = "What's in it now is lost",
                 mimeType = "*/*",
                 onPicked = { ctx, uri ->
                     runCatching {
@@ -597,7 +585,6 @@ object ContainersCatalog {
             DocumentPickItem(
                 id = "container_backup_restore_point",
                 title = "Restore from a scheduled backup",
-                subtitle = "Pick one in its folder: droidtop puts the container back as it was then",
                 mimeType = "*/*",
                 onPicked = { ctx, uri ->
                     val name = withContext(Dispatchers.IO) {
@@ -665,14 +652,14 @@ object ContainersCatalog {
             return ActionItem(
                 id = "container_recreate",
                 title = "Recreate from the image",
-                subtitle = "No image is recorded for this container: it was made before droidtop recorded them",
+                subtitle = "No image recorded",
             )
         }
         return AsyncActionItem(
             id = "container_recreate",
             title = "Recreate from the image",
-            subtitle = "Deletes it and downloads ${info.image} fresh, keeping the name and everything else about it",
-            confirmTitle = "Recreate ${info.displayName} from ${info.image}? Everything installed by hand in it is lost",
+            subtitle = null,
+            confirmTitle = "Recreate ${info.displayName}? What you installed in it is lost",
             run = { _, onStatus ->
                 onStatus("Downloading ${info.image}...")
                 try {
@@ -772,7 +759,6 @@ object ContainersCatalog {
                 ToggleItem(
                     id = "container_socket_wayland",
                     title = "Wayland",
-                    subtitle = "Share the desktop's display with this container's own programs",
                     current = sockets.waylandShared,
                     onToggle = { _, on ->
                         withContext(Dispatchers.IO) {
@@ -788,7 +774,7 @@ object ContainersCatalog {
                     ActionItem(
                         id = "container_socket_clipboard",
                         title = "Clipboard: always shared",
-                        subtitle = "This container runs the desktop itself, so its programs reach the clipboard directly",
+                        subtitle = null,
                     ),
                 )
             } else {
@@ -796,7 +782,7 @@ object ContainersCatalog {
                     ToggleItem(
                         id = "container_socket_clipboard",
                         title = "Clipboard",
-                        subtitle = "Let its programs read and set the clipboard. Applies from its next start",
+                        subtitle = "From its next start",
                         current = sockets.clipboardShared,
                         onToggle = { _, on ->
                             withContext(Dispatchers.IO) {
@@ -814,7 +800,6 @@ object ContainersCatalog {
                     ToggleItem(
                         id = "container_socket_audio",
                         title = "Audio",
-                        subtitle = "Share the device's audio with this container",
                         current = sockets.audioShared,
                         onToggle = { _, on ->
                             withContext(Dispatchers.IO) {
@@ -879,8 +864,6 @@ object ContainersCatalog {
             ChoiceItem(
                 id = "container_look_scale",
                 title = "Scale",
-                subtitle = "Its programs' size against the desktop's own scale. Qt programs and GTK's text follow it. " +
-                    "Applies to programs started after the change",
                 options = ContainerLook.SCALES.map { ChoiceOption(it.toString(), scaleLabel(it)) },
                 current = look.scale.toString(),
                 onSelect = { _, value -> value.toFloatOrNull()?.let { save(look.copy(scale = it)) } },
@@ -888,8 +871,6 @@ object ContainersCatalog {
             ToggleItem(
                 id = "container_look_theme",
                 title = "Light or dark as droidtop",
-                subtitle = "Its GTK programs follow droidtop's Light or dark. Off, they keep the image's own look. " +
-                    "Applies to programs started after the change",
                 current = look.followTheme,
                 onToggle = { _, on ->
                     withContext(Dispatchers.IO) { runCatching { runtime.setLook(container, look.copy(followTheme = on)) } }
@@ -916,7 +897,6 @@ object ContainersCatalog {
         return ChoiceItem(
             id = "container_keyboard",
             title = "Keyboard layout",
-            subtitle = "A physical keyboard's layout while one of its windows has the focus",
             options = options,
             current = look.keyboardLayout ?: AS_DESKTOP,
             onSelect = { ctx, value ->
@@ -946,7 +926,7 @@ object ContainersCatalog {
         return ToggleItem(
             id = "container_socket_microphone",
             title = "Microphone",
-            subtitle = "Desktop programs may use the microphone, for calls. From the next start, droidtop in front",
+            subtitle = "From the next start",
             current = DesktopSetupPrefs.microphone(context) && granted,
             onToggle = { ctx, on ->
                 val allowed = ctx.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -994,7 +974,7 @@ object ContainersCatalog {
             ToggleItem(
                 id = "container_program_restart",
                 title = "Restart when it fails",
-                subtitle = "Waits longer after each quick failure, and stops trying after ${ContainerProgram.MAX_FAILURES_IN_A_ROW}",
+                subtitle = null,
                 current = withContext(Dispatchers.IO) { ContainerPrograms.restartPolicy(app, container.id) != ContainerProgram.RestartPolicy.No },
                 onToggle = { _, on ->
                     withContext(Dispatchers.IO) {
@@ -1075,7 +1055,6 @@ object ContainersCatalog {
                 ToggleItem(
                     id = "container_enter_allowed",
                     title = "Run its commands from the desktop",
-                    subtitle = "Commands shown below run here when typed in the desktop's terminal",
                     current = allowed,
                     onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerEnter.setAllowed(filesDir, container.id, on) } },
                 ),
@@ -1104,7 +1083,6 @@ object ContainersCatalog {
                     AsyncActionItem(
                         id = "container_command:${command.name}",
                         title = command.name,
-                        subtitle = "Runs in ${info.displayName} from the desktop's terminal",
                         confirmTitle = "Stop offering ${command.name} on the desktop?",
                         run = { ctx, _ ->
                             withContext(Dispatchers.IO) {
@@ -1136,7 +1114,6 @@ object ContainersCatalog {
                         ToggleItem(
                             id = "container_export:${app.id}",
                             title = app.name,
-                            subtitle = "Shown in the desktop's menus as \"${app.name} (on ${info.displayName})\"",
                             current = app.id in exported,
                             onToggle = { ctx, on ->
                                 withContext(Dispatchers.IO) {
@@ -1176,14 +1153,12 @@ object ContainersCatalog {
             AsyncActionItem(
                 id = "container_home_shared",
                 title = "Your files (shared with the desktop)",
-                subtitle = "The same home folder as every container that shares it",
                 value = "Current".takeIf { current.home == HomeChoice.Shared },
                 run = choose(HomeChoice.Shared),
             ),
             AsyncActionItem(
                 id = "container_home_private",
                 title = "Its own files only",
-                subtitle = "A home of its own that no other container sees",
                 value = "Current".takeIf { current.home == HomeChoice.Private },
                 run = choose(HomeChoice.Private),
             ),
@@ -1214,7 +1189,7 @@ object ContainersCatalog {
                 ChoiceItem(
                     id = "container_all_storage",
                     title = "All internal storage",
-                    subtitle = "Lets this container see and change everything on the device's storage. From its next start",
+                    subtitle = "All of the device's storage. From its next start",
                     options = listOf(ChoiceOption("deny", "Deny"), ChoiceOption("allow", "Allow")),
                     current = if (current.allStorage) "allow" else "deny",
                     onSelect = { _, value ->
@@ -1228,7 +1203,7 @@ object ContainersCatalog {
                 FolderPickItem(
                     id = "container_mount_add",
                     title = "Add a folder",
-                    subtitle = "Shares a folder from this device into this container, from its next start",
+                    subtitle = "From its next start",
                     onPicked = { _, uri ->
                         val resolved = withContext(Dispatchers.IO) { GamesRootPrefs.resolveStoragePath(uri) }
                             ?: return@FolderPickItem "Couldn't resolve that folder to a real path on this device"
@@ -1280,8 +1255,8 @@ object ContainersCatalog {
         return AsyncActionItem(
             id = "container_update_software",
             title = "Update its software",
-            subtitle = "Upgrades what is in it with its own package manager; nothing new is installed",
-            confirmTitle = "Upgrade the software in ${info.displayName}? Programs running in it may need restarting afterwards.",
+            subtitle = null,
+            confirmTitle = "Upgrade ${info.displayName}?",
             run = { _, onStatus ->
                 if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart && !info.running) {
                     onStatus("Starting it")
@@ -1362,21 +1337,21 @@ object ContainersCatalog {
             X11Row.WaylandOff -> ActionItem(
                 id = "container_x11",
                 title = "X11 programs",
-                subtitle = "They need Wayland under Sockets, which is off for this container",
+                subtitle = "Needs Wayland under Sockets",
                 value = "Off",
             )
             X11Row.NotAvailable -> ActionItem(
                 id = "container_x11",
                 title = "X11 programs",
-                subtitle = "Not available for this distro: its packages have no X server droidtop can use",
+                subtitle = "Not available for this distro",
                 value = "Not available",
             )
             X11Row.Install -> AsyncActionItem(
                 id = "container_x11",
                 title = "X11 programs",
-                subtitle = "Installs an X server in it with its own package manager, so X11 programs open",
+                subtitle = null,
                 value = "Install",
-                confirmTitle = "Install an X server in ${info.displayName}? Its package manager downloads it.",
+                confirmTitle = "Install an X server in ${info.displayName}?",
                 run = { _, onStatus ->
                     if (runtime.siblingsNeedStart && !info.running) {
                         onStatus("Starting it")
@@ -1427,7 +1402,7 @@ object ContainersCatalog {
         return AsyncActionItem(
             id = "container_terminal",
             title = "Terminal",
-            subtitle = "Opens a terminal window on the desktop; the first time installs one",
+            subtitle = null,
             run = { ctx, onStatus ->
                 if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart && !info.running) runtime.start(container)
                 onStatus("Getting a terminal ready (the first time installs one)...")
@@ -1457,7 +1432,6 @@ object ContainersCatalog {
         return AsyncActionItem(
             id = id,
             title = title,
-            subtitle = "Opens a shell in it on this screen",
             run = { ctx, onStatus ->
                 if (container.role == ContainerRole.SIBLING && runtime.siblingsNeedStart && !info.running) {
                     onStatus("Starting it")
@@ -1492,7 +1466,6 @@ object ContainersCatalog {
             TextInputItem(
                 id = "container_copy_name",
                 title = "Name",
-                subtitle = "What the copy is called; you can rename it later",
                 value = name,
                 onChange = { _, value ->
                     val typed = value.trim()
@@ -1506,7 +1479,6 @@ object ContainersCatalog {
             AsyncActionItem(
                 id = "container_copy",
                 title = "Make a copy",
-                subtitle = "\"$name\" with everything installed in ${info.displayName}, its home and folders",
                 run = { ctx, onStatus ->
                     onStatus("Copying ${info.displayName}...")
                     dev.droidtop.app.ContainerClone.clone(ctx, runtime, info, name)
@@ -1534,7 +1506,7 @@ object ContainersCatalog {
         return AsyncActionItem(
             id = "container_delete",
             title = "Delete",
-            subtitle = "Removes the container and everything installed in it",
+            subtitle = null,
             confirmTitle = "Delete ${info.displayName} and everything in it?",
             run = { ctx, _ ->
                 // What it exported into the desktop goes with it (docs/SPEC.md 3d "Exported apps").
@@ -1575,7 +1547,6 @@ object ContainersCatalog {
                     ActionItem(
                         id = "container_add_printer",
                         title = "Add a printer",
-                        subtitle = "Opens CUPS's own page in the browser",
                         run = { ctx ->
                             dev.droidtop.library.Links.open(ctx, "http://127.0.0.1:${CompositorProvisioning.PRINTING_WEB_PORT}/admin")
                         },
@@ -1652,7 +1623,6 @@ object ContainersCatalog {
             ActionItem(
                 id = "container_vpn_always_on",
                 title = "Always-on in Android",
-                subtitle = "Android's own VPN settings",
                 run = { ctx -> SettingsLaunch.start(ctx, Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
             ),
         )
@@ -1732,7 +1702,7 @@ object ContainersCatalog {
                 ActionItem(
                     id = "container_devices",
                     title = "No USB device is connected",
-                    subtitle = "Plug one in, then open this page again",
+                    subtitle = "Plug one in",
                 ),
             )
         }
@@ -1740,7 +1710,7 @@ object ContainersCatalog {
             ToggleItem(
                 id = "usb:$path",
                 title = label,
-                subtitle = "$path · available in the container from its next start",
+                subtitle = "$path · from its next start",
                 current = path in shared,
                 onToggle = { _, on ->
                     val next = if (on) shared + path else shared - path
@@ -1755,7 +1725,6 @@ object ContainersCatalog {
     private fun createScreen() = CatalogScreen(
         id = "containers_create",
         title = "Create a container",
-        subtitle = "Each is a stock image from its publisher; droidtop adds nothing to it",
         groups = { context ->
             val repositories = BundledImageRepositories.load(context).repositories
                 .filter { it.arm64Available }
@@ -1780,7 +1749,7 @@ object ContainersCatalog {
                         NestedScreenItem(
                             id = "create:custom",
                             title = "Any OCI image",
-                            subtitle = "By its reference, e.g. docker.io/library/debian:bookworm",
+                            subtitle = "e.g. docker.io/library/debian:bookworm",
                             inline = createFromReferenceScreen(),
                         ),
                     ),
@@ -1820,8 +1789,6 @@ object ContainersCatalog {
                                 ChoiceItem(
                                     id = "create_version",
                                     title = "Version",
-                                    subtitle = "The registry's tags, the current release first" +
-                                        if (list.size > ordered.size) ". ${list.size - ordered.size} older tags: enter one under Custom" else "",
                                     options = ordered.map { ChoiceOption(it, if (it == current) "$it (current)" else it) },
                                     current = tag,
                                     onSelect = { _, value -> form.tag = value },
@@ -1836,7 +1803,6 @@ object ContainersCatalog {
                         TextInputItem(
                             id = "create_name",
                             title = "Name",
-                            subtitle = "What droidtop calls it; you can rename it later",
                             value = name,
                             onChange = { _, value -> form.name = value.trim().ifEmpty { null } },
                         ),
@@ -1846,7 +1812,6 @@ object ContainersCatalog {
                             AsyncActionItem(
                                 id = "create_go",
                                 title = "Create",
-                                subtitle = "Downloads ${repo.repository.substringAfterLast('/')}:$tag and makes \"$name\"",
                                 run = { ctx, onStatus ->
                                     onStatus("Downloading ${repo.repository.substringAfterLast('/')}:$tag...")
                                     val image = CraneImageCatalogResolver(ctx).resolve(repo, tag).toRootfsImage()
@@ -1868,7 +1833,6 @@ object ContainersCatalog {
         return CatalogScreen(
             id = "create:custom",
             title = "Any OCI image",
-            subtitle = "Any image a registry serves for this device's architecture",
             groups = { context ->
                 val runtime = ContainerRuntimeFactory.select(context)
                 val existing = runCatching { runtime.listContainers() }.getOrDefault(emptyList()).map { it.displayName }
@@ -1888,7 +1852,6 @@ object ContainersCatalog {
                         TextInputItem(
                             id = "create_name",
                             title = "Name",
-                            subtitle = "What droidtop calls it; you can rename it later",
                             value = name,
                             onChange = { _, value -> form.name = value.trim().ifEmpty { null } },
                         ),
@@ -1898,7 +1861,6 @@ object ContainersCatalog {
                             AsyncActionItem(
                                 id = "create_go",
                                 title = "Create",
-                                subtitle = "Downloads $reference and makes \"$name\"",
                                 run = { ctx, onStatus ->
                                     onStatus("Downloading $reference...")
                                     val created = runtime.createSibling(RootfsImage(reference = reference), name)
