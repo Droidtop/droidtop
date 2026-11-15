@@ -13,6 +13,7 @@ import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.Place
 import dev.droidtop.net.DownloadPolicy
 import dev.droidtop.pluginhost.DownloadJobs
+import dev.droidtop.pluginhost.JobHistory
 import dev.droidtop.pluginhost.JobNumbers
 import dev.droidtop.pluginhost.JobReport
 import dev.droidtop.pluginhost.JobState
@@ -99,7 +100,7 @@ object PluginJobsScreen {
                     rulesGroup()
             },
             onLeave = { kept.clear() },
-            live = kotlinx.coroutines.flow.merge(PluginJobsCenter.entries(), kept.changes, dev.droidtop.library.settings.UpdatesWaiting.count),
+            live = kotlinx.coroutines.flow.merge(PluginJobsCenter.entries(), kept.changes, dev.droidtop.library.settings.UpdatesWaiting.count, shownKind),
         )
     }
 
@@ -175,8 +176,91 @@ object PluginJobsScreen {
         }
     }
 
+    /**
+     * Which kind of finished job the Finished section and Older jobs show (owner, 2026-11-15, Droidtop/tracker#940: "can
+     * we provide filters for that download history, to sort by scrapes and stuff"); null shows every kind.
+     */
+    val shownKind = kotlinx.coroutines.flow.MutableStateFlow<JobHistory.Kind?>(null)
+
+    /** The Show filter: every kind, or one ([JobHistory.Kind]). */
+    private fun showItem(kind: JobHistory.Kind?): CatalogItem = dev.droidtop.library.settings.ChoiceItem(
+        id = "plugin_jobs_show",
+        title = "Show",
+        options = listOf(dev.droidtop.library.settings.ChoiceOption(SHOW_ALL, "All")) +
+            JobHistory.Kind.entries.map { dev.droidtop.library.settings.ChoiceOption(it.name, it.label) },
+        current = kind?.name ?: SHOW_ALL,
+        onSelect = { _, value -> shownKind.value = JobHistory.Kind.entries.firstOrNull { it.name == value } },
+    )
+
+    private const val SHOW_ALL = "ALL"
+
+    /** The way to the finished jobs older than the live list keeps ([JobHistory]). */
+    private fun olderJobsItem(): CatalogItem = NestedScreenItem(
+        id = "plugin_jobs_older",
+        title = "Older jobs",
+        inline = historyScreen(),
+    )
+
+    /** How many older jobs one page shows before "Show more". */
+    private const val HISTORY_PAGE = 100
+
+    private val historyLimit = kotlinx.coroutines.flow.MutableStateFlow(HISTORY_PAGE)
+    private val historyChanges = kotlinx.coroutines.flow.MutableStateFlow(0)
+
+    /** Older jobs: what [JobHistory] keeps, newest first, under the same Show filter. Read off the main thread. */
+    fun historyScreen(): CatalogScreen = CatalogScreen(
+        id = "plugin_jobs_history",
+        title = "Older jobs",
+        groups = { context ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val kind = shownKind.value
+                val limit = historyLimit.value
+                val counts = JobHistory.counts(context)
+                val total = if (kind == null) counts.values.sum() else counts[kind] ?: 0
+                val rows = JobHistory.page(context, kind, limit)
+                val nowMs = System.currentTimeMillis()
+                val items = buildList<CatalogItem> {
+                    add(showItem(kind))
+                    if (rows.isEmpty()) add(ActionItem(id = "plugin_jobs_history_none", title = "None"))
+                    rows.forEach { entry ->
+                        add(
+                            ActionItem(
+                                id = "plugin_jobs_history_${entry.jobId}",
+                                title = entry.title,
+                                subtitle = jobSource(entry) + " · " + outcome(entry),
+                                value = ValueFormat.ago(nowMs, entry.finishedAtMs ?: entry.startedAtMs),
+                            ),
+                        )
+                    }
+                    if (total > rows.size) {
+                        add(ActionItem(id = "plugin_jobs_history_more", title = "Show more", value = "${total - rows.size} more", run = {
+                            historyLimit.value = limit + HISTORY_PAGE
+                        }))
+                    }
+                    if (rows.isNotEmpty()) {
+                        add(
+                            AsyncActionItem(
+                                id = "plugin_jobs_history_clear",
+                                title = if (kind == null) "Clear older jobs" else "Clear older ${kind.label.lowercase()}",
+                                confirmTitle = "Clear them?",
+                                run = { ctx, _ ->
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { JobHistory.clear(ctx, kind) }
+                                    historyChanges.value++
+                                    "Cleared"
+                                },
+                            ),
+                        )
+                    }
+                }
+                listOf(CatalogGroup(id = "plugin_jobs_history_list", title = "Older jobs ($total)", items = items))
+            }
+        },
+        onLeave = { historyLimit.value = HISTORY_PAGE },
+        live = kotlinx.coroutines.flow.merge(shownKind, historyLimit, historyChanges),
+    )
+
     /** The screen's sections for [snapshot]: Current, Waiting, Paused, Finished, each only when it has a job. */
-    internal fun groupsFor(snapshot: List<PluginJobsCenter.Entry>, nowMs: Long): List<CatalogGroup> {
+    internal fun groupsFor(snapshot: List<PluginJobsCenter.Entry>, nowMs: Long, kind: JobHistory.Kind? = shownKind.value): List<CatalogGroup> {
         JobPace.forget(snapshot.mapTo(HashSet()) { it.jobId })
         if (snapshot.isEmpty()) {
             return listOf(
@@ -188,7 +272,9 @@ object PluginJobsScreen {
                 ),
             )
         }
-        val finished = snapshot.filter { it.done }.sortedByDescending { it.finishedAtMs ?: it.startedAtMs }
+        val finished = snapshot.filter { it.done && (kind == null || JobHistory.Kind.of(it) == kind) }
+            .sortedByDescending { it.finishedAtMs ?: it.startedAtMs }
+        val anyFinished = snapshot.any { it.done }
         return listOfNotNull(
             section("plugin_jobs_current", "Current", snapshot.filter { it.state == JobState.RUNNING }, nowMs),
             // Held by the download rules, or waiting for the connection or for a retry: none of them is the person's pause.
@@ -197,8 +283,19 @@ object PluginJobsScreen {
             // Clear finished heads the section (the owner, 2026-10-31: "can we put a clear button whenever we have a list
             // of events or tasks that are completed? I want to remove all the syncthing spam from the downloads list"):
             // at its foot it was under as many as FINISHED_KEPT rows, where nobody found it.
-            section("plugin_jobs_done", "Finished", finished, nowMs)?.let { group ->
-                group.copy(items = listOf(clearFinishedItem(finished.size)) + group.items)
+            // Show filters it by kind, and Older jobs follows the last row: what the live list no longer holds is kept there
+            // (Droidtop/tracker#940).
+            if (!anyFinished) {
+                null
+            } else {
+                CatalogGroup(
+                    id = "plugin_jobs_done",
+                    title = "Finished (${finished.size})",
+                    items = listOf(showItem(kind)) +
+                        (if (finished.isEmpty()) emptyList() else listOf(clearFinishedItem(finished.size))) +
+                        finished.map { entry -> jobRow(entry, nowMs) } +
+                        olderJobsItem(),
+                )
             },
         )
     }

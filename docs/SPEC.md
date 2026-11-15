@@ -7483,7 +7483,14 @@ The one jobs center, and how its jobs are shown on every surface.
   **Finished jobs are kept:** the newest 200 (`FINISHED_KEPT`), with their result and report, across restarts,
   until the person clears one (`clear`) or all (`clearFinished`); before this a finished job left the list after
   15 seconds and never reached storage. The list is written at most once a second (`PERSIST_INTERVAL_MS`), so
-  keeping reports does not bring back the progress lag. **Retry** runs a finished native job again with the
+  keeping reports does not bring back the progress lag. **Older jobs and the kind filter (owner, 2026-11-15, Droidtop/tracker#940: "why does our downloads history seem
+  to be capped at 200? And can we provide filters for that download history, to sort by scrapes and stuff").** The
+  newest 200 stay in the live list the Downloads page reads; a finished job pushed out of it moves to `JobHistory`
+  (one SQLite file in droidtop's storage, one row written per job, never the whole list) instead of being
+  forgotten, and Finished ends with **Older jobs**, a page of them newest first (100 at a time, Show more, Clear).
+  **Show** heads Finished and Older jobs: All, Downloads (downloads and store installs), Scrapes, Library (rescans
+  and source indexes), Plugins, Other (`JobHistory.Kind`). Download rules > History > **Keep finished jobs**: Until
+  cleared (the default), 90 days or 30 days, applied when droidtop starts. **Retry** runs a finished native job again with the
   arguments it had (`retry`), replacing its row. A finished plugin job offers Retry when whoever started it says how
   to run it again (`offerRetry`, 2026-10-30, Droidtop/tracker#790): a failing plugin service keeps one row, its last
   failed run, whose Retry starts the service at once with no failures counted, and each new run takes that row's place

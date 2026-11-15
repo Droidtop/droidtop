@@ -59,8 +59,21 @@ class PluginJobsScreenTest {
         val finished = job("f", 100, done = true).copy(finishedAtMs = 5L)
         val groups = PluginJobsScreen.groupsFor(listOf(job("a", 10), held, job("p", 5, paused = true), finished), nowMs = 0L)
         assertEquals(listOf("Current (1)", "Waiting (1)", "Paused (1)", "Finished (1)"), groups.map { it.title })
-        assertEquals("plugin_jobs_clear_finished", groups.last().items.first().id)
-        assertEquals("plugin_job_f", groups.last().items[1].id)
+        // Show (the kind filter) heads Finished, then Clear finished, the rows, and Older jobs (Droidtop/tracker#940).
+        assertEquals(
+            listOf("plugin_jobs_show", "plugin_jobs_clear_finished", "plugin_job_f", "plugin_jobs_older"),
+            groups.last().items.map { it.id },
+        )
+    }
+
+    @Test
+    fun `Show keeps the finished jobs of one kind`() {
+        val download = job("d", 100, done = true).copy(finishedAtMs = 5L, nativeKind = dev.droidtop.pluginhost.DownloadJobs.KIND)
+        val scrape = job("s", 100, done = true).copy(finishedAtMs = 6L, nativeKind = "library_scrape")
+        val groups = PluginJobsScreen.groupsFor(listOf(download, scrape), nowMs = 0L, kind = dev.droidtop.pluginhost.JobHistory.Kind.SCRAPES)
+        assertEquals("Finished (1)", groups.last().title)
+        assertTrue(groups.last().items.any { it.id == "plugin_job_s" })
+        assertTrue(groups.last().items.none { it.id == "plugin_job_d" })
     }
 
     @Test

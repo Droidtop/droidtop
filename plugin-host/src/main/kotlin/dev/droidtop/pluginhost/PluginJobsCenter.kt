@@ -216,6 +216,8 @@ object PluginJobsCenter {
             val prefs = context.applicationContext.pluginJobsStore.data.first()
             restore(decodeEntries(prefs[persistedKey].orEmpty()))
             runCatching { onRestored() }
+            // Older finished jobs past the person's Keep history choice go (Droidtop/tracker#940).
+            runCatching { JobHistory.prune(context.applicationContext) }
         }
     }
 
@@ -799,10 +801,24 @@ object PluginJobsCenter {
         persist()
     }
 
-    /** Keeps the newest [FINISHED_KEPT] finished jobs; the rest are forgotten. */
+    /**
+     * Keeps the newest [FINISHED_KEPT] finished jobs in the live list. The rest move to [JobHistory], one row each, instead
+     * of being forgotten (Droidtop/tracker#940).
+     */
     private fun prune() {
-        state.update { current -> keepFinished(current, FINISHED_KEPT) }
+        var dropped: List<Entry> = emptyList()
+        state.update { current ->
+            keepFinished(current, FINISHED_KEPT).also { kept ->
+                val keptIds = kept.mapTo(HashSet()) { it.jobId }
+                dropped = current.filter { it.done && it.jobId !in keptIds }
+            }
+        }
         persist()
+        val context = persistenceContext
+        if (dropped.isNotEmpty() && context != null) {
+            val moving = dropped
+            persistenceScope.launch { runCatching { JobHistory.archive(context, moving) } }
+        }
     }
 
     /** [entries] with only the newest [keep] finished jobs among them, running and paused ones untouched. Pure. */

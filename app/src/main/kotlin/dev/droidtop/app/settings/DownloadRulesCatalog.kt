@@ -36,6 +36,7 @@ object DownloadRulesCatalog {
             EnginePrefs.androidIsolation(context)
         }
         val s = DownloadPolicy.settings.value
+        val keepDays = withContext(Dispatchers.IO) { dev.droidtop.pluginhost.JobHistory.keepDays(context) }
         return listOf(
             CatalogGroup(
                 id = "download_rules_network",
@@ -138,6 +139,21 @@ object DownloadRulesCatalog {
                         subtitle = "Off: updates wait until you stop",
                         current = s.whilePlaying,
                         onToggle = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(whilePlaying = value) } },
+                    ),
+                ),
+            ),
+            // How long finished jobs are kept, in Downloads' Older jobs (owner, 2026-11-15, Droidtop/tracker#940).
+            CatalogGroup(
+                id = "download_rules_history",
+                title = "History",
+                items = listOf(
+                    ChoiceItem(
+                        id = "download_rules_keep_history",
+                        title = "Keep finished jobs",
+                        subtitle = "Older ones are in Downloads' Older jobs",
+                        options = listOf(ChoiceOption("0", "Until cleared"), ChoiceOption("90", "90 days"), ChoiceOption("30", "30 days")),
+                        current = keepDays.toString(),
+                        onSelect = { ctx, value -> dev.droidtop.pluginhost.JobHistory.setKeepDays(ctx, value.toIntOrNull() ?: 0) },
                     ),
                 ),
             ),
