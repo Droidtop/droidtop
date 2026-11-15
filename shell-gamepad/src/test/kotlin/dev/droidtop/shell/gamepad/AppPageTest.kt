@@ -75,7 +75,8 @@ class AppPageTest {
         assertEquals("Game options", PageKind.GAME.optionsHint)
         // Options' shared rows take the same word.
         assertEquals("3 images and videos scraped for this app", PageOptionRows.viewMedia(PageKind.APP, 3) {}.detail)
-        assertEquals("Which of your collections this game is in", PageOptionRows.collections(PageKind.GAME) {}.detail)
+        // The Collections row's title says it all, so it has no line (Droidtop/tracker#153).
+        assertEquals(null, PageOptionRows.collections(PageKind.GAME) {}.detail)
 
         val play = consolePlayState(kind = PageKind.APP, emulatorsKnown = false, emulator = null, systemName = null)
         assertEquals("Open", play.verb)
