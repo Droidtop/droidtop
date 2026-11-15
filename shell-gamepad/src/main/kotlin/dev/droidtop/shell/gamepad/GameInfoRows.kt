@@ -65,7 +65,7 @@ internal val GameInfoRow.isAchievementsSignIn: Boolean
     get() = kind == GameInfoKind.ACHIEVEMENTS && subtitle == ACHIEVEMENTS_SIGN_IN
 
 /** The row a game RetroAchievements knows gets while no key is stored: A opens the guided key setup in place. */
-internal const val ACHIEVEMENTS_SIGN_IN = "Show your achievements: sign in to RetroAchievements"
+internal const val ACHIEVEMENTS_SIGN_IN = "Sign in to RetroAchievements"
 
 /**
  * The rows for [entry], each filled in off the main thread as its source answers: RetroAchievements (a console
@@ -188,12 +188,12 @@ private fun copyGroups(entry: LibraryEntry, copying: SaveCopying, nowMs: Long, v
                 title = words(R.string.gamepad_copy_saves_from_x, from),
                 subtitle = "${saveFiles(side.files.size)}, newest ${SaveLines.ago(side.newestMs, nowMs)}, in ${SaveLines.folder(side.folder.path, volumes, short = true)}",
                 confirmTitle = listOfNotNull(
-                    if (replaced > 0) "Replace ${saveFiles(replaced)} of this copy's? They are backed up first" else "Add these saves to this copy? Its own are backed up first",
-                    if (engine != null) "Both copies run on ${engine.displayName()}." else "droidtop can't tell that these saves fit this copy.",
+                    if (replaced > 0) "Replace ${saveFiles(replaced)}? They're backed up first" else "Add these saves? This copy's are backed up first",
+                    if (engine != null) "Both run on ${engine.displayName()}." else "They may not fit this copy.",
                 ).joinToString(" "),
                 run = { ctx, _ ->
                     val copied = SaveCopies.copy(ctx, side, here)
-                    "Copied ${saveFiles(copied)} from $from. This copy's old saves are backed up"
+                    "Copied ${saveFiles(copied)}"
                 },
             )
         }.ifEmpty {
@@ -205,7 +205,7 @@ private fun copyGroups(entry: LibraryEntry, copying: SaveCopying, nowMs: Long, v
             id = "saves_restore_$index",
             title = words(R.string.gamepad_put_back_the_saves_from_x, SaveLines.ago(backup.takenMs, nowMs)),
             subtitle = "${saveFiles(backup.files)} backed up before saves were copied here",
-            confirmTitle = "Put this copy's saves back as they were? Saves copied in since are removed; saves made since are kept",
+            confirmTitle = "Put the old saves back? Saves made since are kept",
             run = { _, _ ->
                 val restored = SaveCopies.restore(backup)
                 "Put back ${saveFiles(restored)}"
@@ -213,7 +213,7 @@ private fun copyGroups(entry: LibraryEntry, copying: SaveCopying, nowMs: Long, v
         )
     }
     return listOfNotNull(
-        CatalogGroup("saves_copies", "Saves from this game's other copies", rows),
+        CatalogGroup("saves_copies", "Saves from other copies", rows),
         CatalogGroup("saves_backups", "Backups", restore).takeIf { restore.isNotEmpty() },
     )
 }
@@ -303,7 +303,7 @@ internal fun storeAchievementRowsFor(storeLabel: String, gameId: String, result:
         GameInfoRow(
             "Achievements",
             "${list.earned} of ${list.total}",
-            "From $storeLabel, as your account has them",
+            "From $storeLabel",
             screen = storeAchievementsScreen(storeLabel, gameId, list),
         ),
     )
@@ -340,7 +340,7 @@ internal fun storeAchievementItem(achievement: dev.droidtop.library.stores.Store
     return ActionItem(
         id = "store_${achievement.id}",
         title = if (secret) "Hidden achievement" else achievement.title,
-        subtitle = if (secret) "Described once you earn it" else listOfNotNull(achievement.description.ifBlank { null }, rarityLine(achievement.rarityPercent)).joinToString(" · ").ifBlank { null },
+        subtitle = if (secret) null else listOfNotNull(achievement.description.ifBlank { null }, rarityLine(achievement.rarityPercent)).joinToString(" · ").ifBlank { null },
         value = when {
             earned != null && earned > 0 -> synchronized(EARNED_DATE) { EARNED_DATE.format(java.util.Date(earned)) }
             earned != null -> "Earned"
@@ -366,7 +366,7 @@ internal fun achievementRowsFor(result: RaResult, entryId: String = ""): List<Ga
             GameInfoRow(
                 "Achievements",
                 "Is it ${result.game.title}?",
-                "RetroAchievements has a game of this name, but no file of yours is on its list. Confirm it to see its achievements",
+                "Your file isn't on its list. Confirm to see its achievements",
                 screen = raProposalScreen(entryId, result.game),
             ),
         )
@@ -385,9 +385,9 @@ internal fun achievementRowsFor(result: RaResult, entryId: String = ""): List<Ga
             if (offline(result.message)) emptyList() else listOf(GameInfoRow("Achievements", "Not loaded", result.message))
         is RaResult.Known -> {
             val progress = result.progress
-            val how = "Recognised by ${result.matchedBy}" + if (result.stale) ". RetroAchievements could not be reached; this is the last progress loaded" else ""
+            val how = "Matched by ${result.matchedBy}" + if (result.stale) ". Last loaded progress" else ""
             if (progress == null) {
-                listOf(GameInfoRow("Achievements", "${result.game.numAchievements} to earn", "Your progress was not loaded. $how", url = RetroAchievementsClient.gameUrl(result.game.id)))
+                listOf(GameInfoRow("Achievements", "${result.game.numAchievements} to earn", "Progress not loaded. $how", url = RetroAchievementsClient.gameUrl(result.game.id)))
             } else {
                 listOf(
                     GameInfoRow(
@@ -457,7 +457,7 @@ internal fun playTimeRows(context: Context, entry: LibraryEntry): List<GameInfoR
                     GameInfoRow(
                         "How long to beat",
                         summary,
-                        close + "From HowLongToBeat players, a guide and not a promise.",
+                        close + "From HowLongToBeat",
                         url = result.game.pageUrl,
                     ),
                 )
@@ -467,7 +467,7 @@ internal fun playTimeRows(context: Context, entry: LibraryEntry): List<GameInfoR
 }
 
 /** What the How long to beat row says when HowLongToBeat would not answer: what happened and what happens next. */
-internal const val HLTB_FAILED_LINE = "HowLongToBeat did not answer. droidtop tries again later."
+internal const val HLTB_FAILED_LINE = "HowLongToBeat didn't answer"
 
 internal fun compatibilityRows(context: Context, entry: LibraryEntry): List<GameInfoRow> =
     when (val result = EmulatorCompat.lookup(context, entry)) {
@@ -477,7 +477,7 @@ internal fun compatibilityRows(context: Context, entry: LibraryEntry): List<Game
             GameInfoRow(
                 "Emulator compatibility",
                 result.info.rating,
-                "From ${result.info.emulator}'s own list: other people's results on other hardware, not a verdict.",
+                "From ${result.info.emulator}'s list",
                 url = result.info.listUrl,
             ),
         )

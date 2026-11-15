@@ -50,7 +50,7 @@ class ConsoleGamePageTest {
         assertEquals(PageTab.values().toList(), byTab.keys.toList())
         assertEquals(listOf("About"), byTab.getValue(PageTab.OVERVIEW).map { it.title })
         assertEquals(listOf("Last played", "Play time", "Times played"), byTab.getValue(PageTab.ACTIVITY).map { it.title })
-        assertEquals(listOf("Manual", "Where these facts came from"), byTab.getValue(PageTab.EXTRAS).map { it.title })
+        assertEquals(listOf("Manual", "Sources"), byTab.getValue(PageTab.EXTRAS).map { it.title })
         assertEquals(listOf("Kind", "System", "Emulator", "File", "Developer"), byTab.getValue(PageTab.DETAILS).map { it.title })
         // Where the file lives as a person names it; the whole path is the row's tip.
         val file = byTab.getValue(PageTab.DETAILS).first { it.title == "File" }

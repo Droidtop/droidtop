@@ -166,7 +166,6 @@ enum class LibraryFacet(val key: String, val label: String) {
     /** One line the Filter sheet shows under this facet's values, where its words need saying. */
     val hint: String?
         get() = when (this) {
-            KIND -> "Engine: games that run through an engine such as Ren'Py or RPG Maker"
             else -> null
         }
 

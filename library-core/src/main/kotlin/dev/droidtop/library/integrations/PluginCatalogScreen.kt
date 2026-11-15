@@ -116,7 +116,7 @@ object PluginCatalogScreen {
         id = ID,
         title = "More catalogs",
         needsNetwork = true,
-        subtitle = "Other plugin lists, not droidtop's and not vetted. You read each notice before adding it",
+        subtitle = "Unofficial, not checked by droidtop",
         groups = { context -> catalogsGroups(context) },
     )
 
@@ -148,7 +148,7 @@ object PluginCatalogScreen {
                         NestedScreenItem(
                             id = "plugins_catalog_${slug(source.id)}",
                             title = source.name,
-                            subtitle = "Not part of droidtop. ${source.indexUrl}",
+                            subtitle = "Unofficial · ${source.indexUrl}",
                             inline = catalogScreen(source.id, source.name),
                             chip = chipFor(source),
                         )
@@ -183,20 +183,18 @@ object PluginCatalogScreen {
                     TextInputItem(
                         id = "plugins_catalogs_add_address",
                         title = "Catalog address",
-                        subtitle = "Its GitHub repository (https://github.com/<owner>/<repo>) or its index.json address",
+                        subtitle = "GitHub repository or index.json address",
                         value = pendingAddress,
                         onChange = { _, v -> pendingAddress = v.trim() },
                     ),
                     AsyncActionItem(
                         id = "plugins_catalogs_add_fetch",
                         title = "Fetch this catalog",
-                        subtitle = "Shows its disclaimer and keys below; nothing is added until you accept",
                         run = { ctx, onStatus -> fetch(ctx, pendingAddress, onStatus) },
                     ),
                     DocumentPickItem(
                         id = "plugins_catalogs_add_qr",
                         title = "Read a QR code",
-                        subtitle = "A photo or screenshot of the catalog's QR code",
                         mimeType = "image/*",
                         onPicked = { ctx, uri ->
                             val text = PluginCatalogSources.qrText(ctx, uri)
@@ -216,8 +214,8 @@ object PluginCatalogScreen {
     }
 
     private suspend fun fetch(context: Context, address: String, onStatus: (String) -> Unit): String {
-        if (address.isBlank()) return "Type the catalog's address first"
-        onStatus("Fetching $address...")
+        if (address.isBlank()) return "Enter an address first"
+        onStatus("Fetching")
         return when (val result = PluginCatalog.propose(context, address)) {
             is PluginCatalog.ProposeResult.Failed -> {
                 pendingProposal = null
@@ -253,14 +251,14 @@ object PluginCatalogScreen {
                             tone = NoticeTone.Caution,
                             title = "Unofficial list",
                             body = "Add from it only if someone you trust pointed you to it.",
-                            details = "${proposal.info.name} is not part of droidtop and droidtop has not checked it. " +
-                                "Nothing is added until you accept the notice below.\nAddress: ${proposal.indexUrl}",
+                            details = "Not checked by droidtop. " +
+                                "\nAddress: ${proposal.indexUrl}",
                         ),
                         placement = NoticePlacement.Page,
                     ),
                 )
                 addAll(noticeItems("plugins_catalogs_proposal_notice", proposal.info.name, false, proposal.disclaimer.text, gate))
-                add(ActionItem(id = "plugins_catalogs_proposal_address", title = proposal.indexUrl.removePrefix("https://"), subtitle = "Where droidtop reads it from"))
+                add(ActionItem(id = "plugins_catalogs_proposal_address", title = proposal.indexUrl.removePrefix("https://"), ))
                 add(
                     ActionItem(
                         id = "plugins_catalogs_proposal_signed",
@@ -274,7 +272,7 @@ object PluginCatalogScreen {
                         ActionItem(
                             id = "plugins_catalogs_proposal_catalog_key",
                             title = "Catalog key",
-                            subtitle = "Vouches for this catalog's plugins; droidtop refuses a later copy under another key",
+                            subtitle = "A later copy under another key is refused",
                             value = UserOriginKeys.fingerprint(master) ?: "unreadable",
                         ),
                     )
@@ -284,7 +282,7 @@ object PluginCatalogScreen {
                     AsyncActionItem(
                         id = "plugins_catalogs_proposal_accept",
                         title = "Accept and add",
-                        subtitle = "Its publishers' plugins can then install, marked Unofficial; each runs once you approve it",
+                        subtitle = "Each plugin still asks before it runs",
                         gate = gate,
                         confirmTitle = "Accept the notice of \"${proposal.info.name}\"" +
                             (if (newOrigins > 0) " and trust its $newOrigins publisher${if (newOrigins == 1) "" else "s"}?" else "?"),
@@ -300,7 +298,6 @@ object PluginCatalogScreen {
                     ActionItem(
                         id = "plugins_catalogs_proposal_discard",
                         title = "Discard",
-                        subtitle = "Add nothing, trust nothing",
                         run = { _ -> pendingProposal = null },
                     ),
                 )
@@ -350,7 +347,7 @@ object PluginCatalogScreen {
         return ActionItem(
             id = "plugins_catalogs_proposal_origin_${origin.origin}",
             title = title,
-            subtitle = "Third-party, not official, and droidtop has not checked it",
+            subtitle = "Unofficial, not checked",
             value = fingerprint,
         )
     }
@@ -363,11 +360,7 @@ object PluginCatalogScreen {
         id = "plugins_catalog_screen_${slug(sourceId)}",
         title = name,
         needsNetwork = true,
-        subtitle = if (sourceId == PluginCatalogSources.OFFICIAL_ID) {
-            "What droidtop's catalog lists. Nothing here runs until you approve it on the Plugins screen"
-        } else {
-            "Unofficial catalog, not part of droidtop. Nothing here runs until you approve it on the Plugins screen"
-        },
+        subtitle = if (sourceId == PluginCatalogSources.OFFICIAL_ID) null else "Unofficial",
         groups = { context -> catalogGroups(context, sourceId) },
     )
 
@@ -461,7 +454,6 @@ object PluginCatalogScreen {
                     ChoiceItem(
                         id = "plugins_catalog_channel_$sourceId",
                         title = "Channel",
-                        subtitle = "Which versions to take. Testing and Unstable are sooner and less sure; a plugin can differ",
                         options = PluginChannel.entries.map { ChoiceOption(it.id, it.label) },
                         current = PluginChannels.forContext(context).catalog(sourceId).id,
                         onSelect = { ctx, value -> PluginChannel.of(value)?.let { PluginChannels.forContext(ctx).setCatalog(sourceId, it) } },
@@ -472,7 +464,6 @@ object PluginCatalogScreen {
                 AsyncActionItem(
                     id = "plugins_catalog_refresh",
                     title = "Refresh catalog",
-                    subtitle = if (current.official) "Fetch the latest list from droidtop" else "Fetch the latest list from ${current.indexUrl}",
                     run = { ctx, _ -> PluginCatalog.refresh(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current) },
                 ),
             )
@@ -484,13 +475,7 @@ object PluginCatalogScreen {
                     ActionItem(
                         id = "plugins_catalog_empty",
                         title = if (load.published) "Nothing to show yet" else "No catalog is published yet",
-                        subtitle = if (load.published) {
-                            "The refresh above just failed. A plugin file can still be installed from the Plugins screen."
-                        } else if (current.official) {
-                            "There is nothing to browse yet. Install a plugin file from the Plugins screen instead."
-                        } else {
-                            "Nothing is published at this catalog's address now."
-                        },
+                        subtitle = if (load.published) "Refresh failed" else null,
                     ),
                 )
             }
@@ -533,7 +518,6 @@ object PluginCatalogScreen {
                 AsyncActionItem(
                     id = "plugins_catalog_disclaimer_accept",
                     title = "Accept",
-                    subtitle = "Lists this catalog's plugins again",
                     gate = gate,
                     confirmTitle = "Accept the new notice of \"${source.name}\"?",
                     run = { ctx, _ ->
@@ -553,7 +537,7 @@ object PluginCatalogScreen {
                 PluginCatalog.OriginState.NotTrusted -> AsyncActionItem(
                     id = "plugins_catalog_trust_${origin.origin}",
                     title = "Trust origin \"${origin.origin}\"",
-                    subtitle = "New in this catalog. Key fingerprint $fingerprint: third-party, not official, and droidtop has not vetted it",
+                    subtitle = "Key $fingerprint · unofficial, not checked",
                     // The fingerprint first: an armed row on the handheld shows this question in two lines at most.
                     confirmTitle = "Trust key $fingerprint for origin \"${origin.origin}\" from \"${source.name}\"?",
                     run = { ctx, _ -> PluginCatalog.trustOrigin(ctx, source, origin.origin, origin.keyBase64) },
@@ -563,8 +547,7 @@ object PluginCatalogScreen {
                     AsyncActionItem(
                         id = "plugins_catalog_changed_${origin.origin}",
                         title = "\"${origin.origin}\" has a new key",
-                        subtitle = "You trust $trusted; this catalog now names $fingerprint. Its plugins here are not offered " +
-                            "until you decide. Trust the new key only if its publisher said it changed it",
+                        subtitle = "Was $trusted, now $fingerprint. Trust it only if the publisher said so",
                         confirmTitle = "Trust new key $fingerprint for \"${origin.origin}\" in place of $trusted? Its plugins keep " +
                             "their approval and permissions." + if (source.indexSigned) "" else " This catalog's index is not signed.",
                         run = { ctx, _ -> PluginCatalog.replaceOriginKey(ctx, source, origin.origin, origin.keyBase64) },
@@ -587,7 +570,7 @@ object PluginCatalogScreen {
                     id = "plugins_catalog_about_where",
                     title = "Unofficial",
                     subtitle = buildString {
-                        append("Not part of droidtop and not vetted by it. Index ").append(source.indexUrl)
+                        append("Not checked by droidtop. Index ").append(source.indexUrl)
                         source.homepage?.let { append(". Home ").append(it) }
                         append(". ")
                         append(
@@ -602,10 +585,10 @@ object PluginCatalogScreen {
                 AsyncActionItem(
                     id = "plugins_catalog_remove",
                     title = "Remove this catalog",
-                    subtitle = "Nothing is listed or updated from it. Plugins from it stay, under the keys you trusted",
+                    subtitle = "Its installed plugins stay",
                     confirmTitle = "Remove \"${source.name}\"?",
                     run = { ctx, _ ->
-                        if (PluginCatalog.removeCatalog(ctx, source)) "Removed \"${source.name}\"" else "It was already removed"
+                        if (PluginCatalog.removeCatalog(ctx, source)) "Removed" else "Already removed"
                     },
                 ),
             )
@@ -650,7 +633,7 @@ object PluginCatalogScreen {
                             incompatible?.let { why ->
                                 NoticeItem(
                                     id = "${id}_incompatible",
-                                    notice = Notice(tone = NoticeTone.Danger, title = "Incompatible with your version", body = "This droidtop can't run it: $why."),
+                                    notice = Notice(tone = NoticeTone.Danger, title = "Incompatible with your version", body = why.replaceFirstChar { it.uppercase() }),
                                 )
                             },
                             if (conflict) {
@@ -659,7 +642,7 @@ object PluginCatalogScreen {
                                     notice = Notice(
                                         tone = NoticeTone.Caution,
                                         title = "No release offered",
-                                        body = "The catalog lists releases whose versions and dates disagree, so none is offered until it is fixed.",
+                                        body = "The catalog's versions and dates disagree.",
                                     ),
                                 )
                             } else {
@@ -713,7 +696,6 @@ object PluginCatalogScreen {
             offered && latest != null -> AsyncActionItem(
                 id = id,
                 title = "Install",
-                subtitle = "It waits for your approval before it runs",
                 value = "Install ${latest.version}",
                 run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, latest, onStatus) },
             )
@@ -723,7 +705,7 @@ object PluginCatalogScreen {
                 value = when (state) {
                     PluginCatalog.OriginState.NotTrusted -> "Trust its origin first"
                     is PluginCatalog.OriginState.KeyChanged -> "Its key changed"
-                    is PluginCatalog.OriginState.Superseded -> "Moving to its new key; refresh the catalog"
+                    is PluginCatalog.OriginState.Superseded -> "New key; refresh"
                     is PluginCatalog.OriginState.Unusable -> "Not available (${state.reason})"
                     PluginCatalog.OriginState.Offered -> ""
                 },

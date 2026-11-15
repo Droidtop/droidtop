@@ -68,8 +68,8 @@ class AppPageTest {
             assertFalse(line, line.contains("game"))
             assertTrue(tab.emptyLine(PageKind.GAME).contains("this game"))
         }
-        assertEquals("You have not opened this app yet", PageTab.ACTIVITY.emptyLine(PageKind.APP))
-        assertEquals("You have not played this game yet", PageTab.ACTIVITY.emptyLine(PageKind.GAME))
+        assertEquals("Not opened yet", PageTab.ACTIVITY.emptyLine(PageKind.APP))
+        assertEquals("Not played yet", PageTab.ACTIVITY.emptyLine(PageKind.GAME))
         assertEquals("App options", PageKind.APP.optionsHint)
         assertEquals("Game options", PageKind.GAME.optionsHint)
         // Options' shared rows take the same word.

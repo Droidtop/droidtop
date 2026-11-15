@@ -567,12 +567,12 @@ internal enum class PageTab(val label: String) {
 
     /** What this tab says with no row, so an empty tab is an answer and not a blank, worded for [kind]. Pure. */
     fun emptyLine(kind: PageKind): String = when (this) {
-        OVERVIEW -> "Nothing is known about this ${kind.noun} yet"
-        VERSIONS -> "No version information for this ${kind.noun}"
-        ACTIVITY -> "You have not ${kind.done} this ${kind.noun} yet"
-        EXTRAS -> "No extras for this ${kind.noun} yet"
-        DETAILS -> "No details for this ${kind.noun} yet"
-        THREAD -> "No thread is linked to this ${kind.noun}"
+        OVERVIEW -> "Nothing known yet"
+        VERSIONS -> "No versions"
+        ACTIVITY -> "Not ${kind.done} yet"
+        EXTRAS -> "No extras"
+        DETAILS -> "No details"
+        THREAD -> "No thread linked"
     }
 }
 
@@ -645,9 +645,7 @@ internal const val SCRAPING = "Looking it up…"
 internal fun scrapeRow(entry: LibraryEntry, status: String?, sources: String, onScrape: () -> Unit): ActionRow =
     ActionRow(
         SCRAPE_ROW,
-        status ?: PageKind.of(entry).noun.let { noun ->
-            if (entry.isUnscraped()) "Not scraped yet. Looks this $noun up in $sources" else "Looks this $noun up in $sources again"
-        },
+        status ?: "Not scraped yet".takeIf { entry.isUnscraped() },
         onSelect = if (status == SCRAPING) null else onScrape,
     )
 
@@ -665,16 +663,16 @@ internal object PageOptionRows {
     fun saves(value: String?, onSelect: () -> Unit) = ActionRow(SAVES, value, onSelect = onSelect)
 
     fun signIn(kind: PageKind, onSelect: () -> Unit) =
-        ActionRow(SIGN_IN, "Shows your RetroAchievements progress on this ${kind.noun}", onSelect = onSelect)
+        ActionRow(SIGN_IN, null, onSelect = onSelect)
 
     fun chooseMatch(kind: PageKind, onSelect: () -> Unit) =
-        ActionRow(CHOOSE_MATCH, "Pick the right ${kind.noun} by hand when the scraper guessed wrong", onSelect = onSelect)
+        ActionRow(CHOOSE_MATCH, null, onSelect = onSelect)
 
     fun viewMedia(kind: PageKind, count: Int, onSelect: () -> Unit) =
         ActionRow(VIEW_MEDIA, "$count images and videos scraped for this ${kind.noun}", onSelect = onSelect)
 
     fun collections(kind: PageKind, onSelect: () -> Unit) =
-        ActionRow(COLLECTIONS, "Which of your collections this ${kind.noun} is in", onSelect = onSelect)
+        ActionRow(COLLECTIONS, null, onSelect = onSelect)
 }
 
 /** The A hint on the action band: what the button under the cursor does. */
@@ -1040,7 +1038,7 @@ internal fun pageStatuses(
         saves?.let { PageStatus(PageStatusKind.SAVES, "Saves: $it", PageStatusTone.PLAIN) },
         when {
             achievements != null -> PageStatus(PageStatusKind.ACHIEVEMENTS, "Achievements: $achievements", PageStatusTone.GOOD)
-            achievementsSignIn -> PageStatus(PageStatusKind.ACHIEVEMENTS, "Achievements: sign in to see them", PageStatusTone.WAITING)
+            achievementsSignIn -> PageStatus(PageStatusKind.ACHIEVEMENTS, "Achievements: sign in", PageStatusTone.WAITING)
             else -> null
         },
         if (kind == PageKind.GAME && entry.isUnscraped()) PageStatus(PageStatusKind.NOT_SCRAPED, "Not scraped yet", PageStatusTone.WAITING) else null,

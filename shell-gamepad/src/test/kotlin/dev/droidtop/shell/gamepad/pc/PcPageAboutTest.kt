@@ -317,7 +317,7 @@ class PcPageAboutTest {
         )
         assertEquals("Not ready to play: Windows games need a one-time setup", statuses.first { it.kind == PageStatusKind.READY }.label)
         assertEquals(PageStatusTone.WAITING, statuses.first { it.kind == PageStatusKind.CLOUD_SAVES }.tone)
-        assertEquals("Achievements: sign in to see them", statuses.first { it.kind == PageStatusKind.ACHIEVEMENTS }.label)
+        assertEquals("Achievements: sign in", statuses.first { it.kind == PageStatusKind.ACHIEVEMENTS }.label)
         // Nothing scraped yet: its glyph says so, and Edit metadata holds Scrape.
         assertTrue(statuses.any { it.kind == PageStatusKind.NOT_SCRAPED })
         // A state the page does not know is not a glyph: no saves row, no update.
@@ -378,9 +378,9 @@ class PcPageAboutTest {
     fun theScrapeRowSaysWhatItDoesAndTakesNoPressWhileItRuns() {
         val unscraped = entry()
         assertEquals(SCRAPE_ROW, scrapeRow(unscraped, null, "the PC sources") {}.title)
-        assertEquals("Not scraped yet. Looks this game up in the PC sources", scrapeRow(unscraped, null, "the PC sources") {}.detail)
+        assertEquals("Not scraped yet", scrapeRow(unscraped, null, "the PC sources") {}.detail)
         val scraped = entry(description = "A game", fieldSources = mapOf("description" to "IGDB"))
-        assertEquals("Looks this game up in the console scrapers again", scrapeRow(scraped, null, "the console scrapers") {}.detail)
+        assertEquals(null, scrapeRow(scraped, null, "the console scrapers") {}.detail)
         // While one runs the row says so and A does nothing; what it said stays as the row's line.
         assertNull(scrapeRow(scraped, SCRAPING, "the PC sources") {}.onSelect)
         assertEquals("Scraped 1 game", scrapeRow(scraped, "Scraped 1 game", "the PC sources") {}.detail)
@@ -391,11 +391,11 @@ class PcPageAboutTest {
         val day = 24L * 60 * 60 * 1000
         val now = 10 * day
         val synced = dev.droidtop.library.stores.StoreSaves.LastSync(okAt = now - 2 * day, failedAt = null)
-        assertEquals("Synced 2 days ago" to "Select to sync now", cloudSavesLine("Steam", true, synced, online = true, now = now))
+        assertEquals("Synced 2 days ago" to "Sync now", cloudSavesLine("Steam", true, synced, online = true, now = now))
         assertEquals("Offline" to "Not synced since 2 days ago", cloudSavesLine("Steam", true, synced, online = false, now = now))
         val failed = synced.copy(failedAt = now - 1000)
         assertEquals("Last sync failed" to "Select to retry", cloudSavesLine("Steam", true, failed, online = true, now = now))
-        assertEquals("Not synced yet" to "Select to sync now", cloudSavesLine("Steam", true, null, online = true, now = now))
+        assertEquals("Not synced yet" to "Sync now", cloudSavesLine("Steam", true, null, online = true, now = now))
         assertEquals("Not supported" to "Amazon cloud saves are not supported", cloudSavesLine("Amazon", false, null, online = true, now = now))
     }
 

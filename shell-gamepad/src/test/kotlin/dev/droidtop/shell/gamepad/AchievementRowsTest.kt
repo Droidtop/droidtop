@@ -72,7 +72,7 @@ class AchievementRowsTest {
         assertEquals(null, rarityLine(null))
         assertEquals("Earned", storeAchievementItem(StoreAchievement("E", "Done", "", earnedAtMs = 0L)).value)
         // A secret one says nothing about itself, rarity included.
-        assertEquals("Described once you earn it", storeAchievementItem(rare.copy(hidden = true)).subtitle)
+        assertEquals(null, storeAchievementItem(rare.copy(hidden = true)).subtitle)
     }
 
     @Test

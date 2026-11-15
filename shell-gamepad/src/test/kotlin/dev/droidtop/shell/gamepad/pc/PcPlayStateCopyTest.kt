@@ -71,8 +71,8 @@ class PcPlayStateCopyTest {
         val rows = copyRows(listOf(steam, gog), chosen = "gog:1", acting = "steam:1", origin = { it.id.substringBefore(':') }, onRun = {}, onOptions = {})
         assertEquals(listOf("steam", "gog"), rows.map { it.title })
         assertEquals(listOf("Play", "Install"), rows.map { it.value })
-        assertEquals("The button plays this one · Installed", rows[0].subtitle)
-        assertEquals("Chosen for this game · Not installed", rows[1].subtitle)
+        assertEquals("Plays · Installed", rows[0].subtitle)
+        assertEquals("Chosen · Not installed", rows[1].subtitle)
         // One copy, or a folder game's versions: no copy rows.
         assertTrue(copyRows(listOf(steam), null, "steam:1", { "" }, {}, {}).isEmpty())
     }

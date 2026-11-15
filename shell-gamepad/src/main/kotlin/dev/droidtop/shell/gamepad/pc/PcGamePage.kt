@@ -235,7 +235,7 @@ internal fun PcGamePage(
                             cloudStatus = SYNCING
                             cloudStatus = dev.droidtop.library.stores.StoreSaves
                                 .sync(context, entry.id, GameNaming.displayName(entry.title), dev.droidtop.library.stores.SaveSyncPhase.MANUAL)
-                                ?.line ?: "No cloud saves for this game"
+                                ?.line ?: "No cloud saves"
                             cloudToken++
                         }
                     }
@@ -539,7 +539,7 @@ internal fun PcGamePage(
                         scrapeRow(entry, scrapeStatus, "the PC sources") { scrape() },
                         // The person's own title for the game (docs/SPEC.md 7n), kept by the library.
                         if (library != null) {
-                            ActionRow("Title", entry.gameName?.takeIf { name -> name.isNotBlank() }?.let { name -> "Your own title: $name" } ?: "From the folder name") {
+                            ActionRow("Title", entry.gameName?.takeIf { name -> name.isNotBlank() }?.let { name -> name } ?: "From the folder name") {
                                 close()
                                 renaming = true
                             }
@@ -586,7 +586,7 @@ internal fun PcGamePage(
                         } else {
                             null
                         },
-                        ActionRow("All game options", "Install, updates, how it runs and the rest of the game's menu") {
+                        ActionRow("All game options", null) {
                             close()
                             onOpenOptions()
                         },
@@ -617,7 +617,7 @@ internal fun PcGamePage(
                 scope.launch {
                     library.renameGame(gameIds, text)
                     dev.droidtop.library.settings.Notices.flash(
-                        if (text.isBlank()) "Back to the title read from the folder name" else "Renamed to ${text.trim()}",
+                        if (text.isBlank()) "Title reset" else "Renamed",
                         context = context,
                     )
                 }
@@ -771,10 +771,10 @@ internal fun ownershipSentence(entry: LibraryEntry): Pair<String, String>? {
     val store = entry.storeLabel() ?: return null
     return when (holding) {
         dev.droidtop.library.stores.StoreHolding.OWNED -> null
-        dev.droidtop.library.stores.StoreHolding.FAMILY -> holding.label to "Shared by another account in your $store family"
-        dev.droidtop.library.stores.StoreHolding.FREE -> holding.label to "Free to play on $store. It counts as yours once you install it or play it"
-        dev.droidtop.library.stores.StoreHolding.NOT_OWNED -> holding.label to "This game left your library. $store may refuse to start it"
-        dev.droidtop.library.stores.StoreHolding.WISHLIST -> holding.label to "On your $store wishlist. A finds it on $store"
+        dev.droidtop.library.stores.StoreHolding.FAMILY -> holding.label to "$store family"
+        dev.droidtop.library.stores.StoreHolding.FREE -> holding.label to "Free on $store"
+        dev.droidtop.library.stores.StoreHolding.NOT_OWNED -> holding.label to "No longer in your $store library"
+        dev.droidtop.library.stores.StoreHolding.WISHLIST -> holding.label to "On your $store wishlist"
     }
 }
 
@@ -797,8 +797,8 @@ internal fun cloudSavesLine(
     return when {
         !online -> "Offline" to (since?.let { "Not synced since $it" } ?: "Not synced yet")
         last?.failedAt != null -> "Last sync failed" to "Select to retry"
-        since != null -> "Synced $since" to "Select to sync now"
-        else -> "Not synced yet" to "Select to sync now"
+        since != null -> "Synced $since" to "Sync now"
+        else -> "Not synced yet" to "Sync now"
     }
 }
 
@@ -855,8 +855,8 @@ internal fun copyRows(
             else -> "Install"
         }
         val notes = listOfNotNull(
-            "The button plays this one".takeIf { copy.id == acting },
-            "Chosen for this game".takeIf { copy.id == chosen && copy.id != acting },
+            "Plays".takeIf { copy.id == acting },
+            "Chosen".takeIf { copy.id == chosen && copy.id != acting },
             if (installed) "Installed" else "Not installed",
         )
         PageFact(
@@ -902,7 +902,7 @@ internal fun oldVersionRows(
             subtitle = if (armed == path) {
                 "$again to remove it" + (size?.let { " and free $it" } ?: "") + ". Its saves are copied to this version first"
             } else {
-                listOfNotNull(size, "Its saves are copied to this version before it is removed").joinToString(" \u00b7 ")
+                listOfNotNull(size, "Saves are kept").joinToString(" \u00b7 ")
             },
             onActivate = { onRemove(old) },
             tip = path,
@@ -1043,7 +1043,7 @@ private fun pageRows(
         add(PageFact(link.label, value = "Open", onActivate = { onOpenLink(link.url) }, tip = link.url, tab = PageTab.EXTRAS))
     }
     if (!entry.hideMetadata) {
-        sourcesLine(entry)?.let { add(PageFact("Where these facts came from", subtitle = it, tab = PageTab.EXTRAS)) }
+        sourcesLine(entry)?.let { add(PageFact("Sources", subtitle = it, tab = PageTab.EXTRAS)) }
     }
 
     val owned = siblings.mapNotNull { it.ownership() }
@@ -1361,7 +1361,7 @@ internal fun elsewhereRows(
         subtitle = listOfNotNull(
             if (now == null) "No longer installed there" else null,
             before.takeIf { it.isNotEmpty() }?.let { "Before: " + it.joinToString(", ") },
-            if (get != null) "Select to copy it here as a new version; the one you have stays" else null,
+            if (get != null) "Copy here as a new version" else null,
         ).joinToString(". ").ifBlank { null },
         onActivate = get,
         tab = PageTab.VERSIONS,
