@@ -111,6 +111,7 @@ object PrefixToolsCatalog {
                         TextInputItem(
                             id = "wine_prefix_run_path",
                             title = "Path to a program",
+                            subtitle = "For a file the picker can't reach",
                             value = typedPath,
                             onChange = { _, text -> typedPath = text.trim() },
                         ),

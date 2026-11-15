@@ -454,6 +454,7 @@ object PluginCatalogScreen {
                     ChoiceItem(
                         id = "plugins_catalog_channel_$sourceId",
                         title = "Channel",
+                        subtitle = "Testing and Unstable come sooner, less tested",
                         options = PluginChannel.entries.map { ChoiceOption(it.id, it.label) },
                         current = PluginChannels.forContext(context).catalog(sourceId).id,
                         onSelect = { ctx, value -> PluginChannel.of(value)?.let { PluginChannels.forContext(ctx).setCatalog(sourceId, it) } },

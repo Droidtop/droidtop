@@ -1096,7 +1096,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 ChoiceItem(
                     id = "plugin_${m.id}_channel",
                     title = "Channel",
-                    subtitle = null,
+                    subtitle = "Testing and Unstable come sooner, less tested",
                     options = listOf(dev.droidtop.library.settings.ChoiceOption(CATALOG_CHANNEL, "As its catalog (${catalogs.label})")) +
                         dev.droidtop.library.integrations.PluginChannel.entries.map { dev.droidtop.library.settings.ChoiceOption(it.id, it.label) },
                     current = channels.plugin(m.id)?.id ?: CATALOG_CHANNEL,
@@ -1810,7 +1810,7 @@ internal fun AppSettingsCatalogs.providedByGroups(resolution: ApiResolution, cho
                 dev.droidtop.library.settings.ChoiceItem(
                     id = "plugins_provided_by_$api",
                     title = api,
-                    subtitle = null,
+                    subtitle = "For the plugins that use it",
                     options = list.map { dev.droidtop.library.settings.ChoiceOption(it.plugin.manifest.id, it.plugin.manifest.label) },
                     current = chosen[api]?.takeIf { id -> list.any { it.plugin.manifest.id == id } } ?: list.first().plugin.manifest.id,
                     onSelect = { ctx, value -> PluginProviderChoices.forContext(ctx).choose(api, value) },
@@ -2095,7 +2095,7 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                     TextInputItem(
                         id = "plugin_keys_manual_key",
                         title = "Certificate or public key",
-                        subtitle = null,
+                        subtitle = "As its author publishes it",
                         // The value column beside a row's title is narrow:
                         // the whole ~124-char base64 squeezed this row's
                         // title and description out of the row once one

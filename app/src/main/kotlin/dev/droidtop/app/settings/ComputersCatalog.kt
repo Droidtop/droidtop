@@ -122,12 +122,14 @@ object ComputersCatalog {
         ToggleItem(
             id = "computers_show_games",
             title = "Show computers' games",
+            subtitle = "Marked with the computer's name",
             current = Computers.gamesShown(context),
             onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setGamesShown(ctx, on) }.also { refreshLibrary(ctx) } },
         ),
         ToggleItem(
             id = "computers_show_apps",
             title = "Show computers' apps",
+            subtitle = "Listed in Apps",
             current = Computers.appsShown(context),
             onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setAppsShown(ctx, on) }.also { refreshLibrary(ctx) } },
         ),
@@ -344,14 +346,14 @@ object ComputersCatalog {
                     ToggleItem(
                         id = "computer_show_games",
                         title = "Show this computer's games",
-                        subtitle = null,
+                        subtitle = "Games not on this device",
                         current = computer.showGames,
                         onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setShown(ctx, computer.id, games = on) }.also { refreshLibrary(ctx) } },
                     ),
                     ToggleItem(
                         id = "computer_show_apps",
                         title = "Show this computer's apps",
-                        subtitle = null,
+                        subtitle = "Listed in Apps",
                         current = computer.showApps,
                         onToggle = { ctx, on -> withContext(Dispatchers.IO) { Computers.setShown(ctx, computer.id, apps = on) }.also { refreshLibrary(ctx) } },
                     ),

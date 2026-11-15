@@ -311,6 +311,7 @@ internal object StoresCatalog {
                     ToggleItem(
                         id = "stores_links",
                         title = "Get it on and Support the developer",
+                        subtitle = "On games no store owns",
                         current = !StoreLinkPrefs.hiddenEverywhere(context),
                         onToggle = { ctx, on -> StoreLinkPrefs.setHiddenEverywhere(ctx, !on) },
                     ),

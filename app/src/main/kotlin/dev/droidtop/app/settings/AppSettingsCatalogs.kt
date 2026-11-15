@@ -335,6 +335,7 @@ object AppSettingsCatalogs {
                     TextInputItem(
                         id = "console_systems_db_source",
                         title = "Platform database source",
+                        subtitle = "Blank for the default",
                         value = PlatformDatabaseSource.baseUrl(context)
                             .takeIf { it != PlatformDatabaseSource.DEFAULT_BASE_URL }
                             .orEmpty(),
@@ -1517,6 +1518,7 @@ object AppSettingsCatalogs {
                         ChoiceItem(
                             id = "scrape_offer",
                             title = "After the first library scan",
+                            subtitle = "Fetch art and details for new games",
                             options = dev.droidtop.library.scraper.ScrapeOffer.Answer.entries.map { ChoiceOption(it.id, it.label) },
                             current = dev.droidtop.library.scraper.ScrapeOffer.current(context).id,
                             onSelect = { ctx, value ->
@@ -1586,12 +1588,14 @@ object AppSettingsCatalogs {
                         ToggleItem(
                             id = "scrape_content_miximages",
                             title = "Generate miximages",
+                            subtitle = "The picture most themes show",
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.generateMiximages(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setGenerateMiximages(ctx, value) },
                         ),
                         ToggleItem(
                             id = "scrape_miximage_rotate_boxes",
                             title = "Rotate horizontal boxes in miximages",
+                            subtitle = "Turns wide boxes upright",
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.miximageRotateHorizontalBoxes(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setMiximageRotateHorizontalBoxes(ctx, value) },
                         ),

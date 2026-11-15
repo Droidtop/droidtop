@@ -148,6 +148,7 @@ object DroidtopWideSettings {
                         ChoiceItem(
                             id = AccessibilityPrefs.KEY_COLOR_VISION,
                             title = "Colour vision",
+                            subtitle = "droidtop's own screens only",
                             options = listOf(
                                 ChoiceOption(AccessibilityPrefs.VISION_NONE, "Off"),
                                 ChoiceOption(AccessibilityPrefs.VISION_PROTAN, "Protanopia (red-weak)"),
@@ -163,6 +164,7 @@ object DroidtopWideSettings {
                         ChoiceItem(
                             id = AccessibilityPrefs.KEY_TEXT_SCALE,
                             title = "Text size",
+                            subtitle = "On top of Android's font size",
                             options = listOf(
                                 ChoiceOption("1.0", "Normal"),
                                 ChoiceOption("1.15", "Large"),
@@ -364,12 +366,14 @@ object DroidtopWideSettings {
                         ToggleItem(
                             id = "pref_desktop_tile_windows",
                             title = "Tile windows",
+                            subtitle = "Side by side instead of floating",
                             current = dev.droidtop.app.DesktopSetupPrefs.tileWindows(context),
                             onToggle = { ctx, on -> dev.droidtop.app.DesktopSetupPrefs.setTileWindows(ctx, on) },
                         ),
                         ChoiceItem(
                             id = "pref_desktop_background",
                             title = "Desktop background",
+                            subtitle = "A colour or a picture",
                             options = dev.droidtop.runtime.DesktopAppearance.Background.entries.map { ChoiceOption(it.id, it.label) },
                             current = dev.droidtop.app.DesktopSetupPrefs.background(context).id,
                             onSelect = { ctx, value ->
@@ -444,6 +448,7 @@ object DroidtopWideSettings {
         return ChoiceItem(
             id = dev.droidtop.runtime.DesktopScale.KEY,
             title = "Desktop scale",
+            subtitle = "Size of text and windows",
             options = listOf(
                 ChoiceOption(dev.droidtop.runtime.DesktopScale.AUTOMATIC, "Automatic (${dev.droidtop.runtime.DesktopScale.label(automatic)})"),
             ) + dev.droidtop.runtime.DesktopScale.CHOICES.map { value ->
@@ -564,6 +569,7 @@ object DroidtopWideSettings {
         return ChoiceItem(
             id = "pref_global_default_mode",
             title = "Home opens",
+            subtitle = "Also where the Home button goes",
             options = options,
             current = Modes.defaultMode(context)?.takeIf { id -> options.any { it.value == id } } ?: "",
             onSelect = { ctx, value -> Modes.setDefaultMode(ctx, Mode.byId(value.ifEmpty { null })) },

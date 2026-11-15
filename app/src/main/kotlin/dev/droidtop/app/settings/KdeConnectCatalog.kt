@@ -146,6 +146,7 @@ object KdeConnectCatalog {
             TextInputItem(
                 id = "kdeconnect_name",
                 title = "Name",
+                subtitle = "What other devices see",
                 value = KdeConnect.name(context),
                 onChange = { ctx, text -> KdeConnect.setName(ctx, text) },
             ),

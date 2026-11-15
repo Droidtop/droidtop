@@ -358,7 +358,7 @@ object AppCatalogScreen {
                             ToggleItem(
                                 id = "apps_source_enabled",
                                 title = "Use this source",
-                                subtitle = null,
+                                subtitle = "Off: its apps aren't listed",
                                 current = fresh.enabled,
                                 onToggle = { ctx, value ->
                                     AppCatalogs.quick(ctx, record, "set_source_enabled", JSONObject().put("source", fresh.id).put("enabled", value), "Done")

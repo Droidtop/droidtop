@@ -736,6 +736,7 @@ object UpdatesPage {
                             ChoiceItem(
                                 id = "updates_frequency",
                                 title = "Check for updates",
+                                subtitle = "Nothing about you is sent",
                                 options = AppSelfUpdate.Frequency.entries.map { ChoiceOption(it.name, it.label) },
                                 current = update.frequency(context).name,
                                 onSelect = { ctx, value ->
@@ -746,6 +747,7 @@ object UpdatesPage {
                             ChoiceItem(
                                 id = "updates_channel",
                                 title = "Build channel",
+                                subtitle = "Unstable gets every build first",
                                 options = AppSelfUpdate.Channel.entries.map { ChoiceOption(it.name, it.label) },
                                 current = update.channel(context).name,
                                 onSelect = { ctx, value -> update.setChannel(ctx, AppSelfUpdate.Channel.valueOf(value)) },

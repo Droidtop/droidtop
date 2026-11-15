@@ -86,6 +86,7 @@ object WindowsInstallCatalog {
                             TextInputItem(
                                 id = "windows_install_path",
                                 title = "Path to the installer",
+                                subtitle = "For a file the picker can't reach",
                                 value = typedInstaller,
                                 onChange = { _, text -> typedInstaller = text.trim() },
                             ),

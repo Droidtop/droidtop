@@ -223,14 +223,14 @@ object ContainersCatalog {
             ToggleItem(
                 id = "containers_image_cache_keep",
                 title = "Keep downloaded images",
-                subtitle = null,
+                subtitle = "A new container then needs no download",
                 current = policy.enabled,
                 onToggle = { ctx, on -> withContext(Dispatchers.IO) { DesktopSetupPrefs.setImageCacheKeep(ctx, on) } },
             ),
             ChoiceItem(
                 id = "containers_image_cache_limit",
                 title = "Cache size limit",
-                subtitle = null,
+                subtitle = "The oldest images go first",
                 options = dev.droidtop.runtime.ImageCachePolicy.LIMITS.map {
                     ChoiceOption(dev.droidtop.runtime.ImageCachePolicy.limitId(it), dev.droidtop.runtime.ImageCachePolicy.limitLabel(it))
                 },
@@ -759,6 +759,7 @@ object ContainersCatalog {
                 ToggleItem(
                     id = "container_socket_wayland",
                     title = "Wayland",
+                    subtitle = "Its programs draw on the desktop",
                     current = sockets.waylandShared,
                     onToggle = { _, on ->
                         withContext(Dispatchers.IO) {
@@ -800,6 +801,7 @@ object ContainersCatalog {
                     ToggleItem(
                         id = "container_socket_audio",
                         title = "Audio",
+                        subtitle = "Its programs play sound",
                         current = sockets.audioShared,
                         onToggle = { _, on ->
                             withContext(Dispatchers.IO) {
@@ -864,6 +866,7 @@ object ContainersCatalog {
             ChoiceItem(
                 id = "container_look_scale",
                 title = "Scale",
+                subtitle = "How big its programs are",
                 options = ContainerLook.SCALES.map { ChoiceOption(it.toString(), scaleLabel(it)) },
                 current = look.scale.toString(),
                 onSelect = { _, value -> value.toFloatOrNull()?.let { save(look.copy(scale = it)) } },
@@ -871,6 +874,7 @@ object ContainersCatalog {
             ToggleItem(
                 id = "container_look_theme",
                 title = "Light or dark as droidtop",
+                subtitle = "Its GTK programs follow droidtop",
                 current = look.followTheme,
                 onToggle = { _, on ->
                     withContext(Dispatchers.IO) { runCatching { runtime.setLook(container, look.copy(followTheme = on)) } }
@@ -897,6 +901,7 @@ object ContainersCatalog {
         return ChoiceItem(
             id = "container_keyboard",
             title = "Keyboard layout",
+            subtitle = "For a physical keyboard",
             options = options,
             current = look.keyboardLayout ?: AS_DESKTOP,
             onSelect = { ctx, value ->
@@ -974,7 +979,7 @@ object ContainersCatalog {
             ToggleItem(
                 id = "container_program_restart",
                 title = "Restart when it fails",
-                subtitle = null,
+                subtitle = "Waits longer after each failure",
                 current = withContext(Dispatchers.IO) { ContainerPrograms.restartPolicy(app, container.id) != ContainerProgram.RestartPolicy.No },
                 onToggle = { _, on ->
                     withContext(Dispatchers.IO) {
@@ -1055,6 +1060,7 @@ object ContainersCatalog {
                 ToggleItem(
                     id = "container_enter_allowed",
                     title = "Run its commands from the desktop",
+                    subtitle = "From the desktop's terminal",
                     current = allowed,
                     onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerEnter.setAllowed(filesDir, container.id, on) } },
                 ),
@@ -1789,6 +1795,7 @@ object ContainersCatalog {
                                 ChoiceItem(
                                     id = "create_version",
                                     title = "Version",
+                                    subtitle = "Newest first",
                                     options = ordered.map { ChoiceOption(it, if (it == current) "$it (current)" else it) },
                                     current = tag,
                                     onSelect = { _, value -> form.tag = value },

@@ -91,6 +91,7 @@ object LinuxGameToolsCatalog {
                     TextInputItem(
                         id = "linux_tools_run_path",
                         title = "Path to a program",
+                        subtitle = "Inside the game's folder",
                         value = typedPath,
                         onChange = { _, text -> typedPath = text.trim() },
                     ),

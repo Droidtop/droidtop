@@ -44,7 +44,7 @@ object DownloadRulesCatalog {
                     ChoiceItem(
                         id = "download_rules_network_rule",
                         title = "Download over",
-                        subtitle = null,
+                        subtitle = "Which networks downloads may use",
                         options = NetworkRule.values().map { ChoiceOption(it.key, it.label) },
                         current = s.network.key,
                         onSelect = { ctx, value ->
@@ -107,7 +107,7 @@ object DownloadRulesCatalog {
                     ToggleItem(
                         id = "download_rules_auto_default",
                         title = "Keep installed store games up to date",
-                        subtitle = null,
+                        subtitle = "A game's own menu can change it",
                         current = s.autoUpdateDefault,
                         onToggle = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(autoUpdateDefault = value) } },
                     ),
@@ -135,7 +135,7 @@ object DownloadRulesCatalog {
                     ToggleItem(
                         id = "download_rules_while_playing",
                         title = "Update while a game is running",
-                        subtitle = null,
+                        subtitle = "Off: updates wait until you stop",
                         current = s.whilePlaying,
                         onToggle = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(whilePlaying = value) } },
                     ),
