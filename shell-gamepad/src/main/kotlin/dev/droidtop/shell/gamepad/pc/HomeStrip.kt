@@ -343,7 +343,7 @@ private fun HomeCardView(card: HomeCard, selected: Boolean, onClick: () -> Unit)
             .padRow(onClick = onClick)
             .padding(Space.Md),
     ) {
-        Text(card.title, color = MenuTokens.OnSurface, style = TypeRole.body, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(cardTitle(card.title), color = MenuTokens.OnSurface, style = TypeRole.body, maxLines = 2, softWrap = cardTitleLines(card.title) > 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f, fill = false))
         Text(card.line, color = MenuTokens.OnSurfaceMuted, style = TypeRole.supporting, maxLines = 1, overflow = TextOverflow.Ellipsis)
         (card as? HomeCard.Download)?.let {

@@ -326,7 +326,26 @@ internal fun kindBadgeOf(
         val origin = originLabel(entry, origins, style, roots)
         if (!origin.shown) null else KindBadge(if (isPcKind(entry.kind)) BadgeKind.PC else BadgeKind.ENGINE, origin.detail)
     }
-    else -> KindBadge(BadgeKind.RETRO, entry.systemId?.let { systemNames[it] ?: it })
+    else -> KindBadge(BadgeKind.RETRO, entry.systemId?.let { id -> systemNames[id]?.let { shortSystemName(it, id) } ?: id })
+}
+
+/** The longest system name a card badge shows whole. */
+private const val BADGE_NAME_MAX = 14
+
+/** The makers whose name leads many system names ("Sony PlayStation"), left off when the name is too long for a badge. */
+private val SYSTEM_MAKERS = listOf("Sony", "Nintendo", "Sega", "Microsoft", "Atari", "NEC", "SNK", "Bandai", "Commodore", "Coleco", "Mattel", "Philips", "Panasonic", "Apple")
+
+/**
+ * A system's name short enough for a card badge (Droidtop/tracker#942: "RETRO · SONY PL..."): the name when it fits,
+ * else the name without its maker ("Sony PlayStation 2" -> "PlayStation 2"), else ES-DE's own short name, the system
+ * id ("NES"). Pure.
+ */
+internal fun shortSystemName(name: String, id: String): String {
+    if (name.length <= BADGE_NAME_MAX) return name
+    val maker = SYSTEM_MAKERS.firstOrNull { name.startsWith("$it ") }
+    val rest = maker?.let { name.removePrefix("$it ") }
+    if (rest != null && rest.length <= BADGE_NAME_MAX && rest.count { it.isLetter() } >= 4) return rest
+    return id.uppercase()
 }
 
 /**

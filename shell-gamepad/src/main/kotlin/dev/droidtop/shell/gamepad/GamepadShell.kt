@@ -2290,10 +2290,11 @@ internal fun GameCard(
                     // named after its own class is the longest of all)
                     // never runs past the card into its neighbour's.
                     Text(
-                        dev.droidtop.library.GameNaming.displayName(entry.title),
+                        dev.droidtop.shell.gamepad.pc.cardTitle(dev.droidtop.library.GameNaming.displayName(entry.title)),
                         color = MenuTokens.OnSurface,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 2,
+                        softWrap = dev.droidtop.shell.gamepad.pc.cardTitleLines(dev.droidtop.library.GameNaming.displayName(entry.title)) > 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
@@ -2309,10 +2310,11 @@ internal fun GameCard(
         } else {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Bottom) {
                 Text(
-                    dev.droidtop.library.GameNaming.displayName(entry.title),
+                    dev.droidtop.shell.gamepad.pc.cardTitle(dev.droidtop.library.GameNaming.displayName(entry.title)),
                     color = MenuTokens.OnSurface,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2,
+                    softWrap = dev.droidtop.shell.gamepad.pc.cardTitleLines(dev.droidtop.library.GameNaming.displayName(entry.title)) > 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(

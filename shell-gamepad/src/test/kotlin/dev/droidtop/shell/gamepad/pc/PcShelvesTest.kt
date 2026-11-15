@@ -125,6 +125,11 @@ class PcShelvesTest {
         assertEquals(KindBadge(BadgeKind.ENGINE, null), kindBadgeOf(engine, names))
         assertEquals("Retro · Super Nintendo", kindBadgeOf(rom, names)?.text)
         assertEquals("Retro · gba", kindBadgeOf(rom.copy(systemId = "gba"), names)?.text)
+        // A long system name fits the badge (Droidtop/tracker#942): without its maker, else the system id.
+        assertEquals("PlayStation 2", shortSystemName("Sony PlayStation 2", "ps2"))
+        assertEquals("Mega Drive", shortSystemName("Sega Mega Drive", "megadrive"))
+        assertEquals("NES", shortSystemName("Nintendo Entertainment System", "nes"))
+        assertEquals("Nintendo 64", shortSystemName("Nintendo 64", "n64"))
         val steam = game("/steam", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(storeId = "steam:1", installed = true))
         // A Steam-only library reads "PC"; with a second origin the store is named.
         assertEquals("PC", kindBadgeOf(steam, names)?.text)
