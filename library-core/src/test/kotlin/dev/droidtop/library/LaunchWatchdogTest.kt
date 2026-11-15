@@ -172,7 +172,7 @@ class LaunchWatchdogTest {
     @Test
     fun anAppOpenedByItselfIsNotToldToCheckAGameFile() {
         val app = LaunchWatchPolicy.message("Settings", LaunchTrouble.EXITED_AT_ONCE, opensFile = false)
-        assertTrue(app, app.startsWith("Settings closed straight after it started. Try again"))
+        assertTrue(app, app.startsWith("Settings closed right after starting. Try again"))
         assertFalse(app, "game" in app)
         assertTrue("game file" in LaunchWatchPolicy.message("RetroArch", LaunchTrouble.EXITED_AT_ONCE))
     }

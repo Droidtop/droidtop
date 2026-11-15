@@ -554,7 +554,7 @@ class WineGameActivity : Activity() {
     private fun showFailure(
         message: String,
         cause: Throwable? = null,
-        title: String = if (tool != null) "This Windows program did not start." else "This Windows game did not start.",
+        title: String = if (tool != null) "This Windows program didn't start" else "This Windows game didn't start",
         // The game ended by itself, cleanly: said on the same screen, without the setup advice a failure gets.
         ended: Boolean = false,
     ) {
@@ -577,8 +577,8 @@ class WineGameActivity : Activity() {
                 setOnClickListener { leaveFailure() }
                 text = title + "\n" + "\n" +
                     message + "\n" + "\n" +
-                    (if (ended) "" else "Check that Windows games is set up in Settings, then try again." + "\n" + "\n") +
-                    "Press B to return to droidtop."
+                    (if (ended) "" else "Check Windows games setup in Settings." + "\n" + "\n") +
+                    "B to go back"
                 gravity = Gravity.CENTER
                 // droidtop's own screen, not the game's frame: it follows Light or dark (Droidtop/tracker#561).
                 val tokens = chrome
@@ -935,18 +935,18 @@ object WinePresentation {
         if (status == 0 && (tool || showedWindow) && !crashed) return null
         val what = if (tool) "program" else "game"
         val title = when {
-            crashed -> "This Windows $what stopped with an error."
-            atOnce -> "This Windows $what closed straight after it started."
-            status == 0 -> "This Windows $what closed without showing a window."
-            else -> "This Windows $what stopped with an error."
+            crashed -> "This Windows $what stopped with an error"
+            atOnce -> "This Windows $what closed right after starting"
+            status == 0 -> "This Windows $what closed without a window"
+            else -> "This Windows $what stopped with an error"
         }
         val seconds = (ranMs / 1000).coerceAtLeast(0)
-        val code = if (crashed) "Wine reported a crash after $seconds s, though its exit code was 0 (a launcher such as the Steam loader ends with its own code)." else "Wine exited with code $status after $seconds s."
+        val code = if (crashed) "Wine crashed after $seconds s." else "Wine exited with code $status after $seconds s."
         val lines = output.lines().map(String::trimEnd).filter(String::isNotBlank).takeLast(EXIT_LINES)
         val detail = if (lines.isEmpty()) {
-            "$code It printed nothing."
+            "$code No output."
         } else {
-            code + "\n" + "\n" + "Last lines Wine printed:" + "\n" + lines.joinToString("\n").takeLast(EXIT_DETAIL_CHARS)
+            code + "\n" + "\n" + "Last output:" + "\n" + lines.joinToString("\n").takeLast(EXIT_DETAIL_CHARS)
         }
         return ExitReport(title, detail)
     }
@@ -966,7 +966,7 @@ object WinePresentation {
             minutes >= 1 -> "$minutes min"
             else -> "${(ranMs / 1000).coerceAtLeast(0)} s"
         }
-        return ExitReport("This Windows game closed.", "It ended by itself after $ran, with no error.")
+        return ExitReport("This Windows game closed", "Ran $ran, no error")
     }
 
     /**

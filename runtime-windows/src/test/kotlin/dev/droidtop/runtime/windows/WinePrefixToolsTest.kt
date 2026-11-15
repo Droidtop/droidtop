@@ -44,6 +44,6 @@ class WinePrefixToolsTest {
     fun `a tool is not a failure when it closes quickly with code 0`() {
         assertNull(WinePresentation.exitReport(0, 2_000, showedWindow = false, output = "", tool = true))
         val failed = WinePresentation.exitReport(3, 2_000, showedWindow = true, output = "oops", tool = true)!!
-        assertEquals("This Windows program closed straight after it started.", failed.title)
+        assertEquals("This Windows program closed right after starting", failed.title)
     }
 }

@@ -223,17 +223,16 @@ internal object LaunchWatchPolicy {
     fun message(appName: String, trouble: LaunchTrouble, opensFile: Boolean = true): String = when (trouble) {
         LaunchTrouble.EXITED_AT_ONCE ->
             if (opensFile) {
-                "$appName closed straight after it started. Try again; if it keeps happening, check that its game file and settings are still there."
+                "$appName closed right after starting. Try again, or check the game file"
             } else {
-                "$appName closed straight after it started. Try again; if it keeps happening, it may need an update."
+                "$appName closed right after starting. Try again, or update it"
             }
         LaunchTrouble.NOT_RESPONDING ->
-            "$appName has stopped responding. You can close it and try again, or go back to droidtop."
+            "$appName stopped responding. Close it and try again"
         LaunchTrouble.GONE_WHILE_AWAY ->
-            "$appName is no longer running, but its screen did not return to droidtop. Go back to droidtop and try again."
+            "$appName stopped. Go back and try again"
         LaunchTrouble.STALLED ->
-            "$appName started but has done almost nothing since, so its screen is probably black. Close it and try again. " +
-                "If it keeps happening, check the game file, any BIOS the system needs, and the emulator's file access."
+            "$appName has done almost nothing since starting. Close it and try again, or check the game file, BIOS and file access"
     }
 }
 

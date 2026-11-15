@@ -163,7 +163,7 @@ class WineLaunchPlanTest {
     fun `a game that never showed a window did not run, however long Wine lasted`() {
         // Console, 2026-10-17: a clean exit after ten seconds with no window showed nothing at all.
         val report = WinePresentation.exitReport(0, 12_000, showedWindow = false, output = "err:module:import_dll Library d3d11.dll not found")!!
-        assertEquals("This Windows game closed without showing a window.", report.title)
+        assertEquals("This Windows game closed without a window", report.title)
         assertTrue(report.detail.startsWith("Wine exited with code 0 after 12 s."))
         assertTrue(report.detail.endsWith("d3d11.dll not found"))
     }
@@ -179,8 +179,8 @@ class WineLaunchPlanTest {
         // The rig case (Droidtop/tracker#302): a Unity game with no Direct3D 11 device quit cleanly at once.
         val report = WinePresentation.exitReport(0, 3_400, showedWindow = false, output = "line one\n\nline two\n")
         assertNotNull(report)
-        assertEquals("This Windows game closed straight after it started.", report!!.title)
-        assertEquals("Wine exited with code 0 after 3 s.\n\nLast lines Wine printed:\nline one\nline two", report.detail)
+        assertEquals("This Windows game closed right after starting", report!!.title)
+        assertEquals("Wine exited with code 0 after 3 s.\n\nLast output:\nline one\nline two", report.detail)
     }
 
     @Test
@@ -192,13 +192,13 @@ class WineLaunchPlanTest {
     fun `a non-zero exit is always reported, and only the last lines are kept`() {
         val output = (1..30).joinToString("\n") { "line $it" }
         val report = WinePresentation.exitReport(134, 60_000, showedWindow = true, output = output)!!
-        assertEquals("This Windows game stopped with an error.", report.title)
+        assertEquals("This Windows game stopped with an error", report.title)
         assertTrue(report.detail.startsWith("Wine exited with code 134 after 60 s."))
         assertTrue(report.detail.endsWith("line 30"))
         assertTrue("line 19" in report.detail.lines() && "line 18" !in report.detail.lines())
         assertEquals(WinePresentation.EXIT_LINES, report.detail.lines().count { it.startsWith("line ") })
         val silent = WinePresentation.exitReport(1, 1_000, showedWindow = false, output = "  \n")!!
-        assertEquals("Wine exited with code 1 after 1 s. It printed nothing.", silent.detail)
+        assertEquals("Wine exited with code 1 after 1 s. No output.", silent.detail)
     }
 
     @Test
@@ -219,11 +219,11 @@ class WineLaunchPlanTest {
         val stardew = "00c8:err:module:find_forwarded_export module not found for forward 'icuuc68.u_charsToUChars_68'\n" +
             "00c8:err:seh:NtRaiseException Unhandled exception code c0000409 flags 1 addr 0x6ffffc79dd7e\n"
         val report = WinePresentation.exitReport(0, 5_000, showedWindow = false, output = stardew)!!
-        assertEquals("This Windows game stopped with an error.", report.title)
-        assertTrue(report.detail.startsWith("Wine reported a crash after 5 s"))
+        assertEquals("This Windows game stopped with an error", report.title)
+        assertTrue(report.detail.startsWith("Wine crashed after 5 s"))
         assertTrue(report.detail.endsWith("addr 0x6ffffc79dd7e"))
         val slime = "0148:err:msvcrt:_wassert (L\"!status && vkCreateGraphicsPipelines\",L\"dlls/winevulkan/loader_thunks.c\",3216)"
-        assertEquals("This Windows game stopped with an error.", WinePresentation.exitReport(0, 79_000, showedWindow = true, output = slime)!!.title)
+        assertEquals("This Windows game stopped with an error", WinePresentation.exitReport(0, 79_000, showedWindow = true, output = slime)!!.title)
     }
 
     @Test
@@ -237,10 +237,10 @@ class WineLaunchPlanTest {
     fun `a game that closed itself cleanly is said, a prefix tool just closes`() {
         // The owner, 2026-11-05 (Droidtop/tracker#896): "yes, an end screen for clean self-exits".
         val ended = WinePresentation.selfExitEnd(754_000, tool = false)!!
-        assertEquals("This Windows game closed.", ended.title)
-        assertEquals("It ended by itself after 12 min, with no error.", ended.detail)
-        assertEquals("It ended by itself after 45 s, with no error.", WinePresentation.selfExitEnd(45_000, tool = false)!!.detail)
-        assertEquals("It ended by itself after 2 h 5 min, with no error.", WinePresentation.selfExitEnd(125 * 60_000L, tool = false)!!.detail)
+        assertEquals("This Windows game closed", ended.title)
+        assertEquals("Ran 12 min, no error", ended.detail)
+        assertEquals("Ran 45 s, no error", WinePresentation.selfExitEnd(45_000, tool = false)!!.detail)
+        assertEquals("Ran 2 h 5 min, no error", WinePresentation.selfExitEnd(125 * 60_000L, tool = false)!!.detail)
         assertNull(WinePresentation.selfExitEnd(754_000, tool = true))
     }
 }
