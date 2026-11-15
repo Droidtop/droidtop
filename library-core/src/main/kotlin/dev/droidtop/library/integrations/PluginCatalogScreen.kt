@@ -397,7 +397,6 @@ object PluginCatalogScreen {
                         AsyncActionItem(
                             id = "plugins_catalog_install_all_$sourceId",
                             title = "Install all",
-                            subtitle = "$toInstall plugin${if (toInstall == 1) "" else "s"} from ${current.name}. Each one waits for your approval before it runs",
                             value = toInstall.toString(),
                             run = { ctx, onStatus ->
                                 PluginCatalog.installAll(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current, onStatus).also { lastBulk[sourceId] = it }
@@ -410,7 +409,6 @@ object PluginCatalogScreen {
                         AsyncActionItem(
                             id = "plugins_catalog_update_all_$sourceId",
                             title = "Update all",
-                            subtitle = "$toUpdate plugin${if (toUpdate == 1) "" else "s"} installed from ${current.name} ${if (toUpdate == 1) "has" else "have"} a newer version",
                             value = toUpdate.toString(),
                             run = { ctx, onStatus ->
                                 PluginCatalog.updateAll(ctx, onStatus, only = PluginCatalogSources.byId(ctx, sourceId) ?: current).also { lastBulk[sourceId] = it }

@@ -21632,10 +21632,13 @@ menu still list every `listed` place.
     Check now or Update, records what it saw (`AppSelfUpdate.recordSeen`) or that it failed (`recordFailure`).
   - **Update all** when two or more can be installed from here, each the way its own Update does, all started at once
     as their own jobs: their pools put them in order, so each row shows its own place (Waiting, then its bar), not a
-    list the page keeps. A row already under way is not started again; with every row under way the button says so.
-    droidtop's own update is never part of it: installing droidtop replaces it and ends the other updates mid-way, and
-    on the Plugins tab it updated droidtop although no row there named it (Droidtop/tracker#506). droidtop's row keeps
-    its own Update; with only droidtop's update waiting, the button says "droidtop updates from its own row".
+    list the page keeps. A row already under way is not started again; with every row under way the button reads
+    "Updating". droidtop's own update is never part of it: installing droidtop replaces it and ends the other updates
+    mid-way, and on the Plugins tab it updated droidtop although no row there named it (Droidtop/tracker#506).
+    droidtop's row keeps its own Update. The press says "Updating all" and nothing more; each row shows its own
+    progress and result (owner, 2026-11-15, Droidtop/tracker#153: "it should be simple, like 'updating all' to
+    confirm"). A disabled Update all gives no explanation beyond "Updating" (the old "Each one opens its own page"
+    and "droidtop updates from its own row" are gone).
   - **One row per update**, each naming both versions in words (owner, 2026-10-24, Droidtop/tracker#639: "the
     updates page should show current and newest available version, in a way that makes it obvious which is which"):
     the version on offer in the value column, emphasised ("Available: v0.38"), and the version here first on the

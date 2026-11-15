@@ -430,22 +430,15 @@ object UpdatesPage {
                     id = "updates_all",
                     label = "Update all",
                     enabled = installable.isNotEmpty(),
-                    // A row that opens its source's page has nothing for Update all to install, and one under way is
-                    // already started: the button says so, never "Nothing to update" beside rows (Droidtop/tracker#837).
-                    disabledReason = when {
-                        updates.isEmpty() -> "Nothing to update"
-                        updates.all { it.kind == Kind.DROIDTOP } -> "droidtop updates from its own row"
-                        updates.any { it.install != null } -> "Every update is under way"
-                        else -> "Each one opens its own page"
-                    },
+                    // Short, or nothing (owner, 2026-11-15, Droidtop/tracker#153): the rows say the rest.
+                    disabledReason = if (updates.any { it.install != null && it.kind != Kind.DROIDTOP }) "Updating" else null,
                 ) { ctx ->
                     // Every update starts at once as its own job; their pools decide the order, and each row shows its
                     // job's place in it (Waiting, then its bar) (#833). Not one after the other from here.
-                    scope.launch {
-                        val said = installable.map { install -> async { install(ctx) { } } }.awaitAll()
-                            .filter { it.isNotBlank() }.joinToString(". ")
-                        dev.droidtop.library.settings.Notices.flash(said.ifBlank { "Updated" }, context = ctx)
-                    }
+                    // One word at the press (owner, 2026-11-15: "it should be simple, like 'updating all'"); each row shows
+                    // its own progress and result.
+                    dev.droidtop.library.settings.Notices.flash("Updating all", context = ctx)
+                    scope.launch { installable.map { install -> async { install(ctx) { } } }.awaitAll() }
                 },
             ),
             groups = views,
