@@ -144,9 +144,6 @@ object AppSettingsCatalogs {
         AsyncActionItem(
             id = "library_rebuild_index",
             title = "Rebuild the library index",
-            subtitle = "Rebuilds the game list from what droidtop already knows about each " +
-                "game, without scanning any folder. Use it if the list looks wrong after an " +
-                "update; to pick up new or changed games, use Rescan library",
             run = { ctx, onStatus ->
                 onStatus("Rebuilding...")
                 val result = withContext(Dispatchers.IO) {
@@ -154,7 +151,7 @@ object AppSettingsCatalogs {
                 }
                 when {
                     result.records == 0 && result.keptWithoutRecord == 0 ->
-                        "Nothing to rebuild from yet: scan the library first"
+                        "Scan the library first"
                     result.keptWithoutRecord == 0 -> "Rebuilt from ${result.records} game records"
                     else -> "Rebuilt from ${result.records} game records, and kept " +
                         "${result.keptWithoutRecord} listed games that had none"
@@ -222,7 +219,6 @@ object AppSettingsCatalogs {
     private fun consoleSystemsScreen(systemId: String? = null): CatalogScreen = CatalogScreen(
         id = SCREEN_CONSOLE_SYSTEMS,
         title = "Console systems",
-        subtitle = "Each folder's system comes from its name; open a folder to change it",
         groups = { context -> consoleSystemsGroups(context, systemId) },
         // The search index must not pay for the folder walk in
         // consoleSystemsGroups: on a real device it held "Indexing
@@ -300,14 +296,12 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "console_systems_platforms",
                         title = "Manage platforms",
-                        subtitle = "Add, edit, or delete the platforms droidtop recognizes",
                         registryId = SCREEN_PLATFORMS,
                         icon = CatalogIcon.PLATFORMS,
                     ),
                     NestedScreenItem(
                         id = "console_systems_enginehost",
                         title = "Enginehost",
-                        subtitle = "Engine-game runtimes, like an emulator's core list; its own settings and save storage",
                         registryId = SCREEN_ENGINEHOST,
                         icon = CatalogIcon.ENGINEHOST,
                     ),
@@ -341,7 +335,6 @@ object AppSettingsCatalogs {
                     TextInputItem(
                         id = "console_systems_db_source",
                         title = "Platform database source",
-                        subtitle = "Web address the platform database is downloaded from; blank restores the default",
                         value = PlatformDatabaseSource.baseUrl(context)
                             .takeIf { it != PlatformDatabaseSource.DEFAULT_BASE_URL }
                             .orEmpty(),
@@ -361,7 +354,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "console_systems_no_folders",
                             title = "No console system folders found",
-                            subtitle = "Name a folder after its system (snes, psx, ...) inside a Game folder, or choose one below",
+                            subtitle = "Name a folder after its system (snes, psx, ...)",
                         ),
                     )
                 } else {
@@ -371,13 +364,12 @@ object AppSettingsCatalogs {
                         FolderPickItem(
                             id = "console_systems_choose_folder",
                             title = "Choose a system for another folder",
-                            subtitle = "For a folder whose name is not a system's",
                             onPicked = { ctx, uri: Uri ->
                                 val picked = GamesRootPrefs.resolveStoragePath(uri)
                                 val roots = GamesRootPrefs.gamesRootPaths(ctx).map { it.trimEnd('/') + "/" }
                                 when {
-                                    picked == null -> "Couldn't get that folder's real path on this device; pick a folder on this device's storage"
-                                    roots.none { picked.absolutePath.startsWith(it) } -> "That folder is not inside one of your Game folders; choose a folder inside one"
+                                    picked == null -> "Pick a folder on this device"
+                                    roots.none { picked.absolutePath.startsWith(it) } -> "Pick a folder inside a Game folder"
                                     else -> {
                                         if (SystemOverridePrefs.get(ctx, picked.absolutePath) == null) {
                                             SystemOverridePrefs.set(ctx, picked.absolutePath, SystemOverridePrefs.NOT_SET)
@@ -416,7 +408,7 @@ object AppSettingsCatalogs {
             id = "console_folder_${folder.absolutePath}",
             title = folder.name,
             subtitle = when {
-                resolved == null -> "Not set: open to choose its system"
+                resolved == null -> "Not set"
                 player == null -> "${resolved.displayName}: no emulator installed yet"
                 else -> resolved.displayName
             },
@@ -458,7 +450,6 @@ object AppSettingsCatalogs {
                                                 NestedScreenItem(
                                                     id = "folder_player_app_status_${resolved.id}_${record.manifest.id}",
                                                     title = "${chosenPlayer.name}: ${record.manifest.label}",
-                                                    subtitle = "Status and actions this plugin offers for ${chosenPlayer.name}",
                                                     inline = PluginAppStatus.screenFor(record),
                                                 ),
                                             )
@@ -468,7 +459,6 @@ object AppSettingsCatalogs {
                                         NestedScreenItem(
                                             id = "folder_emulator_setup_${resolved.id}",
                                             title = "Emulator setup and test",
-                                            subtitle = "What runs ${resolved.displayName}, what to install, and a launch test",
                                             inline = EmulatorsCatalog.systemScreen(resolved),
                                         ),
                                     )
@@ -476,8 +466,6 @@ object AppSettingsCatalogs {
                                         ActionItem(
                                             id = "folder_scrape_${folder.absolutePath}",
                                             title = "Scrape missing artwork & metadata",
-                                            subtitle = "Fills box art, descriptions, ratings and more for games that lack them. " +
-                                                "Runs as a job under Downloads and installs: pause it there, and it carries on after a restart",
                                             run = { ctx ->
                                                 LibraryScrapeJob.start(ctx, "Scrape ${resolved.displayName}", resolved.id, folder)
                                             },
@@ -487,8 +475,6 @@ object AppSettingsCatalogs {
                                         AsyncActionItem(
                                             id = "folder_gamelist_${folder.absolutePath}",
                                             title = "Import gamelist.xml",
-                                            subtitle = "Bring in another scraper's results (Skraper, Skyscraper, ARRM, ES-DE) " +
-                                                "for this folder: game details go into droidtop, artwork is used from where it sits",
                                             run = { ctx, _ -> importGamelistXml(ctx, folder) },
                                         ),
                                     )
@@ -513,7 +499,6 @@ object AppSettingsCatalogs {
                                             NestedScreenItem(
                                                 id = "folder_bios_${resolved.id}",
                                                 title = "BIOS files",
-                                                subtitle = "Firmware ${resolved.displayName} emulators may need, looked for in ${gamesRoot.name}/bios",
                                                 inline = biosScreen(gamesRoot, bios),
                                                 valueLabel = { _ -> "$biosPresent/${bios.files.size}" },
                                             ),
@@ -558,7 +543,7 @@ object AppSettingsCatalogs {
     private fun biosScreen(gamesRoot: File, spec: SystemBiosSpec) = CatalogScreen(
         id = "bios_${spec.systemId}",
         title = "${spec.name} BIOS files",
-        subtitle = "Checked under ${gamesRoot.absolutePath}/bios — md5-verified against Batocera's real registry",
+        subtitle = "${gamesRoot.absolutePath}/bios",
         groups = { context ->
             withContext(Dispatchers.IO) {
                 val statuses = BiosDatabase.check(gamesRoot, spec)
@@ -572,9 +557,9 @@ object AppSettingsCatalogs {
                                 title = status.spec.file.removePrefix("bios/"),
                                 subtitle = when {
                                     !status.present -> "Missing — place it at ${File(gamesRoot, status.spec.file).absolutePath}"
-                                    status.md5Ok == false -> "Present, but the md5 matches no known-good dump"
+                                    status.md5Ok == false -> "Present, unknown dump"
                                     status.md5Ok == true -> "Present, verified"
-                                    else -> "Present (no known hash to verify against)"
+                                    else -> "Present"
                                 },
                             )
                         },
@@ -620,7 +605,6 @@ object AppSettingsCatalogs {
     private fun systemChoiceItem(context: Context, folder: File, systems: List<ConsoleSystemDef>) = ChoiceItem(
         id = "folder_system_${folder.absolutePath}",
         title = "System",
-        subtitle = "Which platform this folder's games belong to",
         options = listOf(ChoiceOption("", "From the folder name")) +
             listOfNotNull(
                 ChoiceOption(SystemOverridePrefs.NOT_SET, "Not set")
@@ -705,7 +689,6 @@ object AppSettingsCatalogs {
     private fun enginehostScreen() = CatalogScreen(
         id = SCREEN_ENGINEHOST,
         title = "Enginehost",
-        subtitle = "The separate app that runs engine games natively",
         groups = { context ->
             val installed = dev.droidtop.library.EngineHost.isInstalled(context)
             val bundles = if (installed) {
@@ -721,7 +704,7 @@ object AppSettingsCatalogs {
                                 ActionItem(
                                     id = "enginehost_missing",
                                     title = "Enginehost isn't installed",
-                                    subtitle = "Engine games fall back to Wine or a Linux container until it is",
+                                    subtitle = "Needed for engine games",
                                 ),
                             )
                             return@buildList
@@ -730,7 +713,6 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "enginehost_settings",
                                 title = "Enginehost settings",
-                                subtitle = "Opens Enginehost's own settings",
                                 run = { ctx ->
                                     ctx.startActivity(dev.droidtop.library.EngineHost.settingsIntent())
                                 },
@@ -740,7 +722,6 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "enginehost_saves",
                                 title = "Save storage",
-                                subtitle = "One shared place for engine saves, and moving saves there, in Enginehost's own screen",
                                 run = { ctx ->
                                     ctx.startActivity(dev.droidtop.library.EngineHost.savesSettingsIntent())
                                 },
@@ -758,7 +739,6 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "enginehost_no_bundles",
                                 title = "No runtime bundles installed yet",
-                                subtitle = "An engine game offers its bundle at launch, installed unasked when droidtop is sure which",
                             ),
                         )
                     } else {
@@ -810,7 +790,6 @@ object AppSettingsCatalogs {
     private fun androidSettingsScreen() = CatalogScreen(
         id = SCREEN_ANDROID_SETTINGS,
         title = "Android settings",
-        subtitle = "Direct links to every reachable system screen, and droidtop's own permission grants",
         groups = { context ->
             val controls = dev.droidtop.runtime.systemstatus.SystemControls
             listOf(
@@ -821,7 +800,6 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "grant_app_details",
                             title = "droidtop's app info",
-                            subtitle = "Permissions, storage, notifications for droidtop itself",
                             run = { ctx -> SettingsLaunch.start(ctx, controls.appDetailsIntent(ctx)) },
                         ),
                         ActionItem(
@@ -829,14 +807,12 @@ object AppSettingsCatalogs {
                             title = "Modify system settings",
                             // State in the value column, what it is for in
                             // the subtitle (UI pass 2026-09-24, M14).
-                            subtitle = "Lets droidtop change brightness, screen timeout and auto-rotate",
                             value = if (controls.canWriteBrightness(context)) "Granted" else "Not granted",
                             run = { ctx -> SettingsLaunch.start(ctx, controls.brightnessGrantIntent(ctx)) },
                         ),
                         ActionItem(
                             id = "grant_dnd",
                             title = "Do Not Disturb access",
-                            subtitle = "Lets droidtop turn Do Not Disturb on and off",
                             value = if (controls.hasDndAccess(context)) "Granted" else "Not granted",
                             run = { ctx -> SettingsLaunch.start(ctx, controls.dndGrantIntent()) },
                         ),
@@ -884,7 +860,7 @@ object AppSettingsCatalogs {
                         AsyncActionItem(
                             id = "windows_prefix_remove_${container.id}",
                             title = "Remove $name",
-                            subtitle = "No game runs in it. Its Windows installation, settings and any saves in it are deleted",
+                            subtitle = "Unused. Its saves are deleted too",
                             confirmTitle = "Remove the prefix $name and everything in it, saves included?",
                             confirmKeep = "Keep it",
                             run = { ctx, _ -> dev.droidtop.runtime.windows.PcContainers.remove(ctx, container.id) },
@@ -900,7 +876,6 @@ object AppSettingsCatalogs {
     private fun windowsGamesScreen() = CatalogScreen(
         id = SCREEN_WINDOWS_GAMES,
         title = "Windows games",
-        subtitle = "Where Windows games run: the Wine build, graphics and the folders it can reach",
         groups = { context -> windowsGamesGroups(context) },
         // The Wine option rows read the installed components and droidtop's
         // component catalog (a network fetch once a day); search does not wait
@@ -925,7 +900,7 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "windows_unavailable",
                                 title = "Windows support isn't loaded",
-                                subtitle = "This build cannot run Windows games, so there is nothing to set up",
+                                subtitle = "Not available in this build",
                             ),
                         )
                         return@buildList
@@ -943,7 +918,6 @@ object AppSettingsCatalogs {
                             NestedScreenItem(
                                 id = "windows_install_row",
                                 title = "Install a Windows game",
-                                subtitle = "Run a GOG offline installer or any setup program, then add what it installed to your games",
                                 registryId = WindowsInstallCatalog.SCREEN_ID,
                             ),
                         )
@@ -971,7 +945,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "windows_no_roots",
                             title = "No game folders added yet",
-                            subtitle = "Add one under Game folders first: Windows games need a folder the environment can see",
+                            subtitle = "Add a Game folder first",
                         ),
                     )
                 } else {
@@ -1011,7 +985,6 @@ object AppSettingsCatalogs {
     private fun accountsAndSourcesScreen() = CatalogScreen(
         id = SCREEN_ACCOUNTS_AND_SOURCES,
         title = "Accounts and sources",
-        subtitle = "Every account, scraper, plugin and integration droidtop uses, with its status and actions",
         groups = { context -> accountsAndSourcesGroups(context) },
     )
 
@@ -1053,7 +1026,6 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "accounts_stores_link",
                         title = "Game sources",
-                        subtitle = "Steam, GOG, Epic Games, Amazon Games and itch.io: sign in or out, library, sync",
                         registryId = StoresCatalog.SCREEN_ID,
                         valueLabel = { "$signedInStores of ${PcStore.entries.size} signed in" },
                         icon = CatalogIcon.GLOBAL,
@@ -1134,14 +1106,12 @@ object AppSettingsCatalogs {
                     NestedScreenItem(
                         id = "accounts_plugins_screen",
                         title = "Plugins",
-                        subtitle = "Extra features you install and approve, kept out of droidtop's own data",
                         registryId = SCREEN_PLUGINS,
                         valueLabel = { pluginsValueLabel },
                     ),
                     NestedScreenItem(
                         id = "accounts_integrations_screen",
                         title = "App integrations",
-                        subtitle = "Hook other installed apps into droidtop, e.g. a downloader for a system's games",
                         registryId = SCREEN_INTEGRATIONS,
                         valueLabel = { if (activeIntegrations == 0) "none" else "$activeIntegrations active" },
                         icon = CatalogIcon.INTEGRATIONS,
@@ -1170,7 +1140,7 @@ object AppSettingsCatalogs {
             sites.expired(context, site) -> "Expired"
             else -> "Signed in"
         }
-        val subtitle = "Your sign-in stays in droidtop, and plugins never see it"
+        val subtitle = "Plugins never see your sign-in"
         // The state drawn beside its words (show, then say: Droidtop/tracker#738); an expired sign-in waits for the person.
         val mark = when (state) {
             "Signed in" -> dev.droidtop.library.settings.StatusMark.SIGNED_IN
@@ -1224,7 +1194,6 @@ object AppSettingsCatalogs {
                                         AsyncActionItem(
                                             id = "${id}_remove",
                                             title = "Remove",
-                                            subtitle = "Takes ${site.name} off the list and signs out of it",
                                             confirmTitle = "Remove ${site.name}?",
                                             run = { c, _ -> withContext(Dispatchers.IO) { sites.remove(c, site) }; "Removed ${site.name}" },
                                         ),
@@ -1246,7 +1215,6 @@ object AppSettingsCatalogs {
     private fun addDownloadSiteRow(): CatalogItem = NestedScreenItem(
         id = "accounts_download_sites_add",
         title = "Add site",
-        subtitle = "Another download site to sign in to once, by its address",
         inline = CatalogScreen(
             id = "accounts_download_sites_add_screen",
             title = "Add site",
@@ -1259,7 +1227,7 @@ object AppSettingsCatalogs {
                             TextInputItem(
                                 id = "accounts_download_sites_add_address",
                                 title = "Site address",
-                                subtitle = "Its https address, best its sign-in page, such as https://example.com/login",
+                                subtitle = "e.g. https://example.com/login",
                                 value = pendingSiteAddress,
                                 onChange = { _, v -> pendingSiteAddress = v.trim() },
                             ),
@@ -1270,7 +1238,7 @@ object AppSettingsCatalogs {
                                     when (val added = withContext(Dispatchers.IO) { dev.droidtop.pluginhost.DownloadSites.add(ctx, pendingSiteAddress) }) {
                                         is dev.droidtop.pluginhost.DownloadSites.Added.Site -> {
                                             pendingSiteAddress = ""
-                                            "Added ${added.site.name}. Open it under Download sites to sign in"
+                                            "Added"
                                         }
                                         is dev.droidtop.pluginhost.DownloadSites.Added.Refused -> added.reason
                                     }
@@ -1305,7 +1273,6 @@ object AppSettingsCatalogs {
                         ToggleItem(
                             id = "accounts_debrid_used_$id",
                             title = "Use $title for downloads",
-                            subtitle = "Off keeps it signed in but unused",
                             current = accounts.used(context, id),
                             onToggle = { ctx, value -> accounts.setUsed(ctx, id, value) },
                         ),
@@ -1328,7 +1295,6 @@ object AppSettingsCatalogs {
     private fun integrationsScreen() = CatalogScreen(
         id = SCREEN_INTEGRATIONS,
         title = "App integrations",
-        subtitle = "Declared as .json files you add, never bundled or synced: which apps you hook in is yours",
         groups = { context ->
             val declared = withContext(Dispatchers.IO) {
                 IntegrationStore.seedExampleIfEmpty(context)
@@ -1372,7 +1338,7 @@ object AppSettingsCatalogs {
                             DocumentPickItem(
                                 id = "integrations_add",
                                 title = "Add integration file",
-                                subtitle = "Pick a .json integration; it is copied into $folderLabel",
+                                subtitle = null,
                                 // Not application/json: many file managers
                                 // label a .json as octet-stream, which a
                                 // narrower filter would hide. The file is
@@ -1403,7 +1369,6 @@ object AppSettingsCatalogs {
     internal fun externalLaunchScreen() = CatalogScreen(
         id = "plugins_external_launch_screen",
         title = "Apps that start games",
-        subtitle = "An app asks the first time; a change applies to its next request",
         groups = { context ->
             withContext(Dispatchers.IO) {
                 val callers = dev.droidtop.app.ExternalGameLaunch.callers(context)
@@ -1457,9 +1422,6 @@ object AppSettingsCatalogs {
         // The ScreenScraper sentence used to say droidtop had no developer ID,
         // long after one was registered (ScreenScraperDevCredentials), so the
         // page argued against its own default (UI pass 2026-09-24, finding H7).
-        subtitle = "One source at a time, like real ES-DE. ScreenScraper and the libretro database " +
-            "work without an account; TheGamesDB needs a free API key, and your own ScreenScraper " +
-            "login raises how much you can scrape per day",
         // A scrape asks the sources over the network: offline the page says so first (Droidtop/tracker#594).
         needsNetwork = true,
         groups = { context ->
@@ -1525,7 +1487,6 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "scrape_run_all",
                             title = "Scrape the whole library",
-                            subtitle = "Console games, then PC and engine games, with the sources chosen above",
                             run = { ctx -> LibraryScrapeJob.start(ctx, "Scrape the whole library") },
                         ),
                         ActionItem(
@@ -1556,7 +1517,6 @@ object AppSettingsCatalogs {
                         ChoiceItem(
                             id = "scrape_offer",
                             title = "After the first library scan",
-                            subtitle = "What droidtop does about fetching box art and details when your games have been scanned",
                             options = dev.droidtop.library.scraper.ScrapeOffer.Answer.entries.map { ChoiceOption(it.id, it.label) },
                             current = dev.droidtop.library.scraper.ScrapeOffer.current(context).id,
                             onSelect = { ctx, value ->
@@ -1567,8 +1527,8 @@ object AppSettingsCatalogs {
                         // PC and engine games get their details by themselves (Droidtop/tracker#568), on by default.
                         ToggleItem(
                             id = "scrape_pc_auto",
-                            title = "Get details for PC games automatically",
-                            subtitle = "After start and each store sync, for PC and engine games missing art. No account needed",
+                            title = "Get PC game details automatically",
+                            subtitle = null,
                             current = dev.droidtop.library.scraper.PcAutoScrape.enabled(context),
                             onToggle = { ctx, on -> dev.droidtop.library.scraper.PcAutoScrape.setEnabled(ctx, on) },
                         ),
@@ -1619,21 +1579,19 @@ object AppSettingsCatalogs {
                         ToggleItem(
                             id = "scrape_content_videos",
                             title = "Fetch videos",
-                            subtitle = "Game preview videos; the largest downloads by far",
+                            subtitle = "Large downloads",
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeVideos(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setScrapeVideos(ctx, value) },
                         ),
                         ToggleItem(
                             id = "scrape_content_miximages",
                             title = "Generate miximages",
-                            subtitle = "Composes the screenshot, box, and marquee into the hero image most themes display",
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.generateMiximages(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setGenerateMiximages(ctx, value) },
                         ),
                         ToggleItem(
                             id = "scrape_miximage_rotate_boxes",
                             title = "Rotate horizontal boxes in miximages",
-                            subtitle = "Turns a box wider than it is tall on its side, so it takes the space of an upright one",
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.miximageRotateHorizontalBoxes(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setMiximageRotateHorizontalBoxes(ctx, value) },
                         ),
@@ -1653,7 +1611,6 @@ object AppSettingsCatalogs {
                         NestedScreenItem(
                             id = "scraper_accounts_link_row",
                             title = "Accounts and sources",
-                            subtitle = "ScreenScraper, TheGamesDB, IGDB and SteamGridDB credentials",
                             registryId = SCREEN_ACCOUNTS_AND_SOURCES,
                             icon = CatalogIcon.GLOBAL,
                         ),
@@ -1692,7 +1649,6 @@ object AppSettingsCatalogs {
     private fun platformsScreen() = CatalogScreen(
         id = SCREEN_PLATFORMS,
         title = "Manage platforms",
-        subtitle = "Every platform droidtop recognizes. Open one to edit or delete it",
         groups = { context ->
             val dao = ConsoleSystemsDatabase.get(context).consoleSystemDao()
             if (dao.count() == 0) ConsoleSystemsRepository.allSystems(context)
@@ -1710,7 +1666,6 @@ object AppSettingsCatalogs {
                         AsyncActionItem(
                             id = "platforms_restore",
                             title = "Restore defaults",
-                            subtitle = "Reset every built-in platform to its original values",
                             confirmTitle = "Restore built-in platforms?",
                             run = { ctx, _ ->
                                 ConsoleSystemsRepository.restoreDefaults(ctx)
@@ -1787,7 +1742,7 @@ object AppSettingsCatalogs {
                                     TextInputItem(
                                         id = "platform_new_id",
                                         title = "Id",
-                                        subtitle = "Used as the ROMs subfolder name, e.g. \"psx\"",
+                                        subtitle = "e.g. psx",
                                         value = newId,
                                         onChange = { _, v -> newId = v.trim() },
                                     ),
@@ -1870,7 +1825,7 @@ object AppSettingsCatalogs {
                                     AsyncActionItem(
                                         id = "platform_delete_${entity.id}",
                                         title = "Delete platform",
-                                        subtitle = if (entity.isBuiltIn) "Built-in — Restore defaults can bring it back" else "Removes this custom platform",
+                                        subtitle = if (entity.isBuiltIn) "Restore defaults brings it back" else null,
                                         confirmTitle = "Delete ${entity.displayName}?",
                                         run = { ctx, _ ->
                                             ConsoleSystemsDatabase.get(ctx).consoleSystemDao().delete(entity.id)
