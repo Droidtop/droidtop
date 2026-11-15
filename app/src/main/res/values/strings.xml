@@ -21,9 +21,9 @@
     <string name="widget_plugin_status_empty">No status-tile plugins yet</string>
     <string name="widget_plugin_title">Plugin</string>
     <string name="widget_plugin_pick">Choose what this widget shows</string>
-    <string name="widget_plugin_none">No plugin offers a widget yet. Plugins with a widget or a tile for widgets show here once approved and enabled.</string>
+    <string name="widget_plugin_none">No plugin offers a widget yet</string>
     <string name="widget_plugin_unset">Tap to choose a plugin</string>
-    <string name="widget_plugin_gone">That plugin is no longer installed, approved or enabled. Tap to choose another.</string>
+    <string name="widget_plugin_gone">Plugin gone. Tap to choose another</string>
     <string name="widget_plugin_waiting">Waiting for %1$s</string>
     <string name="widget_search_title">Library search</string>
     <string name="widget_search_hint">Search games and apps</string>
@@ -59,20 +59,20 @@
     <string name="companion_not_allowed_yet">Not allowed yet</string>
     <string name="pair_computer_pair_a">Pair a %1$s</string>
     <string name="pair_computer_getting_a_code">Getting a code…</string>
-    <string name="pair_computer_keep_this_screen_open_until">Keep this screen open until the other handheld says it is paired. Both have to be on the same network.</string>
-    <string name="pair_computer_on_the_computer_open_droidtop">On the computer, open droidtop-agent, choose Pair a handheld and type:</string>
+    <string name="pair_computer_keep_this_screen_open_until">Keep this open until the other handheld is paired. Same network</string>
+    <string name="pair_computer_on_the_computer_open_droidtop">In droidtop-agent, choose Pair a handheld and type:</string>
     <string name="pair_computer_get_a_new_code">Get a new code</string>
     <string name="pair_computer_use_a_code_from_the">Use a code from the other %1$s</string>
-    <string name="pair_computer_the_s_address_such_as">The %1$s\'s address, such as 192.168.1.20:47612</string>
+    <string name="pair_computer_the_s_address_such_as">e.g. 192.168.1.20:47612 (%1$s)</string>
     <string name="pair_computer_code">Code</string>
     <string name="pair_computer_pair_with_this">Pair with this %1$s</string>
     <string name="pair_computer_paired_with">Paired with %1$s.</string>
     <string name="pair_computer_done">Done</string>
     <string name="pair_computer_paired_with_2">Paired with %1$s.</string>
-    <string name="pair_computer_saves_sync_with_it_when">Saves sync with it when a game starts and ends. Should its games and programs also show here?</string>
-    <string name="pair_computer_show_its_games_in_my">Show its games in my library (the ones not on this device)</string>
+    <string name="pair_computer_saves_sync_with_it_when">Saves sync when a game starts and ends. Show its games and programs here too?</string>
+    <string name="pair_computer_show_its_games_in_my">Show its games in my library</string>
     <string name="pair_computer_show_its_programs_in_apps">Show its programs in Apps</string>
-    <string name="pair_computer_you_can_change_both_later">You can change both later in Settings > Computers > %1$s.</string>
+    <string name="pair_computer_you_can_change_both_later">Change later in Settings > Computers > %1$s.</string>
     <string name="companion_connections_bluetooth_devices">Bluetooth devices</string>
     <string name="desktop_notification_permission_show_the_desktop_s_notification">Show the desktop\'s notification?</string>
     <string name="desktop_notification_permission_allow">Allow</string>
@@ -94,7 +94,7 @@
     <string name="store_sign_in_account_name">Account name</string>
     <string name="store_sign_in_password">Password</string>
     <string name="store_sign_in_sign_in">Sign in</string>
-    <string name="store_sign_in_scan_this_with_the_app">Scan this with the %1$s app on your phone, then approve the sign-in there.</string>
+    <string name="store_sign_in_scan_this_with_the_app">Scan with the %1$s app, then approve there.</string>
     <string name="store_sign_in_open_in_the_app_on">Open in the %1$s app on this device</string>
     <string name="store_sign_in_back">Back</string>
     <string name="store_sign_in_code">Code</string>
@@ -116,7 +116,7 @@
     <string name="companion_notifications_tap_to_show">Tap to show</string>
     <string name="companion_notifications_now_playing">Now playing · %1$s</string>
     <string name="remote_input_type_from_another_device">Type from another device</string>
-    <string name="remote_input_open_it_in_a_browser">Open it in a browser on the same network. Nothing is typed until you confirm the code here.</string>
+    <string name="remote_input_open_it_in_a_browser">Open it in a browser on the same network, then confirm the code here.</string>
     <string name="remote_input_confirm">Confirm</string>
     <string name="remote_input_refuse">Refuse</string>
     <string name="remote_input_last_sent">Last sent: %1$s</string>
@@ -150,13 +150,13 @@
     <string name="device_setup_not_now">Not now</string>
     <!-- The storage-full screen, shown instead of droidtop when too little space is free to start (docs/SPEC.md 10c, "Storage full", Droidtop/tracker#849) -->
     <string name="storage_full_title">Storage is full</string>
-    <string name="storage_full_body">droidtop needs at least about %1$s free to start. Free some space, then try again.</string>
+    <string name="storage_full_body">droidtop needs about %1$s free to start.</string>
     <string name="storage_full_open_settings">Open storage settings</string>
     <string name="storage_full_try_again">Try again</string>
     <string name="storage_full_still">Still only %1$s free.</string>
     <!-- The desktop's background picture (DesktopBackgroundPicture, Droidtop/tracker#694). -->
-    <string name="desktop_background_picture_saved">The desktop\'s background picture is set. It shows when the desktop next starts.</string>
-    <string name="desktop_background_picture_failed">Couldn\'t use that picture for the desktop\'s background.</string>
+    <string name="desktop_background_picture_saved">Set. Shows on the desktop's next start.</string>
+    <string name="desktop_background_picture_failed">Couldn't use that picture.</string>
     <!-- KDE Connect's touchpad (docs/SPEC.md 7p). -->
     <string name="kdeconnect_touchpad_title">Controlling %1$s</string>
     <string name="kdeconnect_touchpad_help">Drag to move, tap to click, two fingers to scroll. B leaves</string>
@@ -166,12 +166,12 @@
     <string name="terminal_failed">Couldn\'t open a shell: %1$s</string>
     <string name="terminal_gone">that container isn\'t there any more</string>
     <string name="terminal_ended">The shell has ended</string>
-    <string name="terminal_leave_again">Press again to close the terminal. What runs in it stops.</string>
+    <string name="terminal_leave_again">Press again to close. What runs in it stops.</string>
     <string name="terminal_hint_enter">Enter</string>
     <string name="terminal_hint_keyboard">Keyboard</string>
     <string name="terminal_hint_close">Close</string>
     <string name="terminal_clip_label">Terminal text</string>
     <string name="language_title">Language</string>
-    <string name="language_subtitle">The language droidtop\'s own screens use. Games, apps and themes keep their own</string>
+    <string name="language_subtitle">For droidtop's own screens</string>
     <string name="language_follow_android">Follow Android</string>
 </resources>
