@@ -28959,6 +28959,8 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 - **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). The running console game's L2 sheet in Gaming has the same row for its system ("Search SNES", after Guides; it opens the one search over that system's games and the sources that serve it, the sheet closing first). Home's system tiles get it with Your library's systems (#485 F7b), which are not built yet.
 - **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
 
+**B with a keyboard up (owner, 2026-11-15, Droidtop/tracker#938: "dismiss it from the gamepad without closing the search results").** While an on-screen keyboard is up over the search panel, Android's (an inset in the panel's window) or droidtop's own where it serves the field, B puts it away and leaves the query and its results on screen, the cursor on the first result; the hint reads "Hide keyboard". With no keyboard up, B closes the panel as before.
+
 The games a search looks through are the games the lists show (`searchablePool`): the person's own ownership
 options from PC Games' List options, to which the search's "Include free-to-play" switch adds, and games that are
 missing right now too (an offline card), whose row says "Missing" where another says Installed or Not installed.

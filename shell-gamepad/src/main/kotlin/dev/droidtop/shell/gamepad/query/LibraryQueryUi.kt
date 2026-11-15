@@ -18,8 +18,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -957,7 +959,17 @@ internal fun LibrarySearchDialog(
     ) {
         GatePadInThisDialog()
         HideSystemBarsInThisDialog()
-        DeclareLayerHints(listOf(HintBinding(GamepadAction.A, "Open") { focusKey != null }, HintBinding(GamepadAction.B, "Close")))
+        // Read in the dialog's own window, whose insets carry Android's keyboard (the panel is edge to edge).
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        val imeVisible = WindowInsets.isImeVisible
+        // A keyboard is up: Android's (an inset), or droidtop's own where it serves this field and the person is typing.
+        val keyboardUp = imeVisible || (typing && dev.droidtop.shell.gamepad.KeyboardTargets.servesField(view.display?.displayId))
+        DeclareLayerHints(
+            listOf(
+                HintBinding(GamepadAction.A, "Open") { focusKey != null },
+                HintBinding(GamepadAction.B, if (keyboardUp) "Hide keyboard" else "Close"),
+            ),
+        )
         Column(
             modifier = Modifier
                 .width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp))
@@ -969,8 +981,19 @@ internal fun LibrarySearchDialog(
                     val at = entries.indexOfFirst { it.key == focusKey }
                     when (press.action) {
                         GamepadAction.B -> {
-                            // From the places of one game, B goes back to the results; from the results it closes.
-                            if (choosing != null) choosing = null else onDismiss()
+                            // From the places of one game, B goes back to the results. With a keyboard up, B puts it
+                            // away and keeps the query and its results, the cursor on the first result (owner,
+                            // 2026-11-15, Droidtop/tracker#938: "dismiss it from the gamepad without closing the search
+                            // results"). Otherwise B closes.
+                            when {
+                                choosing != null -> choosing = null
+                                keyboardUp -> {
+                                    keyboard?.hide()
+                                    typing = false
+                                    entries.firstOrNull()?.let { focusKey = it.key }
+                                }
+                                else -> onDismiss()
+                            }
                             true
                         }
                         // On the source filter's row, Left and Right move between its chips.
