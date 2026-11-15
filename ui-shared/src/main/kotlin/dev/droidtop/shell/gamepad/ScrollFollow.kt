@@ -158,6 +158,41 @@ suspend fun LazyListState.keepCentred(index: Int, chained: Boolean = false) {
     }
 }
 
+/**
+ * Keeps the hero card of a row whose cursor card widens (Home's first shelf, docs/SPEC.md 7i "Home art") in view the
+ * way Steam's home row does (owner, 2026-11-15, Droidtop/tracker#632: "steam scrolling for that doesn't actually move
+ * the items much. When you snap off a card, it shrinks, and when you snap onto a card, it grows. Part of the movement
+ * velocity is provided by the resize"). The row is not centred: it scrolls only when the grown card would leave the
+ * visible span, and then just far enough, worked out from the widths the cards end at ([cardPx] for every card,
+ * [heroPx] for the one under the cursor). The scroll runs on the resize's own timing, so both are one motion. Centring
+ * measured the widths mid-resize, scrolled, then corrected, which looked like a jump right, a drift left and a snap.
+ */
+suspend fun LazyListState.keepHeroInView(index: Int, cardPx: Float, heroPx: Float, chained: Boolean = false) {
+    val info = layoutInfo
+    if (info.visibleItemsInfo.isEmpty()) return
+    val step = cardPx + info.mainAxisItemSpacing
+    val span = (info.viewportEndOffset - info.viewportStartOffset - info.beforeContentPadding - info.afterContentPadding).toFloat()
+    val current = firstVisibleItemIndex * step + firstVisibleItemScrollOffset
+    val delta = heroScrollTarget(current, index, step, heroPx, span) - current
+    if (kotlin.math.abs(delta) < 1f) return
+    animateScrollBy(delta, if (chained) Motion.scroll(chained = true) else Motion.focus())
+}
+
+/**
+ * Where a hero row's scroll ends ([LazyListState.keepHeroInView]), in the list's own scroll units (item 0 at 0, each
+ * card [step] apart once settled): unchanged while card [index], [heroPx] wide, fits the [span] in view, else the
+ * least move that fits it. Pure, for the tests.
+ */
+fun heroScrollTarget(current: Float, index: Int, step: Float, heroPx: Float, span: Float): Float {
+    val start = index * step
+    val end = start + heroPx
+    return when {
+        start < current -> start
+        end > current + span -> end - span
+        else -> current
+    }.coerceAtLeast(0f)
+}
+
 /** [LazyListState.keepCentred] for a grid: the selection's row, centred vertically. */
 suspend fun LazyGridState.keepCentred(index: Int, chained: Boolean = false) {
     repeat(2) {

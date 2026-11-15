@@ -22561,6 +22561,14 @@ theme's roles (section 7k2).
   on both sides stays visible. The first press eases; a press arriving while a scroll is moving,
   and a held direction repeating, is linear (`Motion.scroll(chained)`), so holding a direction is
   one smooth glide. Tall pages of rows keep the least-scroll rule (`keepInView`, section 6e).
+- **Home's hero row follows Steam's way, not the centre** (owner, 2026-11-15, Droidtop/tracker#632: "steam
+  scrolling for that doesn't actually move the items much. When you snap off a card, it shrinks, and when you
+  snap onto a card, it grows. Part of the movement velocity is provided by the resize"). On the first shelf, whose
+  cursor card widens into the hero card, the card left behind shrinks and the new one grows in place. The row
+  scrolls only when the grown card would leave the visible span, and then just far enough (`keepHeroInView`). The
+  target is worked out from the widths the cards end at, and the scroll runs on the resize's timing, so the two are
+  one motion. Centring had measured the widths mid-resize, scrolled, then corrected: a jump right, a drift left
+  and a snap back.
 
 ## 7k2. Gaming theming: the active ES-DE theme as droidtop's own design tokens (owner direction 2026-10-01, Droidtop/tracker#185)
 

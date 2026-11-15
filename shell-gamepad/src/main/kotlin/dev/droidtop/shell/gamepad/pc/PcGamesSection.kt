@@ -79,6 +79,7 @@ import dev.droidtop.shell.gamepad.input.declaresHints
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.keepCentred
+import dev.droidtop.shell.gamepad.keepHeroInView
 import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryViewPrefs
@@ -956,6 +957,10 @@ internal fun PcGamesSection(
     // "Gaming motion and focus").
     val tilesState = rememberLazyGridState()
     val homeCardsState = rememberLazyListState()
+    // The first shelf's card widths in pixels, for its Steam-style follow (keepHeroInView, Droidtop/tracker#632).
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val heroRowCard = capsuleWidth(cardSize)
+    val heroRowPx = with(density) { heroRowCard.toPx() to heroWidth(heroRowCard).toPx() }
     LaunchedEffect(onHomeStrip, state.homeCard, state.homeTab) {
         if (onHomeStrip) {
             columnState.keepInView(HomeColumn.strip(shelves.size), animate = !heldStep)
@@ -971,7 +976,13 @@ internal fun PcGamesSection(
             state.onShelves -> {
                 val shelf = shelves.getOrNull(state.shelfIndex) ?: return@LaunchedEffect
                 columnState.keepInView(HomeColumn.shelf(state.home, state.shelfIndex), animate = !heldStep)
-                rowState(shelf.id).keepCentred(state.itemIndex, chained = heldStep)
+                // The first shelf's cursor card widens into the hero card: that row follows Steam's way, with the
+                // resize doing most of the moving; the other shelves centre.
+                if (state.shelfIndex == 0) {
+                    rowState(shelf.id).keepHeroInView(state.itemIndex, heroRowPx.first, heroRowPx.second, chained = heldStep)
+                } else {
+                    rowState(shelf.id).keepCentred(state.itemIndex, chained = heldStep)
+                }
             }
             else -> if (grid.isNotEmpty()) gridState.keepCentred(state.itemIndex, chained = heldStep)
         }
