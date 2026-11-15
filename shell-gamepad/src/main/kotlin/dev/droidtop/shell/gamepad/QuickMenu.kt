@@ -478,8 +478,14 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
         ) {
             MenuRow(
                 title = words(R.string.gamepad_overlay),
-                value = if (canDraw) overlayLevel.label else "Needs display over apps",
-                subtitle = if (overlayLevel != OverlayLevel.OFF && !hasShell) "FPS, CPU and GPU need More controls" else null,
+                // The row is the action and the value says what A does: a missing grant reads "Allow", with what it needs
+                // on the line under it, not a status that looks like a label (Droidtop/tracker#943).
+                value = if (canDraw) overlayLevel.label else "Allow",
+                subtitle = when {
+                    !canDraw -> "Needs display over apps"
+                    overlayLevel != OverlayLevel.OFF && !hasShell -> "FPS, CPU and GPU need More controls"
+                    else -> null
+                },
                 adjustable = canDraw,
                 selected = rows.getOrNull(focusIndex) == PerfRow.OVERLAY,
                 onClick = {
