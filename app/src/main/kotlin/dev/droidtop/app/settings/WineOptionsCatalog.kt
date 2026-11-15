@@ -229,10 +229,10 @@ object WineOptionsCatalog {
             !overGame || row.id == WineOptions.LSFG || row.id == WineOptions.ALLOCATOR || row.id == WineOptions.STEAMWORKS || row.id == WineOptions.STEAMWORKS_APPID || row.id == WineOptions.STEAMWORKS_OWNED ||
                 row.id == WineOptions.TRANSLATION_CACHE || row.id == WineOptions.PREPARE ||
                 row.id == WineOptions.PREFIX || row.id == WineOptions.GRANT_DEVICE_SYSTEM || row.id == WineOptions.GRANT_ALL_STORAGE -> row.summary
-            row.id == WineOptions.WINE -> row.summary + ". Another build gives this game a prefix of its own (a few hundred megabytes); its saves so far stay in the shared one."
-            row.ownChoice -> row.summary + ". This game's own choice."
-            else -> row.summary + ". The shared setting."
-        }
+            row.id == WineOptions.WINE -> listOf(row.summary, "Another build makes it a prefix of its own").filter { it.isNotBlank() }.joinToString(" · ")
+            row.ownChoice -> listOf(row.summary, "This game's own").filter { it.isNotBlank() }.joinToString(" · ")
+            else -> listOf(row.summary, "Shared").filter { it.isNotBlank() }.joinToString(" · ")
+        }.ifBlank { null }
         if (row.text) {
             return TextInputItem(
                 id = row.id,

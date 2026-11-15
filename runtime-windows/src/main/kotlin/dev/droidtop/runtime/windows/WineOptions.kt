@@ -256,20 +256,19 @@ object WineOptions {
         gameRoots[entryId] = gameRoot
         val title = "Prepare for first launch"
         if (!TranslationCache.enabled(context) || !translationCacheOn(context, entryId)) {
-            return WineOptionRow(PREPARE, title, "Needs the translation cache, which is off for this game.", "Off", emptyList())
+            return WineOptionRow(PREPARE, title, "Needs the translation cache", "Off", emptyList())
         }
         val record = prepared(context, entryId)
         val stamp = runCatching { WindowsLaunchResolver.forEntry(context, entryId, File(gameRoot))?.executable?.let(::stampOf) }.getOrNull()
         val state = when {
             record == null -> "Not prepared yet."
             stamp != null && record.stamp != stamp ->
-                "The game changed since it was prepared (${ValueFormat.ago(System.currentTimeMillis(), record.atMs)}); prepare it again."
-            else -> "Prepared: ${ValueFormat.size(record.bytes)} of translated code (${ValueFormat.ago(System.currentTimeMillis(), record.atMs)})."
+                "Changed since prepared; prepare again"
+            else -> "Prepared ${ValueFormat.ago(System.currentTimeMillis(), record.atMs)} · ${ValueFormat.size(record.bytes)}"
         }
         return WineOptionRow(
             PREPARE, title,
-            "Starts the game once out of sight and muted, for up to three minutes, so its first real start does not translate " +
-                "everything. Uses the processor fully meanwhile; best while charging. $state",
+            "Speeds up the first start. Best while charging. $state",
             PREPARE_IDLE,
             listOf(
                 WineOptionChoice(PREPARE_IDLE, "Not now"),
@@ -311,9 +310,7 @@ object WineOptions {
             if (containers.none { it.id == own }) listOf(WineOptionChoice(PREFIX_NEW, "New prefix for this game")) else emptyList()
         return WineOptionRow(
             PREFIX, "Prefix",
-            "The Windows installation this game runs in, with its own Wine build, settings and saves. Another one runs the " +
-                "game on that one's Wine build, and copies its saves there (Documents, AppData, Saved Games; nothing already there " +
-                "is replaced). Settings stored in the registry stay behind.",
+            "Switching copies the saves over",
             current, choices,
             ownChoice = PcContainers.chosenId(context, entryId) != null,
         )
@@ -376,17 +373,15 @@ object WineOptions {
         if (entryId != null && !allOn) {
             return WineOptionRow(
                 TRANSLATION_CACHE, title,
-                "Off for every game, under Settings > Library > Windows games. $used kept from before.",
+                "Off for all games. $used kept",
                 "Off", listOf(WineOptionChoice(CACHE_CLEAR, "Clear now")),
             )
         }
         val on = if (entryId == null) allOn else translationCacheOn(context, entryId)
         val summary = if (entryId == null) {
-            "Keeps the code that x86 translation makes for each game, so the game starts and runs faster the next time. " +
-                "Needs Box64 0.3.8 or FEXCore 2609 or newer. All games: $used of up to ${ValueFormat.size(TranslationCache.TOTAL_LIMIT_BYTES)}."
+            "Faster starts. $used of ${ValueFormat.size(TranslationCache.TOTAL_LIMIT_BYTES)}"
         } else {
-            "Keeps the code that x86 translation makes for this game, so it starts and runs faster the next time. " +
-                "$used of up to ${ValueFormat.size(TranslationCache.GAME_LIMIT_BYTES)}."
+            "Faster starts. $used of ${ValueFormat.size(TranslationCache.GAME_LIMIT_BYTES)}"
         }
         return WineOptionRow(
             TRANSLATION_CACHE, title, summary,
@@ -410,8 +405,7 @@ object WineOptions {
         val rows = rows(context, settings, Lists.load(context), choices.keys).map { row ->
             if (entryId != null && row.id == WINE) {
                 row.copy(
-                    summary = "A game can have a Wine build of its own once Windows games are set up. Until then it uses the shared one, " +
-                        "chosen under Settings > Library > Windows games.",
+                    summary = "The shared one until Windows games are set up",
                     choices = emptyList(),
                 )
             } else {
@@ -581,7 +575,7 @@ object WineOptions {
     suspend fun useShared(context: Context, entryId: String): String = withContext(Dispatchers.IO) {
         lastWrite?.join()
         setWineChoices(context, entryId, emptyMap())
-        "This game uses the shared settings again."
+        "Using shared settings"
     }
 
     /** Fetches everything [entryId]'s settings name and the device lacks; the line to show when done. */
@@ -589,9 +583,9 @@ object WineOptions {
         lastWrite?.join()
         val container = withContext(Dispatchers.IO) {
             PcContainers.forGame(context, entryId)?.also { it.setLaunchOverrides(launchOverrides(context, entryId, it)) }
-        } ?: return "There is no Windows environment yet. Set up Windows games first."
+        } ?: return "Set up Windows games first"
         return runCatching { WineComponents.ensure(context, container, onStatus) }
-            .fold({ "Everything these settings need is on this device." }, { "Download failed: ${it.message ?: it}" })
+            .fold({ "Everything is here" }, { "Download failed: ${it.message ?: it}" })
     }
 
     /** Stores [wine] as [entryId]'s Wine choices, leaving its own non-prefix choices (frame generation, Steamworks) as they are. */
@@ -641,11 +635,7 @@ object WineOptions {
         return listOf(
             WineOptionRow(
                 STEAMWORKS, "Steamworks",
-                "For a game that calls Steam (steam_api.dll): it starts through a stand-in for the Steam client in its prefix (gbe_fork), " +
-                    "as your droidtop Steam account when signed in, so it does not stop waiting for Steam. " +
-                    "Achievements and multiplayer stay on this device. Nothing in the game's folder changes. " +
-                    "Off for games Steam doesn't own; turn on to use the Steamworks shim. A steam_appid.txt only supplies the app ID, the switch decides." +
-                    (warning?.let { " $it" } ?: ""),
+                "For games that need Steam running" + (warning?.let { ". $it" } ?: ""),
                 if (on) STEAMWORKS_ON else STEAMWORKS_OFF,
                 listOf(WineOptionChoice(STEAMWORKS_ON, "On"), WineOptionChoice(STEAMWORKS_OFF, "Off")),
                 ownChoice = own[STEAMWORKS_KEY] != null,
@@ -653,10 +643,9 @@ object WineOptions {
             WineOptionRow(
                 STEAMWORKS_APPID, "Steamworks app ID",
                 when {
-                    typed != null -> "The Steam app ID you set for this game. Clear it to use " +
-                        (detected?.let { "the detected one (${it.appId}, from ${it.via})" } ?: "none: this game has no Steam app ID of its own") + "."
-                    detected != null -> "Detected from ${detected.via}. Type another number to use that instead."
-                    else -> "None found for this game. Type its Steam app ID (the number in its Steam store page address) to use Steamworks with it."
+                    typed != null -> "Set by you" + (detected?.let { "; detected: ${it.appId}" } ?: "")
+                    detected != null -> "Detected from ${detected.via}"
+                    else -> "None found. The number in its Steam store address"
                 },
                 typed ?: detected?.appId?.toString().orEmpty(),
                 emptyList(),
@@ -668,8 +657,7 @@ object WineOptions {
             if (need != null && warning != null) {
                 WineOptionRow(
                     STEAMWORKS_OWNED, "Yes, I own this game",
-                    "Choose Yes if you own Steam app ${need.appId}, for example on another account or bought elsewhere. droidtop " +
-                        "remembers it for this game and doesn't ask again. The game starts either way.",
+                    "Steam app ${need.appId}, on any account",
                     STEAMWORKS_OFF,
                     listOf(WineOptionChoice(STEAMWORKS_OFF, "No"), WineOptionChoice(STEAMWORKS_ON, "Yes")),
                 )
@@ -692,14 +680,14 @@ object WineOptions {
         if (!installed) {
             return WineOptionRow(
                 LSFG, title,
-                "Lossless Scaling is not installed. Install it from your Steam library in Stores; droidtop never downloads it for you. Until then frame generation stays off.",
+                "Install Lossless Scaling from your Steam library",
                 "Off", emptyList(),
             )
         }
         val current = chosen?.let { LsfgVkManager.multiplier(it).toString() } ?: LSFG_OFF
         return WineOptionRow(
             LSFG, title,
-            "Shows more frames than the game draws, using your Lossless Scaling install. Costs speed and adds delay; off unless you turn it on for this game.",
+            "Adds delay",
             current,
             listOf(WineOptionChoice(LSFG_OFF, "Off")) + LsfgVkManager.MULTIPLIERS.map { WineOptionChoice(it.toString(), "${it}x") },
             ownChoice = chosen != null,
@@ -728,7 +716,7 @@ object WineOptions {
     private fun allocatorRow(context: Context, entryId: String): WineOptionRow {
         val title = "Memory allocator"
         if (!WineAllocator.supported()) {
-            return WineOptionRow(ALLOCATOR, title, "Android's. mimalloc needs Android 10 or later.", ALLOCATOR_ANDROID, emptyList())
+            return WineOptionRow(ALLOCATOR, title, "mimalloc needs Android 10", ALLOCATOR_ANDROID, emptyList())
         }
         val chosen = WineGameOptionsPrefs.get(context, entryId)[WineAllocator.KEY]
         return WineOptionRow(
@@ -865,16 +853,15 @@ object WineOptions {
         add(
             row(
                 WINE, "Wine build",
-                if (x86) "x86_64 builds from Proton 10 on run directly on this device; earlier ones are made for Box64 on ARM and are not offered" else
-                    "An ARM (arm64ec) build runs Windows code through FEXCore or Box64 inside Wine; an x86_64 build runs the whole of Wine under Box64",
+                null,
                 s.wine, wines,
             ),
         )
         val emulators = WineOptionPlan.emulators(x86, s.wine)
         when {
-            x86 -> add(row(EMULATOR, "x86 emulation", "None needed: this device runs x86_64 code itself", "None", emptyList()))
+            x86 -> add(row(EMULATOR, "x86 emulation", "Not needed here", "None", emptyList()))
             emulators.isEmpty() -> add(
-                row(EMULATOR, "x86 emulation", "An x86_64 Wine build runs under Box64; FEXCore needs an ARM (arm64ec) build", WineOptionPlan.BOX64, emptyList()),
+                row(EMULATOR, "x86 emulation", "FEXCore needs an arm64ec build", WineOptionPlan.BOX64, emptyList()),
             )
             else -> add(
                 row(
@@ -906,9 +893,9 @@ object WineOptions {
             ),
         )
         if (WineOptionPlan.usesDriverVersion(x86, s.driver)) {
-            add(row(DRIVER_VERSION, "Driver build", "System uses the device's own driver; the others are Turnip and Qualcomm builds", s.driverVersion, lists.driverVersions))
+            add(row(DRIVER_VERSION, "Driver build", "", s.driverVersion, lists.driverVersions))
         }
-        add(row(DXWRAPPER, "Direct3D", "What turns Direct3D into something the driver understands", s.dxwrapper, lists.dxwrappers))
+        add(row(DXWRAPPER, "Direct3D", "", s.dxwrapper, lists.dxwrappers))
         if (WineOptionPlan.usesDxvk(s.dxwrapper)) {
             val versions = WineOptionPlan.dxvkVersions(s.dxwrapper, lists.dxvk.map { it.value }).toSet()
             add(row(DXVK, "DXVK version", "Direct3D 8 to 11", s.dxvk, lists.dxvk.filter { it.value in versions }))
