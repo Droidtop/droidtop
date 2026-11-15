@@ -685,7 +685,9 @@ internal fun LibrarySearchDialog(
         // Where Get games searches (owner, 2026-10-30, Droidtop/tracker#825: "a filter to choose where it searches"): a
         // chip per source, on or off and kept (SourceSelection), turning while its source is asked and saying so when it
         // failed. A press turns it over and searches again.
-        if (getGames) {
+        // Shown on every search that reaches the sources, not only Get games: the chips are where each source's state
+        // shows, saved or live (owner, 2026-11-15, Droidtop/tracker#937: "I can't see when it is or isn't searching online").
+        if (getGames || text.isNotBlank()) {
             val chips = sourceChips(state, offline)
             if (chips.isNotEmpty()) {
                 add(
@@ -788,7 +790,11 @@ internal fun LibrarySearchDialog(
             val (here, new) = state.rows.partition { !it.isNew }
             here.forEach { row -> add(rowLine(row)) }
             if (new.isNotEmpty()) {
-                add(SearchLine.Header(if (state.featured) FEATURED else dev.droidtop.library.integrations.GetGamesEntry.NEW_GAMES))
+                // Which answer these are, in one word (Droidtop/tracker#937): the sources' saved lists until the press,
+                // then what they answered live.
+                val kind = words(if (live) R.string.gamepad_source_results_live else R.string.gamepad_source_results_saved)
+                val heading = if (state.featured) FEATURED else dev.droidtop.library.integrations.GetGamesEntry.NEW_GAMES
+                add(SearchLine.Header("$heading · $kind"))
                 new.forEach { row -> add(rowLine(row)) }
             }
             // Settings are a different thing being searched (docs/SPEC.md 7k), so they are a section of their own after the
@@ -807,7 +813,6 @@ internal fun LibrarySearchDialog(
                     SearchLine.Entry(
                         "search_sources",
                         if (text.isBlank()) words(R.string.gamepad_sources_featured_now) else words(R.string.gamepad_search_the_sources_for, text.trim()),
-                        subtitle = words(R.string.gamepad_asks_each_source_that_is_on),
                     ) {
                         live = true
                         searchTick++
