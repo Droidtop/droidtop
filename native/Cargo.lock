@@ -1302,7 +1302,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "droidtop-agent-relay"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=20eec9ce295e254e76c5126d1ddc4fda01ec9428#20eec9ce295e254e76c5126d1ddc4fda01ec9428"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=565f7c68518bfcb483aa4a5aba45b286553e6dd4#565f7c68518bfcb483aa4a5aba45b286553e6dd4"
 dependencies = [
  "ed25519-dalek 2.2.0",
  "rand_core 0.6.4",
@@ -1312,7 +1312,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-service"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=20eec9ce295e254e76c5126d1ddc4fda01ec9428#20eec9ce295e254e76c5126d1ddc4fda01ec9428"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=565f7c68518bfcb483aa4a5aba45b286553e6dd4#565f7c68518bfcb483aa4a5aba45b286553e6dd4"
 dependencies = [
  "dirs",
  "droidtop-agent-relay",
@@ -1337,7 +1337,7 @@ dependencies = [
 [[package]]
 name = "droidtop-agent-stream"
 version = "0.1.0"
-source = "git+https://github.com/Droidtop/droidtop-agent?rev=20eec9ce295e254e76c5126d1ddc4fda01ec9428#20eec9ce295e254e76c5126d1ddc4fda01ec9428"
+source = "git+https://github.com/Droidtop/droidtop-agent?rev=565f7c68518bfcb483aa4a5aba45b286553e6dd4#565f7c68518bfcb483aa4a5aba45b286553e6dd4"
 dependencies = [
  "bytes",
  "tokio",
@@ -1812,7 +1812,7 @@ dependencies = [
 [[package]]
 name = "games-scan"
 version = "0.4.0"
-source = "git+https://github.com/Droidtop/lib-games?rev=e142335ac34d605eb072565e8278bc3a32afe46c#e142335ac34d605eb072565e8278bc3a32afe46c"
+source = "git+https://github.com/Droidtop/lib-games?tag=v0.4.0#e142335ac34d605eb072565e8278bc3a32afe46c"
 dependencies = [
  "dirs",
  "engines-detect",
@@ -4127,7 +4127,7 @@ dependencies = [
 [[package]]
 name = "plugins-contexts"
 version = "0.3.0"
-source = "git+https://github.com/Droidtop/lib-plugins?rev=fd6dec87d5de7650ddff0a325b89b9fb1c7c7e94#fd6dec87d5de7650ddff0a325b89b9fb1c7c7e94"
+source = "git+https://github.com/Droidtop/lib-plugins?tag=v0.3.0#fd6dec87d5de7650ddff0a325b89b9fb1c7c7e94"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",
@@ -5286,7 +5286,7 @@ checksum = "c62751faa8bc286982334a082fe125184a29fc89d17775766e4f891b7d726980"
 [[package]]
 name = "saves-locate"
 version = "0.3.0"
-source = "git+https://github.com/Droidtop/lib-saves?rev=53dca8bb6595491d3d1c826e1076ba4ceb5cf887#53dca8bb6595491d3d1c826e1076ba4ceb5cf887"
+source = "git+https://github.com/Droidtop/lib-saves?rev=61af4353e9b02e5ea433a9c0d486f0205d643543#61af4353e9b02e5ea433a9c0d486f0205d643543"
 dependencies = [
  "dirs",
  "flate2",
