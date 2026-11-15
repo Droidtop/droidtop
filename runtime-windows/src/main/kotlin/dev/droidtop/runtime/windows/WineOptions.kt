@@ -853,7 +853,7 @@ object WineOptions {
         add(
             row(
                 WINE, "Wine build",
-                null,
+                "",
                 s.wine, wines,
             ),
         )
