@@ -246,7 +246,7 @@ object StorageSharesCatalog {
                                 if (now.isServerKind()) null else ToggleItem(
                                     id = "${id}_plain",
                                     title = "Allow unencrypted",
-                                    subtitle = "Only for a share on your own network: the password and files travel readable",
+                                    subtitle = "Unencrypted: own network only",
                                     current = now.allowPlainHttp,
                                     onToggle = { c, on -> withContext(Dispatchers.IO) { StorageShares.update(c, now.id) { it.copy(allowPlainHttp = on) } } },
                                 ),
@@ -287,7 +287,7 @@ object StorageSharesCatalog {
                                 AsyncActionItem(
                                     id = "${id}_remove",
                                     title = "Remove",
-                                    subtitle = "Takes it off this list and forgets its password. Nothing on the share is deleted",
+                                    subtitle = "Nothing on the share is deleted",
                                     confirmTitle = "Remove ${now.name}?",
                                     run = { c, _ -> withContext(Dispatchers.IO) { StorageShares.remove(c, now.id) }; "Removed ${now.name}" },
                                 ),
@@ -327,7 +327,6 @@ object StorageSharesCatalog {
     private fun addSftpRow(): CatalogItem = NestedScreenItem(
         id = "accounts_storage_add_sftp",
         title = "Add SFTP share",
-        subtitle = "Any computer or NAS you reach with SSH, with your own sign-in",
         inline = CatalogScreen(
             id = "accounts_storage_add_sftp_screen",
             title = "Add SFTP share",
@@ -340,7 +339,7 @@ object StorageSharesCatalog {
                             TextInputItem(
                                 id = "accounts_storage_add_sftp_host",
                                 title = "Server",
-                                subtitle = "Its name or address, such as nas.local or 192.168.1.20",
+                                subtitle = "e.g. nas.local",
                                 value = sftpHost,
                                 onChange = { _, v -> sftpHost = v.trim() },
                             ),
@@ -409,7 +408,6 @@ object StorageSharesCatalog {
     private fun addSmbRow(): CatalogItem = NestedScreenItem(
         id = "accounts_storage_add_smb",
         title = "Add SMB share",
-        subtitle = "A Windows shared folder, Samba or a NAS, with your own sign-in",
         inline = CatalogScreen(
             id = "accounts_storage_add_smb_screen",
             title = "Add SMB share",
@@ -422,14 +420,14 @@ object StorageSharesCatalog {
                             TextInputItem(
                                 id = "accounts_storage_add_smb_server",
                                 title = "Server",
-                                subtitle = "Its name or address, such as nas.local or 192.168.1.20",
+                                subtitle = "e.g. nas.local",
                                 value = smbServer,
                                 onChange = { _, v -> smbServer = v.trim() },
                             ),
                             TextInputItem(
                                 id = "accounts_storage_add_smb_share",
                                 title = "Share",
-                                subtitle = "The share's name, the part after the server, such as home",
+                                subtitle = "e.g. home",
                                 value = smbShare,
                                 onChange = { _, v -> smbShare = v.trim() },
                             ),
@@ -518,7 +516,6 @@ object StorageSharesCatalog {
     private fun addS3Row(): CatalogItem = NestedScreenItem(
         id = "accounts_storage_add_s3",
         title = "Add S3 storage",
-        subtitle = "AWS S3, Backblaze B2, Wasabi, Cloudflare R2, MinIO or Garage, with your own access key",
         inline = CatalogScreen(
             id = "accounts_storage_add_s3_screen",
             title = "Add S3 storage",
@@ -547,7 +544,7 @@ object StorageSharesCatalog {
                             TextInputItem(
                                 id = "accounts_storage_add_s3_secret",
                                 title = "Secret key",
-                                subtitle = "Kept locked on this device. A key limited to this bucket works best",
+                                subtitle = "Kept locked on this device",
                                 value = "",
                                 secret = true,
                                 onChange = { _, v -> s3SecretKey = v },
@@ -576,7 +573,7 @@ object StorageSharesCatalog {
                             ToggleItem(
                                 id = "accounts_storage_add_s3_plain",
                                 title = "Allow unencrypted",
-                                subtitle = "Only for a service on your own network: requests and files travel readable",
+                                subtitle = "Unencrypted: own network only",
                                 current = s3PlainHttp,
                                 onToggle = { _, on -> s3PlainHttp = on },
                             ),
@@ -619,7 +616,6 @@ object StorageSharesCatalog {
     private fun addRow(): CatalogItem = NestedScreenItem(
         id = "accounts_storage_add",
         title = "Add share",
-        subtitle = "Nextcloud, ownCloud, a NAS or any WebDAV server, with your own sign-in",
         inline = CatalogScreen(
             id = "accounts_storage_add_screen",
             title = "Add share",
@@ -645,7 +641,7 @@ object StorageSharesCatalog {
                             TextInputItem(
                                 id = "accounts_storage_add_password",
                                 title = "Password",
-                                subtitle = "Kept locked on this device. An app password works best where the service has them",
+                                subtitle = "Kept locked on this device",
                                 value = "",
                                 secret = true,
                                 onChange = { _, v -> pendingPassword = v },
@@ -660,7 +656,7 @@ object StorageSharesCatalog {
                             ToggleItem(
                                 id = "accounts_storage_add_plain",
                                 title = "Allow unencrypted",
-                                subtitle = "Only for a share on your own network: the password and files travel readable",
+                                subtitle = "Unencrypted: own network only",
                                 current = pendingPlainHttp,
                                 onToggle = { _, on -> pendingPlainHttp = on },
                             ),

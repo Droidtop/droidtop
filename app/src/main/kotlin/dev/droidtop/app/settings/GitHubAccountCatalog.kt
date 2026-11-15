@@ -346,7 +346,7 @@ object GitHubAccountCatalog {
                 AsyncActionItem(
                     id = "repos_found_refresh",
                     title = "Look again",
-                    subtitle = "Reads the repositories you can access, cached for hours. It never installs anything there",
+                    subtitle = "Never installs anything",
                     run = { ctx, onStatus ->
                         onStatus("Reading your repositories...")
                         describeDetection(PluginRepoDetection.refresh(ctx, force = true))
@@ -421,7 +421,7 @@ object GitHubAccountCatalog {
                 ActionItem(
                     id = "repos_proposal_info",
                     title = "REFUSED: origin \"${decision.origin}\" belongs to ${decision.byRepo}",
-                    subtitle = "One origin per repository. Remove that repository first if this one replaces it.",
+                    subtitle = "Remove the other repository first",
                 ),
             )
         }
@@ -491,12 +491,10 @@ object GitHubAccountCatalog {
                             ActionItem(
                                 id = "repo_last",
                                 title = last ?: "Not checked yet",
-                                subtitle = "Plugins signed with this key show \"Verified by: $repo\"",
                             ),
                             AsyncActionItem(
                                 id = "repo_check_now",
                                 title = "Check for updates now",
-                                subtitle = "Installs a newer version of a plugin you already have, signed with this key",
                                 run = { ctx, onStatus ->
                                     onStatus("Checking $repo...")
                                     PluginRepoUpdates.describe(PluginRepoUpdates.checkNow(ctx, entry))
@@ -539,7 +537,7 @@ object GitHubAccountCatalog {
                             ActionItem(
                                 id = "repo_stop",
                                 title = "Stop trusting $repo",
-                                subtitle = "Plugins it signed stop running and are no longer updated, until you trust it again",
+                                subtitle = "Its plugins stop until you trust it again",
                                 confirmTitle = "Stop trusting $repo?",
                                 run = { ctx ->
                                     UserOriginKeys.remove(UserOriginKeys.storeFile(ctx), entry.origin)
