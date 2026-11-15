@@ -537,6 +537,9 @@ internal fun LibrarySearchDialog(
     // search panel is not drawn under it, because two translucent windows put text on text (Droidtop/tracker#542).
     // What was typed and where the cursor was stay in this composition and are there when the page closes.
     var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
+    // A facet's small screen (a source's search options) opens as a popup over the panel, which stays on screen
+    // (Droidtop/tracker#939).
+    var activePopup by remember { mutableStateOf<CatalogScreen?>(null) }
     // The merged row whose places are being chosen from (its key), or null for the result list.
     var choosing by remember { mutableStateOf<String?>(null) }
     var firstShow by remember { mutableStateOf(true) }
@@ -855,7 +858,7 @@ internal fun LibrarySearchDialog(
                 // A source's own search options (docs/plugin-api.md 1.10, search.filter): its page, then the search again.
                 state.sources.forEach { status ->
                     status.source.filterScreen(context)?.let { options ->
-                        add(SearchLine.Entry("filters:${status.source.id}", "${status.source.label}: search options", subtitle = words(R.string.gamepad_searches_again_after)) { activeCatalog = options })
+                        add(SearchLine.Entry("filters:${status.source.id}", "${status.source.label}: search options", subtitle = words(R.string.gamepad_searches_again_after)) { activePopup = options })
                     }
                 }
                 // A failed source is one compact row below the results (docs/SPEC.md 12a, "One search", Droidtop/tracker#746):
@@ -1128,6 +1131,12 @@ internal fun LibrarySearchDialog(
         }
     }
 
+    activePopup?.let { screen ->
+        dev.droidtop.shell.gamepad.CatalogPopup(root = screen, onExit = {
+            activePopup = null
+            searchTick += 1
+        })
+    }
     activeCatalog?.let { screen ->
         val close: () -> Unit = {
             activeCatalog = null

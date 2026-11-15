@@ -1389,6 +1389,15 @@ of surfaces of their own.
 
 ### 1.10 Facets: small, typed pieces of UI any plugin puts where droidtop has a place (proposed 2026-10-22, approved 2026-10-23, contract 3, Droidtop/tracker#602)
 
+**Facets inform the screen; they do not take it over (owner, 2026-11-15, Droidtop/tracker#939: "Facets shouldn't be
+entire pages, generally. They should be popups or overlays. A facet shouldn't take over, it should give information to
+the main UI").** A facet shows where the person already is: as a row, a value or tag on a row, or, when it needs a
+screen of its own, a popup over the screen it was opened from (`CatalogPopup`: the shell's panel width, at most 70% of
+the window tall, over a dimmed copy of the screen, which stays in sight). Closing it returns to that screen, which
+shows what the facet changed. A full page (`CatalogSheet`) is for a place of its own, not for a facet. First moved: a
+source's search options (`search.filter`) open as a popup over the search panel instead of replacing it. Still to
+move: a `page` call's reply and a source record's `item.page` facets.
+
 **Status: approved by the owner (2026-10-23: "Facets is really useful"); being built in pieces.** Built: the model and
 its guards (`Facets`, `FacetGuards` in `:plugin-host`: reading a reply, templates, the target list with the kinds and
 subjects each takes, the per-target caps from the limits file's `facets`, the store and media guards, the `ui.facets`
