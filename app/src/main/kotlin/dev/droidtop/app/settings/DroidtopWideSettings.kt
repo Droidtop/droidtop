@@ -65,7 +65,6 @@ object DroidtopWideSettings {
     fun globalScreen() = CatalogScreen(
         id = SCREEN_GLOBAL,
         title = "Settings",
-        subtitle = "Home screen and modes",
         // The Gaming settings page draws these groups as sections of its own categories (each group
         // names one) instead of a level of its own; every other surface still opens this screen.
         merged = true,
@@ -149,7 +148,6 @@ object DroidtopWideSettings {
                         ChoiceItem(
                             id = AccessibilityPrefs.KEY_COLOR_VISION,
                             title = "Colour vision",
-                            subtitle = "Recolours droidtop's own screens; games and other apps are not changed",
                             options = listOf(
                                 ChoiceOption(AccessibilityPrefs.VISION_NONE, "Off"),
                                 ChoiceOption(AccessibilityPrefs.VISION_PROTAN, "Protanopia (red-weak)"),
@@ -165,7 +163,6 @@ object DroidtopWideSettings {
                         ChoiceItem(
                             id = AccessibilityPrefs.KEY_TEXT_SCALE,
                             title = "Text size",
-                            subtitle = "Scales droidtop's own text on top of Android's font size",
                             options = listOf(
                                 ChoiceOption("1.0", "Normal"),
                                 ChoiceOption("1.15", "Large"),
@@ -194,7 +191,6 @@ object DroidtopWideSettings {
                         ActionItem(
                             id = "pref_global_rerun_onboarding",
                             title = "Rerun onboarding",
-                            subtitle = "Go through first-run setup again; nothing is reset until you change it there",
                             run = { ctx ->
                                 ctx.startActivity(
                                     Intent(ctx, OnboardingActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -206,17 +202,16 @@ object DroidtopWideSettings {
                         AsyncActionItem(
                             id = "pref_global_share_diagnostics",
                             title = "Share diagnostics",
-                            subtitle = "Zip the logs, settings without credentials, build and theme names; " +
-                                "nothing is sent until you choose where to send it",
+                            subtitle = "Logs and settings, no passwords",
                             run = { ctx, onStatus ->
-                                onStatus("Packing diagnostics...")
+                                onStatus("Packing")
                                 shareDiagnostics(ctx)
                             },
                         ),
                         ToggleItem(
                             id = KEY_BACKUP_CREDENTIALS,
                             title = "Back up credentials",
-                            subtitle = "Include passwords and API credentials in an encoded section of settings backups",
+                            subtitle = "Passwords and keys go in backups, encoded",
                             current = CatalogPrefs.prefs(context).getBoolean(KEY_BACKUP_CREDENTIALS, false),
                             onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_BACKUP_CREDENTIALS, on).apply() },
                         ),
@@ -224,8 +219,6 @@ object DroidtopWideSettings {
                         DocumentPickItem(
                             id = "pref_global_backup",
                             title = "Back up droidtop",
-                            subtitle = "Settings, game records, play history, favourites, collections, scraped details " +
-                                "and the list of plugins, in one file. Not games, ROMs, themes or permissions",
                             mimeType = "application/zip",
                             createName = "droidtop-backup.zip",
                             onPicked = ::writeBackup,
@@ -233,11 +226,9 @@ object DroidtopWideSettings {
                         DocumentPickItem(
                             id = "pref_global_restore",
                             title = "Restore droidtop",
-                            subtitle = "From a droidtop backup. Settings apply now; the rest when droidtop next starts. " +
-                                "Folder access and plugin permissions are asked again, and plugins are reinstalled from their sources",
+                            subtitle = "The rest applies on next start",
                             mimeType = "*/*",
-                            confirmTitle = "Restoring replaces this device's game records, play history, favourites, " +
-                                "collections and scraped details with the backup's",
+                            confirmTitle = "Replace this device's library data with the backup's?",
                             onPicked = ::readBackup,
                         ),
                     ) + shareBackupRows(context),
@@ -254,7 +245,6 @@ object DroidtopWideSettings {
                         dev.droidtop.library.settings.NestedScreenItem(
                             id = "pref_global_updates",
                             title = "Updates",
-                            subtitle = "droidtop, plugins, apps and games with a newer version, and Update all",
                             registryId = AppSettingsCatalogs.SCREEN_UPDATES,
                             icon = dev.droidtop.library.settings.CatalogIcon.SYSTEM_UPDATES,
                             valueLabel = { ctx ->
@@ -274,7 +264,6 @@ object DroidtopWideSettings {
                         ActionItem(
                             id = "pref_global_whats_new",
                             title = "What's new",
-                            subtitle = "What changed in this version and every one before it",
                             run = { ctx ->
                                 ctx.startActivity(
                                     dev.droidtop.app.WhatsNewActivity.intent(ctx, all = true)
@@ -289,7 +278,6 @@ object DroidtopWideSettings {
                             ActionItem(
                                 id = "pref_global_changes_since",
                                 title = "Changes since your last update",
-                                subtitle = "Every build since the one you had, and what to do after updating",
                                 run = { ctx ->
                                     ctx.startActivity(dev.droidtop.app.WhatsNewActivity.since(ctx, from).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                                 },
@@ -299,7 +287,6 @@ object DroidtopWideSettings {
                             NestedScreenItem(
                                 id = "pref_global_developer",
                                 title = "Developer",
-                                subtitle = "Debug builds and recovery; and technical details on the pages they belong to",
                                 registryId = DeveloperMenu.SCREEN,
                             )
                         } else {
@@ -314,7 +301,6 @@ object DroidtopWideSettings {
     fun desktopScreen() = CatalogScreen(
         id = SCREEN_DESKTOP,
         title = "Desktop mode",
-        subtitle = "Settings for the Desktop shell",
         groups = { context ->
             listOf(
                 // The same first row Gaming's settings lead with: from
@@ -331,7 +317,6 @@ object DroidtopWideSettings {
                         ActionItem(
                             id = "pref_desktop_global_settings",
                             title = "Settings",
-                            subtitle = "Modes, your home screen and setup",
                             run = { ctx -> dev.droidtop.shell.standard.BackButtonMenu.openGlobalSettings(ctx) },
                         ),
                     ),
@@ -344,7 +329,6 @@ object DroidtopWideSettings {
                         ToggleItem(
                             id = DesktopPrefs.KEY_TASKBAR_TOP,
                             title = "Taskbar at top",
-                            subtitle = "Move the desktop taskbar to the top of the screen instead of the bottom",
                             current = DesktopPrefs.read(context).taskbarAtTop,
                             onToggle = { ctx, on -> DesktopPrefs.setTaskbarAtTop(ctx, on) },
                         ),
@@ -354,15 +338,14 @@ object DroidtopWideSettings {
                         ToggleItem(
                             id = DesktopPrefs.KEY_CONTAINER_INPUT_METHOD,
                             title = "A container's own input method",
-                            subtitle = "Leave typing to fcitx5 or ibus in a container. Text fields then don't open the keyboard",
+                            subtitle = "fcitx5 or ibus does the typing",
                             current = DesktopPrefs.read(context).containerInputMethod,
                             onToggle = { ctx, on -> DesktopPrefs.setContainerInputMethod(ctx, on) },
                         ),
                         ToggleItem(
                             id = "pref_desktop_keep_running",
                             title = "Keep the desktop running",
-                            subtitle = "Open windows survive a switch to another mode. Costs memory, battery and the desktop's " +
-                                "audio stream while you are elsewhere; Stop in its notification ends it",
+                            subtitle = "Uses memory and battery while you're elsewhere",
                             current = dev.droidtop.app.DesktopSetupPrefs.keepRunning(context),
                             onToggle = { ctx, on -> dev.droidtop.app.DesktopSetupPrefs.setKeepRunning(ctx, on) },
                         ),
@@ -371,7 +354,7 @@ object DroidtopWideSettings {
                         ChoiceItem(
                             id = "pref_desktop_panel",
                             title = "Desktop panel",
-                            subtitle = "A second bar in the Linux desktop, above droidtop's. Applies at next start",
+                            subtitle = "Applies at next start",
                             options = dev.droidtop.runtime.DesktopPanel.entries.map { ChoiceOption(it.id, it.label) },
                             current = dev.droidtop.app.DesktopSetupPrefs.panel(context).id,
                             onSelect = { ctx, value ->
@@ -381,16 +364,12 @@ object DroidtopWideSettings {
                         ToggleItem(
                             id = "pref_desktop_tile_windows",
                             title = "Tile windows",
-                            subtitle = "New windows share the screen side by side, sway's own way, instead of floating where a " +
-                                "finger can move and resize them. For keyboard use. Applies when the desktop next starts",
                             current = dev.droidtop.app.DesktopSetupPrefs.tileWindows(context),
                             onToggle = { ctx, on -> dev.droidtop.app.DesktopSetupPrefs.setTileWindows(ctx, on) },
                         ),
                         ChoiceItem(
                             id = "pref_desktop_background",
                             title = "Desktop background",
-                            subtitle = "The colour or picture behind the Linux desktop's windows. Its apps follow droidtop's " +
-                                "Light or dark. Applies when the desktop next starts",
                             options = dev.droidtop.runtime.DesktopAppearance.Background.entries.map { ChoiceOption(it.id, it.label) },
                             current = dev.droidtop.app.DesktopSetupPrefs.background(context).id,
                             onSelect = { ctx, value ->
@@ -410,13 +389,12 @@ object DroidtopWideSettings {
                         ActionItem(
                             id = "pref_desktop_restart",
                             title = "Restart the desktop",
-                            subtitle = "Applies the changes above now. Closes every window open on the desktop",
+                            subtitle = "Closes every window",
                             run = { ctx -> dev.droidtop.app.DesktopSessionService.restart(ctx) },
                         ),
                         ActionItem(
                             id = "pref_desktop_root_compositor_setup",
                             title = "Desktop setup",
-                            subtitle = "Check what this device can run, and choose the distro and compositor",
                             run = { ctx -> ctx.startActivity(dev.droidtop.app.DesktopSetupPrefs.setupIntent(ctx)) },
                         ),
                         // The container manager is a catalog screen of its own
@@ -425,7 +403,6 @@ object DroidtopWideSettings {
                         dev.droidtop.library.settings.NestedScreenItem(
                             id = "pref_desktop_containers",
                             title = "Containers",
-                            subtitle = "Manage Linux containers and distros: create, start, stop, delete",
                             registryId = ContainersCatalog.SCREEN_ID,
                             icon = dev.droidtop.library.settings.CatalogIcon.CONTAINERS,
                         ),
@@ -434,7 +411,6 @@ object DroidtopWideSettings {
                         dev.droidtop.library.settings.NestedScreenItem(
                             id = "pref_desktop_all_settings",
                             title = "Settings",
-                            subtitle = "droidtop's other settings: the library, games, display, network and more",
                             registryId = SCREEN_GLOBAL,
                         ),
                     ),
@@ -446,7 +422,6 @@ object DroidtopWideSettings {
     fun standardScreen() = CatalogScreen(
         id = SCREEN_STANDARD,
         title = "Mobile mode",
-        subtitle = "Settings for the launcher",
         groups = { context -> listOf(CatalogGroup(
             id = "standard", title = null,
             items = listOf(orientationChoice(context, Mode.LAUNCHER)),
@@ -469,7 +444,6 @@ object DroidtopWideSettings {
         return ChoiceItem(
             id = dev.droidtop.runtime.DesktopScale.KEY,
             title = "Desktop scale",
-            subtitle = "How large the Linux desktop's text and windows are on this screen",
             options = listOf(
                 ChoiceOption(dev.droidtop.runtime.DesktopScale.AUTOMATIC, "Automatic (${dev.droidtop.runtime.DesktopScale.label(automatic)})"),
             ) + dev.droidtop.runtime.DesktopScale.CHOICES.map { value ->
@@ -590,7 +564,6 @@ object DroidtopWideSettings {
         return ChoiceItem(
             id = "pref_global_default_mode",
             title = "Home opens",
-            subtitle = "Which of droidtop's screens droidtop opens on, and the Home button takes you to",
             options = options,
             current = Modes.defaultMode(context)?.takeIf { id -> options.any { it.value == id } } ?: "",
             onSelect = { ctx, value -> Modes.setDefaultMode(ctx, Mode.byId(value.ifEmpty { null })) },
@@ -610,7 +583,6 @@ object DroidtopWideSettings {
         return ActionItem(
             id = "pref_global_users",
             title = "Users and guest",
-            subtitle = "Opens Android's Users screen to switch user or start a guest session",
             run = { ctx -> ctx.startActivity(Intent(intent)) },
         )
     }
@@ -636,7 +608,6 @@ object DroidtopWideSettings {
     fun developerScreen() = CatalogScreen(
         id = DeveloperMenu.SCREEN,
         title = "Developer",
-        subtitle = "For finding faults in droidtop",
         groups = { context ->
             listOf(
                 CatalogGroup(
@@ -701,7 +672,7 @@ object DroidtopWideSettings {
                         ActionItem(
                             id = "developer_turn_off",
                             title = "Turn off the Developer menu",
-                            subtitle = "Hides this menu and the technical rows again; seven taps on the version bring it back",
+                            subtitle = "Tap the version seven times to bring it back",
                             run = { ctx -> DeveloperMenu.set(ctx, false) },
                         ),
                     ),
@@ -715,7 +686,6 @@ object DroidtopWideSettings {
         return ActionItem(
             id = "pref_global_debug_crash",
             title = "Debug: force a crash",
-            subtitle = "Crashes droidtop on purpose: a crash note, counted toward safe mode like a real crash",
             confirmTitle = "Crash droidtop now?",
             run = { _ ->
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
@@ -736,7 +706,6 @@ object DroidtopWideSettings {
         return AsyncActionItem(
             id = "pref_global_debug_desktop_second_screen",
             title = "Debug: desktop on the other screen",
-            subtitle = "Switches the other screen between the desktop and what it had, as Settings > Displays does",
             run = { ctx, _ ->
                 val session = dev.droidtop.app.DesktopSessionService.state.value as? dev.droidtop.app.DesktopSessionState.Connected
                 if (session == null) {
@@ -891,8 +860,6 @@ object DroidtopWideSettings {
                                     AsyncActionItem(
                                         id = "${id}_run",
                                         title = "Back up now",
-                                        subtitle = "Settings, game records, play history, favourites, collections, scraped details and the " +
-                                            "list of plugins. Earlier backups on the share are kept",
                                         run = { c, onStatus ->
                                             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                                 onStatus("Backing up...")
@@ -917,8 +884,7 @@ object DroidtopWideSettings {
                                                 id = "${id}_restore_${backup.path.hashCode()}",
                                                 title = backup.label,
                                                 subtitle = backup.device + if (backup.locked) ", locked" else "",
-                                                confirmTitle = "Restoring replaces this device's game records, play history, favourites, " +
-                                                    "collections and scraped details with the backup's",
+                                                confirmTitle = "Replace this device's library data with the backup's?",
                                                 run = { c, onStatus ->
                                                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                                         onStatus("Fetching the backup...")
