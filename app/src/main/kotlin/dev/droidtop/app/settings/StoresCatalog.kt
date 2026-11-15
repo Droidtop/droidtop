@@ -214,7 +214,6 @@ internal object StoresCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Game sources",
-        subtitle = "Where your games come from: stores, your game folders and imports",
         groups = { context -> rootGroups(context) },
         live = storeJobChanges,
     )
@@ -267,7 +266,6 @@ internal object StoresCatalog {
                         NestedScreenItem(
                             id = "game_sources_folders",
                             title = "Folders",
-                            subtitle = "The game folders droidtop looks in for games, console ROMs included",
                             registryId = FoldersCatalog.SCREEN_ID,
                             valueLabel = { FoldersCatalog.summary(folders) },
                             icon = CatalogIcon.GAME_FOLDERS,
@@ -297,7 +295,6 @@ internal object StoresCatalog {
                     NestedScreenItem(
                         id = "stores_storage",
                         title = "Storage",
-                        subtitle = "What installed store games take, the room left, and uninstalling",
                         inline = StorageCatalog.screen(),
                         icon = CatalogIcon.DATA,
                     ),
@@ -314,7 +311,6 @@ internal object StoresCatalog {
                     ToggleItem(
                         id = "stores_links",
                         title = "Get it on and Support the developer",
-                        subtitle = "For a game no store owns, its menu says where to buy it and where its developer helps",
                         current = !StoreLinkPrefs.hiddenEverywhere(context),
                         onToggle = { ctx, on -> StoreLinkPrefs.setHiddenEverywhere(ctx, !on) },
                     ),
@@ -337,7 +333,6 @@ internal object StoresCatalog {
                     AsyncActionItem(
                         id = "stores_sync_all",
                         title = "Sync all libraries",
-                        subtitle = "Re-reads every signed-in store for games added since the last read",
                         run = { ctx, _ -> syncAllStores(ctx) },
                     ),
                 ),
@@ -389,7 +384,6 @@ internal object StoresCatalog {
                     ActionItem(
                         id = GetGamesEntry.SEARCH_ROW_ID,
                         title = GetGamesEntry.LABEL,
-                        subtitle = "Search every source at once, or see what they feature",
                         icon = CatalogIcon.SEARCH,
                         run = { ctx -> ctx.startActivity(dev.droidtop.app.LauncherSearchActivity.getGamesIntent(ctx)) },
                     ),
@@ -402,7 +396,6 @@ internal object StoresCatalog {
                     NestedScreenItem(
                         id = "stores_add_game",
                         title = "Add a game",
-                        subtitle = "A game already on this device, from its folder or file, or one from a store's pages",
                         inline = addGameScreen(),
                         icon = CatalogIcon.LIBRARY,
                     ),
@@ -412,7 +405,6 @@ internal object StoresCatalog {
                     NestedScreenItem(
                         id = "updates_get_apps",
                         title = "Get apps",
-                        subtitle = "Browse and install apps from the catalogs your plugins add, such as F-Droid repositories",
                         registryId = dev.droidtop.library.integrations.AppCatalogScreen.ID,
                     ),
                 ),
@@ -457,7 +449,6 @@ internal object StoresCatalog {
                         NestedScreenItem(
                             id = "downloads_sources_setup",
                             title = "Game sources",
-                            subtitle = "Sign in to a store, add a game folder, storage and sync",
                             registryId = SCREEN_ID,
                             icon = CatalogIcon.GLOBAL,
                         ),
@@ -479,7 +470,6 @@ internal object StoresCatalog {
     private fun addGameScreen() = CatalogScreen(
         id = "stores_add_game_screen",
         title = "Add a game",
-        subtitle = "Listed where it is; nothing is copied or moved",
         groups = { context -> addGameGroups(context) },
         indexGroups = { emptyList() },
     )
@@ -565,7 +555,6 @@ internal object StoresCatalog {
     private fun storePage(store: PcStore) = CatalogScreen(
         id = "store_page_${store.key}",
         title = store.label,
-        subtitle = "Account, library and downloads",
         needsNetwork = true,
         groups = { context -> pageGroups(context, store) },
         // The search index must not read every store's tables to list a few static rows.
@@ -604,7 +593,7 @@ internal object StoresCatalog {
                 AsyncActionItem(
                     id = "store_${store.key}_signout",
                     title = "Sign out",
-                    subtitle = "Removes the sign-in and this store's games that are not installed. Installed games stay",
+                    subtitle = "Installed games stay",
                     confirmTitle = "Sign out of ${store.label}?",
                     run = { ctx, _ ->
                         store.signOut(ctx).fold(
@@ -626,7 +615,7 @@ internal object StoresCatalog {
                     title = "Library",
                     // PC Games shows a game owned twice (two editions, a copy in each group) as one card, so its tabs can count fewer.
                     // When droidtop last asked for a sync is the page's chip.
-                    subtitle = "PC Games shows editions and copies of one game as one card, so its tabs can count fewer",
+                    subtitle = null,
                     value = countsLine(counts, signedIn),
                 ),
             )
@@ -640,7 +629,7 @@ internal object StoresCatalog {
                         // The Gaming shell opens PC Games on this store's shared games (PcSource.HOLDING_ITEM_PREFIX).
                         id = PcSource.holdingItemId(store.key, StoreHolding.FAMILY),
                         title = StoreHolding.FAMILY.label,
-                        subtitle = "Games another account lends you. PC Games lists them unless List options says otherwise",
+                        subtitle = null,
                         value = "${counts.family} ${if (counts.family == 1) "game" else "games"}",
                         run = ::openGames,
                     ),
@@ -651,7 +640,7 @@ internal object StoresCatalog {
                     ActionItem(
                         id = PcSource.holdingItemId(store.key, StoreHolding.FREE),
                         title = StoreHolding.FREE.label,
-                        subtitle = "Free games the account never added. They show once played or installed, or by List options",
+                        subtitle = null,
                         value = "${counts.free} ${if (counts.free == 1) "game" else "games"}",
                         run = ::openGames,
                     ),
@@ -664,7 +653,6 @@ internal object StoresCatalog {
                     ActionItem(
                         id = "${PcSource.LIBRARY_ITEM_PREFIX}${store.key}",
                         title = "Open library",
-                        subtitle = "Shows only ${store.label} games in PC Games",
                         run = ::openGames,
                     ),
                 )
@@ -674,7 +662,6 @@ internal object StoresCatalog {
                     AsyncActionItem(
                         id = "store_${store.key}_sync",
                         title = "Sync library",
-                        subtitle = "Re-reads ${store.label} for games added since the last read",
                         run = { ctx, _ -> store.requestSync(ctx) },
                     ),
                 )
@@ -738,7 +725,6 @@ internal object StoresCatalog {
                 items = jobs.map { PluginJobsScreen.jobRow(it) } + NestedScreenItem(
                     id = "store_${store.key}_downloads",
                     title = "All downloads",
-                    subtitle = "Everything downloading or waiting, with Pause, Resume and Cancel",
                     registryId = PluginJobsScreen.ID,
                 ),
             ),
@@ -755,13 +741,13 @@ internal object StoresCatalog {
                 ActionItem(
                     id = "store_${store.key}_account",
                     title = "Account",
-                    subtitle = "This device holds no sign-in for ${store.label}",
+                    subtitle = "Not signed in",
                     value = keyFailures[store.key] ?: "Not signed in",
                 ),
                 TextInputItem(
                     id = "store_${store.key}_api_key",
                     title = "API key",
-                    subtitle = "The key you make on ${store.label}'s API keys page. droidtop checks it with ${store.label} and keeps it on this device",
+                    subtitle = "From ${store.label}'s API keys page",
                     value = "",
                     secret = true,
                     onChange = { ctx, text ->
@@ -779,7 +765,6 @@ internal object StoresCatalog {
                 ActionItem(
                     id = "store_${store.key}_key_page",
                     title = "Make a key",
-                    subtitle = "Opens ${store.label}'s API keys page in the browser",
                     run = { ctx ->
                         dev.droidtop.library.Links.open(ctx, signIn.keyPage)
                     },

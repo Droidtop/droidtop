@@ -75,7 +75,6 @@ object EmulatorsCatalog {
     fun screen(): CatalogScreen = CatalogScreen(
         id = SCREEN_EMULATORS,
         title = "Emulators",
-        subtitle = "Emulator per system",
         groups = { context -> groups(context, forIndex = false) },
         // The settings search reads the default-emulator row only; the
         // per-system rows are live library state, as for Console systems.
@@ -105,7 +104,7 @@ object EmulatorsCatalog {
         return ActionItem(
             id = id,
             title = "$name needs All files access",
-            subtitle = "Opens Android's All files access screen for it.",
+            subtitle = null,
             value = "Open settings",
             run = { ctx -> openAllFilesAccessSettings(ctx, packageName) },
         )
@@ -120,7 +119,7 @@ object EmulatorsCatalog {
             AsyncActionItem(
                 id = "emulator_permission_${systemId}_${missing.permission}",
                 title = RiskyPrompts.permissionTitle(name, missing.label),
-                subtitle = "$name has asked for this and does not have it. droidtop can give it for you",
+                subtitle = "$name needs this",
                 value = "Give permission",
                 confirmTitle = RiskyPrompts.permissionConfirm(name, packageName, missing.permission),
                 run = { ctx, _ ->
@@ -267,7 +266,7 @@ object EmulatorsCatalog {
                     ActionItem(
                         id = "emulators_no_systems",
                         title = "No game folders yet",
-                        subtitle = "Add a games folder under Console systems, then each system appears here.",
+                        subtitle = "Add a games folder first",
                     ),
                 )
             } else {
@@ -277,7 +276,6 @@ object EmulatorsCatalog {
                 val retroArchCores = AsyncActionItem(
                     id = "emulators_retroarch_cores",
                     title = "RetroArch cores",
-                    subtitle = "Install the cores these systems use",
                     run = { ctx, onStatus -> RetroArchCores.ensureForLibrary(ctx, withGames, onStatus) },
                 )
                 val usesRetroArch = needs.isNotEmpty()
@@ -356,7 +354,7 @@ object EmulatorsCatalog {
                             NestedScreenItem(
                                 id = "emulator_test_open_${system.id}",
                                 title = "Launch test",
-                                subtitle = "Start one of your games to check this emulator works, and say why if it does not",
+                                subtitle = null,
                                 inline = launchTestScreen(system),
                             ),
                         ),
@@ -594,7 +592,7 @@ object EmulatorsCatalog {
             DocumentPickItem(
                 id = "emulator_bios_add_${system.id}",
                 title = "Add a BIOS file",
-                subtitle = "Pick one of your own BIOS files; droidtop copies it into $name's BIOS folder under the name $name looks for",
+                subtitle = null,
                 mimeType = "*/*",
                 // Through the helper this writes into another app's folder (a risky action): say where, before the picker.
                 confirmTitle = if (reach == EmulatorSetup.Reach.HELPER) RiskyPrompts.addFileConfirm(name, folder) else null,
@@ -695,13 +693,13 @@ object EmulatorsCatalog {
                 NestedScreenItem(
                     id = "emulator_custom_add_${system.id}",
                     title = "Add a custom player",
-                    subtitle = "Point ${system.displayName} at any installed app by its launch command",
+                    subtitle = null,
                     inline = addCustomPlayerScreen(system),
                 ),
                 DocumentPickItem(
                     id = "emulator_custom_import_${system.id}",
                     title = "Add from a file",
-                    subtitle = "A custom player someone shared, or a players database file",
+                    subtitle = null,
                     mimeType = "*/*",
                     onPicked = { ctx, uri ->
                         withContext(Dispatchers.IO) {
@@ -763,7 +761,7 @@ object EmulatorsCatalog {
                             AsyncActionItem(
                                 id = "add_player_save",
                                 title = "Save player",
-                                subtitle = "Checks the command first; without a name it uses the package name",
+                                subtitle = null,
                                 run = { ctx, _ ->
                                     val faults = CustomPlayerPrefs.problems(pkg, args)
                                     if (faults.isNotEmpty()) {
@@ -861,13 +859,13 @@ object EmulatorsCatalog {
                             NestedScreenItem(
                                 id = "emulator_custom_test",
                                 title = "Launch test",
-                                subtitle = "Start one of your games with this player",
+                                subtitle = null,
                                 inline = launchTestScreen(system, player),
                             ),
                             DocumentPickItem(
                                 id = "emulator_custom_share",
                                 title = "Save as a file",
-                                subtitle = "A players database file to share, or to load on another device with Add from a file",
+                                subtitle = null,
                                 mimeType = "application/json",
                                 createName = player.name.replace(Regex("[^A-Za-z0-9._-]+"), "-") + ".json",
                                 onPicked = { ctx, uri ->
@@ -884,7 +882,7 @@ object EmulatorsCatalog {
                             AsyncActionItem(
                                 id = "emulator_custom_remove",
                                 title = "Remove",
-                                subtitle = "Systems and games set to it fall back to your default emulator, then the first installed",
+                                subtitle = null,
                                 confirmTitle = "Remove ${player.name}?",
                                 run = { ctx, _ ->
                                     withContext(Dispatchers.IO) { CustomPlayerPrefs.remove(ctx, system.id, playerId) }
@@ -921,7 +919,7 @@ object EmulatorsCatalog {
                                 ActionItem(
                                     id = "emulator_test_no_games_${system.id}",
                                     title = "No games found",
-                                    subtitle = "droidtop found no ${system.displayName} games in your games folders to test with.",
+                                    subtitle = "No ${system.displayName} games to test with",
                                 ),
                             )
                         } else {
@@ -929,7 +927,7 @@ object EmulatorsCatalog {
                                 AsyncActionItem(
                                     id = "emulator_test_game_${system.id}_$index",
                                     title = file.nameWithoutExtension,
-                                    subtitle = "Start it now and report whether it worked",
+                                    subtitle = null,
                                     run = { ctx, onStatus -> runLaunchTest(ctx, system, file, onStatus, player) },
                                 )
                             }
