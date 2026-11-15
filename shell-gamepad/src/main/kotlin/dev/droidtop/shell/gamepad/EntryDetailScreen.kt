@@ -469,7 +469,7 @@ internal fun consolePageRows(
     entry.manualUri?.let { add(PageFact("Manual", "Available", tab = PageTab.EXTRAS)) }
     entry.videoUri?.let { add(PageFact("Video", "Available", tab = PageTab.EXTRAS)) }
     if (!entry.hideMetadata) {
-        sourcesLine(entry)?.let { add(PageFact("Where these facts came from", subtitle = it, tab = PageTab.EXTRAS)) }
+        sourcesLine(entry)?.let { add(PageFact("Sources", subtitle = it, tab = PageTab.EXTRAS)) }
     }
     add(PageFact("Kind", entry.kind.itemName(), tab = PageTab.DETAILS))
     if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {

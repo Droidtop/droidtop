@@ -64,9 +64,10 @@ class AppPageTest {
         assertEquals(PageKind.GAME, PageKind.of(rom))
         PageTab.values().forEach { tab ->
             val line = tab.emptyLine(PageKind.APP)
-            assertTrue(line, line.contains("this app"))
+            // Short lines (Droidtop/tracker#153): an app's never says "game", and every tab has one.
+            assertTrue(line, line.isNotBlank())
             assertFalse(line, line.contains("game"))
-            assertTrue(tab.emptyLine(PageKind.GAME).contains("this game"))
+            assertTrue(tab.emptyLine(PageKind.GAME).isNotBlank())
         }
         assertEquals("Not opened yet", PageTab.ACTIVITY.emptyLine(PageKind.APP))
         assertEquals("Not played yet", PageTab.ACTIVITY.emptyLine(PageKind.GAME))

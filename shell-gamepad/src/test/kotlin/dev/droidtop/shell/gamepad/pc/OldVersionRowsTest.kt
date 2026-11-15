@@ -29,7 +29,7 @@ class OldVersionRowsTest {
         assertEquals("Version v0.37", row.title)
         assertEquals("Remove", row.value)
         assertTrue(row.subtitle!!.contains("GB"))
-        assertTrue(row.subtitle!!.contains("saves are copied"))
+        assertTrue(row.subtitle!!.contains("Saves are kept"))
         assertEquals(PageTab.VERSIONS, row.tab)
     }
 
