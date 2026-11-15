@@ -64,7 +64,7 @@ object AppCatalogScreen {
     fun screen(): CatalogScreen = CatalogScreen(
         id = ID,
         title = "Get apps",
-        subtitle = "Android apps from your plugins' catalogs, each checked by package and signing key first",
+        subtitle = "Checked by package and key",
         groups = { context -> withContext(Dispatchers.IO) { rootGroups(context) } },
         indexGroups = { emptyList() },
     )
@@ -104,7 +104,7 @@ object AppCatalogScreen {
                         )
                     } else {
                         listOf(
-                            ActionItem("apps_none_row", "No app catalog is added", subtitle = "Apps come from catalog plugins, such as one that reads F-Droid repositories"),
+                            ActionItem("apps_none_row", "No app catalog is added", subtitle = null),
                             NestedScreenItem(
                                 "apps_none_plugins",
                                 "Plugins",
@@ -127,7 +127,7 @@ object AppCatalogScreen {
                 NestedScreenItem(
                     id = "apps_sources_$id",
                     title = "Sources",
-                    subtitle = "Where ${record.manifest.label} reads apps from. Add, switch off, refresh or remove them",
+                    subtitle = null,
                     inline = sourcesScreen(record),
                 ),
             )
@@ -168,7 +168,7 @@ object AppCatalogScreen {
     private fun sourcesScreen(record: PluginRecord): CatalogScreen = CatalogScreen(
         id = "apps_sources_screen_${record.manifest.id}",
         title = "Sources",
-        subtitle = "From ${record.manifest.label}. Nothing is added until you accept its review",
+        subtitle = "From ${record.manifest.label}",
         groups = { context -> withContext(Dispatchers.IO) { sourcesGroups(context, record) } },
         indexGroups = { emptyList() },
     )
@@ -187,7 +187,7 @@ object AppCatalogScreen {
                 buildList<CatalogItem> {
                     if (sources == null) add(ActionItem("apps_sources_failed", "${record.manifest.label}: ${listed.exceptionOrNull()?.message}"))
                     if (sources != null && sources.sources.isEmpty()) {
-                        add(ActionItem("apps_sources_empty", "None added", subtitle = "Add one below: from the list, by its address or its QR code"))
+                        add(ActionItem("apps_sources_empty", "None added", subtitle = null))
                     }
                     sources?.sources?.forEach { source ->
                         add(
@@ -208,7 +208,7 @@ object AppCatalogScreen {
                             AsyncActionItem(
                                 id = "apps_sources_refresh_$id",
                                 title = "Refresh all",
-                                subtitle = "Fetches every source's index again and checks its signature",
+                                subtitle = null,
                                 run = { ctx, onStatus -> AppCatalogs.refresh(ctx, record, null, onStatus) },
                             ),
                         )
@@ -237,20 +237,20 @@ object AppCatalogScreen {
                     TextInputItem(
                         id = "apps_sources_address_$id",
                         title = "Address",
-                        subtitle = "The source's address or link, with its fingerprint when you have it",
+                        subtitle = "Address or link",
                         value = addresses[id].orEmpty(),
                         onChange = { _, v -> addresses[id] = v.trim() },
                     ),
                     AsyncActionItem(
                         id = "apps_sources_fetch_$id",
                         title = "Fetch this source",
-                        subtitle = "Shows its name, key and apps; nothing is added until you accept",
+                        subtitle = null,
                         run = { ctx, onStatus -> fetchReview(ctx, record, addresses[id].orEmpty(), onStatus) },
                     ),
                     DocumentPickItem(
                         id = "apps_sources_qr_$id",
                         title = "Read a QR code",
-                        subtitle = "A photo or screenshot of the source's QR code",
+                        subtitle = null,
                         mimeType = "image/*",
                         onPicked = { ctx, uri ->
                             val text = PluginCatalogSources.qrText(ctx, uri)
@@ -358,7 +358,7 @@ object AppCatalogScreen {
                             ToggleItem(
                                 id = "apps_source_enabled",
                                 title = "Use this source",
-                                subtitle = "Off: its apps are not listed or offered as updates, and it is kept",
+                                subtitle = null,
                                 current = fresh.enabled,
                                 onToggle = { ctx, value ->
                                     AppCatalogs.quick(ctx, record, "set_source_enabled", JSONObject().put("source", fresh.id).put("enabled", value), "Done")
@@ -370,7 +370,7 @@ object AppCatalogScreen {
                             AsyncActionItem(
                                 id = "apps_source_refresh",
                                 title = "Refresh",
-                                subtitle = "Fetches its index again and checks its signature",
+                                subtitle = null,
                                 run = { ctx, onStatus -> AppCatalogs.refresh(ctx, record, fresh.id, onStatus) },
                             ),
                         )
@@ -378,7 +378,7 @@ object AppCatalogScreen {
                             AsyncActionItem(
                                 id = "apps_source_remove",
                                 title = "Remove this source",
-                                subtitle = "Its apps are no longer listed or updated from it. Apps you installed stay",
+                                subtitle = "Installed apps stay",
                                 confirmTitle = "Remove \"${fresh.name}\"?",
                                 run = { ctx, _ ->
                                     val message = AppCatalogs.quick(ctx, record, "remove_source", JSONObject().put("source", fresh.id), "Removed ${fresh.name}")

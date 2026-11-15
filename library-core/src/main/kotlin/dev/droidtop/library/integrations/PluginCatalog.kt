@@ -123,7 +123,7 @@ object PluginCatalog {
             Load(
                 cached,
                 if (cached != null) {
-                    "The refresh just failed (${describe(failure)}); this is the copy fetched earlier."
+                    "Refresh failed (${describe(failure)}); showing the earlier copy"
                 } else {
                     "Couldn't load the catalog: ${describe(failure)}."
                 },
@@ -150,15 +150,15 @@ object PluginCatalog {
         try {
             val parsed = fetchAndCache(context, source)
             noteRefresh(context, source, null)
-            "Catalog up to date: ${parsed.origins.sumOf { it.plugins.size }} plugin(s) listed."
+            "Up to date"
         } catch (failure: Exception) {
             // Kept for Updates (Droidtop/tracker#882): a catalog refused on every check left its plugins at the copy
             // fetched before, and Updates showed no row and no reason. A plain "no network" is not worth a row.
             if (failure !is NotPublished && failure !is java.io.IOException) noteRefresh(context, source, describe(failure))
             if (lastGoodIndex(context, source) != null) {
-                "Couldn't refresh (${describe(failure)}); the copy fetched earlier is still on file."
+                "Refresh failed (${describe(failure)})"
             } else if (failure is NotPublished) {
-                "No plugin catalog is published yet. A plugin file can still be installed from the Plugins screen."
+                "Nothing published yet"
             } else {
                 "Couldn't load the catalog: ${describe(failure)}."
             }
@@ -427,7 +427,7 @@ object PluginCatalog {
             result.ok -> result.values["summary"].orEmpty().let { InstallOutcome(!it.startsWith(NOT_INSTALLED), it) }
             // A catalog bundle gets no shortcut past its hash: a mismatch is never installed.
             result.error == DownloadJobs.DIGEST_MISMATCH ->
-                InstallOutcome(false, "The downloaded bundle doesn't match the catalog's own hash for it -- not installed")
+                InstallOutcome(false, "Download doesn't match the catalog's hash; not installed")
             else -> InstallOutcome(false, "Couldn't download ${plugin.label}: ${result.error}")
         }
     }
@@ -472,20 +472,20 @@ object PluginCatalog {
         val (fresh, skipped) = freshListings(context, only)
         val notes = if (skipped.isEmpty()) "" else " Not compared: ${skipped.joinToString("; ")}."
         if (fresh.isEmpty()) {
-            return@withContext if (skipped.isEmpty()) "No plugin catalog is published yet, so there is nothing to update from." else "Nothing was compared or updated.$notes"
+            return@withContext if (skipped.isEmpty()) "Nothing published yet" else "Nothing was compared or updated.$notes"
         }
         val updates = offersFor(PluginStore.installed(context), fresh, userKeys(context))
-        if (updates.isEmpty()) return@withContext "Everything installed is up to date.$notes"
+        if (updates.isEmpty()) return@withContext "Up to date$notes"
         val failures = mutableListOf<String>()
         updates.forEachIndexed { i, (record, offer) ->
-            onStatus("Updating ${record.manifest.label} (${i + 1}/${updates.size})...")
+            onStatus("Updating ${i + 1}/${updates.size}")
             val outcome = installOutcome(context, offer.plugin, offer.release) { status -> onStatus("${record.manifest.label}: $status") }
             if (!outcome.installed) {
                 failures.add("${record.manifest.label}: ${outcome.line}")
             }
         }
         if (failures.isEmpty()) {
-            "Updated ${updates.size} plugin${if (updates.size == 1) "" else "s"}: ${updates.joinToString(", ") { it.first.manifest.label }}.$notes"
+            "Updated ${updates.size}$notes"
         } else {
             "Updated ${updates.size - failures.size} of ${updates.size}: ${failures.joinToString("; ")}.$notes"
         }
@@ -544,10 +544,10 @@ object PluginCatalog {
         val listing = fresh.firstOrNull()
             ?: return@withContext if (skipped.isEmpty()) "Nothing is published in ${source.name} yet." else "Couldn't load ${source.name}: ${skipped.joinToString("; ")}."
         val todo = installable(listing.source, listing.index, PluginStore.installed(context), userKeys(context))
-        if (todo.isEmpty()) return@withContext "Everything ${source.name} offers is already installed."
+        if (todo.isEmpty()) return@withContext "All installed"
         val failures = mutableListOf<String>()
         todo.forEachIndexed { i, (plugin, release) ->
-            onStatus("Installing ${plugin.label} (${i + 1}/${todo.size})...")
+            onStatus("Installing ${i + 1}/${todo.size}")
             val outcome = installOutcome(context, plugin, release) { status -> onStatus("${plugin.label}: $status") }
             if (!outcome.installed) failures.add("${plugin.label}: ${outcome.line}")
         }
@@ -555,7 +555,7 @@ object PluginCatalog {
         val names = todo.map { it.first.label }.filter { label -> failures.none { it.startsWith("$label:") } }
         buildString {
             if (done > 0) {
-                append("Installed $done plugin${if (done == 1) "" else "s"}: ${names.joinToString(", ")}. Open Plugins to approve them before they run.")
+                append("Installed $done. Approve them in Plugins")
             }
             if (failures.isNotEmpty()) {
                 if (done > 0) append(' ')
@@ -747,7 +747,7 @@ object PluginCatalog {
                 "That isn't a catalog address. Use the catalog's GitHub repository (https://github.com/<owner>/<repo>) " +
                     "or the https address of its index.json; plain http is refused",
             )
-        if (url == indexUrl(context)) return@withContext ProposeResult.Failed("That is droidtop's own catalog, which is always there")
+        if (url == indexUrl(context)) return@withContext ProposeResult.Failed("That's droidtop's own catalog")
         val text = try {
             PlatformDatabaseTransport.getOrNull(url, token(context))
         } catch (failure: Exception) {

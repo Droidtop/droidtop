@@ -640,7 +640,7 @@ object ActionLinks {
     fun screen(): CatalogScreen = CatalogScreen(
         id = SCREEN_ID,
         title = "Open a droidtop link",
-        subtitle = "A link asks droidtop to do the steps below. Approve or deny each; nothing runs before Run",
+        subtitle = "Approve or deny each step; nothing runs before Run",
         groups = { _ ->
             val current = plan
             if (current == null) {
@@ -740,7 +740,7 @@ object ActionLinks {
                 AsyncActionItem(
                     id = "links_actions_run_${plan.serial}",
                     title = if (toRun == 0) "Nothing to run" else "Run the approved steps",
-                    subtitle = if (noticeSteps.isEmpty()) null else "Opens once you have read the notice above",
+                    subtitle = if (noticeSteps.isEmpty()) null else "Read the notice first",
                     gate = if (noticeSteps.isEmpty()) null else gate,
                     confirmTitle = "Run $toRun step${if (toRun == 1) "" else "s"} of this link?",
                     run = { ctx, onStatus ->

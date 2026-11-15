@@ -55,10 +55,10 @@ enum class PcScraperSource(val key: String, val label: String) {
     LUTRIS("lutris", "Lutris (no account needed)"),
 
     /** Needs the user's own free Twitch/IGDB credentials, and in exchange returns descriptions, developer, publisher, genre, series and links. */
-    IGDB("igdb", "IGDB (needs your own free API credentials)"),
+    IGDB("igdb", "IGDB (needs a free key)"),
 
     /** Needs the user's own free SteamGridDB key. Names and art only: its text comes from IGDB and the Steam store. */
-    STEAMGRIDDB("steamgriddb", "SteamGridDB (needs your own free API key)"),
+    STEAMGRIDDB("steamgriddb", "SteamGridDB (needs a free key)"),
 }
 
 object PcScraperSourcePrefs {
@@ -543,7 +543,7 @@ object PcScraper {
         // [PcScraperSourcePrefs.key] stores a choice. The setting is left as it is.
         using: String? = null,
     ): String = withContext(Dispatchers.IO) {
-        if (entries.isEmpty()) return@withContext "PC and engine games: none in the library."
+        if (entries.isEmpty()) return@withContext "No PC or engine games"
         val key = using ?: PcScraperSourcePrefs.key(context)
         ScraperReadiness.pcSourceProblem(context, key)?.let { return@withContext it }
         // A metadata plugin chosen as the source is the one source the pass asks (Droidtop/tracker#67): no built-in
@@ -553,7 +553,7 @@ object PcScraper {
         val wantMetadata = ScrapeOptionsPrefs.scrapeMetadata(context)
         val wantArtwork = ScrapeOptionsPrefs.scrapeArtwork(context)
         if (!wantMetadata && !wantArtwork) {
-            return@withContext "Both content types are disabled in scrape options."
+            return@withContext "Nothing to fetch: both types are off"
         }
 
         val dao = RomDatabase.get(context).romDao()
@@ -575,7 +575,7 @@ object PcScraper {
         val (candidates, unchanged) = afterCheckpoint.partition { entry -> remembered[entry.id] != searchTitleFor(entry) }
         for (entry in unchanged) {
             dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc]: not asked, the last answer under this name stands")
-            reported(entry, Outcome.SKIPPED, "Not asked again: the last answer under this name stands")
+            reported(entry, Outcome.SKIPPED, "Already answered")
         }
         val (targets, passedOver) = candidates.partition { entry ->
             val row = existing[entry.id]
@@ -589,9 +589,9 @@ object PcScraper {
         }
         if (targets.isEmpty()) {
             return@withContext if (resumeAfter != null && candidates.isEmpty()) {
-                "PC and engine games: nothing was left to scrape."
+                "Nothing left to scrape"
             } else {
-                "PC and engine games: nothing matches the \"${filter.label}\" scrape filter."
+                "Nothing matches \"${filter.label}\""
             }
         }
 
