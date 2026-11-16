@@ -17440,6 +17440,13 @@ identity line.
   extender, else the first `.bat`. A program alone in its folder, and
   anything directly in the system folder, stays an entry of its own
   (`RomScanWalk.folderGames`, in the one walk, so the scraper agrees).
+  A game unpacked a level down (`DOOM2/GAME/` with `DOOM2/AUTOEXEC.BAT`) is
+  its outer folder: the game folder climbs while its parent is not the
+  system folder and holds no other game's programs, so a letter folder of
+  several games stays several games. The files a game folder takes in are
+  dropped from the library on the next scan, not kept as missing
+  (`ScanStep.Segment.gone`); a file that is no longer there is still kept,
+  marked missing.
 - **An archive is an entry as it is.** Emulators read `.zip` and `.7z`
   themselves, so droidtop never extracts one. Identity for a
   single-file `.zip` is the inner file's CRC32, read from the archive's

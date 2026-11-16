@@ -538,6 +538,7 @@ class ConsoleRomProvider(
                                             root = root.absolutePath,
                                             entries = folderEntries,
                                             folderMtime = unitStamp(unit, folderEntries.map { it.id }, walkStartedAt),
+                                            gone = unit.folders.flatMap { absorbedByFolder[it.absolutePath].orEmpty() },
                                         ),
                                     )
                                     if (pauseMs > 0) delay(pauseMs)
@@ -647,6 +648,12 @@ class ConsoleRomProvider(
     }
 
     /** Every ROM of [unit]'s system under [unit]'s folders, each folder budgeted on its own. */
+    /**
+     * Per system folder, the files its last walk folded into a game folder (RomScanResult.absorbed,
+     * Droidtop/tracker#931), for the index to drop rather than keep as missing.
+     */
+    private val absorbedByFolder = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
+
     private suspend fun scanSystemUnit(unit: SystemUnit): List<LibraryEntry> =
         unit.folders.flatMap { folder -> scanSystemFolder(folder, unit.system) }
 
@@ -691,6 +698,7 @@ class ConsoleRomProvider(
         // The BIOS names the walk leaves out are the database's: loaded once (cached), before the first walk.
         BiosDatabase.all(context)
         val romScan = RomScanWalk.walk(systemFolder, system.extensions) { ScanBudget.start(folderBudgetMs) }
+        absorbedByFolder[systemFolder.absolutePath] = romScan.absorbed.map { it.absolutePath }
         val romFiles = romScan.files
         // Real, genuine file detection beyond what either ES-DE or EmuDeck
         // actually do (both confirmed this session to be purely

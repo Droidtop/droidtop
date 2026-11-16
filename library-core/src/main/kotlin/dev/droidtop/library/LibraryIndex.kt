@@ -48,6 +48,11 @@ sealed interface ScanStep {
         val entries: List<LibraryEntry> = emptyList(),
         val folderMtime: Long? = null,
         val complete: Boolean = false,
+        /**
+         * Ids this walk no longer lists on purpose though their files are still there (a file that gave way to its
+         * game folder's main program, Droidtop/tracker#931): dropped from the part, never kept as missing.
+         */
+        val gone: List<String> = emptyList(),
     ) : ScanStep
 
     /**
@@ -134,8 +139,13 @@ data class LibrarySlice(val segments: List<ScanStep.Segment> = emptyList()) {
         val found = walked.entries.mapTo(HashSet()) { it.id }
         // A complete answer drops what it no longer lists, and with it the
         // missing rows earlier answers left.
-        val stillMissing = if (walked.complete) emptyList() else previous?.entries.orEmpty().filterNot { it.id in found }.map { it.asMissing() }
-        val merged = walked.copy(entries = walked.entries + stillMissing, complete = false)
+        val gone = walked.gone.toHashSet()
+        val stillMissing = if (walked.complete) {
+            emptyList()
+        } else {
+            previous?.entries.orEmpty().filterNot { it.id in found || it.id in gone }.map { it.asMissing() }
+        }
+        val merged = walked.copy(entries = walked.entries + stillMissing, complete = false, gone = emptyList())
         return if (previous == null) {
             copy(segments = segments + merged)
         } else {

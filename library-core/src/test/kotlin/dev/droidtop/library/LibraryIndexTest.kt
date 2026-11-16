@@ -376,4 +376,14 @@ class LibraryIndexTest {
         }
         assertEquals(0, provider.scans)
     }
+
+    @Test
+    fun `a file the walk folded into a game folder is dropped, not kept missing (tracker 931)`() {
+        val before = LibrarySlice().merge(ScanStep.Segment("dos", "/g", listOf(game("/g/dos/DOOM2/GAME/FDOOM.EXE"), game("/g/dos/DOOM2/AUTOEXEC.BAT"), game("/g/dos/OLD.EXE"))))
+        val after = before.merge(ScanStep.Segment("dos", "/g", listOf(game("/g/dos/DOOM2/GAME/FDOOM.EXE")), gone = listOf("/g/dos/DOOM2/AUTOEXEC.BAT")))
+        val rows = after.entries().associateBy { it.id }
+        assertEquals(setOf("/g/dos/DOOM2/GAME/FDOOM.EXE", "/g/dos/OLD.EXE"), rows.keys)
+        // A file that is gone from the folder is still kept, marked missing.
+        assertEquals(true, rows.getValue("/g/dos/OLD.EXE").missing)
+    }
 }

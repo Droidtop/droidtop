@@ -56,6 +56,26 @@ class FolderGamesTest {
     }
 
     @Test
+    fun aGameUnpackedOneLevelDownIsItsOuterFolder() {
+        val dos = temp.newFolder("dos")
+        val doom2 = File(dos, "DOOM2")
+        write(doom2, "AUTOEXEC.BAT")
+        write(doom2, "GAME/FDOOM.EXE", 700_000)
+        write(doom2, "GAME/FDSETUP.EXE", 90_000)
+        // A letter folder of two games stays two games.
+        write(dos, "K/Keen/KEEN1.EXE", 50)
+        write(dos, "K/Keen/SETUP.EXE", 40)
+        write(dos, "K/Kroz/KROZ.EXE", 50)
+        write(dos, "K/Kroz/INSTALL.EXE", 40)
+
+        val scan = RomScanWalk.walk(dos, dosExtensions)
+        val listed = scan.files.map { it.relativeTo(dos).path.replace('\\', '/') }
+        assertEquals(listOf("DOOM2/GAME/FDOOM.EXE", "K/Keen/KEEN1.EXE", "K/Kroz/KROZ.EXE"), listed)
+        assertEquals(doom2, scan.folderOf[File(doom2, "GAME/FDOOM.EXE")])
+        assertEquals(listOf("DOOM2/AUTOEXEC.BAT", "DOOM2/GAME/FDSETUP.EXE"), scan.absorbed.map { it.relativeTo(dos).path.replace('\\', '/') }.filter { it.startsWith("DOOM2/") }.sorted())
+    }
+
+    @Test
     fun filesDirectlyInTheSystemFolderStayEntriesOfTheirOwn() {
         val dos = temp.newFolder("dos")
         write(dos, "ONE.EXE")

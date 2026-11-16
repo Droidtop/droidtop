@@ -117,6 +117,8 @@ object RomScanWalk {
         val stoppedAt: File? = null,
         // Each game folder's main program and its folder ([folderGames]): the entry is named after the folder.
         val folderOf: Map<File, File> = emptyMap(),
+        // Files still there that gave way to their game folder's main program ([folderGames]): not games, not missing.
+        val absorbed: List<File> = emptyList(),
     )
 
     /**
@@ -182,7 +184,7 @@ object RomScanWalk {
         }
         if (extensions == null) return RomScanResult(files.sortedBy { it.absolutePath }, skipped, stoppedAt)
         val games = folderGames(files.minus(namedDiscs(files) { readLinesOrNull(it) }), systemFolder)
-        return RomScanResult(games.files.sortedBy { it.absolutePath }, skipped, stoppedAt, games.folderOf)
+        return RomScanResult(games.files.sortedBy { it.absolutePath }, skipped, stoppedAt, games.folderOf, games.absorbed)
     }
 
     /**
@@ -227,23 +229,28 @@ object RomScanWalk {
      * program ([mainProgram]), which the folder names. A program alone in its folder, and anything directly in the
      * system folder, stays an entry of its own. Pure, for the JVM tests.
      */
-    data class FolderGames(val files: List<File>, val folderOf: Map<File, File>)
+    data class FolderGames(val files: List<File>, val folderOf: Map<File, File>, val absorbed: List<File> = emptyList())
 
     fun folderGames(files: List<File>, systemFolder: File): FolderGames {
         val root = key(systemFolder)
         val programsByFolder = files.filter { it.extension.lowercase() in PROGRAMS }.groupBy { it.parentFile }
+        val programs = files.filter { it.extension.lowercase() in PROGRAMS }
         // The outermost folders with two or more programs: a game's own subfolders (SETUP/, SOUND/) belong to it.
-        val gameFolders = programsByFolder.filter { (folder, programs) -> folder != null && key(folder) != root && programs.size >= 2 }
-            .keys.filterNotNull().sortedBy { key(it).length }
+        val found = programsByFolder.filter { (folder, list) -> folder != null && key(folder) != root && list.size >= 2 }
+            .keys.filterNotNull()
+            // A game unpacked one level down (DOOM2/GAME/ with DOOM2/AUTOEXEC.BAT beside it, rig AVD dev.3333) is its
+            // outer folder: climb while the parent is not the system folder and holds no program of another game.
+            .map { folder -> climb(folder, systemFolder, programs) }
+        val gameFolders = found.distinctBy { key(it) }.sortedBy { key(it).length }
             .fold(mutableListOf<File>()) { kept, folder -> if (kept.none { isUnder(folder, it) }) kept += folder; kept }
         if (gameFolders.isEmpty()) return FolderGames(files, emptyMap())
         val folderOf = HashMap<File, File>()
         val mains = gameFolders.associateWith { folder ->
-            mainProgram(files.filter { it.extension.lowercase() in PROGRAMS && it.parentFile == folder }, folder.name)
+            mainProgram(programs.filter { isUnder(it.parentFile, folder) }, folder.name)
         }
         mains.forEach { (folder, main) -> folderOf[main] = folder }
         val kept = files.filter { file -> gameFolders.none { isUnder(file.parentFile, it) } || file in folderOf }
-        return FolderGames(kept, folderOf)
+        return FolderGames(kept, folderOf, files - kept.toSet())
     }
 
     /**
@@ -272,6 +279,21 @@ object RomScanWalk {
         "(?:[a-z]{0,4}setup[a-z0-9]*|set(?:snd|sound|up)[a-z0-9]*|install[a-z0-9]*|uninst[a-z0-9]*|config(?:ure)?[a-z0-9]*|" +
             "autoexec|readme[a-z0-9]*|info|help[a-z0-9]*|sound[0-9]*|dos4gw|dos32a|cwsdpmi|pmodew|dpmi[a-z0-9]*)",
     )
+
+    /**
+     * [folder], or the highest folder above it, short of [systemFolder], whose programs are all [folder]'s own or lie
+     * directly in it: a letter folder holding several games (A/<game>/...) stops the climb.
+     */
+    private fun climb(folder: File, systemFolder: File, programs: List<File>): File {
+        var current = folder
+        while (true) {
+            val parent = current.parentFile ?: return current
+            if (key(parent) == key(systemFolder) || !isUnder(parent, systemFolder)) return current
+            val others = programs.filter { isUnder(it.parentFile, parent) && !isUnder(it.parentFile, current) && it.parentFile != parent }
+            if (others.isNotEmpty()) return current
+            current = parent
+        }
+    }
 
     private fun isUnder(folder: File?, ancestor: File): Boolean {
         val a = key(ancestor)
