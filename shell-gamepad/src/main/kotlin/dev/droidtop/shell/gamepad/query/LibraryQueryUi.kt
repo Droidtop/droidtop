@@ -830,7 +830,7 @@ internal fun LibrarySearchDialog(
                         SearchLine.Entry(
                             "waiting",
                             UnavailableSource.waitingTitle(waiting),
-                            subtitle = if (waiting.singleOrNull()?.askable == true) "Press to allow it to get games" else UnavailableSource.waitingSubtitle(waiting),
+                            subtitle = if (waiting.singleOrNull()?.askable == true) "Not allowed to get games yet" else UnavailableSource.waitingSubtitle(waiting),
                         ) {
                             // One source missing only the library.sources point: ask here, and search again once allowed (Droidtop/tracker#270).
                             val ask = waiting.singleOrNull()?.takeIf { it.askable }
