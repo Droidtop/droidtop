@@ -355,18 +355,47 @@ object AppSelfUpdate {
         // from this source" and droidtop never learned why (rig,
         // dq-shell2-01). Ask first, and open the one screen that fixes it.
         if (!context.packageManager.canRequestPackageInstalls()) {
-            runCatching {
-                dev.droidtop.runtime.systemstatus.SettingsLaunch.start(
-                    context,
-                    Intent(
-                        android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                        android.net.Uri.parse("package:" + context.packageName),
-                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
-            }
+            val allow = Intent(
+                android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                android.net.Uri.parse("package:" + context.packageName),
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // In front (the Check now row) the screen opens. From the background (the UPDATE_NOW broadcast, the
+            // scheduled pass) Android refuses to start it, so a notification opens it instead (Droidtop/tracker#951).
+            runCatching { dev.droidtop.runtime.systemstatus.SettingsLaunch.start(context, allow) }
+            notifyAllowInstalls(context, allow)
             throw IllegalStateException(UNKNOWN_APPS_BLOCKED)
         }
     }
+
+    /** One notification whose tap opens droidtop's "Install unknown apps" screen; quietly none without the grant. */
+    private fun notifyAllowInstalls(context: Context, allow: Intent) {
+        runCatching {
+            val manager = context.getSystemService(android.app.NotificationManager::class.java) ?: return
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+                context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) return
+            manager.createNotificationChannel(
+                android.app.NotificationChannel(ALLOW_CHANNEL_ID, "Updates", android.app.NotificationManager.IMPORTANCE_DEFAULT),
+            )
+            val open = android.app.PendingIntent.getActivity(
+                context, ALLOW_NOTIFICATION_ID, allow,
+                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            manager.notify(
+                ALLOW_NOTIFICATION_ID,
+                android.app.Notification.Builder(context, ALLOW_CHANNEL_ID)
+                    .setContentTitle("Allow droidtop to install updates")
+                    .setContentText("Turn on Allow from this source")
+                    .setSmallIcon(dev.droidtop.app.R.drawable.ic_launcher_monochrome)
+                    .setAutoCancel(true)
+                    .setContentIntent(open)
+                    .build(),
+            )
+        }
+    }
+
+    private const val ALLOW_CHANNEL_ID = "updates_available" // the same Updates channel as UpdateChecks
+    private const val ALLOW_NOTIFICATION_ID = 4711
 
     /**
      * Verifies [apk] against the digest published in release-info.json and
@@ -389,9 +418,8 @@ object AppSelfUpdate {
 
     /** What the person reads when Android has not allowed droidtop to install its own updates. */
     const val UNKNOWN_APPS_BLOCKED =
-        "Android has not allowed droidtop to install updates. In the screen that opened (Settings > Apps > " +
-            "Special app access > Install unknown apps > droidtop), turn on \"Allow from this source\", " +
-            "then press Check now again."
+        "Couldn't install: Android doesn't allow droidtop to install updates yet. Turn on Allow from this source, " +
+            "from the notification or Android's Install unknown apps, then check again."
 
     /**
      * The installer's answer on [sessionId] (installed, cancelled, refused), so the Check now row reports what
