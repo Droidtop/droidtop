@@ -143,7 +143,24 @@ jobs:
         # library-core — that narrower scope meant roughly 30% of this repo's test methods had never once run in
         # CI. Add the module here the moment it grows its first test; the step above fails when one is missing.
         if: always()
-        run: ./gradlew :app:testDebugUnitTest :shell-default:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :input-mapping:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :input-japanese:testDebugUnitTest :input-chinese:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :plugin-host-testing:testDebugUnitTest :sandbox-host:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest :net-core:testDebugUnitTest :shell-desktop:testDebugUnitTest :runtime-linux-root:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :shell-default:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :input-mapping:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :input-japanese:testDebugUnitTest :input-chinese:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :plugin-host-testing:testDebugUnitTest :sandbox-host:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest :net-core:testDebugUnitTest :shell-desktop:testDebugUnitTest :runtime-linux-root:testDebugUnitTest -PcomposeReports --stacktrace
+
+      - name: Compose stability
+        # Droidtop/tracker#941: how many composables can skip when their inputs are unchanged, and how many classes
+        # Compose counts as unstable, per module, from the reports the test build above wrote (-PcomposeReports). A
+        # composable that can't skip redraws with its parent, so the totals are the redraw cost as a number per build.
+        if: always()
+        run: python3 -I scripts/compose-stability.py --variant debug --list
+
+      - name: Upload Compose reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compose-reports
+          path: |
+            */build/compose-reports/
+            */build/compose-metrics/
+          if-no-files-found: ignore
 
       # droidtop's native library (native/, docs/SPEC.md 7o): format, lints and its tests on the runner,
       # including the mesh test against droidtop-agent's real service. The Android builds are android-setup's.

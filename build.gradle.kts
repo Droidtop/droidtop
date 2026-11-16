@@ -7,6 +7,23 @@ plugins {
     // scan cache) -- was already declared in the version catalog but
     // unused until now.
     alias(libs.plugins.google.ksp) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+}
+
+// Compose compiler reports, with -PcomposeReports (Droidtop/tracker#941): for each module that uses Compose, which
+// composables can skip when their inputs are unchanged and which classes Compose counts as unstable, the reason a
+// screen redraws whole when one value changes. Written to <module>/build/compose-reports and compose-metrics;
+// scripts/compose-stability.py totals them, and Android checks prints the totals on every run.
+if (providers.gradleProperty("composeReports").isPresent) {
+    subprojects {
+        val module = this
+        plugins.withId("org.jetbrains.kotlin.plugin.compose") {
+            module.extensions.configure<org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension> {
+                reportsDestination.set(module.layout.buildDirectory.dir("compose-reports"))
+                metricsDestination.set(module.layout.buildDirectory.dir("compose-metrics"))
+            }
+        }
+    }
 }
 
 // One Compose for every module (Droidtop/tracker#566): a module compiled against an older Compose than the app ships
