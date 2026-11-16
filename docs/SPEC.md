@@ -2483,6 +2483,10 @@ differ only in the `RootfsUnpacker` that writes the tree.
   toybox would look up in Android's own user table; no pax headers; no
   extended attributes, so file capabilities are not carried). Each layer is
   hashed as it is read and a mismatch fails the unpack and deletes the blob.
+  A layer is read as gzip, zstd (`tar+zstd`, through the aircompressor
+  decoder droidtop already carries) or plain tar by its first bytes
+  (`OciFlattener.uncompressed`, Droidtop/tracker#950); zstd layers used to
+  fail the unpack.
   Off-device, alpine, debian:bookworm-slim and python:3.12-slim flattened
   through it and extracted by toybox 0.8.14 as root matched `crane export`
   extracted by GNU tar path for path (mode, uid, link count, symlink

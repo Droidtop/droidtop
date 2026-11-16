@@ -46,6 +46,9 @@ android {
 
 dependencies {
     implementation(project(":net-core"))
+    // zstd OCI layers (OciFlattener.uncompressed, Droidtop/tracker#950): the pure-Java decoder
+    // :runtime-linux-noroot and :shell-default already use, at the same version.
+    implementation("com.github.alesimula:murine-aircompressor:2.0.9")
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)

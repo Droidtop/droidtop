@@ -197,4 +197,21 @@ class OciFlattenerTest {
         assertEquals("long", names[longName])
         assertEquals("/" + "t".repeat(150), names["s"])
     }
+
+    @Test
+    fun `a layer is read as gzip, zstd or plain tar by its first bytes`() {
+        val text = "hello layer".toByteArray()
+        // A zstd frame by hand (RFC 8878): magic, a header with Single_Segment set and a one-byte content size, then
+        // one raw last block holding the bytes as they are.
+        val blockHeader = 1 or (text.size shl 3)
+        val zstd = byteArrayOf(0x28, 0xb5.toByte(), 0x2f, 0xfd.toByte(), 0x20, text.size.toByte()) +
+            byteArrayOf(blockHeader.toByte(), (blockHeader shr 8).toByte(), (blockHeader shr 16).toByte()) + text
+        fun read(bytes: ByteArray) = OciFlattener.uncompressed(java.io.BufferedInputStream(ByteArrayInputStream(bytes))).readBytes()
+
+        assertEquals("hello layer", String(read(zstd)))
+        val gzip = ByteArrayOutputStream().also { out -> java.util.zip.GZIPOutputStream(out).use { it.write(text) } }.toByteArray()
+        assertEquals("hello layer", String(read(gzip)))
+        assertEquals("hello layer", String(read(text)))
+        assertEquals("", String(read(ByteArray(0))))
+    }
 }
