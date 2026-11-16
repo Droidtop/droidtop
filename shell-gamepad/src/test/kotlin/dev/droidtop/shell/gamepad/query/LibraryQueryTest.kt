@@ -538,8 +538,6 @@ class LibraryQueryTest {
         assertEquals(listOf(KIND_PC), LibraryFacet.KIND.valuesOf(pc, scope.context))
         assertEquals(listOf(KIND_ENGINE), LibraryFacet.KIND.valuesOf(engine, scope.context))
         assertEquals("Engine", LibraryFacet.KIND.valueLabel(KIND_ENGINE))
-        // No explanation line under the values (Droidtop/tracker#153).
-        assertEquals(null, LibraryFacet.KIND.hint)
         val kindScope = scope.copy(facets = listOf(LibraryFacet.KIND))
         assertTrue(LibraryQuery().facetOffers(listOf(pc, pc.copy(id = "steam:2")), kindScope).isEmpty())
         assertEquals(1, LibraryQuery().facetOffers(listOf(pc, engine), kindScope).size)

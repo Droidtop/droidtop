@@ -2,10 +2,6 @@ package dev.droidtop.shell.gamepad.query
 
 import dev.droidtop.library.settings.words
 import dev.droidtop.shell.gamepad.R
-import dev.droidtop.ui.shared.NoticeCard
-import dev.droidtop.library.settings.NoticePlacement
-import dev.droidtop.library.settings.NoticeTone
-import dev.droidtop.library.settings.Notice
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
@@ -105,7 +101,6 @@ import dev.droidtop.shell.gamepad.ShellDialog
 private sealed interface FilterEntry {
     data class Header(val text: String) : FilterEntry
     /** A line of words under a facet's values (what "Engine" means); not a stop. */
-    data class Note(val text: String) : FilterEntry
     data class Row(
         val title: String,
         val value: String? = null,
@@ -236,7 +231,6 @@ internal fun LibraryFilterSheet(
                         ),
                     )
                 }
-                facet.hint?.let { add(FilterEntry.Note(it)) }
                 facetActions[facet].orEmpty().forEach { add(FilterEntry.Row(it.title, subtitle = it.subtitle, onClick = it.onClick)) }
                 add(
                     FilterEntry.Row(
@@ -309,7 +303,6 @@ internal fun LibraryFilterSheet(
             entries.forEach { entry ->
                 when (entry) {
                     is FilterEntry.Header -> MenuSectionLabel(entry.text)
-                    is FilterEntry.Note -> NoticeCard(Notice(NoticeTone.Info, entry.text), NoticePlacement.Group)
                     is FilterEntry.Row -> MenuRow(
                         title = entry.title,
                         value = entry.value,

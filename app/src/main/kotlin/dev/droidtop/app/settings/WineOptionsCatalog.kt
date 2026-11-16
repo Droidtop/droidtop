@@ -191,7 +191,7 @@ object WineOptionsCatalog {
         return NestedScreenItem(
             id = "wine_options_touchscreen",
             title = "Touchscreen",
-            subtitle = "$summary",
+            subtitle = summary,
             inline = CatalogScreen(
                 id = "wine_options_touchscreen_screen",
                 title = "Touchscreen",

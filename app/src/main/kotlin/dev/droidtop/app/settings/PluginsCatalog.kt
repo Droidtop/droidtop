@@ -1075,7 +1075,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 AsyncActionItem(
                     id = "plugin_${m.id}_update",
                     title = "Version ${m.version}",
-                    subtitle = if (offer.source.official) null else "From \"${offer.source.name}\" (unofficial)",
+                    subtitle = if (offer.source.official) null else "From \"${offer.source.name}\", unofficial",
                     value = "Update to ${offer.release.version}",
                     run = { ctx, onStatus -> PluginCatalog.install(ctx, offer.plugin, offer.release, onStatus) },
                 )

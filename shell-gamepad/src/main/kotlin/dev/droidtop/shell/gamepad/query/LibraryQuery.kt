@@ -163,12 +163,6 @@ enum class LibraryFacet(val key: String, val label: String) {
         else -> value
     }
 
-    /** One line the Filter sheet shows under this facet's values, where its words need saying. */
-    val hint: String?
-        get() = when (this) {
-            else -> null
-        }
-
     /** The order a facet's values are listed in: sources in the registry's order ([PcSource.ORDER]), the rest by name. */
     fun valueOrder(): Comparator<FacetValueCount> = when (this) {
         SOURCE -> compareBy<FacetValueCount, PcSource>(PcSource.ORDER) { PcSource.fromId(it.value) }

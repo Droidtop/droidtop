@@ -539,7 +539,7 @@ internal fun PcGamePage(
                         scrapeRow(entry, scrapeStatus, "the PC sources") { scrape() },
                         // The person's own title for the game (docs/SPEC.md 7n), kept by the library.
                         if (library != null) {
-                            ActionRow("Title", entry.gameName?.takeIf { name -> name.isNotBlank() }?.let { name -> name } ?: "From the folder name") {
+                            ActionRow("Title", entry.gameName?.takeIf { it.isNotBlank() } ?: "From the folder name") {
                                 close()
                                 renaming = true
                             }

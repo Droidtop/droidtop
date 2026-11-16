@@ -355,7 +355,7 @@ object AppSettingsCatalogs {
                         ActionItem(
                             id = "console_systems_no_folders",
                             title = "No console system folders found",
-                            subtitle = "Name a folder after its system (snes, psx, ...)",
+                            subtitle = "Name a folder after its system, e.g. snes or psx",
                         ),
                     )
                 } else {

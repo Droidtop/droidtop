@@ -258,7 +258,7 @@ object PluginCatalogScreen {
                     ),
                 )
                 addAll(noticeItems("plugins_catalogs_proposal_notice", proposal.info.name, false, proposal.disclaimer.text, gate))
-                add(ActionItem(id = "plugins_catalogs_proposal_address", title = proposal.indexUrl.removePrefix("https://"), ))
+                add(ActionItem(id = "plugins_catalogs_proposal_address", title = proposal.indexUrl.removePrefix("https://")))
                 add(
                     ActionItem(
                         id = "plugins_catalogs_proposal_signed",
