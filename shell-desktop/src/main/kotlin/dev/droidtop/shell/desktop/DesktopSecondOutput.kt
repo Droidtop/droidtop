@@ -146,6 +146,8 @@ private fun SecondOutputSurface(
     }
     val sizeTo by rememberUpdatedState(onSurfaceSize)
     var liveHolder by remember(hostBridge) { mutableStateOf<SurfaceHolder?>(null) }
+    // The refresh rate of the display the surface is on, which paces its capture (Droidtop/tracker#950).
+    var liveRefreshRate by remember(hostBridge) { mutableStateOf(0f) }
     var surfaceSize by remember(hostBridge) { mutableStateOf<Triple<Int, Int, Int>?>(null) }
     var presentFailed by remember { mutableStateOf(false) }
     // The output that is presented now, so the surface's end stops exactly that capture.
@@ -160,7 +162,7 @@ private fun SecondOutputSurface(
             presented.set(null)
         }
         if (current != null && outputName != null && presented.get() == null) {
-            presentFailed = !hostBridge.presentOutput(outputName, current.surface)
+            presentFailed = !hostBridge.presentOutput(outputName, current.surface, liveRefreshRate)
             if (!presentFailed) presented.set(outputName)
         }
     }
@@ -179,6 +181,7 @@ private fun SecondOutputSurface(
                     router.attachTo(this)
                     holder.addCallback(object : SurfaceHolder.Callback {
                         override fun surfaceCreated(created: SurfaceHolder) {
+                            liveRefreshRate = this@apply.display?.refreshRate ?: 0f
                             liveHolder = created
                         }
 
