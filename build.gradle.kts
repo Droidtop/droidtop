@@ -22,6 +22,11 @@ if (providers.gradleProperty("composeReports").isPresent) {
                 reportsDestination.set(module.layout.buildDirectory.dir("compose-reports"))
                 metricsDestination.set(module.layout.buildDirectory.dir("compose-metrics"))
             }
+            // A compile restored from the build cache writes no report (the first CI run had only the test
+            // compilations' reports), so with reports on these compiles run.
+            module.tasks.matching { it.name.startsWith("compile") && it.name.endsWith("Kotlin") }.configureEach {
+                outputs.cacheIf { false }
+            }
         }
     }
 }
