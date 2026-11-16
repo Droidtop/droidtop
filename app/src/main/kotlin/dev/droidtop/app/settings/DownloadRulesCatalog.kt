@@ -13,6 +13,7 @@ import dev.droidtop.net.MeteredGrants
 import dev.droidtop.net.NetworkRule
 import dev.droidtop.net.engine.EnginePrefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -153,7 +154,12 @@ object DownloadRulesCatalog {
                         subtitle = "Older ones are in Downloads' Older jobs",
                         options = listOf(ChoiceOption("0", "Until cleared"), ChoiceOption("90", "90 days"), ChoiceOption("30", "30 days")),
                         current = keepDays.toString(),
-                        onSelect = { ctx, value -> dev.droidtop.pluginhost.JobHistory.setKeepDays(ctx, value.toIntOrNull() ?: 0) },
+                        // Written off the main thread, as the other rows here are.
+                        onSelect = { ctx, value ->
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                dev.droidtop.pluginhost.JobHistory.setKeepDays(ctx, value.toIntOrNull() ?: 0)
+                            }
+                        },
                     ),
                 ),
             ),

@@ -224,11 +224,12 @@ object PluginJobsScreen {
                     if (rows.isEmpty()) add(ActionItem(id = "plugin_jobs_history_none", title = "None"))
                     rows.forEach { entry ->
                         add(
-                            ActionItem(
+                            NestedScreenItem(
                                 id = "plugin_jobs_history_${entry.jobId}",
                                 title = entry.title,
                                 subtitle = jobSource(entry) + " · " + outcome(entry),
-                                value = ValueFormat.ago(nowMs, entry.finishedAtMs ?: entry.startedAtMs),
+                                valueLabel = ValueFormat.ago(nowMs, entry.finishedAtMs ?: entry.startedAtMs).let { ago -> { _: Context -> ago } },
+                                inline = archivedPage(entry),
                             ),
                         )
                     }
@@ -256,7 +257,37 @@ object PluginJobsScreen {
             }
         },
         onLeave = { historyLimit.value = HISTORY_PAGE },
-        live = kotlinx.coroutines.flow.merge(shownKind, historyLimit, historyChanges, JobHistory.count),
+        // combine, not merge: it gives one value for the four on subscription, which the navigator skips as the one the
+        // page was built from, where merge gave four and the page loaded three times on opening.
+        live = kotlinx.coroutines.flow.combine(shownKind, historyLimit, historyChanges, JobHistory.count) { _, _, _, _ -> },
+    )
+
+    /**
+     * An archived job's page, read only: how it ended, Open (what it made, when that is still there), and what it did.
+     * A job in history is not one the jobs center runs any more, so it has no Retry and no Clear (Clear older jobs
+     * clears history).
+     */
+    private fun archivedPage(entry: PluginJobsCenter.Entry): CatalogScreen = CatalogScreen(
+        id = "plugin_jobs_history_page_${entry.jobId}",
+        title = entry.title,
+        groups = { _ ->
+            val jobId = entry.jobId
+            val items = buildList<CatalogItem> {
+                add(
+                    ActionItem(
+                        id = "plugin_job_${jobId}_outcome",
+                        title = if (entry.state == JobState.FAILED) "Failed" else "Finished",
+                        subtitle = listOfNotNull(outcome(entry), reportCounts(entry.report)).joinToString("\n"),
+                    ),
+                )
+                entry.open?.takeIf { JobOpen.available }?.let { target ->
+                    add(ActionItem(id = "plugin_job_${jobId}_open", title = JobOpen.label(target), run = { ctx -> JobOpen.open(ctx, target) }))
+                }
+                reportItems(jobId, entry.report).forEach(::add)
+            }
+            listOf(CatalogGroup(id = "plugin_jobs_history_page_${entry.jobId}", title = null, items = items))
+        },
+        indexGroups = { emptyList() },
     )
 
     /** The screen's sections for [snapshot]: Current, Waiting, Paused, Finished, each only when it has a job. */
