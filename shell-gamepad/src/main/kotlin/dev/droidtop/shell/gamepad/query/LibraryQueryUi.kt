@@ -966,7 +966,7 @@ internal fun LibrarySearchDialog(
         @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
         val imeVisible = WindowInsets.isImeVisible
         // A keyboard is up: Android's (an inset), or droidtop's own where it serves this field and the person is typing.
-        val keyboardUp = imeVisible || (typing && dev.droidtop.shell.gamepad.KeyboardTargets.servesField(view.display?.displayId))
+        val keyboardUp = imeVisible || (typing && focusKey == null && dev.droidtop.shell.gamepad.KeyboardTargets.servesField(view.display?.displayId))
         DeclareLayerHints(
             listOf(
                 HintBinding(GamepadAction.A, "Open") { focusKey != null },
