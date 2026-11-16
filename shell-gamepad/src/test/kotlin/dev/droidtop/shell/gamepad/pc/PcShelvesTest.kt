@@ -130,6 +130,7 @@ class PcShelvesTest {
         assertEquals("Mega Drive", shortSystemName("Sega Mega Drive", "megadrive"))
         assertEquals("NES", shortSystemName("Nintendo Entertainment System", "nes"))
         assertEquals("Nintendo 64", shortSystemName("Nintendo 64", "n64"))
+        assertEquals("GBA", shortSystemName("gba", "gba"))
         val steam = game("/steam", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(storeId = "steam:1", installed = true))
         // A Steam-only library reads "PC"; with a second origin the store is named.
         assertEquals("PC", kindBadgeOf(steam, names)?.text)

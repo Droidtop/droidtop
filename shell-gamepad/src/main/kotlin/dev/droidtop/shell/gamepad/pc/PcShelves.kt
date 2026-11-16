@@ -326,7 +326,7 @@ internal fun kindBadgeOf(
         val origin = originLabel(entry, origins, style, roots)
         if (!origin.shown) null else KindBadge(if (isPcKind(entry.kind)) BadgeKind.PC else BadgeKind.ENGINE, origin.detail)
     }
-    else -> KindBadge(BadgeKind.RETRO, entry.systemId?.let { id -> systemNames[id]?.let { shortSystemName(it, id) } ?: id })
+    else -> KindBadge(BadgeKind.RETRO, entry.systemId?.let { id -> shortSystemName(systemNames[id] ?: id, id) })
 }
 
 /** The longest system name a card badge shows whole. */
@@ -341,6 +341,8 @@ private val SYSTEM_MAKERS = listOf("Sony", "Nintendo", "Sega", "Microsoft", "Ata
  * id ("NES"). Pure.
  */
 internal fun shortSystemName(name: String, id: String): String {
+    // A system with no name of its own reads as its id in capitals, as the long ones do (GBA, not gba).
+    if (name == id) return id.uppercase()
     if (name.length <= BADGE_NAME_MAX) return name
     val maker = SYSTEM_MAKERS.firstOrNull { name.startsWith("$it ") }
     val rest = maker?.let { name.removePrefix("$it ") }
