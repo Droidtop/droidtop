@@ -118,7 +118,7 @@ object PluginJobsScreen {
             dev.droidtop.library.settings.NestedScreenItem(
                 id = UPDATES_LINK_ID,
                 title = Place.UPDATES.title,
-                subtitle = "droidtop, plugins, apps and games with a newer version",
+                subtitle = "What has a newer version",
                 valueLabel = { dev.droidtop.library.settings.UpdatesWaiting.line(dev.droidtop.library.settings.UpdatesWaiting.count.value) },
                 registryId = Place.ID_UPDATES,
             ),

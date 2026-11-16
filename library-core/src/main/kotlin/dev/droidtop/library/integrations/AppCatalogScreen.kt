@@ -268,7 +268,7 @@ object AppCatalogScreen {
     }
 
     private suspend fun fetchReview(context: Context, record: PluginRecord, address: String, onStatus: (String) -> Unit): String {
-        if (address.isBlank()) return "Type the source's address first"
+        if (address.isBlank()) return "Enter an address first"
         onStatus("Fetching $address...")
         return AppCatalogs.review(context, record, address).fold(
             onSuccess = { review ->
