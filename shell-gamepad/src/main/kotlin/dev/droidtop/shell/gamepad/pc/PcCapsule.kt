@@ -359,16 +359,17 @@ internal fun PcCapsule(
     if (!hero && nameUnder && art != null && !artFailed) {
         // The owner, 2026-10-17: "A toggle for 'show name under image'" for PC games, "which currently ONLY
         // display the icon". Two lines held for every card, so a row of capsules keeps one height.
+        val name = rememberCardTitle(title)
         Text(
             // Breaks between run-together words, never inside one (Droidtop/tracker#942).
-            cardTitle(title),
+            name.text,
             color = if (selected) MenuTokens.OnSurface else MenuTokens.Value,
             // Body size, not the supporting role's: read from across the room on a handheld.
             style = MaterialTheme.typography.bodyMedium,
             minLines = 2,
             maxLines = 2,
             // One word with nowhere to break ends with an ellipsis on one line, the second line kept for the row's height.
-            softWrap = cardTitleLines(title) > 1,
+            softWrap = name.softWrap,
             overflow = TextOverflow.Ellipsis,
         )
     }

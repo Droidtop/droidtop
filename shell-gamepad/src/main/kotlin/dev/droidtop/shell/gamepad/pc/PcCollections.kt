@@ -235,7 +235,8 @@ private fun CollectionTileCard(tile: CollectionTile, selected: Boolean, onClick:
             .padRow(onClick = onClick, onLongClick = onLongClick)
             .padding(Space.Md),
     ) {
-        Text(cardTitle(tile.name), color = MenuTokens.OnSurface, style = TypeRole.body, maxLines = 2, softWrap = cardTitleLines(tile.name) > 1, overflow = TextOverflow.Ellipsis)
+        val name = rememberCardTitle(tile.name)
+        Text(name.text, color = MenuTokens.OnSurface, style = TypeRole.body, maxLines = 2, softWrap = name.softWrap, overflow = TextOverflow.Ellipsis)
         Text(
             listOfNotNull("%,d %s".format(tile.count, if (tile.count == 1) "game" else "games"), "Tab".takeIf { tile.pinned }).joinToString(" · "),
             color = MenuTokens.OnSurfaceMuted,

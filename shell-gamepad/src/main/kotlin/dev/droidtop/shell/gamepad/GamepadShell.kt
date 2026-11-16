@@ -2187,6 +2187,7 @@ internal fun GameCard(
 ) {
     var focused by remember { mutableStateOf(false) }
     val lift = rememberFocusLift(focused)
+    val name = dev.droidtop.shell.gamepad.pc.rememberCardTitle(dev.droidtop.library.GameNaming.displayName(entry.title))
     val window = LocalShellWindow.current
     Box(
         modifier = modifier
@@ -2290,11 +2291,11 @@ internal fun GameCard(
                     // named after its own class is the longest of all)
                     // never runs past the card into its neighbour's.
                     Text(
-                        dev.droidtop.shell.gamepad.pc.cardTitle(dev.droidtop.library.GameNaming.displayName(entry.title)),
+                        name.text,
                         color = MenuTokens.OnSurface,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 2,
-                        softWrap = dev.droidtop.shell.gamepad.pc.cardTitleLines(dev.droidtop.library.GameNaming.displayName(entry.title)) > 1,
+                        softWrap = name.softWrap,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
@@ -2310,11 +2311,11 @@ internal fun GameCard(
         } else {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Bottom) {
                 Text(
-                    dev.droidtop.shell.gamepad.pc.cardTitle(dev.droidtop.library.GameNaming.displayName(entry.title)),
+                    name.text,
                     color = MenuTokens.OnSurface,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2,
-                    softWrap = dev.droidtop.shell.gamepad.pc.cardTitleLines(dev.droidtop.library.GameNaming.displayName(entry.title)) > 1,
+                    softWrap = name.softWrap,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(

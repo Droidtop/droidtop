@@ -5,7 +5,7 @@ import org.junit.Test
 
 /** A card title breaks between run-together words, never inside one (Droidtop/tracker#942). */
 class CardTitleTest {
-    private val zw = '​'
+    private val zw = '\u200B'
 
     @Test
     fun runTogetherWordsGetABreakWhereEachStarts() {
@@ -20,12 +20,15 @@ class CardTitleTest {
         assertEquals("Hollow Knight", cardTitle("Hollow Knight"))
         assertEquals("DOOM", cardTitle("DOOM"))
         assertEquals("a", cardTitle("a"))
+        // Spaces already give the breaks; a dot or digit inside a spaced title adds none.
+        assertEquals("Mr. Driller", cardTitle("Mr. Driller"))
+        assertEquals("Vol.2 Remix", cardTitle("Vol.2 Remix"))
     }
 
     @Test
     fun aSingleUnbreakableWordUsesOneLine() {
-        assertEquals(1, cardTitleLines("Supercalifragilistic"))
-        assertEquals(2, cardTitleLines("HeartOfTheMachine"))
-        assertEquals(2, cardTitleLines("Hollow Knight"))
+        assertEquals(1, CardTitle.of("Supercalifragilistic").lines)
+        assertEquals(2, CardTitle.of("HeartOfTheMachine").lines)
+        assertEquals(2, CardTitle.of("Hollow Knight").lines)
     }
 }

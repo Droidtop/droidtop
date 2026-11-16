@@ -1,14 +1,18 @@
 package dev.droidtop.shell.gamepad.pc
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+
 /**
  * A card's title as it breaks across its two lines (Droidtop/tracker#942: "HeartOfTheMachine" showed as "HeartOfTheMachin"
  * and an orphaned "e"). A title made of words run together (a folder name in camel case, "HeartOfTheMachine",
  * "Stardew_Valley", "game.v2") gets a break opportunity where each word starts, so the line breaks between words. Nothing
- * visible is added: the opportunity is a zero-width space. One word with nowhere to break stays whole for the
- * renderer to end with an ellipsis ([cardTitleLines]). Pure.
+ * visible is added: the opportunity is a zero-width space. A title that already has spaces breaks at them and is left as
+ * it is ("Mr. Driller", "Vol.2" stay whole). One word with nowhere to break stays whole for the renderer to end with an
+ * ellipsis ([CardTitle.lines]). Pure.
  */
 internal fun cardTitle(title: String): String {
-    if (title.length < 2) return title
+    if (title.length < 2 || title.any { it.isWhitespace() }) return title
     val out = StringBuilder(title.length + 8)
     for (i in title.indices) {
         val c = title[i]
@@ -28,12 +32,24 @@ internal fun cardTitle(title: String): String {
 }
 
 /**
- * How many lines a card's title may use: two where it can break between words, one where it is a single word with no
- * break at all, so it ends with an ellipsis instead of splitting a letter onto the second line. Pure.
+ * A card title ready to draw: [text] with its break opportunities, and [lines], two where it can break between words and
+ * one where it is a single word with no break at all, so it ends with an ellipsis instead of splitting a letter onto the
+ * second line ([softWrap]).
  */
-internal fun cardTitleLines(title: String, max: Int = 2): Int {
-    val breakable = cardTitle(title)
-    return if (breakable.any { it.isWhitespace() || it == ZERO_WIDTH_SPACE }) max else 1
+internal class CardTitle(val text: String, val lines: Int) {
+    val softWrap: Boolean get() = lines > 1
+
+    companion object {
+        /** Pure. */
+        fun of(title: String, max: Int = 2): CardTitle {
+            val text = cardTitle(title)
+            return CardTitle(text, if (text.any { it.isWhitespace() || it == ZERO_WIDTH_SPACE }) max else 1)
+        }
+    }
 }
+
+/** [CardTitle.of], worked out once per title rather than on every frame a card is drawn. */
+@Composable
+internal fun rememberCardTitle(title: String): CardTitle = remember(title) { CardTitle.of(title) }
 
 private const val ZERO_WIDTH_SPACE = '​'
