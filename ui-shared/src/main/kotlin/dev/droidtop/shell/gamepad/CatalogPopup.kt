@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,7 +56,9 @@ fun CatalogPopup(root: CatalogScreen, onExit: () -> Unit) {
                     .clip(MenuTokens.OverlayShape)
                     .background(MenuTokens.OverlaySurface),
             ) {
-                CatalogNavigator(root = root, onExit = onExit)
+                CompositionLocalProvider(LocalWrapHeight provides true) {
+                    CatalogNavigator(root = root, onExit = onExit)
+                }
             }
         }
     }

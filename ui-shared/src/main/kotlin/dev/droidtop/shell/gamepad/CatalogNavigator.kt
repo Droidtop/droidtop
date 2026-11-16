@@ -52,6 +52,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
@@ -1003,9 +1004,10 @@ fun CatalogNavigator(
             )
         }
     }
+    val wrap = LocalWrapHeight.current
     Box(
         modifier = Modifier
-            .fillMaxSize()
+            .then(if (wrap) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
             .onSizeChanged { hostWidth = with(density) { it.width.toDp() } }
             .focusRequester(navFocus)
             .then((noticeHints ?: barHints ?: rowHints)?.let { Modifier.declaresHints(it) } ?: Modifier)
@@ -1100,7 +1102,7 @@ fun CatalogNavigator(
                     )
                     pane(Modifier.weight(1f).fillMaxWidth(), edge)
                 }
-                !categoryMode -> pane(Modifier.fillMaxSize(), edge)
+                !categoryMode -> pane(if (wrap) Modifier.fillMaxWidth() else Modifier.fillMaxSize(), edge)
                 twoPane -> Row(Modifier.fillMaxSize()) {
                     column(Modifier.fillMaxHeight().width(SettingsLayout.columnWidth(hostWidth)))
                     pane(Modifier.weight(1f).fillMaxHeight(), 16.dp)
@@ -1113,6 +1115,12 @@ fun CatalogNavigator(
 }
 
 /** The pane: an optional title, then the rows, grouped under small section labels. */
+/**
+ * True where a catalog screen is as tall as its rows rather than the whole space it is given: a popup over another
+ * screen (CatalogPopup), which stood at its full allowed height for one row (rig, AVD dev.3333, Droidtop/tracker#939).
+ */
+val LocalWrapHeight = staticCompositionLocalOf { false }
+
 @Composable
 private fun CatalogPane(
     title: String?,
@@ -1175,7 +1183,8 @@ private fun CatalogPane(
             // runs to the bottom of the page otherwise: no room left for a bar that is drawn below
             // this view anyway. A row the edge cuts fades out instead of ending in a slice.
             modifier = Modifier
-                .weight(1f)
+                // In a popup the list is as tall as its rows, up to the room it is given (LocalWrapHeight).
+                .weight(1f, fill = !LocalWrapHeight.current)
                 .fillMaxWidth()
                 // Where the list runs up under the floating clock and battery, rows fade out across its height
                 // instead of passing under it with their values hidden (rig, AVD dev.3322).
