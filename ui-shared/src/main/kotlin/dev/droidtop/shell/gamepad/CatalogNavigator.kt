@@ -1155,8 +1155,20 @@ private fun CatalogPane(
     val tip = tipRow?.let { catalogTip(it.item, statusById[it.item.id], confirmArmedId == it.item.id, explanation = !underRows && !narrow) }
         ?: hint?.takeIf { active }
     val reserveTip = hint != null || statusById.isNotEmpty() || rows.any { (!underRows && !narrow && it.item.subtitle != null) || it.item.confirmText != null }
+    // How much of the floating clock and battery hangs below the title (all of it on an untitled pane): the list's
+    // first row starts under that and its top fade spans it. A title is shorter than the pill, so a titled pane's
+    // first row ran under it with its value hidden (rig, AVD dev.3347, Game folders: "8 games (4 ROMs)").
+    val density = LocalDensity.current
+    var headerHeight by remember { mutableStateOf(0.dp) }
+    val clusterBelow = maxOf(0.dp, StatusClusterRoom.size.height - (if (title != null) headerHeight else 0.dp))
     Column(modifier) {
-        if (title != null) MenuHeader(title, iconFile = titleIcon)
+        if (title != null) {
+            MenuHeader(
+                title,
+                iconFile = titleIcon,
+                modifier = Modifier.onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
+            )
+        }
         LazyColumn(
             state = state,
             // The list ends above the explanation strip (when the page has any explanations) and
@@ -1165,16 +1177,15 @@ private fun CatalogPane(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                // Untitled, the list runs up under the floating clock and battery: rows fade out across its height
+                // Where the list runs up under the floating clock and battery, rows fade out across its height
                 // instead of passing under it with their values hidden (rig, AVD dev.3322).
-                .fadingEdges(state, top = if (title == null) maxOf(24.dp, StatusClusterRoom.size.height) else 24.dp),
+                .fadingEdges(state, top = maxOf(24.dp, clusterBelow)),
             contentPadding = PaddingValues(
                 start = startPadding,
                 end = LocalShellWindow.current.edgePadding,
-                // Without a title the first row starts at the window's top edge, under the
-                // floating clock and battery (console, build 1386: the pill sat on "Use droidtop
-                // as home screen"); it starts below the cluster instead (StatusClusterRoom).
-                top = if (title == null) maxOf(12.dp, StatusClusterRoom.size.height) else 12.dp,
+                // The first row starts below the floating clock and battery, not under it (console, build
+                // 1386: the pill sat on "Use droidtop as home screen"; StatusClusterRoom).
+                top = maxOf(12.dp, clusterBelow),
                 bottom = 12.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(MenuTokens.RowSpacing),
