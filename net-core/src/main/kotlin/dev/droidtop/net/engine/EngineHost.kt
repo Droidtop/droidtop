@@ -77,14 +77,35 @@ object EngineHost {
         current?.let { stopQuietly(it) }
         running = null
         rpcEndpoint = null
-        val port = freeLoopbackPort()
-        val started = DownloadEngine(wanted.context, wanted.root, rpc = true, rpcPort = port, androidIsolation = wanted.androidIsolation)
-            .start(mapOf("max-concurrent-downloads" to ENGINE_SLOTS.toString()))
+        // One retry before the person's action fails (Droidtop/tracker#930): at the start of a burst (the first
+        // launch after an install, Update all) the engine's process was refused its lockdown (EALREADY) and died, and
+        // Android restarted the service about a second later; both times a later try worked.
+        var port = freeLoopbackPort()
+        val started = try {
+            startEngine(wanted, port)
+        } catch (first: Exception) {
+            if (first is kotlinx.coroutines.CancellationException) throw first
+            kotlinx.coroutines.delay(START_RETRY_MS)
+            port = freeLoopbackPort()
+            try {
+                startEngine(wanted, port)
+            } catch (second: Exception) {
+                second.addSuppressed(first)
+                throw second
+            }
+        }
         running = started
         root = wanted.root
         isolated = wanted.androidIsolation
         rpcEndpoint = Rpc(port, started.rpcSecret)
     }
+
+    private fun startEngine(wanted: Settings, port: Int): DownloadEngine =
+        DownloadEngine(wanted.context, wanted.root, rpc = true, rpcPort = port, androidIsolation = wanted.androidIsolation)
+            .start(mapOf("max-concurrent-downloads" to ENGINE_SLOTS.toString()))
+
+    /** The pause before the one retry of a failed start: Android brings a crashed service back after about a second. */
+    private const val START_RETRY_MS = 1500L
 
     private fun alive(engine: DownloadEngine): Boolean = try {
         engine.active()
