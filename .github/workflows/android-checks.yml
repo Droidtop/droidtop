@@ -171,6 +171,16 @@ jobs:
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked
+      - name: host-bridge pixel swizzle
+        # The desktop frame's B/R swap (host-bridge/native/src/pixel_swizzle.h, Droidtop/tracker#950): the SSSE3 and the
+        # plain path against the reference, on the runner.
+        if: always()
+        run: |
+          for flags in "-mssse3" ""; do
+            g++ -O2 $flags -I host-bridge/native/src host-bridge/native/test/pixel_swizzle_test.cpp -o /tmp/pixel_swizzle_test
+            /tmp/pixel_swizzle_test
+          done
+
       - name: Plugin conformance (python fixture)
         # docs/plugin-api.md 3 I2 (Droidtop/tracker#71): the python kind's fixture through the same
         # conformance cases the native fixture passes in :plugin-host-testing's ConformanceTest.
