@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -745,6 +746,56 @@ private fun EsDeCarousel(
             placements.forEach { placement ->
                 val item = items.getOrNull(placement.index) ?: return@forEach
                 if (item.logoPath == null) return@forEach
+                // Keyed by the entry, so an item keeps its place in the composition as the carousel moves
+                // (Droidtop/tracker#941).
+                key(item.key) {
+                    EsDeCarouselItem(
+                        item = item,
+                        width = itemWidth,
+                        height = itemHeight,
+                        isFocused = placement.index == focusedIndex && kotlin.math.abs(placement.distance) < 1f,
+                        text = itemTextStyle,
+                        imageCornerRadius = config.imageCornerRadius.dp,
+                        imageColorShift = imageColor,
+                        imageSelectedColorShift = imageSelectedColor,
+                        imageColorShiftEnd = imageColorEnd,
+                        imageSelectedColorShiftEnd = imageSelectedColorEnd,
+                        imageGradientHorizontal = imageGradientHorizontal,
+                        imageSelectedGradientHorizontal = imageSelectedGradientHorizontal,
+                        imageSaturation = placement.saturation ?: config.imageSaturation,
+                        imageBrightness = config.imageBrightness,
+                        dimming = placement.dimming,
+                        imageContentScale = imageFit,
+                        imageCropAlignment = imageCropAlignment,
+                        imageFilterQuality = imageFilterQuality,
+                        onSelect = null,
+                        modifier = Modifier
+                            .placeCarouselItem(placement, itemWidth, itemHeight)
+                            // Applied OUTSIDE the mirror below, deliberately:
+                            // real ES-DE flips the texture, not the geometry,
+                            // so the falloff still fades downward on screen.
+                            .reflectionFalloff(config.reflectionsFalloff)
+                            .graphicsLayer {
+                                // Mirrored, then dropped by exactly one item
+                                // height so it sits directly beneath -- real
+                                // ES-DE's own reflection translation. The
+                                // item scale in that translation comes for
+                                // free from the placement transform this
+                                // sits inside.
+                                alpha = placement.opacity * config.reflectionsOpacity
+                                scaleY = -1f
+                                translationY = size.height
+                            },
+                    )
+                }
+            }
+        }
+
+        placements.forEach { placement ->
+            val item = items.getOrNull(placement.index) ?: return@forEach
+            // Keyed by the entry, so an item keeps its place in the composition as the carousel moves
+            // (Droidtop/tracker#941).
+            key(item.key) {
                 EsDeCarouselItem(
                     item = item,
                     width = itemWidth,
@@ -764,64 +815,22 @@ private fun EsDeCarousel(
                     imageContentScale = imageFit,
                     imageCropAlignment = imageCropAlignment,
                     imageFilterQuality = imageFilterQuality,
-                    onSelect = null,
+                    // Pointer and focus are one selection: a tap moves the
+                    // cursor onto the entry it hit and then acts on it,
+                    // through the carousel's OWN step() -- the same move the
+                    // D-pad makes, with its direction and animation. Before
+                    // this the tap activated the entry while the cursor
+                    // stayed behind on another one, so coming back out of a
+                    // system landed on the wrong entry.
+                    onSelect = {
+                        if (placement.index != focusedIndex) step(placement.index - focusedIndex)
+                        item.onSelect()
+                    },
                     modifier = Modifier
                         .placeCarouselItem(placement, itemWidth, itemHeight)
-                        // Applied OUTSIDE the mirror below, deliberately:
-                        // real ES-DE flips the texture, not the geometry,
-                        // so the falloff still fades downward on screen.
-                        .reflectionFalloff(config.reflectionsFalloff)
-                        .graphicsLayer {
-                            // Mirrored, then dropped by exactly one item
-                            // height so it sits directly beneath -- real
-                            // ES-DE's own reflection translation. The
-                            // item scale in that translation comes for
-                            // free from the placement transform this
-                            // sits inside.
-                            alpha = placement.opacity * config.reflectionsOpacity
-                            scaleY = -1f
-                            translationY = size.height
-                        },
+                        .graphicsLayer { alpha = placement.opacity },
                 )
             }
-        }
-
-        placements.forEach { placement ->
-            val item = items.getOrNull(placement.index) ?: return@forEach
-            EsDeCarouselItem(
-                item = item,
-                width = itemWidth,
-                height = itemHeight,
-                isFocused = placement.index == focusedIndex && kotlin.math.abs(placement.distance) < 1f,
-                text = itemTextStyle,
-                imageCornerRadius = config.imageCornerRadius.dp,
-                imageColorShift = imageColor,
-                imageSelectedColorShift = imageSelectedColor,
-                imageColorShiftEnd = imageColorEnd,
-                imageSelectedColorShiftEnd = imageSelectedColorEnd,
-                imageGradientHorizontal = imageGradientHorizontal,
-                imageSelectedGradientHorizontal = imageSelectedGradientHorizontal,
-                imageSaturation = placement.saturation ?: config.imageSaturation,
-                imageBrightness = config.imageBrightness,
-                dimming = placement.dimming,
-                imageContentScale = imageFit,
-                imageCropAlignment = imageCropAlignment,
-                imageFilterQuality = imageFilterQuality,
-                // Pointer and focus are one selection: a tap moves the
-                // cursor onto the entry it hit and then acts on it,
-                // through the carousel's OWN step() -- the same move the
-                // D-pad makes, with its direction and animation. Before
-                // this the tap activated the entry while the cursor
-                // stayed behind on another one, so coming back out of a
-                // system landed on the wrong entry.
-                onSelect = {
-                    if (placement.index != focusedIndex) step(placement.index - focusedIndex)
-                    item.onSelect()
-                },
-                modifier = Modifier
-                    .placeCarouselItem(placement, itemWidth, itemHeight)
-                    .graphicsLayer { alpha = placement.opacity },
-            )
         }
     }
 }
@@ -1370,35 +1379,40 @@ private fun EsDeTextList(
 
         for (index in window.visibleIndices) {
             val item = items.getOrNull(index) ?: continue
-            val selected = index == cursor
-            // Real color selection (TextListComponent.h:373-384): the
-            // primary/secondary pair is chosen by ENTRY TYPE, then the
-            // selected variant of that pair by the cursor.
-            val color = when {
-                item.isSecondary && selected -> config.selectedSecondaryColor
-                item.isSecondary -> config.secondaryColor
-                selected -> config.selectedColor
-                else -> config.primaryColor
+            // Keyed by the entry, not the slot: a scroll by one row used to hand every slot the next entry's name, so
+            // every row's text was laid out again; now a row moves with its entry and only its offset and the two
+            // selection colors change (Droidtop/tracker#941, cause 4).
+            key(item.key) {
+                val selected = index == cursor
+                // Real color selection (TextListComponent.h:373-384): the
+                // primary/secondary pair is chosen by ENTRY TYPE, then the
+                // selected variant of that pair by the cursor.
+                val color = when {
+                    item.isSecondary && selected -> config.selectedSecondaryColor
+                    item.isSecondary -> config.secondaryColor
+                    selected -> config.selectedColor
+                    else -> config.primaryColor
+                }
+                val backgroundColor = when {
+                    !selected -> 0L
+                    item.isSecondary -> config.selectedSecondaryBackgroundColor
+                    else -> config.selectedBackgroundColor
+                }
+                EsDeTextListRow(
+                    item = item,
+                    config = config,
+                    color = colorOfPacked(color),
+                    backgroundColor = colorOfPacked(backgroundColor),
+                    fontSize = fontSizeSp,
+                    fontFamily = rowFontFamily,
+                    y = window.rowY(index).dp,
+                    onSelect = {
+                        cursor = index
+                        onFocusedIndexChanged(index)
+                        item.onSelect()
+                    },
+                )
             }
-            val backgroundColor = when {
-                !selected -> 0L
-                item.isSecondary -> config.selectedSecondaryBackgroundColor
-                else -> config.selectedBackgroundColor
-            }
-            EsDeTextListRow(
-                item = item,
-                config = config,
-                color = colorOfPacked(color),
-                backgroundColor = colorOfPacked(backgroundColor),
-                fontSize = fontSizeSp,
-                fontFamily = rowFontFamily,
-                y = window.rowY(index).dp,
-                onSelect = {
-                    cursor = index
-                    onFocusedIndexChanged(index)
-                    item.onSelect()
-                },
-            )
         }
     }
 }
@@ -1645,23 +1659,27 @@ private fun EsDeGrid(
         ) {
             for (index in drawOrder) {
                 val item = items.getOrNull(index) ?: continue
-                EsDeGridEntry(
-                    item = item,
-                    config = config,
-                    layout = layout,
-                    index = index,
-                    scrollOffset = scrollOffset,
-                    selected = index == cursor,
-                    fontSize = fontSizeSp,
-                    fontFamily = tileFontFamily,
-                    imageContentScale = imageFit,
-                    imageCropAlignment = imageCropAlignment,
-                    imageFilterQuality = imageFilterQuality,
-                    onSelect = {
-                        cursor = index
-                        item.onSelect()
-                    },
-                )
+                // Keyed by the entry: the selected entry is drawn last, so slots by position changed entry on
+                // every move (Droidtop/tracker#941).
+                key(item.key) {
+                    EsDeGridEntry(
+                        item = item,
+                        config = config,
+                        layout = layout,
+                        index = index,
+                        scrollOffset = scrollOffset,
+                        selected = index == cursor,
+                        fontSize = fontSizeSp,
+                        fontFamily = tileFontFamily,
+                        imageContentScale = imageFit,
+                        imageCropAlignment = imageCropAlignment,
+                        imageFilterQuality = imageFilterQuality,
+                        onSelect = {
+                            cursor = index
+                            item.onSelect()
+                        },
+                    )
+                }
             }
         }
     }
