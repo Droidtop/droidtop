@@ -203,6 +203,7 @@ fun GamepadShell(
     openQuickMenu: Boolean = false,
     triggerRescan: Boolean = false,
     triggerBrowseThemes: Boolean = false,
+    homePress: Boolean = false,
 ) {
     // The whole Gaming shell, its overlays and its dialogs draw in the
     // active ES-DE theme (docs/SPEC.md "Gaming theming").
@@ -222,6 +223,7 @@ fun GamepadShell(
                 openQuickMenu = openQuickMenu,
                 triggerRescan = triggerRescan,
                 triggerBrowseThemes = triggerBrowseThemes,
+                homePress = homePress,
             )
           }
         }
@@ -264,6 +266,8 @@ internal fun GamepadShellBody(
     openQuickMenu: Boolean = false,
     triggerRescan: Boolean = false,
     triggerBrowseThemes: Boolean = false,
+    // A HOME press brought droidtop to the front (Droidtop/tracker#936).
+    homePress: Boolean = false,
 ) {
     val context = LocalContext.current
     // Where droidtop's danger and confirm dialogs and its corner flashes are drawn (docs/SPEC.md 7k, "Notices").
@@ -467,7 +471,14 @@ internal fun GamepadShellBody(
         overlays.runningGameOpen = openQuickMenu && gameRunning
         overlays.quickMenuOpen = openQuickMenu && !gameRunning
         overlays.leftMenuOpen = false
-        Log.i("droidtop.ReturnToGame", "deep link $deepLinkToken applied: quickMenu=$openQuickMenu gameRunning=$gameRunning")
+        // HOME is the way home, as on any Android home screen (Droidtop/tracker#936: pressed twice in Settings,
+        // droidtop stayed on Settings). With no game to return to and no section asked for, the shell goes to the
+        // section it opens on (GamingPrefs.defaultSection, Home unless the person chose another).
+        if (homePress && !gameRunning && startSectionName == null) {
+            val start = GamingPrefs.defaultSection(context)
+            if (start in menuSectionsFor(uiMode)) nav.openSection(start)
+        }
+        Log.i("droidtop.ReturnToGame", "deep link $deepLinkToken applied: quickMenu=$openQuickMenu gameRunning=$gameRunning home=$homePress")
     }
     // The face-button layout of the pad in use (SPEC 7b, "Console and controller detection"),
     // followed live because a handheld's own toggle can flip it while this shell stays in front.
