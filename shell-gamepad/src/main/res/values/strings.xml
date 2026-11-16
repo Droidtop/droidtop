@@ -76,7 +76,7 @@
     <string name="gamepad_current_filters_and_sort">Current filters and sort</string>
     <string name="gamepad_sort_by">Sort by</string>
     <string name="gamepad_open_its_page">Open its page</string>
-    <string name="gamepad_searches_again_after">Searches again after</string>
+    <string name="gamepad_searches_again_after">Searches again when closed</string>
     <string name="gamepad_open_plugins">Open Plugins</string>
     <string name="gamepad_launch_on_which_screen">Launch on which screen?</string>
     <string name="gamepad_close_the_app">Close the app</string>
