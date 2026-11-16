@@ -89,6 +89,10 @@ class ContainerTerminalActivity : AppCompatActivity() {
             setTerminalViewClient(viewClient)
             setTextSize(textSizePx)
             setTypeface(Typeface.MONOSPACE)
+            // The emulator draws its text in the terminal's own colours (light on dark) and leaves the background to
+            // its view, which showed droidtop's light page through: white on near-white (AVD rig check of build
+            // 3184, Droidtop/tracker#909). The terminal's default background goes under it.
+            setBackgroundColor(com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND.let { com.termux.terminal.TerminalColors.COLOR_SCHEME.mDefaultColors[it] })
             isFocusable = true
             isFocusableInTouchMode = true
         }

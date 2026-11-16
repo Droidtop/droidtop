@@ -840,6 +840,10 @@ class ProotRuntime(
             // was added is skipped, not a failed start.
             readMounts(containerId).binds(ContainerLayout.sharedHomeDir(appStorageDir))
                 .forEach { (host, guest) -> add("--bind=$host:$guest") }
+            // Android refuses apps some of /proc (SELinux), and top, ps and uptime fail on them ("can't open 'stat':
+            // Permission denied", Droidtop/tracker#909): a stand-in is bound over each one this process cannot read,
+            // as Termux's proot-distro does.
+            ProcStandIns.binds(etcDir).forEach { (host, guest) -> add("--bind=$host:$guest") }
             add("--bind=${File(etcDir, "resolv.conf").absolutePath}:/etc/resolv.conf")
             add("--bind=${File(etcDir, "hosts").absolutePath}:/etc/hosts")
             add("--bind=${File(etcDir, "bwrap").absolutePath}:$BWRAP_SHIM_PATH")
