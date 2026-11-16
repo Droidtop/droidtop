@@ -199,6 +199,11 @@ fun CatalogNavigator(
 ) {
     val context = LocalContext.current
     var version by remember { mutableStateOf(0) }
+    // A live screen's changes (screen.live) re-read that screen only: the root's while it shows, the pane's while a
+    // pushed or linked screen shows. One shared counter rebuilt the whole root, every short screen merged into it
+    // included, on each progress report of the Downloads page (Droidtop/tracker#941).
+    var rootLive by remember { mutableStateOf(0) }
+    var paneLive by remember { mutableStateOf(0) }
     // Both place-holding states below are saveable because the Activity
     // recreate the Text size setting triggers (AccessibilityPrefs,
     // Droidtop/tracker#87) used to rebuild them from nothing: the user
@@ -274,7 +279,7 @@ fun CatalogNavigator(
     // column, and the pane's rows for a plain category or a navigator
     // without a column. Suspend builder (real screens run Room queries /
     // filesystem walks), rebuilt after every value change.
-    val rootGroups by produceState<List<CatalogGroup>?>(null, root, version, refreshKey) {
+    val rootGroups by produceState<List<CatalogGroup>?>(null, root, version, refreshKey, rootLive) {
         value = withOfflineNotice(root, context, mergeShortScreens(root.groups(context)) { it.groups(context) })
     }
     val categories = remember(rootGroups, root) {
@@ -306,11 +311,12 @@ fun CatalogNavigator(
     var stripIndex by remember(screen.id) { mutableStateOf(0) }
     // Tagged with the screen they belong to: right after a push or a pop
     // the list must not treat the previous screen's rows as this one's.
-    val paneLoaded by produceState<Pair<CatalogScreen, List<CatalogGroup>>?>(null, screen, version, refreshKey) {
+    val paneLoaded by produceState<Pair<CatalogScreen, List<CatalogGroup>>?>(null, screen, version, refreshKey, paneLive) {
         if (screen === root) return@produceState
         // A linked category loads once the column's cursor rests on it, so
-        // running down the column does not build every screen it passes.
-        if (depth == 0) delay(PANE_LOAD_SETTLE_MS)
+        // running down the column does not build every screen it passes. A
+        // screen already showing reloads at once (a live change, a value set).
+        if (depth == 0 && value?.first !== screen) delay(PANE_LOAD_SETTLE_MS)
         // A screen inside Settings (Accounts and sources) does not repeat a place the left menu has either.
         value = screen to withOfflineNotice(screen, context, withoutPlaceLinks(mergeShortScreens(screen.groups(context)) { it.groups(context) }, placeScreenIds))
     }
@@ -412,7 +418,7 @@ fun CatalogNavigator(
 
     // A screen of live data (the friends, a conversation) says when it changed; its rows are read
     // again then. The first value is what the screen was just built from, so only later ones count.
-    LaunchedEffect(screen) { screen.live?.drop(1)?.collect { version++ } }
+    LaunchedEffect(screen) { screen.live?.drop(1)?.collect { if (screen === root) rootLive++ else paneLive++ } }
 
     // Coming back from another app's screen (Android's All files access page, a store page) re-reads the
     // rows, so a row that described what that screen changes shows the new state. The first resume is the
