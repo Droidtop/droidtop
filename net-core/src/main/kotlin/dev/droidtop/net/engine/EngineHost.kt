@@ -100,7 +100,7 @@ object EngineHost {
         rpcEndpoint = Rpc(port, started.rpcSecret)
     }
 
-    private fun startEngine(wanted: Settings, port: Int): DownloadEngine =
+    private suspend fun startEngine(wanted: Settings, port: Int): DownloadEngine =
         DownloadEngine(wanted.context, wanted.root, rpc = true, rpcPort = port, androidIsolation = wanted.androidIsolation)
             .start(mapOf("max-concurrent-downloads" to ENGINE_SLOTS.toString()))
 
