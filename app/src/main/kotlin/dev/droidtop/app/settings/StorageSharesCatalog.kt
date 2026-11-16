@@ -246,7 +246,7 @@ object StorageSharesCatalog {
                                 if (now.isServerKind()) null else ToggleItem(
                                     id = "${id}_plain",
                                     title = "Allow unencrypted",
-                                    subtitle = "Unencrypted: own network only",
+                                    subtitle = "Own network only: the password and files travel readable",
                                     current = now.allowPlainHttp,
                                     onToggle = { c, on -> withContext(Dispatchers.IO) { StorageShares.update(c, now.id) { it.copy(allowPlainHttp = on) } } },
                                 ),
@@ -287,7 +287,7 @@ object StorageSharesCatalog {
                                 AsyncActionItem(
                                     id = "${id}_remove",
                                     title = "Remove",
-                                    subtitle = "Nothing on the share is deleted",
+                                    subtitle = "Forgets its password. Nothing on the share is deleted",
                                     confirmTitle = "Remove ${now.name}?",
                                     run = { c, _ -> withContext(Dispatchers.IO) { StorageShares.remove(c, now.id) }; "Removed ${now.name}" },
                                 ),
@@ -573,7 +573,7 @@ object StorageSharesCatalog {
                             ToggleItem(
                                 id = "accounts_storage_add_s3_plain",
                                 title = "Allow unencrypted",
-                                subtitle = "Unencrypted: own network only",
+                                subtitle = "Own network only: requests and files travel readable",
                                 current = s3PlainHttp,
                                 onToggle = { _, on -> s3PlainHttp = on },
                             ),
@@ -656,7 +656,7 @@ object StorageSharesCatalog {
                             ToggleItem(
                                 id = "accounts_storage_add_plain",
                                 title = "Allow unencrypted",
-                                subtitle = "Unencrypted: own network only",
+                                subtitle = "Own network only: the password and files travel readable",
                                 current = pendingPlainHttp,
                                 onToggle = { _, on -> pendingPlainHttp = on },
                             ),

@@ -563,7 +563,7 @@ object UpdatesPage {
             ActionItem(
                 id = "updates_plugin_held_${held.installed.manifest.id}",
                 title = held.installed.manifest.label,
-                subtitle = "${held.version} held back: ${held.reason}",
+                subtitle = "${held.version} held back: ${held.reason}. Check its key in Keys you trust",
                 iconFile = PluginStore.iconFile(context, held.installed),
             )
         }

@@ -470,7 +470,7 @@ internal fun AppSettingsCatalogs.pluginSourcesScreen() = CatalogScreen(
                     NestedScreenItem(
                         id = "plugins_keys_you_trust",
                         title = "Keys you trust",
-                        subtitle = "Who may sign plugins",
+                        subtitle = "Who may sign plugins. Only the official key is vetted",
                         registryId = SCREEN_PLUGIN_KEYS,
                         valueLabel = { if (userKeys.isEmpty()) "Official only" else "Official + ${userKeys.size} more" },
                     ),
@@ -1959,7 +1959,7 @@ internal suspend fun AppSettingsCatalogs.appKeysGroup(context: Context): Catalog
         id = "plugin_keys_apps",
         title = "Apps you trust",
         items = if (apps.isEmpty()) {
-            listOf(ActionItem(id = "plugin_keys_apps_none", title = "No app keys added by you", subtitle = null))
+            listOf(ActionItem(id = "plugin_keys_apps_none", title = "No app keys added by you", subtitle = "One signed by its maker's official key needs none"))
         } else {
             apps.entries.sortedBy { it.key }.flatMap { (packageName, cert) ->
                 listOf(
@@ -2004,7 +2004,7 @@ internal fun AppSettingsCatalogs.stopTrustingApp(context: Context, packageName: 
 internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
     id = SCREEN_PLUGIN_KEYS,
     title = "Keys you trust",
-    subtitle = null,
+    subtitle = "Any but the official key is yours, not vetted",
     groups = { context ->
         val userKeys = withContext(Dispatchers.IO) { UserOriginKeys.load(UserOriginKeys.storeFile(context)) }
         // The pinned signing root is read from the APK's resources on first use: off the main thread.
@@ -2074,7 +2074,7 @@ internal fun AppSettingsCatalogs.pluginKeysScreen() = CatalogScreen(
                     AsyncActionItem(
                         id = "plugin_keys_source_fetch",
                         title = "Fetch this source's key",
-                        subtitle = null,
+                        subtitle = "Nothing is trusted until you confirm",
                         run = { ctx, onStatus -> fetchSourceKey(ctx, pendingKeySourceUrl, onStatus) },
                     ),
                 ),

@@ -1195,7 +1195,7 @@ object ContainersCatalog {
                 ChoiceItem(
                     id = "container_all_storage",
                     title = "All internal storage",
-                    subtitle = "All of the device's storage. From its next start",
+                    subtitle = "It can see and change all of the device's storage. From its next start",
                     options = listOf(ChoiceOption("deny", "Deny"), ChoiceOption("allow", "Allow")),
                     current = if (current.allStorage) "allow" else "deny",
                     onSelect = { _, value ->
