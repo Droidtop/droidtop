@@ -1395,8 +1395,11 @@ the main UI").** A facet shows where the person already is: as a row, a value or
 screen of its own, a popup over the screen it was opened from (`CatalogPopup`: the shell's panel width, at most 70% of
 the window tall, over a dimmed copy of the screen, which stays in sight). Closing it returns to that screen, which
 shows what the facet changed. A full page (`CatalogSheet`) is for a place of its own, not for a facet. First moved: a
-source's search options (`search.filter`) open as a popup over the search panel instead of replacing it. Still to
-move: a `page` call's reply and a source record's `item.page` facets.
+source's search options (`search.filter`) open as a popup over the search panel instead of replacing it, and on a
+game's page a plugin row's `page` call, and an action's reply screen, open as a popup over the page. A source record's
+page (its downloads, versions and details, `item.page`) stays a page: it is a long list of its own, the exception the
+rule allows. Still to move: a `page` call inside a settings screen (a plugin's own settings), which the settings
+navigator pushes as a screen.
 
 **Status: approved by the owner (2026-10-23: "Facets is really useful"); being built in pieces.** Built: the model and
 its guards (`Facets`, `FacetGuards` in `:plugin-host`: reading a reply, templates, the target list with the kinds and

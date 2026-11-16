@@ -142,10 +142,14 @@ internal fun rememberPluginPageRows(entry: LibraryEntry): PluginPageRows {
     }
 }
 
-/** The plugin page a row opened, over the game page, in its own window with the pad's front. */
+/**
+ * The plugin page a row opened (a facet's `page` call, an action's reply), as a popup over the game page, which stays in
+ * sight dimmed behind it and shows what the page changed once it closes (Droidtop/tracker#939: "A facet shouldn't take
+ * over, it should give information to the main UI"). CatalogPopup paints its own panel, so the page behind does not
+ * show through it (the reason a bare Dialog was replaced, rig, 0.2.0-dev.2070).
+ */
 @Composable
 internal fun PluginPageScreen(rows: PluginPageRows) {
     val screen = rows.screen ?: return
-    // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the page behind show through (rig, 0.2.0-dev.2070).
-    dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = rows.closeScreen)
+    dev.droidtop.shell.gamepad.CatalogPopup(root = screen, onExit = rows.closeScreen)
 }
