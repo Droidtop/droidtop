@@ -124,7 +124,8 @@ class PcShelvesTest {
         // An engine game is "Engine": its engine is an implementation category, not a badge (#496).
         assertEquals(KindBadge(BadgeKind.ENGINE, null), kindBadgeOf(engine, names))
         assertEquals("Retro · Super Nintendo", kindBadgeOf(rom, names)?.text)
-        assertEquals("Retro · gba", kindBadgeOf(rom.copy(systemId = "gba"), names)?.text)
+        // A system with no name reads as its id in capitals.
+        assertEquals("Retro · GBA", kindBadgeOf(rom.copy(systemId = "gba"), names)?.text)
         // A long system name fits the badge (Droidtop/tracker#942): without its maker, else the system id.
         assertEquals("PlayStation 2", shortSystemName("Sony PlayStation 2", "ps2"))
         assertEquals("Mega Drive", shortSystemName("Sega Mega Drive", "megadrive"))
