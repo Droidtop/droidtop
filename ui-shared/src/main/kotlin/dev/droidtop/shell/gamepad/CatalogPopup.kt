@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -42,7 +43,9 @@ fun CatalogPopup(root: CatalogScreen, onExit: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = window.frameBarHeight, bottom = window.frameBarHeight),
+                .padding(top = window.frameBarHeight, bottom = window.frameBarHeight)
+                // A text field in the popup (a source's search options) stays above the on-screen keyboard.
+                .imePadding(),
             contentAlignment = Alignment.Center,
         ) {
             Box(
