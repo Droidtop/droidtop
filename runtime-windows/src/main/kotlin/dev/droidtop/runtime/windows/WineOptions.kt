@@ -585,7 +585,7 @@ object WineOptions {
             PcContainers.forGame(context, entryId)?.also { it.setLaunchOverrides(launchOverrides(context, entryId, it)) }
         } ?: return "Set up Windows games first"
         return runCatching { WineComponents.ensure(context, container, onStatus) }
-            .fold({ "Everything is here" }, { "Download failed: ${it.message ?: it}" })
+            .fold({ "Everything is here" }, { "Couldn't download: ${it.message ?: it}" })
     }
 
     /** Stores [wine] as [entryId]'s Wine choices, leaving its own non-prefix choices (frame generation, Steamworks) as they are. */
@@ -643,7 +643,7 @@ object WineOptions {
             WineOptionRow(
                 STEAMWORKS_APPID, "Steamworks app ID",
                 when {
-                    typed != null -> "Set by you" + (detected?.let { "; detected: ${it.appId}" } ?: "")
+                    typed != null -> "Set by you" + (detected?.let { ". Detected: ${it.appId}" } ?: "")
                     detected != null -> "Detected from ${detected.via}"
                     else -> "None found. The number in its Steam store address"
                 },

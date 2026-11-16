@@ -123,7 +123,7 @@ object PluginCatalog {
             Load(
                 cached,
                 if (cached != null) {
-                    "Refresh failed (${describe(failure)}); showing the earlier copy"
+                    "Couldn't refresh: ${describe(failure)}. Showing the earlier copy"
                 } else {
                     "Couldn't load the catalog: ${describe(failure)}."
                 },
@@ -156,7 +156,7 @@ object PluginCatalog {
             // fetched before, and Updates showed no row and no reason. A plain "no network" is not worth a row.
             if (failure !is NotPublished && failure !is java.io.IOException) noteRefresh(context, source, describe(failure))
             if (lastGoodIndex(context, source) != null) {
-                "Refresh failed (${describe(failure)})"
+                "Couldn't refresh: ${describe(failure)}"
             } else if (failure is NotPublished) {
                 "Nothing published yet"
             } else {
@@ -427,7 +427,7 @@ object PluginCatalog {
             result.ok -> result.values["summary"].orEmpty().let { InstallOutcome(!it.startsWith(NOT_INSTALLED), it) }
             // A catalog bundle gets no shortcut past its hash: a mismatch is never installed.
             result.error == DownloadJobs.DIGEST_MISMATCH ->
-                InstallOutcome(false, "Download doesn't match the catalog's hash; not installed")
+                InstallOutcome(false, "Couldn't install: the download doesn't match the catalog")
             else -> InstallOutcome(false, "Couldn't download ${plugin.label}: ${result.error}")
         }
     }

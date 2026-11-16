@@ -78,7 +78,7 @@ object UpdatesPage {
                     "Debug builds are much slower"
                 AppSettingsCatalogs.ctxIsDebuggable(context) ->
                     "Running a debug build"
-                else -> "Much slower; for finding droidtop bugs"
+                else -> "Much slower. For finding droidtop bugs"
             },
             current = update.debugBuilds(context),
             onToggle = { ctx, value -> update.setDebugBuilds(ctx, value) },
@@ -392,7 +392,7 @@ object UpdatesPage {
         return CatalogPage(
             header = PageHeader(
                 title = "Updates",
-                byline = listOfNotNull(lastLine ?: "Not checked yet", failure?.let { "Check failed: $it" }).joinToString(". "),
+                byline = listOfNotNull(lastLine ?: "Not checked yet", failure?.let { "Couldn't check: $it" }).joinToString(". "),
             ),
             buttons = listOf(
                 // Its progress and its answer are a line at the top of the page, in place: the press was easy to miss when

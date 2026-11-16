@@ -630,7 +630,7 @@ object PluginJobsScreen {
                         id = "plugin_job_${jobId}_restart",
                         title = "Start over",
                         confirmTitle = "Start over? The partial download is deleted.",
-                        run = { ctx, _ -> if (dev.droidtop.library.stores.StoreInstallJob.restart(ctx, jobId)) "Starting over" else "Can't start over" },
+                        run = { ctx, _ -> if (dev.droidtop.library.stores.StoreInstallJob.restart(ctx, jobId)) "Starting over" else "Couldn't start over" },
                     ),
                 )
             }

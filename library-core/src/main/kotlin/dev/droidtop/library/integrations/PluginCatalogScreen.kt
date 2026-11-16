@@ -476,7 +476,7 @@ object PluginCatalogScreen {
                     ActionItem(
                         id = "plugins_catalog_empty",
                         title = if (load.published) "Nothing to show yet" else "No catalog is published yet",
-                        subtitle = if (load.published) "Refresh failed" else null,
+                        subtitle = if (load.published) "Couldn't refresh" else null,
                     ),
                 )
             }

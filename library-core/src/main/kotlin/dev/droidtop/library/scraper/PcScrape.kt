@@ -55,10 +55,10 @@ enum class PcScraperSource(val key: String, val label: String) {
     LUTRIS("lutris", "Lutris (no account needed)"),
 
     /** Needs the user's own free Twitch/IGDB credentials, and in exchange returns descriptions, developer, publisher, genre, series and links. */
-    IGDB("igdb", "IGDB (needs a free key)"),
+    IGDB("igdb", "IGDB, with a free key"),
 
     /** Needs the user's own free SteamGridDB key. Names and art only: its text comes from IGDB and the Steam store. */
-    STEAMGRIDDB("steamgriddb", "SteamGridDB (needs a free key)"),
+    STEAMGRIDDB("steamgriddb", "SteamGridDB, with a free key"),
 }
 
 object PcScraperSourcePrefs {

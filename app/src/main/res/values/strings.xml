@@ -63,7 +63,7 @@
     <string name="pair_computer_on_the_computer_open_droidtop">In droidtop-agent, choose Pair a handheld and type:</string>
     <string name="pair_computer_get_a_new_code">Get a new code</string>
     <string name="pair_computer_use_a_code_from_the">Use a code from the other %1$s</string>
-    <string name="pair_computer_the_s_address_such_as">e.g. 192.168.1.20:47612 (%1$s)</string>
+    <string name="pair_computer_the_s_address_such_as">%1$s, e.g. 192.168.1.20:47612</string>
     <string name="pair_computer_code">Code</string>
     <string name="pair_computer_pair_with_this">Pair with this %1$s</string>
     <string name="pair_computer_paired_with">Paired with %1$s.</string>

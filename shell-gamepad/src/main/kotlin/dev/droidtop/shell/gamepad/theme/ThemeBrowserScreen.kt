@@ -290,7 +290,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                                         ThemeDownloader.ThemeSyncStatus.UPDATED -> "Updated"
                                         ThemeDownloader.ThemeSyncStatus.UP_TO_DATE -> "Already up to date"
                                         ThemeDownloader.ThemeSyncStatus.DIVERGED -> "Not updated: your copy has local changes"
-                                        ThemeDownloader.ThemeSyncStatus.FAILED -> "Download failed. Check the connection and select it again."
+                                        ThemeDownloader.ThemeSyncStatus.FAILED -> "Couldn't download. Check the connection and select it again."
                                         ThemeDownloader.ThemeSyncStatus.CANCELLED -> "Timed out. Check the connection and select it again."
                                     })
                                     // A theme UPDATED in place keeps its name -- the
