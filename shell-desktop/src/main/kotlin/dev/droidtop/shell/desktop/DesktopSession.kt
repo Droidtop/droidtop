@@ -258,7 +258,8 @@ internal fun BoxScope.DesktopViewport(
                     DesktopKeyboardTarget.surface = java.lang.ref.WeakReference(this)
                     holder.addCallback(object : SurfaceHolder.Callback {
                         override fun surfaceCreated(holder: SurfaceHolder) {
-                            presentFailed = !hostBridge.presentOutput(primaryOutput, holder.surface)
+                            // Paced to the display this view is on (Droidtop/tracker#950).
+                            presentFailed = !hostBridge.presentOutput(primaryOutput, holder.surface, this@apply.display?.refreshRate ?: 0f)
                         }
 
                         // The only place the view's real size is known:
