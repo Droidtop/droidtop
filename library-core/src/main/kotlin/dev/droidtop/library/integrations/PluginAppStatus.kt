@@ -180,7 +180,7 @@ object PluginAppStatus {
                                     TextInputItem(
                                         id = "plugin_app_status_${m.id}_job_$job",
                                         title = jobLabel,
-                                        subtitle = "Type a value and commit to start this job; progress shows on the Jobs screen",
+                                        subtitle = "Type a value to start this job. Its progress shows in Downloads",
                                         value = "",
                                         onChange = { ctx, text ->
                                             if (text.isNotBlank()) {

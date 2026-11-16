@@ -40,7 +40,7 @@ internal fun AppSettingsCatalogs.keysAndAccountsRow(count: Int): NestedScreenIte
 internal fun AppSettingsCatalogs.keysAndAccountsScreen() = CatalogScreen(
     id = SCREEN_KEYS_AND_ACCOUNTS,
     title = "Keys and accounts",
-    subtitle = "What droidtop holds for you. Removing one here is the same as removing it on its own page",
+    subtitle = "What droidtop holds for you. Removing one here removes it everywhere",
     groups = { context ->
         keysGroups(withContext(Dispatchers.IO) { heldKeys(context) })
     },

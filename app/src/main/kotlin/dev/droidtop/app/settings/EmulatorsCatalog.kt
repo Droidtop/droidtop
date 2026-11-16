@@ -90,8 +90,8 @@ object EmulatorsCatalog {
             return AsyncActionItem(
                 id = id,
                 title = RiskyPrompts.allFilesTitle(name),
-                subtitle = "$name cannot open your games by their path yet. droidtop can give it All files access for you; " +
-                    "you can take it back in Android's All files access screen",
+                subtitle = "$name can't open your games by their path yet. droidtop can give it All files access. " +
+                    "Android's All files access screen takes it back",
                 value = "Give access",
                 confirmTitle = RiskyPrompts.allFilesConfirm(name, packageName),
                 run = { ctx, _ ->

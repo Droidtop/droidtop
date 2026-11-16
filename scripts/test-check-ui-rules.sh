@@ -33,6 +33,8 @@ fixture bare-click shell-gamepad/src/main/kotlin/A.kt 'Modifier.clickable { open
 fixture raw-corners shell-gamepad/src/main/kotlin/A.kt 'Modifier.clip(RoundedCornerShape(8.dp))'
 fixture press-target shell-gamepad/src/main/kotlin/A.kt 'Modifier.heightIn(min = window.minTouchTarget)'
 fixture companion-words app/src/main/kotlin/dev/droidtop/app/CompanionA.kt 'CompanionNote("Needs the helper app")'
+fixture copy-phrases app/src/main/kotlin/A.kt 'ActionItem(id = "x", title = "Reset", subtitle = "Clears it; the rest stays")'
+fixture copy-phrases-res app/src/main/res/values/strings.xml '<string name="x">The file could not be read</string>'
 
 status=0
 for dir in "$tmp"/*/; do

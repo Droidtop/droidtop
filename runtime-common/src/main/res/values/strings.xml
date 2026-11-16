@@ -231,7 +231,7 @@
     <string name="gaming_trackpad">Trackpad</string>
     <string name="gaming_how_the_companion_s_input_trackpad">Pointer, clicks and scrolling</string>
     <string name="gaming_dim_the_companion_screen">Dim the companion screen</string>
-    <string name="gaming_with_no_input_it_dims_after">Dims after this; chats keep it on</string>
+    <string name="gaming_with_no_input_it_dims_after">Dims after this. Chats keep it on</string>
     <string name="gaming_wake_the_companion_screen">Wake the companion screen</string>
     <string name="gaming_what_turns_the_companion_screen_back">What wakes it</string>
     <string name="gaming_show_tabs_handle">Show tabs handle</string>
@@ -270,7 +270,7 @@
     <string name="gaming_screensaver_show_name">Show the game\'s name</string>
     <string name="gaming_screensaver_show_name_subtitle">Under covers and screenshots</string>
     <string name="gaming_background_music">Background music</string>
-    <string name="gaming_background_music_subtitle">Your music folder in the menus; 0 is off</string>
+    <string name="gaming_background_music_subtitle">Your music folder in the menus. 0 is off</string>
     <string name="gaming_music_folder">Music folder</string>
     <string name="gaming_music_folder_none">None chosen yet</string>
     <string name="gaming_while_a_game_runs">While a game runs</string>

@@ -769,7 +769,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
             jobId,
             dev.droidtop.pluginhost.PluginJobsCenter.Instead(
                 title = dev.droidtop.library.OPEN_THREAD,
-                subtitle = "Start the download on $label's page yourself; droidtop places it as this game's update",
+                subtitle = "Start the download on $label's page. droidtop places it as this game's update",
             ) { _ ->
                 threadScope.launch {
                     val said = openThread(source, externalId, version, gameName, newest) { line -> Log.i(TAG, "open thread $source/$externalId: $line") }

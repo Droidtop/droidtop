@@ -154,8 +154,8 @@ object PrefixToolsCatalog {
                         AsyncActionItem(
                             id = "wine_prefix_reset",
                             title = "Reset the prefix",
-                            subtitle = "Makes $where new. Every program installed in it, its registry and the saves a game keeps inside it are deleted; " +
-                                "its settings stay, and the next start sets it up again. Game folders are not touched",
+                            subtitle = "Makes $where new. Every program installed in it, its registry and the saves a game keeps inside it are deleted. " +
+                                "Its settings stay, and the next start sets it up again. Game folders are not touched",
                             confirmTitle = "Reset the prefix? What is installed in it and the saves inside it are deleted",
                             run = { ctx, onStatus -> WinePrefixTools.reset(ctx, entryId, onStatus) },
                         ),

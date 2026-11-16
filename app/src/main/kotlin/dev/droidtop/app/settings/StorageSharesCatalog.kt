@@ -222,13 +222,13 @@ object StorageSharesCatalog {
                                     val port = v.trim().ifEmpty { "0" }.toIntOrNull()
                                     if (port != null && port in 0..65535) sh.copy(port = port) else sh
                                 },
-                                kindField(now, setOf(StorageShares.SFTP, StorageShares.SMB), "${id}_folder_srv", "Folder", now.folder, "On the share; blank is its top") { sh, v ->
+                                kindField(now, setOf(StorageShares.SFTP, StorageShares.SMB), "${id}_folder_srv", "Folder", now.folder, "On the share. Blank is its top") { sh, v ->
                                     sh.copy(folder = v.trim().trim('/', '\\'))
                                 },
                                 kindField(now, setOf(StorageShares.SMB), "${id}_domain", "Domain", now.domain, "Blank for most home shares") { sh, v -> sh.copy(domain = v.trim()) },
                                 s3Field(now, "${id}_bucket", "Bucket", now.bucket) { sh, v -> if (StorageShares.bucketProblem(v) == null) sh.copy(bucket = v.trim()) else sh },
                                 s3Field(now, "${id}_region", "Region", now.region, "Blank is us-east-1") { sh, v -> sh.copy(region = v.trim()) },
-                                s3Field(now, "${id}_folder", "Folder", now.folder, "Inside the bucket; blank is its top") { sh, v -> sh.copy(folder = v.trim().trim('/')) },
+                                s3Field(now, "${id}_folder", "Folder", now.folder, "Inside the bucket. Blank is its top") { sh, v -> sh.copy(folder = v.trim().trim('/')) },
                                 TextInputItem(
                                     id = "${id}_user",
                                     title = if (now.kind == StorageShares.S3) "Access key" else "User name",
@@ -356,14 +356,14 @@ object StorageSharesCatalog {
                             TextInputItem(
                                 id = "accounts_storage_add_sftp_folder",
                                 title = "Folder",
-                                subtitle = "On the server; blank is your home folder",
+                                subtitle = "On the server. Blank is your home folder",
                                 value = sftpFolder,
                                 onChange = { _, v -> sftpFolder = v.trim() },
                             ),
                             TextInputItem(
                                 id = "accounts_storage_add_sftp_name",
                                 title = "Name",
-                                subtitle = "How it is listed; the server's name when left blank",
+                                subtitle = "How it is listed. Blank uses the server's name",
                                 value = sftpName,
                                 onChange = { _, v -> sftpName = v },
                             ),
@@ -450,14 +450,14 @@ object StorageSharesCatalog {
                             TextInputItem(
                                 id = "accounts_storage_add_smb_folder",
                                 title = "Folder",
-                                subtitle = "On the share; blank is its top",
+                                subtitle = "On the share. Blank is its top",
                                 value = smbFolder,
                                 onChange = { _, v -> smbFolder = v.trim() },
                             ),
                             TextInputItem(
                                 id = "accounts_storage_add_smb_name",
                                 title = "Name",
-                                subtitle = "How it is listed; the share and server when left blank",
+                                subtitle = "How it is listed. Blank uses the share and server",
                                 value = smbName,
                                 onChange = { _, v -> smbName = v },
                             ),
@@ -552,14 +552,14 @@ object StorageSharesCatalog {
                             TextInputItem(
                                 id = "accounts_storage_add_s3_folder",
                                 title = "Folder",
-                                subtitle = "Inside the bucket; blank is its top",
+                                subtitle = "Inside the bucket. Blank is its top",
                                 value = s3Folder,
                                 onChange = { _, v -> s3Folder = v.trim() },
                             ),
                             TextInputItem(
                                 id = "accounts_storage_add_s3_name",
                                 title = "Name",
-                                subtitle = "How it is listed; the bucket's name when left blank",
+                                subtitle = "How it is listed. Blank uses the bucket's name",
                                 value = s3Name,
                                 onChange = { _, v -> s3Name = v },
                             ),
@@ -649,7 +649,7 @@ object StorageSharesCatalog {
                             TextInputItem(
                                 id = "accounts_storage_add_name",
                                 title = "Name",
-                                subtitle = "How it is listed; its server name when left blank",
+                                subtitle = "How it is listed. Blank uses its server name",
                                 value = pendingName,
                                 onChange = { _, v -> pendingName = v },
                             ),

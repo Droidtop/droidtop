@@ -1423,14 +1423,14 @@ internal fun AppSettingsCatalogs.runtimeItem(context: Context, kind: PluginKind,
         PluginKind.PYTHON -> ActionItem(
             id = "plugins_python_runtime_remove",
             title = "Python runtime: installed",
-            subtitle = "CPython ${PythonRuntimeManager.installedVersion(context) ?: PythonRuntimeManager.pinnedVersion(context)} (${PythonRuntimeManager.currentAbi()}); Python plugins stop until it is downloaded again",
+            subtitle = "CPython ${PythonRuntimeManager.installedVersion(context) ?: PythonRuntimeManager.pinnedVersion(context)} (${PythonRuntimeManager.currentAbi()}). Python plugins stop until it is downloaded again",
             confirmTitle = "Remove the downloaded Python runtime?",
             run = { ctx -> PythonRuntimeManager.remove(ctx) },
         )
         PluginKind.FLUTTER_EMBED -> ActionItem(
             id = "plugins_flutter_runtime_remove",
             title = "Flutter runtime: installed",
-            subtitle = "Flutter engine ${FlutterRuntimeManager.pinnedVersion(context)} (${FlutterRuntimeManager.currentAbi()}); Flutter plugins stop until it is downloaded again",
+            subtitle = "Flutter engine ${FlutterRuntimeManager.pinnedVersion(context)} (${FlutterRuntimeManager.currentAbi()}). Flutter plugins stop until it is downloaded again",
             confirmTitle = "Remove the downloaded Flutter runtime?",
             run = { ctx -> FlutterRuntimeManager.remove(ctx) },
         )

@@ -16,7 +16,7 @@
     <string name="launcher_import_brought">What comes across</string>
     <string name="launcher_import_changed">Changed on the way</string>
     <string name="launcher_import_done">Your %1$s home screen is in place</string>
-    <string name="launcher_import_failed">This backup could not be imported</string>
+    <string name="launcher_import_failed">Couldn\'t import this backup</string>
     <string name="launcher_import_go">Import</string>
     <string name="launcher_import_heading">Import from %1$s</string>
     <string name="launcher_import_left_out">Not brought across</string>

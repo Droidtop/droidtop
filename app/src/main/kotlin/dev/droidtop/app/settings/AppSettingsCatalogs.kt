@@ -317,7 +317,7 @@ object AppSettingsCatalogs {
                     AsyncActionItem(
                         id = "console_systems_update_players",
                         title = "Update platform databases",
-                        subtitle = "Players, platforms, engine routing and BIOS files; built from " +
+                        subtitle = "Players, platforms, engine routing and BIOS files. Built from " +
                             (PlatformDatabaseSnapshot.shortCommit(context)
                                 ?.let { "snapshot $it" } ?: "an unrecorded snapshot"),
                         run = { ctx, onStatus ->

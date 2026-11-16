@@ -306,7 +306,7 @@ object LinkRouter {
             "links_handlers_list",
             "Registered",
             buildList<CatalogItem> {
-                if (all.isEmpty()) add(ActionItem("links_handlers_none", "None yet", subtitle = "Plugins register the links they open; you can add an app below"))
+                if (all.isEmpty()) add(ActionItem("links_handlers_none", "None yet", subtitle = "Plugins register the links they open. Add an app below"))
                 all.forEachIndexed { i, handler ->
                     val mine = handler.kind == KIND_ANDROID
                     add(

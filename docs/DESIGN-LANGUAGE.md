@@ -67,6 +67,14 @@ what it learned last.
 - Something missing is said as what does not work yet ("Brightness can't change yet"), never "Needs …" and never a
   permission's name; a granted one is a noun ("Your game folders"); the exact name is in Info (SPEC "Permissions",
   Droidtop/tracker#830).
+- One job per string (owner, 2026-11-15, Droidtop/tracker#153). A string says what happens. The mechanism (Android's
+  names for things, limits) goes in Info (Y), and the undo is the row's own state, so a question does not repeat it.
+  A fact the person consents to (every app is affected, a service is turned on) stays in the question.
+- Errors are active, the same in droidtop and Enginehost: "Couldn't X." then the reason when it is known, then the
+  next step when there is one. Never the passive "X could not be Y".
+- No semicolon splices and no parenthetical asides in on-screen text: two sentences instead.
+- Every settings row has one short line saying what it does, unless its title already says it all. The line never
+  restates the title, explains how droidtop works inside, or says "its own page".
 
 ## System integration
 - A disabled mode or feature runs no code (droidtop modes, 2026-09-11).

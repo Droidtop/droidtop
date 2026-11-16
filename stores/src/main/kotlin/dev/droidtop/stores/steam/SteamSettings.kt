@@ -29,7 +29,7 @@ internal object SteamSettings {
         ChoiceItem(
             id = ID_STATUS,
             title = "Status",
-            subtitle = "Online and Invisible keep Steam connected for friends and chat; Offline disconnects",
+            subtitle = "Online and Invisible keep Steam connected for friends and chat. Offline disconnects",
             options = SocialPresence.entries.map { ChoiceOption(it.key, it.label) },
             current = SteamPrefs.presence(context).key,
             onSelect = { ctx, value -> scope.launch { SteamFriendsHub.setPresence(ctx, SocialPresence.from(value)) } },

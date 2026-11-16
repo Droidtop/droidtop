@@ -39,7 +39,7 @@ internal object KeysAndAccountsCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Keys and accounts",
-        subtitle = "Each stays on this device. Remove here is the same as on its own page",
+        subtitle = "Each stays on this device. Removing one here removes it everywhere",
         groups = { context -> groups(context) },
     )
 

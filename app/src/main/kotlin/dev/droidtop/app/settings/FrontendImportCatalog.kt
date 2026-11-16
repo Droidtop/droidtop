@@ -25,7 +25,7 @@ object FrontendImportCatalog {
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
         title = "Import from another frontend",
-        subtitle = "Favourites and collections, matched to your games; your ROMs are not touched",
+        subtitle = "Favourites and collections, matched to your games. Your ROMs aren't touched",
         groups = { _ ->
             listOf(
                 CatalogGroup(
@@ -43,7 +43,7 @@ object FrontendImportCatalog {
                         DocumentPickItem(
                             id = "frontend_import_pegasus_favorites",
                             title = "Favourites from favorites.txt",
-                            subtitle = "In Pegasus's own data folder; the games found become favourites here",
+                            subtitle = "In Pegasus's data folder. The games found become favourites here",
                             mimeType = "*/*",
                             onPicked = { ctx, uri -> importPegasusFavorites(ctx, uri) },
                         ),
@@ -56,7 +56,7 @@ object FrontendImportCatalog {
                         DocumentPickItem(
                             id = "frontend_import_launchbox_platform",
                             title = "Favourites and play time",
-                            subtitle = "From a platform file, Data/Platforms/<platform>.xml; one platform at a time",
+                            subtitle = "One platform at a time, from Data/Platforms/<platform>.xml",
                             mimeType = "*/*",
                             onPicked = { ctx, uri -> importLaunchBoxPlatform(ctx, uri) },
                         ),

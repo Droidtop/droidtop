@@ -52,7 +52,7 @@ object ElevatedAccessCatalog {
             return dev.droidtop.library.settings.AsyncActionItem(
                 id = "accounts_wireless_debugging",
                 title = "Pair with wireless debugging",
-                subtitle = "More controls with nothing to install. Android shows a code; reply with it",
+                subtitle = "More controls with nothing to install. Enter the code Android shows",
                 run = { ctx, _ -> dev.droidtop.app.WirelessPairing.start(ctx) },
             )
         }

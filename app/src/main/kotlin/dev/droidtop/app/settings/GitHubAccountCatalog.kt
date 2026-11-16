@@ -405,9 +405,9 @@ object GitHubAccountCatalog {
                 ActionItem(
                     id = "repos_proposal_info",
                     title = "REFUSED: $repo now publishes a different key",
-                    subtitle = "You trusted ${decision.trustedFingerprint}; it now publishes ${decision.publishedFingerprint}. That can mean the owner rotated it, " +
-                        "or that the repository was taken over. droidtop does not replace it from here. If you are sure, remove the repository " +
-                        "and add it again; plugins signed with the old key stop running when you remove it.",
+                    subtitle = "You trusted ${decision.trustedFingerprint}. It now publishes ${decision.publishedFingerprint}. That can mean the owner rotated it, " +
+                        "or that the repository was taken over. droidtop doesn't replace it from here. If you are sure, remove the repository " +
+                        "and add it again. Plugins signed with the old key stop running when you remove it.",
                 ),
             )
             is PluginRepos.TrustDecision.OriginChanged -> listOf(

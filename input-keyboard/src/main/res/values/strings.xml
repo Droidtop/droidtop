@@ -740,18 +740,18 @@
     <string name="slab_enter">Enter</string>
     <string name="summary_dictionaries">Words for suggestions and corrections, one per language, added from a wordlist file (.combined, or .gz)</string>
     <string name="dictionary_add_from_file">Add from a file…</string>
-    <string name="dictionary_converting">Converting the wordlist; this takes a moment</string>
+    <string name="dictionary_converting">Converting the wordlist. This takes a moment</string>
     <string name="dictionary_remove">Remove %1$s</string>
     <string name="dictionary_remove_damaged">Remove %1$s (damaged, so not in use)</string>
     <string name="dictionary_removed">Removed the %1$s dictionary</string>
-    <string name="dictionary_not_removed">The %1$s dictionary could not be removed</string>
+    <string name="dictionary_not_removed">Couldn\'t remove the %1$s dictionary</string>
     <string name="dictionary_added">Added %1$s: %2$d words, used from the next text field</string>
     <string name="title_droidtop_mode">Settings shown</string>
     <string name="title_pro_mode">Pro mode</string>
     <string name="summary_pro_mode_on">Every Hacker\'s Keyboard option is shown</string>
-    <string name="summary_pro_mode_off">The common options only. Turn on for every Hacker\'s Keyboard option; hidden options keep their values</string>
+    <string name="summary_pro_mode_off">The common options only. Turn on for every Hacker\'s Keyboard option. Hidden options keep their values</string>
     <string name="title_keyboard_preset">Start from a preset</string>
-    <string name="summary_keyboard_preset">Handheld, Terminal or Classic Hacker: sets a few options at once; each stays changeable</string>
+    <string name="summary_keyboard_preset">Handheld, Terminal or Classic Hacker: sets a few options at once. Each stays changeable</string>
     <string name="title_reset_modern">Reset to modern defaults</string>
     <string name="summary_reset_modern">Puts every option back to its default. Your macros and languages stay</string>
     <string name="confirm_reset_modern">Reset every keyboard option to its default? Your macros and languages stay.</string>
@@ -804,7 +804,7 @@
         <item>forever</item>
     </string-array>
     <string name="title_space_drag">Space bar moves the cursor</string>
-    <string name="summary_space_drag">Drag a finger along the space bar to move the cursor; with Shift held on the keyboard it selects.</string>
+    <string name="summary_space_drag">Drag a finger along the space bar to move the cursor. With Shift held on the keyboard it selects.</string>
     <string name="title_glide">Glide typing</string>
     <string name="summary_glide">Draw a word across the letters without lifting your finger. Needs a dictionary for the language (Dictionaries).</string>
     <string name="title_macros">Macros</string>
@@ -829,7 +829,7 @@
     <string name="offline_voice_failed_server">The server answered %1$d for %2$s</string>
     <string name="offline_voice_failed_checksum">The download did not match its checksum, so it was not kept</string>
     <string name="offline_voice_failed_files">The download did not hold the files expected (%1$d of %2$d)</string>
-    <string name="offline_voice_failed_not_placed">The download could not be put in place</string>
+    <string name="offline_voice_failed_not_placed">Couldn\'t put the download in place</string>
     <string name="offline_voice_downloading_engine">Downloading the engine: %1$d of %2$d MB</string>
     <string name="offline_voice_downloading_model">Downloading the English model: %1$d of %2$d MB</string>
     <!-- The tool strip and its panels (Droidtop/tracker#340, #772). -->
@@ -865,7 +865,7 @@
     <string-array name="keyboard_view_mode_entries">
         <item>Normal (the key grid shape above)</item>
         <item>Floating</item>
-        <item>Thumb split (a screen over 7.5 inches wide; split elsewhere)</item>
+        <item>Thumb split on screens over 7.5 inches, split elsewhere</item>
         <item>Number pad</item>
     </string-array>
     <string-array name="keyboard_view_mode_values" translatable="false">
@@ -888,7 +888,7 @@
     <string name="tool_unpin">Unpin</string>
     <string name="tool_delete">Delete</string>
     <!-- The clipboard panel (Droidtop/tracker#903 H12d). -->
-    <string name="clip_hint">Tap a clip to paste it; hold it, or press X on a pad, to pin or delete it.</string>
+    <string name="clip_hint">Tap a clip to paste it. Hold it, or press X on a pad, to pin or delete it.</string>
     <string name="clip_clear_unpinned">Clear unpinned</string>
     <plurals name="clip_clear_ask">
         <item quantity="one">Clear %1$d unpinned clip? Pinned clips stay.</item>
@@ -944,7 +944,7 @@
     <string name="gif_not_accepted">This field does not take images.</string>
     <string name="gif_not_taken">The app did not take the image.</string>
     <string name="gif_too_large">That image is too large to send.</string>
-    <string name="gif_unreadable">That image could not be read. Rescan its folder in the keyboard settings.</string>
+    <string name="gif_unreadable">Couldn\'t read that image. Rescan its folder in the keyboard settings.</string>
     <string name="title_gif_folders">GIF and sticker folders</string>
     <string name="summary_gif_folders">Folders of GIF, WebP and PNG images for the emoji panel\'s GIFs and Stickers tabs. Your files stay where they are.</string>
     <string name="gif_folder_add">Add folder</string>
@@ -953,13 +953,13 @@
     <string name="gif_folder_removed">Removed %1$s</string>
     <string name="gif_folders_scanning">Reading the folders…</string>
     <string name="gif_folders_scanned">Images found: %1$d.</string>
-    <string name="gif_folders_unreadable">Folders that could not be read: %1$d. Remove them and add them again.</string>
+    <string name="gif_folders_unreadable">Couldn\'t read some folders: %1$d. Remove them and add them again.</string>
     <string name="gif_folder_not_kept">Android did not let the keyboard keep reading that folder. Pick it again, or another folder.</string>
     <!-- Why a wordlist was not added (Droidtop/tracker#339, #772). -->
     <string name="dictionary_refused_no_language">The wordlist does not say its language (no locale= in its first line)</string>
     <string name="dictionary_refused_no_words">The wordlist has no words</string>
     <string name="dictionary_refused_engine">This language\'s dictionary does not fit the keyboard\'s engine: %1$s</string>
-    <string name="dictionary_refused_not_saved">The dictionary could not be saved</string>
-    <string name="dictionary_refused_not_opened">The file could not be opened</string>
-    <string name="dictionary_refused_not_read">The file could not be read: %1$s</string>
+    <string name="dictionary_refused_not_saved">Couldn\'t save the dictionary</string>
+    <string name="dictionary_refused_not_opened">Couldn\'t open the file</string>
+    <string name="dictionary_refused_not_read">Couldn\'t read the file: %1$s</string>
 </resources>

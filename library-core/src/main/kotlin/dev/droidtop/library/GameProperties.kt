@@ -71,7 +71,7 @@ object GameProperties {
                 ChoiceItem(
                     id = "properties_controls",
                     title = "Controls",
-                    subtitle = "How the pad plays it; the Quick Menu's Controls row changes it while it runs",
+                    subtitle = "How the pad plays it. The Quick Menu's Controls row changes it while it runs",
                     options = listOf(ChoiceOption(GAMEPAD, GameControls.GAMEPAD_LABEL)) +
                         GameControls.entries.map { ChoiceOption(it.id, it.label) },
                     current = controls?.id ?: GAMEPAD,
@@ -84,7 +84,7 @@ object GameProperties {
                 TextInputItem(
                     id = "properties_launch_options",
                     title = "Launch options",
-                    subtitle = "Added after the program's own, one per word; quote words with spaces. Never run by a shell",
+                    subtitle = "Added after the program's own, one per word. Quote words with spaces. Never run by a shell",
                     value = options,
                     onChange = { ctx, text ->
                         withContext(Dispatchers.IO) {
@@ -117,7 +117,7 @@ object GameProperties {
                     AsyncActionItem(
                         id = "properties_reset",
                         title = "Reset",
-                        subtitle = "Clears the launch options and the variables; the program choice stays",
+                        subtitle = "Clears the launch options and the variables. The program choice stays",
                         confirmTitle = "Clear this game's launch options and variables?",
                         run = { ctx, _ ->
                             withContext(Dispatchers.IO) {

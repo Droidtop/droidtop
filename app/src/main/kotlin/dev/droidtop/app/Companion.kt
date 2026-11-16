@@ -114,7 +114,7 @@ object CompanionState {
                 if (kill) library.killRunning(app, entry) else library.quitRunning(app, entry)
             }
             val outcome = kotlinx.coroutines.withTimeoutOrNull(STOP_WAIT_MS) { stop.await() }
-            if (outcome == null) stopStatus.value = "${entry.title} has not ended yet; droidtop is still trying to end it"
+            if (outcome == null) stopStatus.value = "${entry.title} hasn't ended yet. droidtop is still trying"
             val text = when (val result = outcome ?: stop.await()) {
                 dev.droidtop.library.QuitResult.Ended -> null
                 is dev.droidtop.library.QuitResult.NotEnded -> result.message

@@ -298,7 +298,7 @@ const val OPEN_THREAD = "Open thread"
 
 /** The Downloads tab's last row, when the record has a page: [OPEN_THREAD]. Null for a record with no page. Pure. */
 fun openThreadRow(record: UpdateSources.Record): RecordRow? =
-    RecordRow(OPEN_THREAD, subtitle = "Start the download on the page yourself; droidtop places it as this game's", action = RecordAction.OpenThread)
+    RecordRow(OPEN_THREAD, subtitle = "Start the download on the page. droidtop places it as this game's", action = RecordAction.OpenThread)
         .takeIf { record.url?.startsWith("https://") == true }
 
 /** Where a record's Downloads keep the system last picked per source. */

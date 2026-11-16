@@ -42,7 +42,7 @@
     <string name="guides_title">Guides for %1$s</string>
     <string name="guides_looking">Looking in the game\'s folder</string>
     <string name="guides_none_in_folder">None in the game\'s folder</string>
-    <string name="guide_unreadable">This guide could not be read.</string>
+    <string name="guide_unreadable">Couldn\'t read this guide.</string>
     <string name="guide_opening_page">Opening the page</string>
     <string name="guide_pdf_heading">%1$s  ·  page %2$d of %3$d</string>
     <string name="guide_notes">Notes</string>
@@ -130,7 +130,7 @@
     <string name="gamepad_copied_to_its_game_folder_as">Nothing is replaced</string>
     <string name="gamepad_its_update">Its update</string>
     <string name="gamepad_no_source_page_for_this_update">No source page for this update</string>
-    <string name="gamepad_the_source_naming_the_newer_version">No page to show; see the game\'s sources</string>
+    <string name="gamepad_the_source_naming_the_newer_version">No page to show. See the game\'s sources</string>
     <string name="gamepad_system">System</string>
     <string name="gamepad_which_system_s_links_are_listed">Which system\'s links are listed</string>
     <string name="gamepad_pick_a_host_or_try_them">Pick a host, or try them in order</string>
