@@ -297,7 +297,15 @@ internal object ContainedDex {
         }
         val access = runCatching { android.system.Os.access(path, android.system.OsConstants.R_OK); "ok" }.getOrElse { it.message ?: "failed" }
         val stat = runCatching { "${android.system.Os.stat(path).st_size} bytes" }.getOrElse { it.message ?: "failed" }
-        android.util.Log.w("droidtop.plugin", "$pluginId: its class loader does not find $base; $path: access $access, stat $stat")
+        // The class loader decides by opening the file read only (IoUtils.canOpenReadOnly), so that is the call to see
+        // (Droidtop/tracker#926: access and stat succeed while findLibrary answers nothing).
+        val open = runCatching {
+            val fd = android.system.Os.open(path, android.system.OsConstants.O_RDONLY, 0)
+            android.system.Os.close(fd)
+            "ok"
+        }.getOrElse { error -> (error as? android.system.ErrnoException)?.let { "errno ${it.errno} (${it.message})" } ?: (error.message ?: "failed") }
+        val loaderPaths = runCatching { loader.toString().substringAfter("nativeLibraryDirectories=", "").take(200) }.getOrDefault("")
+        android.util.Log.w("droidtop.plugin", "$pluginId: its class loader does not find $base; $path: access $access, stat $stat, open $open; loader paths $loaderPaths")
     }
 
     /**
