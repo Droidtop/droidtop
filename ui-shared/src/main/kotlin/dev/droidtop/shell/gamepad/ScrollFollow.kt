@@ -176,6 +176,18 @@ suspend fun LazyListState.keepHeroInView(index: Int, cardPx: Float, heroPx: Floa
     val delta = heroScrollTarget(current, index, step, heroPx, span) - current
     if (kotlin.math.abs(delta) < 1f) return
     animateScrollBy(delta, if (chained) Motion.scroll(chained = true) else Motion.focus())
+    // The settled-width estimate is off when a card before the first visible one is not [cardPx] wide (the old hero
+    // scrolled partly out of view). The scroll ran on the resize's timing, so the widths are final now: the card's real
+    // place corrects what is left, if anything.
+    val settled = layoutInfo
+    val item = settled.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+    val rest = inViewDelta(
+        item.offset,
+        item.size,
+        settled.viewportStartOffset + settled.beforeContentPadding,
+        settled.viewportEndOffset - settled.afterContentPadding,
+    ) ?: return
+    if (kotlin.math.abs(rest) >= 1f) animateScrollBy(rest, Motion.scroll(chained = true))
 }
 
 /**
