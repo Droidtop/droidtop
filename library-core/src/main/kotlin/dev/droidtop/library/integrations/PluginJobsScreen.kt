@@ -100,7 +100,9 @@ object PluginJobsScreen {
                     rulesGroup()
             },
             onLeave = { kept.clear() },
-            live = kotlinx.coroutines.flow.merge(PluginJobsCenter.entries(), kept.changes, dev.droidtop.library.settings.UpdatesWaiting.count, shownKind, JobHistory.count),
+            // All StateFlows, combined: one value on subscription, which the navigator skips, where merge gave five and the
+            // page loaded four extra times on opening (Droidtop/tracker#941).
+            live = kotlinx.coroutines.flow.combine(PluginJobsCenter.entries(), kept.changes, dev.droidtop.library.settings.UpdatesWaiting.count, shownKind, JobHistory.count) { _, _, _, _, _ -> },
         )
     }
 

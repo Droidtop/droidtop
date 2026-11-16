@@ -97,7 +97,7 @@ object UpdatesPage {
             UpdatesWaiting.refresh?.invoke(context)
             listOf(PluginJobsScreen.updatesGroup()) + PluginJobsScreen.jobGroups()
         },
-        live = kotlinx.coroutines.flow.merge(UpdatesWaiting.count, dev.droidtop.pluginhost.PluginJobsCenter.entries()),
+        live = kotlinx.coroutines.flow.combine(UpdatesWaiting.count, dev.droidtop.pluginhost.PluginJobsCenter.entries()) { _, _ -> },
     )
 
     /** The page, wherever it is opened: the left menu's Updates, a notification, Settings, the Quick Menu's row. */
@@ -110,7 +110,7 @@ object UpdatesPage {
         groups = { context -> withContext(Dispatchers.IO) { page(context).asGroups() } },
         // Live (Droidtop/tracker#748): a kind that finished reading, an update that started or ended, each rebuilds
         // the rows at once.
-        live = kotlinx.coroutines.flow.merge(changes, dev.droidtop.pluginhost.PluginJobsCenter.entries()),
+        live = kotlinx.coroutines.flow.combine(changes, dev.droidtop.pluginhost.PluginJobsCenter.entries()) { _, _ -> },
     )
 
     private fun settingsRow() = NestedScreenItem(
