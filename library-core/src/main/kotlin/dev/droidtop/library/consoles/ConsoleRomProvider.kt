@@ -610,7 +610,12 @@ class ConsoleRomProvider(
         } else {
             RomScanWalk.walk(path, system.extensions) { ScanBudget.start(ScanBudget.DEFAULT_FOLDER_BUDGET_MS) }.files
         }
-        val entries = romEntries(files, systemFolder, system)
+        // A file reported alone is judged with its siblings, so a program in a game folder is that folder's game or nothing.
+        val folderGames = RomScanWalk.folderGames(
+            if (path.isFile) path.parentFile?.let { RomScanWalk.walk(it, system.extensions).files }.orEmpty().ifEmpty { files } else files,
+            systemFolder,
+        )
+        val entries = romEntries(folderGames.files.filter { path.isDirectory || it == path }, systemFolder, system, folderGames.folderOf)
         writeRomRecords(entries, root, system.id)
         return listOf(PathIndexing(key = system.id, root = root.absolutePath, entries = entries, under = path.path))
     }
@@ -716,7 +721,7 @@ class ConsoleRomProvider(
         // lets Room's own executor and the filesystem overlap thousands of
         // independent lookups instead of paying their latency one at a
         // time.
-        val entries = romEntries(romFiles, systemFolder, system)
+        val entries = romEntries(romFiles, systemFolder, system, romScan.folderOf)
         ScanLog.write(
             label = "rom folder ${systemFolder.absolutePath}",
             games = entries.size,
@@ -737,6 +742,8 @@ class ConsoleRomProvider(
         romFiles: List<File>,
         systemFolder: File,
         system: ConsoleSystemDef,
+        // A game folder's main program and its folder (RomScanWalk.folderGames): the entry is named after the folder.
+        folderOf: Map<File, File> = emptyMap(),
     ): List<LibraryEntry> = coroutineScope {
         // The games root is systemFolder's own parent (<gamesRoot>/<systemId>/...),
         // same directory ES-DE's own `downloaded_media` sits alongside --
@@ -752,7 +759,7 @@ class ConsoleRomProvider(
                     ?: system.id
                 LibraryEntry(
                     id = romFile.absolutePath,
-                    title = dev.droidtop.library.GameNaming.displayName(romFile.nameWithoutExtension),
+                    title = dev.droidtop.library.GameNaming.displayName(folderOf[romFile]?.name ?: romFile.nameWithoutExtension),
                     kind = LibraryEntryKind.CONSOLE_ROM,
                     systemId = effectiveSystemId,
                     // Three media lookups per ROM, each answered from

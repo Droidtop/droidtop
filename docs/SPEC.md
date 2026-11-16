@@ -17427,6 +17427,16 @@ identity line.
   review: until then nothing read a playlist and a game of several discs was listed once per file, up to 7
   times); an `.m3u` lists one path per line, `#` lines skipped, a `.cue` names its tracks in `FILE` lines, paths
   are relative to the playlist's folder with either slash, and names compare without case.
+- **A program folder is one game (Droidtop/tracker#931, 2026-11-16).** An
+  unpacked DOS game listed each of its files as a game (42 for one Doom).
+  A folder below a system folder that holds two or more programs (`.exe`,
+  `.com`, `.bat`) is one game: what the walk found in it, at any depth,
+  gives way to its main program, and the entry is named after the folder.
+  The main program is the one named like the folder, else the largest
+  `.exe` or `.com` that is not an installer, setup, sound setup or DOS
+  extender, else the first `.bat`. A program alone in its folder, and
+  anything directly in the system folder, stays an entry of its own
+  (`RomScanWalk.folderGames`, in the one walk, so the scraper agrees).
 - **An archive is an entry as it is.** Emulators read `.zip` and `.7z`
   themselves, so droidtop never extracts one. Identity for a
   single-file `.zip` is the inner file's CRC32, read from the archive's

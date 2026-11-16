@@ -115,6 +115,8 @@ object RomScanWalk {
         val files: List<File>,
         val skipped: List<Pair<File, String>>,
         val stoppedAt: File? = null,
+        // Each game folder's main program and its folder ([folderGames]): the entry is named after the folder.
+        val folderOf: Map<File, File> = emptyMap(),
     )
 
     /**
@@ -178,8 +180,9 @@ object RomScanWalk {
                 }
             }
         }
-        val kept = if (extensions == null) files else files.minus(namedDiscs(files) { readLinesOrNull(it) })
-        return RomScanResult(kept.sortedBy { it.absolutePath }, skipped, stoppedAt)
+        if (extensions == null) return RomScanResult(files.sortedBy { it.absolutePath }, skipped, stoppedAt)
+        val games = folderGames(files.minus(namedDiscs(files) { readLinesOrNull(it) }), systemFolder)
+        return RomScanResult(games.files.sortedBy { it.absolutePath }, skipped, stoppedAt, games.folderOf)
     }
 
     /**
@@ -216,6 +219,64 @@ object RomScanWalk {
     // A playlist is a few lines; one that is not text or not readable names nothing.
     private fun readLinesOrNull(file: File): List<String>? =
         runCatching { if (file.length() > 64 * 1024) null else file.readLines() }.getOrNull()
+
+    /**
+     * A program folder as one game (Droidtop/tracker#931: an unpacked DOS game listed each of its 42 files as a
+     * game). A folder below [systemFolder] that holds two or more programs ([PROGRAMS]: `.exe`, `.com`, `.bat`) is a
+     * game installed there, not a shelf of games: everything found in it, at any depth, gives way to its one main
+     * program ([mainProgram]), which the folder names. A program alone in its folder, and anything directly in the
+     * system folder, stays an entry of its own. Pure, for the JVM tests.
+     */
+    data class FolderGames(val files: List<File>, val folderOf: Map<File, File>)
+
+    fun folderGames(files: List<File>, systemFolder: File): FolderGames {
+        val root = key(systemFolder)
+        val programsByFolder = files.filter { it.extension.lowercase() in PROGRAMS }.groupBy { it.parentFile }
+        // The outermost folders with two or more programs: a game's own subfolders (SETUP/, SOUND/) belong to it.
+        val gameFolders = programsByFolder.filter { (folder, programs) -> folder != null && key(folder) != root && programs.size >= 2 }
+            .keys.filterNotNull().sortedBy { key(it).length }
+            .fold(mutableListOf<File>()) { kept, folder -> if (kept.none { isUnder(folder, it) }) kept += folder; kept }
+        if (gameFolders.isEmpty()) return FolderGames(files, emptyMap())
+        val folderOf = HashMap<File, File>()
+        val mains = gameFolders.associateWith { folder ->
+            mainProgram(files.filter { it.extension.lowercase() in PROGRAMS && it.parentFile == folder }, folder.name)
+        }
+        mains.forEach { (folder, main) -> folderOf[main] = folder }
+        val kept = files.filter { file -> gameFolders.none { isUnder(file.parentFile, it) } || file in folderOf }
+        return FolderGames(kept, folderOf)
+    }
+
+    /**
+     * The program a game folder runs: the one named like its folder (letters and digits only, any case), else the
+     * largest `.exe` or `.com` that is not an installer, setup or driver ([HELPERS]), else the first `.bat`; when
+     * every program is a helper, the same choice among all of them. [size] is a file's length, for the tests.
+     */
+    internal fun mainProgram(programs: List<File>, folderName: String, size: (File) -> Long = { it.length() }): File {
+        fun plain(name: String) = name.lowercase().filter { it.isLetterOrDigit() }
+        val folderKey = plain(folderName)
+        programs.firstOrNull { folderKey.isNotEmpty() && plain(it.nameWithoutExtension) == folderKey }?.let { return it }
+        val games = programs.filter { program ->
+            val name = program.nameWithoutExtension.lowercase()
+            name !in HELPERS && !name.startsWith("uninst") && !name.startsWith("install")
+        }.ifEmpty { programs }
+        return games.filter { it.extension.lowercase() != "bat" }.maxByOrNull(size)
+            ?: games.sortedBy { it.name.lowercase() }.first()
+    }
+
+    /** What a DOS game folder's programs are. */
+    val PROGRAMS = setOf("exe", "com", "bat")
+
+    /** Programs a game folder ships beside the game: its installer, setup, sound setup, DOS extender and startup files. */
+    private val HELPERS = setOf(
+        "setup", "setsound", "sound", "config", "configure", "autoexec", "readme", "info", "help",
+        "dos4gw", "dos32a", "cwsdpmi", "pmodew", "uninstal",
+    )
+
+    private fun isUnder(folder: File?, ancestor: File): Boolean {
+        val a = key(ancestor)
+        val f = folder?.let { key(it) } ?: return false
+        return f == a || f.startsWith(a + File.separator) || f.startsWith("$a/")
+    }
 
     /** [walk]'s file list only, for callers with nothing to report. */
     fun romFiles(systemFolder: File, extensions: Set<String>): List<File> =
