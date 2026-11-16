@@ -346,8 +346,8 @@ object UpdatesPage {
         // What Update all starts: every row that is not already under way, except droidtop's own. Installing droidtop
         // replaces it and ends every other update mid-way, and on the Plugins tab it updated droidtop although no row
         // there named it (Droidtop/tracker#506); droidtop's row keeps its own Update.
-        val installable = updates.mapNotNull { update ->
-            update.install?.takeIf { update.kind != Kind.DROIDTOP && stateOf(update, jobs).first.let { it == State.AVAILABLE || it == State.FAILED } }
+        val installable = updates.filter { update ->
+            update.install != null && update.kind != Kind.DROIDTOP && stateOf(update, jobs).first.let { it == State.AVAILABLE || it == State.FAILED }
         }
         val checkingRows = unread.associate { section ->
             section.kind to ActionItem(id = "updates_checking_${section.name.lowercase()}", title = section.checking, progress = -1f)
@@ -434,7 +434,15 @@ object UpdatesPage {
                     // One word at the press (owner, 2026-11-15: "it should be simple, like 'updating all'"); each row shows
                     // its own progress and result.
                     dev.droidtop.library.settings.Notices.flash("Updating all", context = ctx)
-                    scope.launch { installable.map { install -> async { install(ctx) { } } }.awaitAll() }
+                    // An update that failed before any job existed (a store this build cannot update, a refused plugin)
+                    // has no row of its own to say so: once the batch is done, its line is flashed (review of #153).
+                    scope.launch {
+                        val said = installable.map { update -> async { update to update.install!!(ctx) { } } }.awaitAll()
+                        val now = DownloadJobs.updateJobs()
+                        val failed = said.filter { (update, line) -> line.isNotBlank() && update.job(now) == null && update.id !in pressed }
+                            .map { it.second }
+                        if (failed.isNotEmpty()) dev.droidtop.library.settings.Notices.flash(failed.joinToString(". "), context = ctx)
+                    }
                 },
             ),
             groups = views,
