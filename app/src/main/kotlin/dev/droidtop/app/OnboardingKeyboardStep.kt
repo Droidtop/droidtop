@@ -184,7 +184,7 @@ private fun KeyboardLayoutChoice() {
     )
     StepSectionLabel("Layout")
     SelectableRow(
-        title = "Automatic (recommended)",
+        title = "Automatic",
         supporting = if (handheld) {
             "Upright: four rows. Sideways: all five, with Esc, Ctrl and Alt, split for two thumbs"
         } else {

@@ -1562,7 +1562,7 @@ object AppSettingsCatalogs {
                         ),
                         ToggleItem(
                             id = "scrape_content_marquees",
-                            title = "Fetch marquees (wheel logos)",
+                            title = "Fetch marquees and wheel logos",
                             current = dev.droidtop.library.scraper.ScrapeOptionsPrefs.scrapeMarquees(context),
                             onToggle = { ctx, value -> dev.droidtop.library.scraper.ScrapeOptionsPrefs.setScrapeMarquees(ctx, value) },
                         ),

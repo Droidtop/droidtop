@@ -42,7 +42,7 @@ object ComponentSourcesCatalog {
                     TextInputItem(
                         id = "wine_build_link",
                         title = "Link to a Wine build",
-                        subtitle = "A .wcp package (Winlator or GameNative format), x86_64 or ARM (arm64ec)",
+                        subtitle = "A Winlator or GameNative .wcp package, x86_64 or arm64ec",
                         value = link,
                         onChange = { _, text -> link = text.trim() },
                     ),

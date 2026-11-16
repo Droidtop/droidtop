@@ -1158,7 +1158,7 @@ object ContainersCatalog {
         return listOf(
             AsyncActionItem(
                 id = "container_home_shared",
-                title = "Your files (shared with the desktop)",
+                title = "Your files, shared with the desktop",
                 value = "Current".takeIf { current.home == HomeChoice.Shared },
                 run = choose(HomeChoice.Shared),
             ),

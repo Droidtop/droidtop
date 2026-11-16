@@ -676,7 +676,7 @@ object WineOptions {
     private suspend fun lsfgRow(context: Context, entryId: String): WineOptionRow {
         val chosen = WineGameOptionsPrefs.get(context, entryId)[LSFG_KEY]
         val installed = LsfgVkManager.losslessFolder(context) != null
-        val title = "Frame generation (Lossless Scaling)"
+        val title = "Frame generation"
         if (!installed) {
             return WineOptionRow(
                 LSFG, title,

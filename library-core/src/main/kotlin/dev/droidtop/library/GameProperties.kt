@@ -134,7 +134,7 @@ object GameProperties {
             dev.droidtop.library.settings.NestedScreenItem(
                 id = "properties_drivers",
                 title = "Drivers",
-                subtitle = "Kernel drivers this game installs (anti-cheat, copy protection), and which are approved",
+                subtitle = "Anti-cheat and copy-protection drivers this game installs, and which are approved",
                 inline = GameDrivers.screen(entryId, title),
             ),
         )

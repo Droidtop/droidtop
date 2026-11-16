@@ -257,7 +257,7 @@
     <string name="gaming_pad_button_labels_subtitle">Face button glyphs</string>
     <string name="gaming_pad_labels_auto">Automatic</string>
     <string name="gaming_pad_labels_xbox">Xbox (A B X Y)</string>
-    <string name="gaming_pad_labels_playstation">PlayStation (shapes)</string>
+    <string name="gaming_pad_labels_playstation">PlayStation shapes</string>
     <string name="gaming_pad_labels_nintendo">Nintendo (B A Y X)</string>
     <string name="gaming_stick_dead_zone">Stick dead zone</string>
     <string name="gaming_stick_dead_zone_subtitle">Raise it if a stick drifts</string>

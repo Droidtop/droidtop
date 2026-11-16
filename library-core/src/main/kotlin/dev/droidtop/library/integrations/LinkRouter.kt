@@ -334,7 +334,7 @@ object LinkRouter {
                     TextInputItem(
                         id = "links_handlers_pattern",
                         title = "Links like",
-                        subtitle = "A scheme (magnet:) or a site (https://example.org)",
+                        subtitle = "A scheme such as magnet: or a site such as https://example.org",
                         value = draftPattern,
                         onChange = { _, value -> draftPattern = value.trim() },
                     ),

@@ -485,7 +485,7 @@ internal object StoresCatalog {
                     FolderPickItem(
                         id = "stores_add_folder",
                         title = "A game's folder",
-                        subtitle = "A Windows game, an engine game (Ren'Py, RPG Maker, ...) or an HTML game, in its own folder",
+                        subtitle = "A Windows, engine or HTML game, in its own folder",
                         onPicked = { ctx, uri ->
                             val folder = GamesRootPrefs.resolveStoragePath(uri)
                                 ?: return@FolderPickItem "droidtop cannot reach that folder. Pick a folder on this device's storage"
