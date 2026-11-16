@@ -34,7 +34,10 @@ class DeviceSetupItem(
     val id: String,
     /** The row's title, at most 40 characters. */
     @StringRes val title: Int,
-    /** The confirm card's question before [apply]: what changes, for whom, and that it can be undone. */
+    /**
+     * The confirm card's question before [apply]: what changes and for whom, in one job (Droidtop/tracker#153). The undo
+     * is the row's own state, so the question does not repeat it.
+     */
     @StringRes val ask: Int,
     /** The confirm card's question before [undo]: what comes back. */
     @StringRes val undoAsk: Int,
