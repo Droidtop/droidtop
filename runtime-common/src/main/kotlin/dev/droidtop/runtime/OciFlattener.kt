@@ -126,17 +126,7 @@ object OciFlattener {
         val raw = file.inputStream()
         val hashing = DigestInputStream(BufferedInputStream(raw, 1 shl 16), MessageDigest.getInstance("SHA-256"))
         val sniff = BufferedInputStream(hashing, 1 shl 16)
-        sniff.mark(4)
-        val magic = ByteArray(4).also { sniff.read(it) }
-        sniff.reset()
-        val tar: InputStream = when {
-            magic[0] == 0x1f.toByte() && magic[1] == 0x8b.toByte() -> GZIPInputStream(sniff, 1 shl 16)
-            magic.contentEquals(byteArrayOf(0x28, 0xb5.toByte(), 0x2f, 0xfd.toByte())) -> {
-                raw.close()
-                error("layer ${layer.digest} is zstd-compressed (${layer.mediaType}), which droidtop cannot unpack yet")
-            }
-            else -> sniff
-        }
+        val tar = runCatching { uncompressed(sniff) }.getOrElse { raw.close(); throw it }
         return LayerStream(
             tar = tar,
             verify = {
@@ -152,6 +142,29 @@ object OciFlattener {
             closeable = raw,
         )
     }
+
+    /**
+     * A layer blob as its uncompressed tar, by what its first bytes say: gzip, zstd (the OCI media type
+     * `tar+zstd`, which images now publish, Droidtop/tracker#950), or a plain tar. [sniff] must support mark.
+     */
+    internal fun uncompressed(sniff: BufferedInputStream): InputStream {
+        sniff.mark(4)
+        val magic = ByteArray(4)
+        var read = 0
+        while (read < 4) {
+            val n = sniff.read(magic, read, 4 - read)
+            if (n < 0) break
+            read += n
+        }
+        sniff.reset()
+        return when {
+            read >= 2 && magic[0] == 0x1f.toByte() && magic[1] == 0x8b.toByte() -> GZIPInputStream(sniff, 1 shl 16)
+            read == 4 && magic.contentEquals(ZSTD_MAGIC) -> io.airlift.compress.zstd.ZstdInputStream(sniff)
+            else -> sniff
+        }
+    }
+
+    private val ZSTD_MAGIC = byteArrayOf(0x28, 0xb5.toByte(), 0x2f, 0xfd.toByte())
 
     private class State {
         /**
