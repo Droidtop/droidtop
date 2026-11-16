@@ -1165,7 +1165,9 @@ private fun CatalogPane(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .fadingEdges(state),
+                // Untitled, the list runs up under the floating clock and battery: rows fade out across its height
+                // instead of passing under it with their values hidden (rig, AVD dev.3322).
+                .fadingEdges(state, top = if (title == null) maxOf(24.dp, StatusClusterRoom.size.height) else 24.dp),
             contentPadding = PaddingValues(
                 start = startPadding,
                 end = LocalShellWindow.current.edgePadding,
@@ -1410,15 +1412,16 @@ private fun CategoryEntry(label: String, icon: CatalogIcon?, current: Boolean, c
  * more to scroll to, so a row the viewport cuts reads as "more this way"
  * rather than a slice.
  */
-private fun Modifier.fadingEdges(state: LazyListState, edge: Dp = 24.dp): Modifier = this
+private fun Modifier.fadingEdges(state: LazyListState, edge: Dp = 24.dp, top: Dp = edge): Modifier = this
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()
         val h = edge.toPx().coerceAtMost(size.height / 2)
+        val hTop = top.toPx().coerceAtMost(size.height / 2)
         if (state.canScrollBackward) {
             drawRect(
-                brush = Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = 0f, endY = h),
-                size = Size(size.width, h),
+                brush = Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = 0f, endY = hTop),
+                size = Size(size.width, hTop),
                 blendMode = BlendMode.DstOut,
             )
         }
