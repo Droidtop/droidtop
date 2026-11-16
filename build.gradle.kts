@@ -10,6 +10,17 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
 }
 
+// The classes Compose may treat as stable (compose-stability.conf, Droidtop/tracker#941), for every module that uses
+// Compose.
+subprojects {
+    val module = this
+    plugins.withId("org.jetbrains.kotlin.plugin.compose") {
+        module.extensions.configure<org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension> {
+            stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("compose-stability.conf"))
+        }
+    }
+}
+
 // Compose compiler reports, with -PcomposeReports (Droidtop/tracker#941): for each module that uses Compose, which
 // composables can skip when their inputs are unchanged and which classes Compose counts as unstable, the reason a
 // screen redraws whole when one value changes. Written to <module>/build/compose-reports and compose-metrics;
