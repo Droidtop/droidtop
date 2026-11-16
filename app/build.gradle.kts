@@ -132,7 +132,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = false
             proguardFiles(
-                getDefaultProguardFile("proguard-android.txt"),
+                // Trial (Droidtop/tracker#947): R8 optimisation on, obfuscation still off (proguard-rules.pro).
+                getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
                 "../shell-default/proguard.pro",
                 "../shell-default/proguard.flags",
