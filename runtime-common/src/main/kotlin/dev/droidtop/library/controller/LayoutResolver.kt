@@ -22,23 +22,31 @@ data class PadFacts(
  * The one rule from facts to [FaceLayout] (docs/SPEC.md 7b, "Console and
  * controller detection"). Strongest first:
  *
- * 1. a capture the person made for this pad that is still current;
- * 2. the console table, for the pad built into a known console, with its
- *    toggle read live (a value the table does not list is not guessed:
- *    the family is known but the layout is not);
- * 3. the glyph family of an external pad, from SDL's ids;
- * 4. unknown: Xbox-style, flagged as not established.
+ * 1. the console's own layout switch, for the pad built into a known
+ *    console whose toggle reads a value the table lists: it alone decides,
+ *    every time it changes, and no capture overrides it (owner,
+ *    2026-11-06, Droidtop/tracker#935: a stored capture kept confirm on
+ *    the bottom button in Retro mode, "the opposite of what I'd ever want");
+ * 2. a capture the person made for this pad that is still current, for a
+ *    pad droidtop cannot read (a toggle it cannot read or does not list, an
+ *    external pad);
+ * 3. the console table without a readable toggle (a value the table does
+ *    not list is not guessed: the family is known but the layout is not);
+ * 4. the glyph family of an external pad, from SDL's ids;
+ * 5. unknown: Xbox-style, flagged as not established.
  */
 object LayoutResolver {
     fun resolve(facts: PadFacts): FaceLayout {
-        facts.capture?.takeIf { it.isCurrent(facts.signature) }?.let { return FaceLayout.captured(it.confirmKeyCodeIsB) }
         val console = facts.console
+        val family = console?.glyphFamily ?: GlyphFamily.XBOX
         if (facts.builtIn && console != null) {
-            val family = console.glyphFamily ?: GlyphFamily.XBOX
-            val toggle = console.toggle ?: return FaceLayout.forFamily(family, LayoutSource.CONSOLE)
-            val value = facts.toggleValue?.let { toggle.values[it] }
-                ?: return FaceLayout.forFamily(family, LayoutSource.UNKNOWN)
-            return FaceLayout(family, value.confirmOnRight, value.keysSwapped, LayoutSource.CONSOLE)
+            val switched = console.toggle?.let { toggle -> facts.toggleValue?.let { toggle.values[it] } }
+            if (switched != null) return FaceLayout(family, switched.confirmOnRight, switched.keysSwapped, LayoutSource.CONSOLE)
+        }
+        facts.capture?.takeIf { it.isCurrent(facts.signature) }?.let { return FaceLayout.captured(it.confirmKeyCodeIsB) }
+        if (facts.builtIn && console != null) {
+            if (console.toggle == null) return FaceLayout.forFamily(family, LayoutSource.CONSOLE)
+            return FaceLayout.forFamily(family, LayoutSource.UNKNOWN)
         }
         facts.externalFamily?.let { return FaceLayout.forFamily(it, LayoutSource.FAMILY) }
         return FaceLayout.DEFAULT

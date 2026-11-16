@@ -84,6 +84,20 @@ class LayoutResolverTest {
     }
 
     @Test
+    fun theConsolesOwnSwitchBeatsAStoredCapture() {
+        // A capture made in Xbox mode said confirm is the bottom button; back in Retro mode it is current again.
+        val capture = PadCapture(confirmKeyCodeIsB = true, signature = "s", stale = false)
+        val retro = LayoutResolver.resolve(PadFacts(rp5, true, null, toggleValue = "0", capture = capture, signature = "s"))
+        assertEquals(LayoutSource.CONSOLE, retro.source)
+        assertEquals(FacePosition.RIGHT, retro.positionOf(FaceRole.CONFIRM))
+        val xbox = LayoutResolver.resolve(PadFacts(rp5, true, null, toggleValue = "1", capture = capture, signature = "s"))
+        assertEquals(FacePosition.BOTTOM, xbox.positionOf(FaceRole.CONFIRM))
+        // With the switch unreadable, the person's capture is what is known.
+        val unread = LayoutResolver.resolve(PadFacts(rp5, true, null, toggleValue = null, capture = capture, signature = "s"))
+        assertEquals(LayoutSource.CAPTURED, unread.source)
+    }
+
+    @Test
     fun anUnreadableToggleIsUnknownNotGuessed() {
         val layout = LayoutResolver.resolve(PadFacts(rp5, true, GlyphFamily.XBOX, toggleValue = null, capture = null, signature = ""))
         assertEquals(LayoutSource.UNKNOWN, layout.source)

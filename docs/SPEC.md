@@ -11804,9 +11804,12 @@ square, triangle, Nintendo with A on the right. So on an Xbox-printed handheld t
 layout the confirm pill says B, because that is what the plastic says on the right button; pills always
 point at a real button. Resolution order, strongest first:
 
-1. **A capture** the person made for this pad that still holds (below).
-2. **The console table**, for the pad built into a known console.
-3. **The glyph family of an external pad**, from SDL's controller list.
+1. **The console's own layout switch**, for the pad built into a known console whose toggle reads a value the
+   table lists: it alone decides, each time it changes, and no capture overrides it (owner, 2026-11-06,
+   Droidtop/tracker#935: a capture kept confirm on the bottom button in Retro mode).
+2. **A capture** the person made for this pad that still holds (below), for a pad droidtop cannot read.
+3. **The console table** without a readable toggle, and **the glyph family of an external pad**, from SDL's
+   controller list.
 4. **Unknown**: Xbox-style, flagged as not established (only unknown asks anything of the person).
 
 **Where it lives (Droidtop/tracker#827 F1a, 2026-10-30).** The detection is `:runtime-common`'s
