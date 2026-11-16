@@ -23,10 +23,10 @@ def is_variant(path, suffix, variant):
     return path.name.lower().endswith("_" + variant + suffix)
 
 
-def modules(variant):
-    for metrics in sorted(ROOT.glob("*/build/compose-metrics")):
+def modules(variant, root):
+    for metrics in sorted(root.glob("*/build/compose-metrics")):
         module = metrics.parent.parent.name
-        found = [p for p in metrics.glob("*-module.json") if is_variant(p, "-module.json", variant)]
+        found = [p for p in metrics.rglob("*-module.json") if is_variant(p, "-module.json", variant)]
         if not found:
             continue
         data = json.loads(found[0].read_text(encoding="utf-8"))
@@ -40,12 +40,19 @@ def modules(variant):
         for composables in reports.glob("*-composables.txt"):
             if not is_variant(composables, "-composables.txt", variant):
                 continue
+            # With strong skipping (Kotlin 2) nearly every composable is "skippable"; what decides whether it really
+            # skips is its parameters: an unstable one is compared by identity, so a new object each time (a list
+            # rebuilt on every change) re-runs it. Each composable is "fun a.b.Name(" then one parameter per line.
+            current = None
             for line in composables.read_text(encoding="utf-8").splitlines():
-                # "restartable scheme(...) fun Name(" can not skip; "restartable skippable ..." can.
-                if line.startswith("restartable ") and " skippable " not in " " + line + " ":
-                    name = re.search(r"fun (\w+)\(", line)
-                    if name:
-                        stuck.append(name.group(1))
+                name = re.search(r"fun ([\w.]+)\(", line)
+                if name and line.startswith("restartable"):
+                    current = name.group(1).rsplit(".", 1)[-1]
+                elif line.startswith(")"):
+                    current = None
+                elif current and line.strip().startswith("unstable "):
+                    stuck.append(current)
+                    current = None
         yield module, data, unstable, stuck
 
 
@@ -53,28 +60,30 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--variant", default="debug")
     parser.add_argument("--list", action="store_true")
+    parser.add_argument("--root", default=str(ROOT), help="the tree holding <module>/build/compose-*, the repository by default")
     args = parser.parse_args()
 
-    rows = list(modules(args.variant.lower()))
+    rows = list(modules(args.variant.lower(), pathlib.Path(args.root)))
     if not rows:
         # A warning, not a failure: the numbers are a report, and a renamed report file must not block a build.
         print("::warning::No Compose metrics found: build with -PcomposeReports first.")
         return 0
     out = ["### Compose stability (%s)" % args.variant, "",
-           "| Module | Restartable | Skippable | Can't skip | Unstable classes |", "| --- | ---: | ---: | ---: | ---: |"]
-    total = [0, 0, 0]
+           "| Module | Restartable | Skippable | Can't skip | Unstable params | Unstable classes |", "| --- | ---: | ---: | ---: | ---: | ---: |"]
+    total = [0, 0, 0, 0]
     for module, data, unstable, stuck in rows:
         restartable = int(data.get("restartableComposables", 0))
         skippable = int(data.get("skippableComposables", 0))
         total[0] += restartable
         total[1] += skippable
         total[2] += unstable
-        out.append("| %s | %d | %d | %d | %d |" % (module, restartable, skippable, restartable - skippable, unstable))
-    out.append("| **all** | %d | %d | %d | %d |" % (total[0], total[1], total[0] - total[1], total[2]))
+        total[3] += len(set(stuck))
+        out.append("| %s | %d | %d | %d | %d | %d |" % (module, restartable, skippable, restartable - skippable, len(set(stuck)), unstable))
+    out.append("| **all** | %d | %d | %d | %d | %d |" % (total[0], total[1], total[0] - total[1], total[3], total[2]))
     if args.list:
         for module, _, _, stuck in rows:
             if stuck:
-                out += ["", "**%s** can't skip: %s" % (module, ", ".join(sorted(set(stuck))))]
+                out += ["", "**%s**, composables with an unstable parameter: %s" % (module, ", ".join(sorted(set(stuck))))]
     text = "\n".join(out) + "\n"
     print(text)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
