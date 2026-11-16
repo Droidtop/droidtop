@@ -37,6 +37,10 @@ concurrency:
 jobs:
   checks:
     runs-on: ubuntu-24.04
+    env:
+      # Compose compiler reports for every Gradle run in this job (Droidtop/tracker#941). Lint compiles the main sources
+      # first; with the flag only on the test step those compiles were up to date and wrote no report.
+      ORG_GRADLE_PROJECT_composeReports: "true"
     steps:
       - name: Checkout (with submodules)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -143,7 +147,7 @@ jobs:
         # library-core — that narrower scope meant roughly 30% of this repo's test methods had never once run in
         # CI. Add the module here the moment it grows its first test; the step above fails when one is missing.
         if: always()
-        run: ./gradlew :app:testDebugUnitTest :shell-default:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :input-mapping:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :input-japanese:testDebugUnitTest :input-chinese:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :plugin-host-testing:testDebugUnitTest :sandbox-host:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest :net-core:testDebugUnitTest :shell-desktop:testDebugUnitTest :runtime-linux-root:testDebugUnitTest -PcomposeReports --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :shell-default:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :input-mapping:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :input-japanese:testDebugUnitTest :input-chinese:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :plugin-host-testing:testDebugUnitTest :sandbox-host:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest :net-core:testDebugUnitTest :shell-desktop:testDebugUnitTest :runtime-linux-root:testDebugUnitTest --stacktrace
 
       - name: Compose stability
         # Droidtop/tracker#941: how many composables can skip when their inputs are unchanged, and how many classes
