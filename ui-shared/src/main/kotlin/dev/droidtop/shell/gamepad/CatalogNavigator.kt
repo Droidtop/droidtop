@@ -1071,6 +1071,8 @@ fun CatalogNavigator(
             SettingsCategoryColumn(
                 categories = categories,
                 current = categoryIndex,
+                // Alone on the screen the column reaches the window's right edge, under the clock and battery.
+                underCluster = !twoPane,
                 cursor = columnCursor.takeIf { inColumn },
                 showSearch = showSearch,
                 state = columnState,
@@ -1344,6 +1346,7 @@ internal fun gamingPageColors(): PageColors {
 private fun SettingsCategoryColumn(
     categories: List<SettingsCategory>,
     current: Int,
+    underCluster: Boolean,
     cursor: Int?,
     showSearch: Boolean,
     state: LazyListState,
@@ -1352,13 +1355,16 @@ private fun SettingsCategoryColumn(
     modifier: Modifier = Modifier,
 ) {
     val offset = if (showSearch) 1 else 0
+    // Full width, the first entry starts below the floating clock and battery and the list fades out across them, as a
+    // pane does: the pill sat on the first entry's highlight (rig, AVD dev.3347, Downloads and Updates in portrait).
+    val cluster = if (underCluster) StatusClusterRoom.size.height else 0.dp
     LazyColumn(
         state = state,
         modifier = modifier
             .background(MenuTokens.Card)
-            .fadingEdges(state),
+            .fadingEdges(state, top = maxOf(24.dp, cluster)),
         // The entries reach the plate's left edge, where their accent edge is drawn.
-        contentPadding = PaddingValues(top = Space.Md, bottom = Space.Md),
+        contentPadding = PaddingValues(top = maxOf(Space.Md, cluster), bottom = Space.Md),
         verticalArrangement = Arrangement.spacedBy(Space.Xs),
     ) {
         if (showSearch) {
