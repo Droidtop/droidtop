@@ -37,7 +37,7 @@
     <string name="title_debugging">Debugging</string>
     <string name="title_input_connection_details">Input connection details</string>
     <string name="title_version">Version</string>
-    <string name="title_swipe_gestures">Swipe gestures (experimental)</string>
+    <string name="title_swipe_gestures">Swipe gestures, experimental</string>
     <string name="title_hardware_key_actions">Hardware key actions</string>
 
     <!-- Option to play back sound on keypress in soft keyboard -->
@@ -153,7 +153,7 @@
     <string name="added_word"><xliff:g id="word">%s</xliff:g> : Saved</string>
     
     <!-- Tip to long press on keys -->
-    <string name="tip_long_press">Hold a key down to see accents (ø, ö, etc.)</string>
+    <string name="tip_long_press">Hold a key down to see its accents, such as ø and ö</string>
     <!-- Tip to dismiss keyboard -->
     <string name="tip_dismiss">Press the back key \u21B6 to close the keyboard at any point</string>
     <!-- Tip to press ?123 to access numbers and symbols -->
@@ -348,20 +348,20 @@
     <!-- Description for keyboard theme switcher -->
     <string name="keyboard_layout">Keyboard Theme</string>
     <string name="layout_basic" translatable="false">Basic</string>
-    <string name="layout_high_contrast" translatable="false">Basic (High Contrast)</string>
-    <string name="layout_stone_bold"  translatable="false">Stone (bold)</string>
-    <string name="layout_stone_normal"  translatable="false">Stone (normal)</string>
+    <string name="layout_high_contrast" translatable="false">Basic high contrast</string>
+    <string name="layout_stone_bold"  translatable="false">Stone bold</string>
+    <string name="layout_stone_normal"  translatable="false">Stone</string>
     <string name="layout_gingerbread"  translatable="false">Gingerbread</string>
-    <string name="layout_ics"  translatable="false">Ice Cream Sandwich (bright hints)</string>
-    <string name="layout_ics_darker"  translatable="false">Ice Cream Sandwich (dark hints)</string>
+    <string name="layout_ics"  translatable="false">Ice Cream Sandwich, bright hints</string>
+    <string name="layout_ics_darker"  translatable="false">Ice Cream Sandwich, dark hints</string>
     <string name="layout_trans"  translatable="false">Transparent</string>
-    <string name="layout_trans_neon"  translatable="false">Transparent (experimental)</string>
+    <string name="layout_trans_neon"  translatable="false">Transparent, experimental</string>
 	<string name="layout_material_black" translatable="false">Material Black</string>
     <string name="layout_material_dark" translatable="false">Material Dark</string>
     <string name="layout_material_light" translatable="false">Material Light</string>
     <!-- droidtop: Hacker Keyboard Reborn's modern themes (Droidtop/tracker#903 H12b). Modern is the old "Follow light or dark", id 8. -->
     <string name="layout_modern">Modern</string>
-    <string name="layout_dynamic">Dynamic (wallpaper)</string>
+    <string name="layout_dynamic">Dynamic, from the wallpaper</string>
     <string name="layout_modern_high_contrast">High contrast</string>
     <string name="layout_match_host">Match droidtop</string>
 
@@ -424,7 +424,7 @@
     <string name="title_keyboard_mode_landscape">Keyboard mode, landscape</string>
     <string-array name="keyboard_mode_entries">
         <item>4-row Gingerbread layout</item>
-        <item>5-row compact layout (US QWERTY only!)</item>
+        <item>5-row compact layout, US QWERTY only</item>
         <item>Full 5-row layout</item>
     </string-array>
     <string-array name="keyboard_mode_values">
@@ -433,13 +433,13 @@
         <item>2</item>
     </string-array>
 
-    <string name="title_ctrl_a_override">Ctrl-A (select all) override</string>
+    <string name="title_ctrl_a_override">Ctrl-A override</string>
     <string name="toast_ctrl_a_override_info">Ctrl-A is disabled. Use Ctrl-Alt-A instead, or enable it in settings.</string>
     <string name="default_ctrl_a_override">0</string>
     <string-array name="ctrl_a_override_entries">
         <item>Disable Ctrl-A, use Ctrl-Alt-A instead</item>
         <item>Disable Ctrl-A completely</item>
-        <item>Use Ctrl-A (no override)</item>
+        <item>Use Ctrl-A</item>
     </string-array>
     <string-array name="ctrl_a_override_values">
         <item>0</item>
@@ -450,7 +450,7 @@
     <string name="title_chording_ctrl_key">Ctrl key code</string>
     <string name="default_chording_ctrl_key">0</string>
     <string-array name="chording_ctrl_key_entries">
-        <item>None (ignored when not modifying other keys)</item>
+        <item>None</item>
         <item>Left Ctrl</item>
         <item>Right Ctrl</item>
     </string-array>
@@ -463,7 +463,7 @@
     <string name="title_chording_alt_key">Alt key code</string>
     <string name="default_chording_alt_key">0</string>
     <string-array name="chording_alt_key_entries">
-        <item>None (ignored when not modifying other keys)</item>
+        <item>None</item>
         <item>Left Alt</item>
         <item>Right Alt</item>
     </string-array>
@@ -476,7 +476,7 @@
     <string name="title_chording_meta_key">Meta key code</string>
     <string name="default_chording_meta_key">0</string>
     <string-array name="chording_meta_key_entries">
-        <item>None (ignored when not modifying other keys)</item>
+        <item>None</item>
         <item>Left Meta</item>
         <item>Right Meta</item>
     </string-array>
@@ -509,8 +509,8 @@
     <string name="summary_connectbot_tab_hack_false">Send plain Tab key event</string>
 
     <string name="title_caps_lock">Double-tap Shift mode</string>
-    <string name="summary_caps_lock_true">Caps Lock (q1 => Q1)</string>
-    <string name="summary_caps_lock_false">Shift Lock (q1 => Q!)</string>
+    <string name="summary_caps_lock_true">Caps Lock: q1 => Q1</string>
+    <string name="summary_caps_lock_false">Shift Lock: q1 => Q!</string>
 
     <string name="title_shift_lock_modifiers">Apply Shift Lock to modifier keys?</string>
     <string name="summary_shift_lock_modifiers_true">Yes, including arrow keys</string>
@@ -537,7 +537,7 @@
     <string name="title_slide_keys">Sliding key events</string>
     <!-- Values are a bitmap, see use in PointerTracker -->
     <string-array name="slide_keys_entries">
-        <item>Ignore keys during sliding movement (Recommended)</item>
+        <item>Ignore keys during sliding movement</item>
         <item>Send first key touched</item>
         <item>Send last key touched</item>
         <item>Send first and last key</item>
@@ -569,7 +569,7 @@
         <item>Light</item>
         <item>Medium</item>
         <item>Strong</item>
-        <item>Custom (Vibrate duration)</item>
+        <item>Custom vibrate duration</item>
     </string-array>
     <string-array name="vibrate_strength_values" translatable="false">
         <item>off</item>
@@ -584,7 +584,7 @@
     <string name="title_click_method">Click volume control method</string>
     <string name="default_click_method">0</string>
     <string-array name="click_method_entries">
-        <item>System default (ignore click volume)</item>
+        <item>System default, ignores click volume</item>
         <item>Absolute click volume</item>
         <item>Follow media volume</item>
         <item>Reverse media volume</item>
@@ -599,11 +599,11 @@
     <string name="title_long_press_duration">Long-press duration</string>
 
     <string name="title_render_mode">Drawing method</string>
-    <string name="render_mode_unavailable">(not changeable on this device)</string>
+    <string name="render_mode_unavailable">Not changeable on this device</string>
     <string-array name="render_mode_entries">
-        <item>Direct draw (saves memory)</item>
-        <item>Software buffered (default)</item>
-        <item>Hardware accelerated (experimental)</item>
+        <item>Direct draw, saves memory</item>
+        <item>Software buffered</item>
+        <item>Hardware accelerated, experimental</item>
     </string-array>
     <!-- Keep these values in sync with android.view.View LAYER_TYPE_* definitions -->
     <string-array name="render_mode_values">
@@ -621,7 +621,7 @@
     <string name="title_vol_up">Volume up</string>
     <string name="title_vol_down">Volume down</string>
         <string-array name="swipe_action_entries">
-        <item>(no action)</item>
+        <item>No action</item>
         <item>Close keyboard</item>
         <item>Toggle extension row</item>
         <item>Launch Settings</item>
@@ -738,11 +738,11 @@
     <string name="slab_search">Search</string>
     <string name="slab_save">Save</string>
     <string name="slab_enter">Enter</string>
-    <string name="summary_dictionaries">Words for suggestions and corrections, one per language, added from a wordlist file (.combined, or .gz)</string>
+    <string name="summary_dictionaries">Words for suggestions and corrections, one per language, added from a .combined or .gz wordlist file</string>
     <string name="dictionary_add_from_file">Add from a file…</string>
     <string name="dictionary_converting">Converting the wordlist. This takes a moment</string>
     <string name="dictionary_remove">Remove %1$s</string>
-    <string name="dictionary_remove_damaged">Remove %1$s (damaged, so not in use)</string>
+    <string name="dictionary_remove_damaged">Remove %1$s. It\'s damaged, so not in use</string>
     <string name="dictionary_removed">Removed the %1$s dictionary</string>
     <string name="dictionary_not_removed">Couldn\'t remove the %1$s dictionary</string>
     <string name="dictionary_added">Added %1$s: %2$d words, used from the next text field</string>
@@ -761,16 +761,16 @@
     <string name="title_keyboard_form">Key grid shape, portrait</string>
     <string name="title_keyboard_form_landscape">Key grid shape, landscape</string>
     <string-array name="keyboard_form_entries">
-        <item>Automatic (full width)</item>
+        <item>Automatic, full width</item>
         <item>Full width</item>
-        <item>Split (a gap in the middle, for two thumbs)</item>
+        <item>Split, with a gap in the middle for two thumbs</item>
         <item>One-handed, left</item>
         <item>One-handed, right</item>
     </string-array>
     <string-array name="keyboard_form_landscape_entries">
-        <item>Automatic (split on a handheld, else full width)</item>
+        <item>Automatic: split on a handheld, else full width</item>
         <item>Full width</item>
-        <item>Split (a gap in the middle, for two thumbs)</item>
+        <item>Split, with a gap in the middle for two thumbs</item>
         <item>One-handed, left</item>
         <item>One-handed, right</item>
     </string-array>
@@ -784,7 +784,7 @@
     <string name="title_emoji">Emoji panel</string>
     <string name="summary_emoji">An Emoji button on the tool strip: emoji by group, recently used, and search by name typed on the keyboard.</string>
     <string name="title_inline_autofill">Autofill suggestions</string>
-    <string name="summary_inline_autofill">Show suggestions from a password manager or autofill service in a row above the keys (Android 11 and later).</string>
+    <string name="summary_inline_autofill">Show suggestions from a password manager or autofill service in a row above the keys. Android 11 and later.</string>
     <string name="title_incognito">Incognito mode</string>
     <string name="summary_incognito">Learn no words and record no clipboard history while on. Password fields and editors that ask for no personalised learning are always treated this way.</string>
     <string name="title_clipboard_history">Clipboard history</string>
@@ -806,7 +806,7 @@
     <string name="title_space_drag">Space bar moves the cursor</string>
     <string name="summary_space_drag">Drag a finger along the space bar to move the cursor. With Shift held on the keyboard it selects.</string>
     <string name="title_glide">Glide typing</string>
-    <string name="summary_glide">Draw a word across the letters without lifting your finger. Needs a dictionary for the language (Dictionaries).</string>
+    <string name="summary_glide">Draw a word across the letters without lifting your finger. Needs a dictionary for the language, under Dictionaries.</string>
     <string name="title_macros">Macros</string>
     <string name="message_macros">One per line, name = steps. Steps: C-b (Ctrl+B), A-x, S-Tab, M-x, key names (Esc, Enter, Tab, Up, F5, ...), letters, and \"quoted text\" with \\n for Enter. Example: tmux new window = C-b c</string>
     <string name="notification_channel_name">Hacker\'s Keyboard</string>
@@ -815,12 +815,12 @@
     <!-- droidtop: offline voice typing, downloaded on request (Droidtop/tracker#343). -->
     <string name="title_offline_voice">Offline voice typing</string>
     <string name="summary_offline_voice">Dictation on this device, with nothing sent anywhere. Downloads the speech engine and an English model first</string>
-    <string name="offline_voice_on">On: the voice key types what you say, offline (%1$d MB on this device)</string>
+    <string name="offline_voice_on">On: the voice key types what you say, offline. Takes %1$d MB on this device</string>
     <string name="offline_voice_download">Download</string>
     <string name="offline_voice_download_body">Downloads about %1$d MB from the sherpa-onnx project on GitHub and keeps %2$d MB on this device. Each file is checked before it is used. The voice key then types what you say, without a connection. Android asks once for the microphone.</string>
     <string name="offline_voice_starting">Starting the download</string>
     <string name="offline_voice_remove">Remove</string>
-    <string name="offline_voice_remove_body">Removes the speech engine and model (%1$d MB). The voice key goes back to another keyboard\'s voice typing, if one is on.</string>
+    <string name="offline_voice_remove_body">Removes the speech engine and model, %1$d MB. The voice key goes back to another keyboard\'s voice typing, if one is on.</string>
     <string name="offline_voice_removing">Removing</string>
     <string name="offline_voice_listening">Listening… tap here or the voice key to stop</string>
     <string name="offline_voice_failed">Offline voice typing stopped: %1$s</string>
@@ -828,7 +828,7 @@
     <string name="offline_voice_failed_abi">This device has no 64-bit ABI the engine is built for</string>
     <string name="offline_voice_failed_server">The server answered %1$d for %2$s</string>
     <string name="offline_voice_failed_checksum">The download did not match its checksum, so it was not kept</string>
-    <string name="offline_voice_failed_files">The download did not hold the files expected (%1$d of %2$d)</string>
+    <string name="offline_voice_failed_files">Couldn\'t use the download: it held %1$d of the %2$d files expected</string>
     <string name="offline_voice_failed_not_placed">Couldn\'t put the download in place</string>
     <string name="offline_voice_downloading_engine">Downloading the engine: %1$d of %2$d MB</string>
     <string name="offline_voice_downloading_model">Downloading the English model: %1$d of %2$d MB</string>
@@ -863,7 +863,7 @@
     <string name="title_keyboard_view_mode">Keyboard mode, portrait</string>
     <string name="title_keyboard_view_mode_landscape">Keyboard mode, landscape</string>
     <string-array name="keyboard_view_mode_entries">
-        <item>Normal (the key grid shape above)</item>
+        <item>Normal, the key grid shape above</item>
         <item>Floating</item>
         <item>Thumb split on screens over 7.5 inches, split elsewhere</item>
         <item>Number pad</item>
@@ -911,7 +911,7 @@
     <string name="clip_age_days">%1$d days</string>
     <string name="clip_age_weeks">%1$d wk</string>
     <string name="clip_keep_status">Unpinned clips are kept for %1$s.</string>
-    <string name="tool_macro_problems_more">" (and %1$d more)"</string>
+    <string name="tool_macro_problems_more">". %1$d more like it."</string>
     <string name="tool_macros_empty">None yet. In the keyboard settings, Editing helpers, write one per line: name = C-b c</string>
     <!-- The emoji panel (Droidtop/tracker#342, #772). -->
     <string name="emoji_search">Search</string>
@@ -956,7 +956,7 @@
     <string name="gif_folders_unreadable">Couldn\'t read some folders: %1$d. Remove them and add them again.</string>
     <string name="gif_folder_not_kept">Android did not let the keyboard keep reading that folder. Pick it again, or another folder.</string>
     <!-- Why a wordlist was not added (Droidtop/tracker#339, #772). -->
-    <string name="dictionary_refused_no_language">The wordlist does not say its language (no locale= in its first line)</string>
+    <string name="dictionary_refused_no_language">The wordlist doesn\'t say its language. Its first line needs locale=</string>
     <string name="dictionary_refused_no_words">The wordlist has no words</string>
     <string name="dictionary_refused_engine">This language\'s dictionary does not fit the keyboard\'s engine: %1$s</string>
     <string name="dictionary_refused_not_saved">Couldn\'t save the dictionary</string>
