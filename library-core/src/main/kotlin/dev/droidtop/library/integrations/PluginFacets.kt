@@ -67,6 +67,17 @@ object PluginFacets {
         hostContext = JSONObject().put("target", "plugin"),
     )
 
+    /** The plugin's settings page as facets (`settings.page`), drawn by the one renderer. */
+    fun settingsScreen(record: PluginRecord): dev.droidtop.library.settings.CatalogScreen = PluginViews.screen(
+        record = record,
+        point = POINT,
+        op = OP_GET,
+        id = "plugin_facets_settings_${record.manifest.id}",
+        title = "${record.manifest.label} settings",
+        args = getArgs(SETTINGS_PAGE),
+        hostContext = JSONObject().put("target", "plugin"),
+    )
+
     /**
      * A source's search options (`search.filter`), drawn by the one renderer: each option the person changes is kept
      * ([SourceFilters]) and goes with the source's next search; its notices and actions run as anywhere else.

@@ -38,15 +38,23 @@ object PluginSettingsRows {
 
     fun systemTarget(systemId: String): String = "system:$systemId"
 
-    /** True when [record] has a settings page: declared settings, or an older `ui.settings` view. */
+    /**
+     * True when [record] has a settings page: declared settings, a `settings.page` facet, or an older `ui.settings`
+     * view. The facet counts too (Droidtop/tracker#880: F95zone 0.8.1 moved its settings to a `settings.page` facet,
+     * and its Quick Menu panel lost its Settings row, while Settings > Plugins still drew the page).
+     */
     fun has(record: PluginRecord): Boolean =
-        record.manifest.v2.settings.isNotEmpty() || record.manifest.v2.provides.any { it.point == UI_SETTINGS }
+        record.manifest.v2.settings.isNotEmpty() ||
+            PluginFacets.declares(record, PluginFacets.SETTINGS_PAGE) ||
+            record.manifest.v2.provides.any { it.point == UI_SETTINGS }
 
     fun screenFor(record: PluginRecord, target: String = TARGET_GLOBAL): CatalogScreen {
         val m = record.manifest
         if (m.v2.settings.isNotEmpty()) {
             return CatalogScreen(id = "plugin_settings_${m.id}_$target", title = "${m.label} settings", groups = { ctx -> declaredGroups(ctx, record) })
         }
+        // The plugin's settings as facets, drawn by the one renderer, as Settings > Plugins draws them.
+        if (PluginFacets.declares(record, PluginFacets.SETTINGS_PAGE)) return PluginFacets.settingsScreen(record)
         // An older plugin's own view (docs/plugin-api.md 1.6): inputs, actions and jobs, drawn by droidtop, asked of the plugin.
         return PluginViews.screen(
             record = record,
