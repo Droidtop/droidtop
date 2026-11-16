@@ -1043,8 +1043,8 @@ object AppSettingsCatalogs {
                 items = listOf(
                     guidedKeyRow(context, ScraperKeyService.SCREENSCRAPER, "ScreenScraper"),
                     guidedKeyRow(context, ScraperKeyService.THEGAMESDB, "TheGamesDB"),
-                    guidedKeyRow(context, ScraperKeyService.IGDB, "IGDB (PC & engine games)"),
-                    guidedKeyRow(context, ScraperKeyService.STEAMGRIDDB, "SteamGridDB (PC & engine games)"),
+                    guidedKeyRow(context, ScraperKeyService.IGDB, "IGDB", "For PC and engine games"),
+                    guidedKeyRow(context, ScraperKeyService.STEAMGRIDDB, "SteamGridDB", "For PC and engine games"),
                 ),
             ),
             CatalogGroup(
@@ -1285,9 +1285,10 @@ object AppSettingsCatalogs {
     }
 
     // The service's own page, opened in place, in the frame every Settings page has (Droidtop/tracker#869).
-    private fun guidedKeyRow(context: Context, service: ScraperKeyService, title: String) = NestedScreenItem(
+    private fun guidedKeyRow(context: Context, service: ScraperKeyService, title: String, subtitle: String? = null) = NestedScreenItem(
         id = "accounts_" + service.name.lowercase(),
         title = title,
+        subtitle = subtitle,
         valueLabel = ScraperKeyCheck.state(context, service).let { state -> { _: Context -> state } },
         icon = CatalogIcon.GLOBAL,
         inline = ScraperKeyScreen.screen(service),
