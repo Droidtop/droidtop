@@ -409,6 +409,10 @@ object PluginJobsScreen {
             .joinToString(", ").ifEmpty { null }
     }
 
+    /** True when [report] has items and every one of them failed. Pure. */
+    private fun allFailed(report: JobReport?): Boolean =
+        report != null && report.items.isNotEmpty() && report.items.all { it.outcome == Outcome.FAILED }
+
     private val OUTCOME_ORDER = listOf(Outcome.FAILED, Outcome.NEEDS_PICK, Outcome.DONE, Outcome.SKIPPED)
 
     private fun outcomeWord(outcome: Outcome): String = when (outcome) {
@@ -463,11 +467,13 @@ object PluginJobsScreen {
 
     /**
      * How [entry]'s bar moves (Droidtop/tracker#643): waiting its turn or for a connection is queued, stopped by the
-     * person is paused, under way with no fraction is checking, and a finished job is done or failed. Pure.
+     * person is paused, under way with no fraction is checking, and a finished job is done or failed. A job that ran
+     * to its end with every item of its report failed is failed: the done check over "Library · 3 failed" read as
+     * success (rig, AVD dev.3347, Droidtop/tracker#940). Pure.
      */
     fun lookOf(entry: PluginJobsCenter.Entry): JobLook = when (entry.state) {
         JobState.FAILED -> JobLook.FAILED
-        JobState.DONE -> JobLook.DONE
+        JobState.DONE -> if (allFailed(entry.report)) JobLook.FAILED else JobLook.DONE
         JobState.HELD, JobState.WAITING_FOR_NETWORK, JobState.WAITING_TO_RETRY -> JobLook.QUEUED
         JobState.PAUSED -> JobLook.PAUSED
         JobState.RUNNING -> if (entry.shownPercent >= 0) JobLook.ACTIVE else JobLook.CHECKING

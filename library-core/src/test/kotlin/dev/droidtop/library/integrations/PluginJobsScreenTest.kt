@@ -163,6 +163,21 @@ class PluginJobsScreenTest {
     }
 
     @Test
+    fun `a job that ran to its end with every item failed looks failed`() {
+        fun report(vararg outcomes: dev.droidtop.pluginhost.Outcome) =
+            dev.droidtop.pluginhost.JobReport(outcomes.mapIndexed { i, o -> dev.droidtop.pluginhost.ReportItem("game $i", o) })
+        val allFailed = job("s", 100, done = true).copy(
+            report = report(dev.droidtop.pluginhost.Outcome.FAILED, dev.droidtop.pluginhost.Outcome.FAILED),
+        )
+        assertEquals(JobLook.FAILED, PluginJobsScreen.lookOf(allFailed))
+        val someDone = job("s", 100, done = true).copy(
+            report = report(dev.droidtop.pluginhost.Outcome.FAILED, dev.droidtop.pluginhost.Outcome.DONE),
+        )
+        assertEquals(JobLook.DONE, PluginJobsScreen.lookOf(someDone))
+        assertEquals(JobLook.DONE, PluginJobsScreen.lookOf(job("e", 100, done = true).copy(report = report())))
+    }
+
+    @Test
     fun `a download that sends only its bytes draws a filling bar, not a spinner`() {
         // Droidtop/tracker#877: "Droidtop still shows text, with a spinner for downloads, not a progress bar".
         val bytes = job("b").copy(numbers = dev.droidtop.pluginhost.JobNumbers(bytesDone = 120_000_000, bytesTotal = 300_000_000))
