@@ -147,7 +147,9 @@ public:
     // output's id (its registry name, never 0) or 0 when nothing was
     // started, so the caller can key the window by the output it really
     // went to.
-    uint32_t presentOutput(const std::string& outputName, ANativeWindow* window);
+    // `refreshRate` is the display's, in frames a second: captures are paced
+    // to at most one per refresh (0 or less: as fast as frames come).
+    uint32_t presentOutput(const std::string& outputName, ANativeWindow* window, float refreshRate);
 
     // Stops that output's capture. Returns the id presentOutput gave for it,
     // or 0 when it had none; after it returns its window is no longer drawn
@@ -272,6 +274,11 @@ public:
     void dispatchLoop();
 
 private:
+    // Frame pacing (wayland_client.cpp): the dispatch loop's poll timeout
+    // until the next paced capture, and starting those that are due.
+    int captureWaitMs();
+    void startDueCaptures();
+
     struct wl_display* display_ = nullptr;
     struct wl_registry* registry_ = nullptr;
     WaylandGlobals* globals_ = nullptr;

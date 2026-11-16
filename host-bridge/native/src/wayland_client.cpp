@@ -14,6 +14,7 @@
 #include <cerrno>
 #include <condition_variable>
 #include <cstring>
+#include <ctime>
 #include <deque>
 #include <fcntl.h>
 #include <map>
@@ -229,8 +230,24 @@ struct OutputCapture {
     // until the first touch changed something (Droidtop/tracker#386).
     bool firstFrame = true;
 
+    // Frame pacing (Droidtop/tracker#950, item 2): the shortest time between
+    // the starts of two captures, from the refresh rate of the display the
+    // surface is on (0: none). A busy desktop otherwise asked for the next
+    // frame the moment one arrived, flat out, against the container's own
+    // compositing. A frame that came back early waits until dueAtNs, which
+    // the dispatch loop's poll wakes for.
+    int64_t minIntervalNs = 0;
+    int64_t lastStartNs = 0;
+    int64_t dueAtNs = 0; // 0: no capture waiting
+
     bool running = false;
 };
+
+int64_t monotonicNs() {
+    timespec ts{};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return static_cast<int64_t>(ts.tv_sec) * 1000000000LL + ts.tv_nsec;
+}
 
 /**
  * Live clipboard state for one connection, over ext-data-control-v1.
@@ -1046,6 +1063,19 @@ constexpr wl_registry_listener kRegistryListener = {
 
 void startNextCapture(OutputCapture* cap); // fwd decl — frame_ready/frame_failed below re-arm via this
 
+// The next capture after one ended: now, or at the pace's next slot, which
+// the dispatch loop starts (dispatchLoop, startDueCaptures).
+void captureAgain(OutputCapture* cap) {
+    if (cap->minIntervalNs > 0) {
+        int64_t next = cap->lastStartNs + cap->minIntervalNs;
+        if (monotonicNs() < next) {
+            cap->dueAtNs = next;
+            return;
+        }
+    }
+    startNextCapture(cap);
+}
+
 void allocateShmBuffer(OutputCapture* cap) {
     size_t size = static_cast<size_t>(cap->stride) * cap->height;
     if (cap->buffer && cap->bufferWidth == cap->width && cap->bufferHeight == cap->height &&
@@ -1156,7 +1186,7 @@ void frame_ready(void* data, zwlr_screencopy_frame_v1* frame, uint32_t /*tv_sec_
     cap->frame = nullptr;
 
     if (cap->running) {
-        startNextCapture(cap); // continuous loop: immediately request the next frame
+        captureAgain(cap); // continuous loop: the next frame, at the display's pace
     }
 }
 
@@ -1167,7 +1197,7 @@ void frame_failed(void* data, zwlr_screencopy_frame_v1* frame) {
     cap->frame = nullptr;
 
     if (cap->running) {
-        startNextCapture(cap); // retry — a single failed frame shouldn't kill the session
+        captureAgain(cap); // retry, paced: a single failed frame shouldn't kill the session, nor spin it
     }
 }
 
@@ -1224,6 +1254,8 @@ constexpr zwlr_screencopy_frame_v1_listener kFrameListener = {
 };
 
 void startNextCapture(OutputCapture* cap) {
+    cap->dueAtNs = 0;
+    cap->lastStartNs = monotonicNs();
     cap->haveBufferInfo = false;
     cap->frame = zwlr_screencopy_manager_v1_capture_output(cap->manager, /*overlay_cursor=*/1, cap->output);
     zwlr_screencopy_frame_v1_add_listener(cap->frame, &kFrameListener, cap);
@@ -1635,6 +1667,34 @@ void WaylandClient::runPendingTasks() {
  * which flushes only when it wakes, so a capture request made from the UI
  * thread against an idle compositor was never sent at all.
  */
+// How long the dispatch loop may sleep before a paced capture is due, in
+// milliseconds rounded up, or -1 when none is waiting. Dispatch thread only.
+int WaylandClient::captureWaitMs() {
+    if (!globals_) return -1;
+    int64_t now = monotonicNs();
+    int64_t soonest = -1;
+    for (auto& tracked : globals_->outputs) {
+        OutputCapture* cap = tracked->capture;
+        if (!cap || !cap->running || cap->dueAtNs == 0) continue;
+        int64_t wait = cap->dueAtNs > now ? cap->dueAtNs - now : 0;
+        if (soonest < 0 || wait < soonest) soonest = wait;
+    }
+    if (soonest < 0) return -1;
+    return static_cast<int>((soonest + 999999) / 1000000);
+}
+
+// Starts each paced capture whose time has come. Dispatch thread only.
+void WaylandClient::startDueCaptures() {
+    if (!globals_) return;
+    int64_t now = monotonicNs();
+    for (auto& tracked : globals_->outputs) {
+        OutputCapture* cap = tracked->capture;
+        if (cap && cap->running && cap->dueAtNs != 0 && cap->dueAtNs <= now && !cap->frame) {
+            startNextCapture(cap);
+        }
+    }
+}
+
 void WaylandClient::dispatchLoop() {
     pollfd fds[2] = {
         {wl_display_get_fd(display_), POLLIN, 0},
@@ -1659,7 +1719,7 @@ void WaylandClient::dispatchLoop() {
         }
         fds[0].revents = 0;
         fds[1].revents = 0;
-        if (poll(fds, 2, -1) < 0) {
+        if (poll(fds, 2, captureWaitMs()) < 0) {
             wl_display_cancel_read(display_);
             if (errno == EINTR) continue;
             broken = true;
@@ -1676,6 +1736,7 @@ void WaylandClient::dispatchLoop() {
             (void)ignored;
         }
         if (wl_display_dispatch_pending(display_) < 0) broken = true;
+        if (!broken) startDueCaptures();
     }
     if (broken) {
         LOGW("the compositor connection failed (%s); dispatch thread exiting", strerror(errno));
@@ -1879,6 +1940,7 @@ namespace {
 struct PresentRequest {
     const std::string& outputName;
     ANativeWindow* window;
+    int64_t minIntervalNs;
     uint32_t outputId = 0;
 };
 struct StopRequest {
@@ -1890,8 +1952,10 @@ struct StopRequest {
 // Capture state belongs to the dispatch thread (its frame callbacks run
 // there), so starting and stopping a capture happens there too: tearing
 // it down from the UI thread raced a frame callback still using it.
-uint32_t WaylandClient::presentOutput(const std::string& outputName, ANativeWindow* window) {
-    PresentRequest request{outputName, window};
+uint32_t WaylandClient::presentOutput(const std::string& outputName, ANativeWindow* window, float refreshRate) {
+    // A frame at most per refresh of the display the surface is on; no pace when the rate is unknown.
+    int64_t interval = refreshRate > 1.0f ? static_cast<int64_t>(1e9 / refreshRate) : 0;
+    PresentRequest request{outputName, window, interval};
     runOnDispatchThread([](WaylandClient* self, void* arg) {
         auto* req = static_cast<PresentRequest*>(arg);
         auto* globals = self->globals_;
@@ -1913,6 +1977,7 @@ uint32_t WaylandClient::presentOutput(const std::string& outputName, ANativeWind
         cap->output = tracked->output;
         cap->shm = globals->shm;
         cap->screencopyVersion = globals->screencopy_version;
+        cap->minIntervalNs = req->minIntervalNs;
         cap->running = true;
         tracked->capture = cap;
         startNextCapture(cap);

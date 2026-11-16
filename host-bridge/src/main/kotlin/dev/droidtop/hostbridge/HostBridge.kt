@@ -114,8 +114,8 @@ class HostBridge : HostBridgeInput {
      * read: which Android screen shows which compositor output is not decided here (the named [presentOutput] is the
      * call for another output).
      */
-    fun presentOutput(output: DisplayOutput, surface: Surface): Boolean {
-        return nativePresentOutput(surface)
+    fun presentOutput(output: DisplayOutput, surface: Surface, refreshRate: Float = 0f): Boolean {
+        return nativePresentOutput(surface, refreshRate)
     }
 
     /**
@@ -123,8 +123,8 @@ class HostBridge : HostBridgeInput {
      * [surface]. Each output has one capture: presenting it again moves it to the new surface. False when there is no
      * output of that name.
      */
-    fun presentOutput(outputName: String, surface: Surface): Boolean =
-        outputName.isNotEmpty() && nativePresentNamedOutput(outputName, surface)
+    fun presentOutput(outputName: String, surface: Surface, refreshRate: Float = 0f): Boolean =
+        outputName.isNotEmpty() && nativePresentNamedOutput(outputName, surface, refreshRate)
 
     /** Stops the primary output's capture. */
     fun stopPresenting() {
@@ -353,8 +353,8 @@ class HostBridge : HostBridgeInput {
     private external fun nativeConnectionLost(): Boolean
     private external fun nativeSetInputMethodTaken(taken: Boolean)
     private external fun nativeOutputNames(): Array<String>
-    private external fun nativePresentOutput(surface: Surface): Boolean
-    private external fun nativePresentNamedOutput(outputName: String, surface: Surface): Boolean
+    private external fun nativePresentOutput(surface: Surface, refreshRate: Float): Boolean
+    private external fun nativePresentNamedOutput(outputName: String, surface: Surface, refreshRate: Float): Boolean
     private external fun nativeStopPresenting()
     private external fun nativeStopPresentingOutput(outputName: String)
     private external fun nativeSetOutputSize(width: Int, height: Int, scale: Double): Boolean

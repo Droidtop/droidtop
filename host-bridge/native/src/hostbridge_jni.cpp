@@ -165,7 +165,7 @@ std::string toStdString(JNIEnv* env, jstring value) {
 }
 
 // Presents [outputName] ("" the primary) into [surface]. Callers hold g_clientsMutex.
-jboolean presentOnLocked(JNIEnv* env, jint key, const std::string& outputName, jobject surface) {
+jboolean presentOnLocked(JNIEnv* env, jint key, const std::string& outputName, jobject surface, jfloat refreshRate) {
     auto* client = findClient(key);
     if (!client) {
         LOGI("presentOutput: no connected client");
@@ -180,7 +180,7 @@ jboolean presentOnLocked(JNIEnv* env, jint key, const std::string& outputName, j
 
     // presentOutput stops the output's previous capture before it returns,
     // so its previous window is no longer drawn into and can go.
-    uint32_t outputId = client->presentOutput(outputName, window);
+    uint32_t outputId = client->presentOutput(outputName, window, refreshRate);
     if (outputId == 0) {
         ANativeWindow_release(window);
         return JNI_FALSE;
@@ -434,18 +434,18 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeConnectionLost(JNIEnv* env, jobjec
 
 // The primary output (the first the compositor advertised).
 extern "C" JNIEXPORT jboolean JNICALL
-Java_dev_droidtop_hostbridge_HostBridge_nativePresentOutput(JNIEnv* env, jobject thiz, jobject surface) {
+Java_dev_droidtop_hostbridge_HostBridge_nativePresentOutput(JNIEnv* env, jobject thiz, jobject surface, jfloat refreshRate) {
     std::lock_guard<std::mutex> lock(g_clientsMutex);
-    return presentOnLocked(env, identityHash(env, thiz), std::string(), surface);
+    return presentOnLocked(env, identityHash(env, thiz), std::string(), surface, refreshRate);
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_dev_droidtop_hostbridge_HostBridge_nativePresentNamedOutput(
-    JNIEnv* env, jobject thiz, jstring outputName, jobject surface) {
+    JNIEnv* env, jobject thiz, jstring outputName, jobject surface, jfloat refreshRate) {
     std::string name = toStdString(env, outputName);
     if (name.empty()) return JNI_FALSE; // a name is required here; the primary has its own call
     std::lock_guard<std::mutex> lock(g_clientsMutex);
-    return presentOnLocked(env, identityHash(env, thiz), name, surface);
+    return presentOnLocked(env, identityHash(env, thiz), name, surface, refreshRate);
 }
 
 extern "C" JNIEXPORT void JNICALL
