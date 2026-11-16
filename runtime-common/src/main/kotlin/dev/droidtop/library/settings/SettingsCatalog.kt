@@ -502,6 +502,9 @@ class NestedScreenItem(
     override val chip: RowTag? = null,
     override val iconFile: String? = null,
     override val summaryShown: Boolean = false,
+    // Opens as a popup over this screen, not pushed in its place: a facet's small screen, such as a plugin's page call
+    // (docs/plugin-api.md 1.10, Droidtop/tracker#939). Gaming's navigator draws it so; other renderers push it.
+    val popup: Boolean = false,
 ) : CatalogItem {
     init {
         require((inline != null) != (registryId != null)) { "Exactly one of inline/registryId must be set" }

@@ -203,6 +203,14 @@ fun CatalogNavigator(
     // pushed or linked screen shows. One shared counter rebuilt the whole root, every short screen merged into it
     // included, on each progress report of the Downloads page (Droidtop/tracker#941).
     var rootLive by remember { mutableStateOf(0) }
+    // A row marked popup (NestedScreenItem.popup) opens its screen over this one; closing it reads this screen again.
+    var popupScreen by remember { mutableStateOf<CatalogScreen?>(null) }
+    popupScreen?.let { opened ->
+        CatalogPopup(root = opened, onExit = {
+            popupScreen = null
+            version++
+        })
+    }
     var paneLive by remember { mutableStateOf(0) }
     // Both place-holding states below are saveable because the Activity
     // recreate the Text size setting triggers (AccessibilityPrefs,
@@ -641,7 +649,9 @@ fun CatalogNavigator(
             }
             is NestedScreenItem -> {
                 val child = item.resolve()
-                if (child != null) {
+                if (child != null && item.popup) {
+                    popupScreen = child
+                } else if (child != null) {
                     scrollByDepth[stack.lastIndex] = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
                     stack.add(child)
                     selectionByDepth[stack.lastIndex] = 0

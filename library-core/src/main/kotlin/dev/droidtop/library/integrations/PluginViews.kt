@@ -749,6 +749,8 @@ private class PluginPage(
             valueLabel = value?.let { shown -> { _: Context -> shown } },
             inline = PluginPage(record, point, action.op, action.args(), hostContext, HashMap(values), null, null, onJobDone, extraWhenFailed, extraGroups)
                 .screen("${screenId}_${action.op}_${itemId.hashCode()}", action.title ?: title),
+            // A plugin's page call is a facet: a popup over the plugin's screen (docs/plugin-api.md 1.10).
+            popup = true,
         )
         ViewAction.Kind.CALL, ViewAction.Kind.JOB, ViewAction.Kind.GRANT, ViewAction.Kind.SECRET -> AsyncActionItem(
             id = itemId,

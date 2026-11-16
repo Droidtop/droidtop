@@ -1398,8 +1398,9 @@ shows what the facet changed. A full page (`CatalogSheet`) is for a place of its
 source's search options (`search.filter`) open as a popup over the search panel instead of replacing it, and on a
 game's page a plugin row's `page` call, and an action's reply screen, open as a popup over the page. A source record's
 page (its downloads, versions and details, `item.page`) stays a page: it is a long list of its own, the exception the
-rule allows. Still to move: a `page` call inside a settings screen (a plugin's own settings), which the settings
-navigator pushes as a screen.
+rule allows. A `page` call inside a plugin's own settings screen is a row marked `NestedScreenItem.popup`, which
+Gaming's settings navigator opens as a popup over that screen and reads that screen again when it closes; the Mobile
+and Desktop settings renderers, which have no overlay of that kind, push it as before.
 
 **Status: approved by the owner (2026-10-23: "Facets is really useful"); being built in pieces.** Built: the model and
 its guards (`Facets`, `FacetGuards` in `:plugin-host`: reading a reply, templates, the target list with the kinds and
