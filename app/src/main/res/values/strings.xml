@@ -22,8 +22,8 @@
     <string name="widget_plugin_title">Plugin</string>
     <string name="widget_plugin_pick">Choose what this widget shows</string>
     <string name="widget_plugin_none">No plugin offers a widget yet</string>
-    <string name="widget_plugin_unset">Tap to choose a plugin</string>
-    <string name="widget_plugin_gone">Plugin gone. Tap to choose another</string>
+    <string name="widget_plugin_unset">Choose a plugin</string>
+    <string name="widget_plugin_gone">Plugin gone. Choose another</string>
     <string name="widget_plugin_waiting">Waiting for %1$s</string>
     <string name="widget_search_title">Library search</string>
     <string name="widget_search_hint">Search games and apps</string>
@@ -113,7 +113,7 @@
     <string name="scraper_key_setup_clear">Clear</string>
     <string name="plugin_widget_configure_reading_your_plugins">Reading your plugins</string>
     <string name="companion_social_messages">Messages</string>
-    <string name="companion_notifications_tap_to_show">Tap to show</string>
+    <string name="companion_notifications_tap_to_show">Text hidden</string>
     <string name="companion_notifications_now_playing">Now playing · %1$s</string>
     <string name="remote_input_type_from_another_device">Type from another device</string>
     <string name="remote_input_open_it_in_a_browser">Open it in a browser on the same network, then confirm the code here.</string>

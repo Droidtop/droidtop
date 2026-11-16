@@ -583,7 +583,7 @@ object UpdatesPage {
         val catalogs = PluginCatalog.refreshProblems(context).map { (source, problem) ->
             ActionItem(
                 id = "updates_catalog_refused_${source.id.hashCode().toUInt()}",
-                title = "${source.name} couldn't be checked",
+                title = "Couldn't check ${source.name}",
                 subtitle = "$problem. Its plugins' newest versions may be missing here until it can be read again",
             )
         }

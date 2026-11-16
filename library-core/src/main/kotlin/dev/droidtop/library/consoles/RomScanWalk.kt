@@ -255,10 +255,7 @@ object RomScanWalk {
         fun plain(name: String) = name.lowercase().filter { it.isLetterOrDigit() }
         val folderKey = plain(folderName)
         programs.firstOrNull { folderKey.isNotEmpty() && plain(it.nameWithoutExtension) == folderKey }?.let { return it }
-        val games = programs.filter { program ->
-            val name = program.nameWithoutExtension.lowercase()
-            name !in HELPERS && !name.startsWith("uninst") && !name.startsWith("install")
-        }.ifEmpty { programs }
+        val games = programs.filter { !HELPER.matches(it.nameWithoutExtension.lowercase()) }.ifEmpty { programs }
         return games.filter { it.extension.lowercase() != "bat" }.maxByOrNull(size)
             ?: games.sortedBy { it.name.lowercase() }.first()
     }
@@ -266,10 +263,14 @@ object RomScanWalk {
     /** What a DOS game folder's programs are. */
     val PROGRAMS = setOf("exe", "com", "bat")
 
-    /** Programs a game folder ships beside the game: its installer, setup, sound setup, DOS extender and startup files. */
-    private val HELPERS = setOf(
-        "setup", "setsound", "sound", "config", "configure", "autoexec", "readme", "info", "help",
-        "dos4gw", "dos32a", "cwsdpmi", "pmodew", "uninstal",
+    /**
+     * Programs a game folder ships beside the game, by name: its setup in any spelling (SETUP, SETUP2, FDSETUP,
+     * SNDSETUP, SETSOUND), installer and uninstaller, configuration and startup files, readme and help viewers, and
+     * DOS extenders (DOS4GW, CWSDPMI, PMODEW).
+     */
+    private val HELPER = Regex(
+        "(?:[a-z]{0,4}setup[a-z0-9]*|set(?:snd|sound|up)[a-z0-9]*|install[a-z0-9]*|uninst[a-z0-9]*|config(?:ure)?[a-z0-9]*|" +
+            "autoexec|readme[a-z0-9]*|info|help[a-z0-9]*|sound[0-9]*|dos4gw|dos32a|cwsdpmi|pmodew|dpmi[a-z0-9]*)",
     )
 
     private fun isUnder(folder: File?, ancestor: File): Boolean {

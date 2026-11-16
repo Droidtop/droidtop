@@ -54,7 +54,7 @@ RULES=(
 "press-target @@ 1 @@ \.minTouchTarget\b @@ /ShellWindow\.kt$ @@ a press target's size is ShellWindow.pressTarget: a finger's where touch comes first, the shell's 48dp where the pad drives (Droidtop/tracker#740: read directly, the finger size made the Quick Menu sparse)"
 "companion-words @@ 1 @@ \"[^\"]*\b(helper|Helper|Shizuku|provider|Provider|Risky|root|Root|adb|ADB|IME|kernel)\b[^\"]*\" @@ only:^app/src/main/kotlin/dev/droidtop/app/Companion[^/]*\.kt$ except /CompanionPins\.kt$ @@ machinery words (helper, Shizuku, provider, Risky, root, adb, IME, kernel) never appear in what the companion says (Droidtop/tracker#786 rule 10); the helper's own page in CompanionPins.kt is excused until it moves to droidtop > Advanced, and leaves this allowlist in that commit"
 "literal-text @@ 1 @@ \bText\(\"[A-Z] @@ ^(display|host-bridge|input-keyboard|input-seat|library-core|net-core|plugin-host|plugin-host-testing|runtime-common|runtime-linux-noroot|runtime-linux-root|runtime-windows|shell-default|stores)/ @@ a word on screen is a string resource (Droidtop/tracker#177); a module leaves this allowlist in the commit that clears it"
-"copy-phrases @@ 1 @@ \b(title|subtitle|value|summary|confirmTitle) = \"[^\"]*([a-z)]; [a-z]|its own page|could not be|Recommended\.|(Press|Select) to [a-z]) @@ - @@ a row says one thing in active words: no semicolon splice (two sentences instead), no \"its own page\", errors as \"Couldn't X\" never \"X could not be Y\", and no \"Recommended.\" outside a danger notice (Droidtop/tracker#153, docs/DESIGN-LANGUAGE.md \"Copy\"); string resources are held to the same, below"
+"copy-phrases @@ 1 @@ \b(title|subtitle|value|summary|confirmTitle) = \"[^\"]*([a-z)]; [a-z]|its own (page|screen)|(cannot|can not|could not|couldn.t) be [a-z]+|Recommended\.|\\b(Press|Select|Tap|Click) (to|here)\\b) @@ - @@ a row says one thing in active words: no semicolon splice (two sentences instead), no \"its own page\", errors as \"Couldn't X\" never \"X could not be Y\", and no \"Recommended.\" outside a danger notice (Droidtop/tracker#153, docs/DESIGN-LANGUAGE.md \"Copy\"); string resources are held to the same, below"
 )
 
 failed=0
@@ -109,7 +109,7 @@ done
 # copy-phrases for string resources: the same phrases in a <string> of any module's values/strings.xml (vendored
 # trees aside). Scanned here because the rules above read Kotlin only.
 res_sites="$(find . -path ./vendor -prune -o -path ./.git -prune -o -path '*/build' -prune -o -path '*/src/main/res/values/strings.xml' -print 2>/dev/null \
-    | sed 's|^\./||' | xargs -r grep -EnH -- '<string [^>]*>[^<]*([a-z)]; [a-z]|its own page|could not be|Recommended\.|(Press|Select) to [a-z])' 2>/dev/null || true)"
+    | sed 's|^\./||' | xargs -r grep -EnH -- '<string [^>]*>[^<]*([a-z)]; [a-z]|its own (page|screen)|(cannot|can not|could not|couldn.t) be [a-z]+|Recommended\.|\b(Press|Select|Tap|Click) (to|here)\b)' 2>/dev/null || true)"
 res_count=0
 [ -n "$res_sites" ] && res_count="$(printf '%s\n' "$res_sites" | wc -l | tr -d ' ')"
 report copy-phrases-res 1 "$res_count" "$res_sites" "a string resource follows the copy-phrases rule (Droidtop/tracker#153)"

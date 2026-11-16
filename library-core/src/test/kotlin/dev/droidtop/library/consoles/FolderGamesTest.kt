@@ -48,6 +48,9 @@ class FolderGamesTest {
         assertEquals("KEEN1.EXE", RomScanWalk.mainProgram(listOf(program("KEEN1.EXE"), program("SETUP.EXE")), "Other", size).name)
         // Only helpers: the same choice among them.
         assertEquals("SETUP.EXE", RomScanWalk.mainProgram(listOf(program("SETUP.EXE"), program("INSTALL.BAT")), "Other", size).name)
+        // Setups in any spelling are helpers, so the game wins even when they are larger.
+        val spelled = mapOf("FDSETUP.EXE" to 900L, "SNDSETUP.EXE" to 800L, "SETUP2.EXE" to 700L, "INSTALL.EXE" to 600L, "TYRIAN.EXE" to 10L)
+        assertEquals("TYRIAN.EXE", RomScanWalk.mainProgram(spelled.keys.map(::program), "Other") { spelled[it.name] ?: 0L }.name)
         // Only batch files: the first by name.
         assertEquals("GO.BAT", RomScanWalk.mainProgram(listOf(program("RUN.BAT"), program("GO.BAT")), "Other", size).name)
     }
