@@ -76,7 +76,7 @@ class LinkActivity : ComponentActivity() {
     private fun offerFile(uri: Uri) {
         val context = applicationContext
         if (UiModePrefs.get(this).hidesSettings) {
-            dev.droidtop.library.settings.Notices.flash("Downloads cannot be added in this UI mode", context = context)
+            dev.droidtop.library.settings.Notices.flash("Couldn't add the download in this mode", context = context)
             finish()
             return
         }

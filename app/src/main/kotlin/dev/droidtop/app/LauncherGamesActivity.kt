@@ -204,7 +204,7 @@ class LauncherGamesActivity : AppCompatActivity() {
                     .getOrDefault(false)
                 if (!asked) {
                     withContext(Dispatchers.Main) {
-                        dev.droidtop.library.settings.Notices.flash("${entry.title} could not be pinned", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
+                        dev.droidtop.library.settings.Notices.flash("Couldn't pin ${entry.title}", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
                     }
                 }
             }
