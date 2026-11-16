@@ -33,7 +33,7 @@ NONE_VALUES = ("none", "internal")
 
 # Subjects of changes nobody using droidtop notices. A Changelog trailer always wins over these.
 INTERNAL_RE = re.compile(
-    r"^(merge\b|revert \"merge|ci\b|ci:|tests?\b|tests?:|lint\b|docs?\b|docs?:|spec\b|spec:|changelog fragment\b)"
+    r"^(merge\b|revert \"merge|ci\b|ci:|tests?\b|tests?:|lint\b|docs?\b|docs?:|spec\b|spec:|changelog fragment\b|checks?:|ui rules?:|build:|gradle:)"
     r"|\b(\w+test|tests?)\s*:"
     r"|\bchangelog fragment\b",
     re.IGNORECASE,
@@ -41,7 +41,7 @@ INTERNAL_RE = re.compile(
 FIXED_RE = re.compile(r"\b(fix|fixes|fixed|no longer|crash\w*|broken|regression|again works|works again)\b", re.IGNORECASE)
 ADDED_RE = re.compile(r"^(add|adds|added|new)\b|\b(gets|now has|now offers)\b", re.IGNORECASE)
 
-INTERNAL_LINE = "Internal changes ({count}); nothing looks different"
+INTERNAL_LINE = "Internal changes: {count}. Nothing looks different"
 
 
 class ConventionError(ValueError):
