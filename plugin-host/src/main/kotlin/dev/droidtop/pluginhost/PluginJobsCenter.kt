@@ -213,11 +213,23 @@ object PluginJobsCenter {
     fun attach(context: Context) {
         persistenceContext = context.applicationContext
         persistenceScope.launch {
-            val prefs = context.applicationContext.pluginJobsStore.data.first()
-            restore(decodeEntries(prefs[persistedKey].orEmpty()))
+            val app = context.applicationContext
+            val prefs = app.pluginJobsStore.data.first()
+            val saved = decodeEntries(prefs[persistedKey].orEmpty())
+            // A finished job already in history was archived just before droidtop stopped, while the live list's write
+            // was still waiting: it stays in history only, never in both (Droidtop/tracker#940).
+            val archived = runCatching { JobHistory.has(app, saved.filter { it.done }.map { it.jobId }) }.getOrDefault(emptySet())
+            restore(saved.filter { it.jobId !in archived })
             runCatching { onRestored() }
-            // Older finished jobs past the person's Keep history choice go (Droidtop/tracker#940).
-            runCatching { JobHistory.prune(context.applicationContext) }
+            // Finished jobs past the person's Keep finished jobs choice go, from history and from the live list.
+            runCatching { JobHistory.prune(app) }
+            val days = runCatching { JobHistory.keepDays(app) }.getOrDefault(0)
+            if (days > 0) {
+                val cutoff = System.currentTimeMillis() - days * 24L * 60 * 60 * 1000
+                state.update { list -> list.filterNot { it.done && (it.finishedAtMs ?: it.startedAtMs) < cutoff } }
+                persist()
+            }
+            runCatching { JobHistory.refreshCount(app) }
         }
     }
 
@@ -817,7 +829,15 @@ object PluginJobsCenter {
         val context = persistenceContext
         if (dropped.isNotEmpty() && context != null) {
             val moving = dropped
-            persistenceScope.launch { runCatching { JobHistory.archive(context, moving) } }
+            persistenceScope.launch {
+                runCatching { JobHistory.archive(context, moving) }
+                // Archived with its spec (encodeEntries reads it); the live maps let it go, so they hold the live list only.
+                moving.forEach { entry ->
+                    finishedSpecs.remove(entry.jobId)
+                    retryHandlers.remove(entry.jobId)
+                    insteadHandlers.remove(entry.jobId)
+                }
+            }
         }
     }
 
@@ -1000,10 +1020,15 @@ object PluginJobsCenter {
         }
     }.toString()
 
-    internal fun decodeEntries(encoded: String): List<Entry> = try {
+    /**
+     * The entries [encoded] holds. With [register] (the live list, restored) each one's spec is kept so it can resume or
+     * be retried; without it (Older jobs reading [JobHistory]) nothing is kept, so reading history grows no map. A row
+     * that cannot be read is left out on its own; the others still come back.
+     */
+    internal fun decodeEntries(encoded: String, register: Boolean = true): List<Entry> = try {
         val array = JSONArray(encoded)
         fun JSONObject.text(key: String): String? = optString(key).takeIf { it.isNotEmpty() && it != "null" }
-        (0 until array.length()).map { i -> array.getJSONObject(i).let { o ->
+        (0 until array.length()).mapNotNull { i -> runCatching { array.getJSONObject(i) }.getOrNull()?.let { o -> runCatching {
             val done = o.optBoolean("done", false)
             val result = if (!done) null else if (o.optBoolean("ok", true)) {
                 PluginResult.success(o.text("summary")?.let { mapOf("summary" to it) }.orEmpty())
@@ -1026,6 +1051,7 @@ object PluginJobsCenter {
                 report = JobReport.decode(o.text("report")),
                 open = OpenTarget.decode(o.text("open")),
             ).also { entry ->
+                if (!register) return@also
                 val cap = PluginCapability.fromId(o.optString("capability"))
                 val args = buildMap { o.optJSONObject("args")?.let { a -> a.keys().forEach { put(it, a.optString(it)) } } }
                 when {
@@ -1034,6 +1060,6 @@ object PluginJobsCenter {
                     !done && entry.pausable && entry.resumable && cap != null -> resumeSpecs[entry.jobId] = ResumeSpec(null, cap, args)
                 }
             }
-        } }
+        }.getOrNull() } }
     } catch (_: Exception) { emptyList() }
 }

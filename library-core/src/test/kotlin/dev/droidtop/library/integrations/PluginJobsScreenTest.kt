@@ -39,6 +39,14 @@ class PluginJobsScreenTest {
     }
 
     @Test
+    fun `older jobs stay reachable when the live list holds no finished job`() {
+        val empty = PluginJobsScreen.groupsFor(emptyList(), nowMs = 0L, older = true)
+        assertEquals(listOf("plugin_jobs_none", "plugin_jobs_older"), empty.single().items.map { it.id })
+        val running = PluginJobsScreen.groupsFor(listOf(job("a", 10)), nowMs = 0L, older = true)
+        assertEquals(listOf("plugin_jobs_show", "plugin_jobs_older"), running.last().items.map { it.id })
+    }
+
+    @Test
     fun `a running job is one row with its progress, and a finished one says how it ended`() {
         val running = PluginJobsScreen.jobRow(job("a", 42), nowMs = 0L)
         assertTrue(running is NestedScreenItem)

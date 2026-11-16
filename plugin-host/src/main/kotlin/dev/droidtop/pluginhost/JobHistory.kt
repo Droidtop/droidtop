@@ -21,6 +21,31 @@ object JobHistory {
 
     @Volatile private var open: SQLiteDatabase? = null
 
+    /**
+     * How many jobs history holds, kept in memory so the Downloads page can offer Older jobs without reading the disk
+     * while it draws. Read at start ([refreshCount]) and after every archive, clear and prune.
+     */
+    val count = kotlinx.coroutines.flow.MutableStateFlow(0)
+
+    /** Reads [count] from the file. Disk work: call off the main thread. */
+    fun refreshCount(context: Context) {
+        count.value = if (!exists(context)) 0 else db(context)?.let { android.database.DatabaseUtils.queryNumEntries(it, "jobs").toInt() } ?: 0
+    }
+
+    /** Which of [ids] history already holds. */
+    fun has(context: Context, ids: List<String>): Set<String> {
+        if (ids.isEmpty() || !exists(context)) return emptySet()
+        val db = db(context) ?: return emptySet()
+        val found = HashSet<String>()
+        ids.chunked(500).forEach { chunk ->
+            val marks = chunk.joinToString(",") { "?" }
+            db.rawQuery("SELECT id FROM jobs WHERE id IN ($marks)", chunk.toTypedArray()).use { cursor ->
+                while (cursor.moveToNext()) found += cursor.getString(0)
+            }
+        }
+        return found
+    }
+
     /** The kinds the Downloads page filters by. Pure. */
     enum class Kind(val label: String) {
         DOWNLOADS("Downloads"),
@@ -32,13 +57,21 @@ object JobHistory {
 
         companion object {
             /** Which kind [entry] is: by droidtop's own job kind, else a plugin's job. Pure. */
-            fun of(entry: PluginJobsCenter.Entry): Kind = when (entry.nativeKind) {
-                null -> PLUGINS
-                DownloadJobs.KIND, "store_install" -> DOWNLOADS
-                "library_scrape" -> SCRAPES
-                "library_rescan", "source-index" -> LIBRARY
-                else -> OTHER
+            fun of(entry: PluginJobsCenter.Entry): Kind {
+                val kind = entry.nativeKind ?: return PLUGINS
+                return when {
+                    // Every kind registered as a download (downloads, store installs, a computer's game copy, fonts).
+                    PluginJobsCenter.isDownloadKind(kind) -> DOWNLOADS
+                    kind == SCRAPE_KIND -> SCRAPES
+                    kind in LIBRARY_KINDS -> LIBRARY
+                    else -> OTHER
+                }
             }
+
+            // The kinds library-core registers (LibraryScrapeJob.KIND, LibraryRescanJob.KIND, SourceIndexRefresh.KIND),
+            // which plugin-host cannot import.
+            private const val SCRAPE_KIND = "library_scrape"
+            private val LIBRARY_KINDS = setOf("library_rescan", "source-index")
         }
     }
 
@@ -75,6 +108,7 @@ object JobHistory {
         } finally {
             db.endTransaction()
         }
+        refreshCount(context)
     }
 
     /** Up to [limit] archived jobs of [kind] (null: every kind), newest first, from [offset]. */
@@ -87,7 +121,7 @@ object JobHistory {
         db.rawQuery("SELECT entry FROM jobs $where ORDER BY finished DESC LIMIT $limit OFFSET $offset", args).use { cursor ->
             while (cursor.moveToNext()) runCatching { rows.put(org.json.JSONObject(cursor.getString(0))) }
         }
-        return PluginJobsCenter.decodeEntries(rows.toString())
+        return PluginJobsCenter.decodeEntries(rows.toString(), register = false)
     }
 
     /** How many archived jobs there are of each kind. */
@@ -109,6 +143,7 @@ object JobHistory {
         if (!exists(context)) return
         val db = db(context) ?: return
         if (kind == null) db.delete("jobs", null, null) else db.delete("jobs", "kind = ?", arrayOf(kind.name))
+        refreshCount(context)
     }
 
     /** Drops what is older than [keepDays] allows, at [nowMs]; nothing when history is kept until cleared. */
@@ -117,6 +152,7 @@ object JobHistory {
         if (days <= 0 || !exists(context)) return
         val db = db(context) ?: return
         db.delete("jobs", "finished < ?", arrayOf((nowMs - days * DAY_MS).toString()))
+        refreshCount(context)
     }
 
     private fun exists(context: Context) = File(context.filesDir, FILE).isFile

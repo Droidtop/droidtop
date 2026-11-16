@@ -100,7 +100,7 @@ object PluginJobsScreen {
                     rulesGroup()
             },
             onLeave = { kept.clear() },
-            live = kotlinx.coroutines.flow.merge(PluginJobsCenter.entries(), kept.changes, dev.droidtop.library.settings.UpdatesWaiting.count, shownKind),
+            live = kotlinx.coroutines.flow.merge(PluginJobsCenter.entries(), kept.changes, dev.droidtop.library.settings.UpdatesWaiting.count, shownKind, JobHistory.count),
         )
     }
 
@@ -256,11 +256,18 @@ object PluginJobsScreen {
             }
         },
         onLeave = { historyLimit.value = HISTORY_PAGE },
-        live = kotlinx.coroutines.flow.merge(shownKind, historyLimit, historyChanges),
+        live = kotlinx.coroutines.flow.merge(shownKind, historyLimit, historyChanges, JobHistory.count),
     )
 
     /** The screen's sections for [snapshot]: Current, Waiting, Paused, Finished, each only when it has a job. */
-    internal fun groupsFor(snapshot: List<PluginJobsCenter.Entry>, nowMs: Long, kind: JobHistory.Kind? = shownKind.value): List<CatalogGroup> {
+    internal fun groupsFor(
+        snapshot: List<PluginJobsCenter.Entry>,
+        nowMs: Long,
+        kind: JobHistory.Kind? = shownKind.value,
+        // Whether history holds jobs ([JobHistory.count], in memory): then Older jobs stays reachable with no finished job
+        // in the live list, after Clear finished too (review of Droidtop/tracker#940).
+        older: Boolean = JobHistory.count.value > 0,
+    ): List<CatalogGroup> {
         JobPace.forget(snapshot.mapTo(HashSet()) { it.jobId })
         if (snapshot.isEmpty()) {
             return listOf(
@@ -268,7 +275,8 @@ object PluginJobsScreen {
                     id = "plugin_jobs_list",
                     title = null,
                     // A short title: the navigator's detail strip repeats any title longer than a row shows.
-                    items = listOf(ActionItem(id = "plugin_jobs_none", title = "Nothing running")),
+                    items = listOf(ActionItem(id = "plugin_jobs_none", title = "Nothing running")) +
+                        (if (older) listOf(olderJobsItem()) else emptyList()),
                 ),
             )
         }
@@ -285,7 +293,7 @@ object PluginJobsScreen {
             // at its foot it was under as many as FINISHED_KEPT rows, where nobody found it.
             // Show filters it by kind, and Older jobs follows the last row: what the live list no longer holds is kept there
             // (Droidtop/tracker#940).
-            if (!anyFinished) {
+            if (!anyFinished && !older) {
                 null
             } else {
                 CatalogGroup(
