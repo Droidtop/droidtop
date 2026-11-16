@@ -150,7 +150,7 @@ object PluginAppStatus {
                                     AsyncActionItem(
                                         id = "plugin_app_status_${m.id}_launch",
                                         title = "Launch",
-                                        subtitle = "Opens the app this plugin manages",
+                                        subtitle = "The app this plugin manages",
                                         run = { ctx, _ ->
                                             // An app Android knows is opened by droidtop itself, the way it opens any app; the
                                             // plugin is asked only for one it installs some other way (Droidtop/tracker#558:

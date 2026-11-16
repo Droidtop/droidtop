@@ -528,7 +528,7 @@ internal object StoresCatalog {
                     TextInputItem(
                         id = "stores_add_find_${store.key}",
                         title = "Find on ${store.label}",
-                        subtitle = "Opens ${store.label}'s search for what you type",
+                        subtitle = "Searches ${store.label} for what you type",
                         value = "",
                         onChange = { ctx, text -> StoreWeb.search(ctx, own, text) },
                     )
@@ -685,7 +685,7 @@ internal object StoresCatalog {
                 TextInputItem(
                     id = "store_${store.key}_find",
                     title = "Find a game",
-                    subtitle = "Opens ${store.label}'s search for what you type",
+                    subtitle = "Searches ${store.label} for what you type",
                     value = "",
                     onChange = { ctx, text -> StoreWeb.search(ctx, webStore, text) },
                 ),

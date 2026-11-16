@@ -130,7 +130,7 @@ object MeteredConnectionCatalog {
                 ActionItem(
                     id = "download_rules_metered_$key",
                     title = label,
-                    subtitle = "Select to undo",
+                    subtitle = "Allowed. Stop it here",
                     confirmTitle = "Stop letting downloads use $label?",
                     run = { ctx -> MeteredGrants.remove(ctx, key) },
                 )

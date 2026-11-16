@@ -344,8 +344,7 @@ object EmulatorsCatalog {
                                     openEmulatorRow(
                                         id = "emulator_open_${system.id}",
                                         title = "${player.name} settings",
-                                        subtitle = "Opens ${player.name} for its own settings: graphics, controls, where it keeps BIOS files. " +
-                                            "droidtop does not change them",
+                                        subtitle = "Graphics, controls and BIOS files, in ${player.name}. droidtop doesn't change them",
                                         name = player.name,
                                         packageName = player.packageName,
                                     )

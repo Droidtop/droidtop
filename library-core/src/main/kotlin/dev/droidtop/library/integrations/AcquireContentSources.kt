@@ -326,7 +326,7 @@ object AcquireContentSources {
     fun askRow(id: String, source: UnavailableSource): AsyncActionItem = AsyncActionItem(
         id = id,
         title = UnavailableSource.waitingTitle(listOf(source)),
-        subtitle = "Press to allow it to get games",
+        subtitle = "Not allowed to get games yet",
         run = { ctx, _ ->
             if (askSource(ctx, source)) "${source.label} can get games now. Go back and search again"
             else "${source.label} is still not allowed to get games"

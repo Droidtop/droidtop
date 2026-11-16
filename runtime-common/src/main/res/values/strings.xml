@@ -177,11 +177,11 @@
     <string name="gaming_vpn">VPN</string>
     <string name="gaming_opens_the_system_vpn_screen_to">Android\'s VPN screen</string>
     <string name="gaming_battery">Battery</string>
-    <string name="gaming_opens_the_system_battery_saver_screen">Opens the system Battery Saver screen</string>
+    <string name="gaming_opens_the_system_battery_saver_screen">Android\'s Battery Saver</string>
     <string name="gaming_bluetooth">Bluetooth</string>
     <string name="gaming_pair_controllers_and_audio_in_the">Android\'s Bluetooth screen</string>
     <string name="gaming_location">Location</string>
-    <string name="gaming_opens_android_s_location_screen">Opens Android\'s location screen</string>
+    <string name="gaming_opens_android_s_location_screen">Android\'s location settings</string>
     <string name="gaming_mute_microphone">Mute microphone</string>
     <string name="gaming_every_app_hears_silence_from_the">Every app hears silence</string>
     <string name="gaming_flashlight">Flashlight</string>
@@ -193,7 +193,7 @@
     <string name="gaming_power_off">Power off</string>
     <string name="gaming_restart">Restart</string>
     <string name="gaming_audio_output">Audio output</string>
-    <string name="gaming_opens_android_s_output_switcher">Opens Android\'s output switcher</string>
+    <string name="gaming_opens_android_s_output_switcher">Where sound plays, in Android\'s switcher</string>
     <string name="gaming_other_shells">Other shells</string>
     <string name="gaming_desktop_mode">Desktop mode</string>
     <string name="gaming_settings_for_the_desktop_shell">Settings for the Desktop shell</string>
