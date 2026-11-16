@@ -123,6 +123,22 @@ class LibraryScrapeJobTest {
     }
 
     @Test
+    fun thePcStepsOwnIdleLineFoldsWithTheSystems() {
+        // The lines PcScrape.scrape itself returns when it has nothing to do (kept in this wording for isIdle).
+        for (pcIdle in listOf(
+            "PC and engine games: nothing matches the \"Games missing artwork or metadata\" scrape filter.",
+            "PC and engine games: nothing was left to scrape.",
+            "PC and engine games: none in the library.",
+        )) {
+            val summary = LibraryScrapeJob.summarize(
+                listOf("NES: nothing matches the \"Games missing artwork or metadata\" scrape filter.", pcIdle),
+                hasPc = true,
+            )
+            assertTrue(summary, summary.endsWith("Nothing to scrape under the scrape filter: NES, PC and engine games."))
+        }
+    }
+
+    @Test
     fun theQueueSkipsAStepThatSaidNothing() = runBlocking {
         val summary = LibraryScrapeJob.runQueue(queue, from = null, step = { index, _, _, _ ->
             StepResult(if (index == 1) "" else "${queue[index].second}: done")

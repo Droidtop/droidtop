@@ -543,7 +543,9 @@ object PcScraper {
         // [PcScraperSourcePrefs.key] stores a choice. The setting is left as it is.
         using: String? = null,
     ): String = withContext(Dispatchers.IO) {
-        if (entries.isEmpty()) return@withContext "No PC or engine games"
+        // The step's idle lines keep their subject and their wording: LibraryScrapeJob.summarize folds them into one line
+        // by it, as it does the console systems' (LibraryScrapeJob.isIdle).
+        if (entries.isEmpty()) return@withContext "PC and engine games: none in the library."
         val key = using ?: PcScraperSourcePrefs.key(context)
         ScraperReadiness.pcSourceProblem(context, key)?.let { return@withContext it }
         // A metadata plugin chosen as the source is the one source the pass asks (Droidtop/tracker#67): no built-in
@@ -589,9 +591,9 @@ object PcScraper {
         }
         if (targets.isEmpty()) {
             return@withContext if (resumeAfter != null && candidates.isEmpty()) {
-                "Nothing left to scrape"
+                "PC and engine games: nothing was left to scrape."
             } else {
-                "Nothing matches \"${filter.label}\""
+                "PC and engine games: nothing matches the \"${filter.label}\" scrape filter."
             }
         }
 
