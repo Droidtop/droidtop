@@ -98,7 +98,12 @@ open class PluginSandboxService : PluginProcessService() {
             val abi = libraries.keys.first().removePrefix(ContainedFiles.NATIVE_PREFIX).substringBefore('/')
             libraries.forEach { (name, fd) -> SandboxFiles.register(SandboxFiles.PLUGIN + name, fd) }
             hooks = SandboxFiles.ensureHooks()
-            SandboxFiles.PLUGIN + ContainedFiles.NATIVE_PREFIX + abi
+            val folder = SandboxFiles.PLUGIN + ContainedFiles.NATIVE_PREFIX + abi
+            // The folder itself must stat as a directory, or ART leaves it out of the loader's library list.
+            SandboxFiles.registerDirectory(folder).takeIf { it != 0 }?.let { error ->
+                android.util.Log.w("droidtop.plugin", "$pluginId: $folder could not be made a folder (errno ${-error})")
+            }
+            folder
         }
         return try {
             val loader = ContainedDex.loader(ContainedDex.read(jar), javaClass.classLoader!!, libraryPath)

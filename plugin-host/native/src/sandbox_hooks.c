@@ -337,6 +337,29 @@ Java_dev_droidtop_pluginhost_SandboxFiles_nativeRegister(JNIEnv *env, jclass cla
 }
 
 /*
+ * Makes [jPath] a folder to stat: a local file of the sandbox library backed by a descriptor of a real directory
+ * ("/"), so stat answers S_IFDIR. ART builds a class loader's native-library list from the folders that
+ * File.isDirectory says exist (DexPathList.makePathElements); the library folder under /droidtop-sandbox/ held only
+ * registered files, so it was left out and System.loadLibrary found nothing in it although each library opened
+ * (Droidtop/tracker#926, rig AVD dev.3341). Returns 0 or a negative errno.
+ */
+JNIEXPORT jint JNICALL
+Java_dev_droidtop_pluginhost_SandboxFiles_nativeRegisterDirectory(JNIEnv *env, jclass clazz, jstring jPath) {
+    (void) clazz;
+    int dir = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (dir < 0) return -errno;
+    const char *path = (*env)->GetStringUTFChars(env, jPath, NULL);
+    if (path == NULL) {
+        close(dir);
+        return -ENOMEM;
+    }
+    int result = sbx_local_add(path, dir);
+    (*env)->ReleaseStringUTFChars(env, jPath, path);
+    if (result != 0) close(dir);
+    return result;
+}
+
+/*
  * A file droidtop opened for the plugin through the broker (`hostOpen`, docs/plugin-api.md 5.3), given a path the
  * plugin's own code (Dart's dart:io, which opens paths only) can open: a local file of the sandbox library, read and
  * written when [writable]. Takes fd. Returns 0 or a negative errno.

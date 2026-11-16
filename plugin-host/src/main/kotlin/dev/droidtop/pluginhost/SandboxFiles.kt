@@ -31,6 +31,14 @@ internal object SandboxFiles {
 
     @JvmStatic private external fun nativeRegister(path: String, fd: Int): Boolean
 
+    @JvmStatic private external fun nativeRegisterDirectory(path: String): Int
+
+    /**
+     * Makes the virtual folder [path] a directory to stat, so a class loader keeps it in its native-library list
+     * (Droidtop/tracker#926). Returns 0 or a negative errno.
+     */
+    fun registerDirectory(path: String): Int = nativeRegisterDirectory(path)
+
     @JvmStatic private external fun nativeHook(suffixes: Array<String>): String
 
     @JvmStatic private external fun nativeShare(path: String, fd: Int, writable: Boolean): Int
