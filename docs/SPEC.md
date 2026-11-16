@@ -16142,6 +16142,13 @@ whole shell to restart one timer. It is now a `MutableStateFlow` that
 only the timer observes (`collectLatest`: each input cancels the pending
 delay and starts a new one); writing it recomposes nothing.
 
+**Redraw cost is a number per build (owner, 2026-11-15, Droidtop/tracker#941: "It seems like everything is always
+fully redrawing itself").** Android checks builds with `-PcomposeReports`, and `scripts/compose-stability.py` prints,
+per module, how many restartable composables can skip when their inputs are unchanged and how many classes Compose
+counts as unstable; the full reports are the `compose-reports` artifact. A composable that can't skip redraws whenever
+its parent does, so a change that should touch one row shows as a rise in that count. Fixes for #941 cite the counts
+before and after.
+
 **App icons are drawn once per version, never on the model thread.** The
 Apps scan borrows Launcher3's `MODEL_EXECUTOR` (the icon cache refuses
 any other thread), and it used to draw and PNG-encode every app's icon
