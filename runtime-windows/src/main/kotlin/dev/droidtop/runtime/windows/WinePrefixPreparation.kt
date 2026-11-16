@@ -66,9 +66,12 @@ internal object WinePrefixPreparation {
      * caller is already off the main thread.
      */
     suspend fun prepare(context: Context, prefix: Container, screenInfo: ScreenInfo): EnvVars {
+        // What each step costs on a launch, in one line (Droidtop/tracker#950 items 5 and 6): the numbers that decide
+        // which steps move off the game press to when a Wine environment is installed or updated.
+        val steps = StepTimes()
         val imageFs = ImageFs.find(context)
         val containerManager = ContainerManager(context)
-        val contentsManager = ContentsManager(context).apply { syncContents() }
+        val contentsManager = steps.time("contents") { ContentsManager(context).apply { syncContents() } }
         val wineInfo = WineInfo.fromIdentifier(context, contentsManager, prefix.wineVersion)
 
         // Where wine lives for THIS prefix, before anything reads it: a
@@ -86,7 +89,7 @@ internal object WinePrefixPreparation {
         // prefix was created -- otherwise a second container (or a
         // reinstalled base system) would leave the guest's HOME pointing
         // at someone else's prefix.
-        containerManager.activateContainer(prefix)
+        steps.time("activate") { containerManager.activateContainer(prefix) }
 
         val state = mutableStateOf(
             XServerState(
@@ -128,23 +131,27 @@ internal object WinePrefixPreparation {
         }
 
         val envVars = EnvVars()
-        setupWineSystemFiles(
-            context,
-            firstTimeBoot,
-            screenInfo,
-            state,
-            prefix,
-            containerManager,
-            envVars,
-            contentsManager,
-            extractListener,
-        )
+        steps.time("system files") {
+            setupWineSystemFiles(
+                context,
+                firstTimeBoot,
+                screenInfo,
+                state,
+                prefix,
+                containerManager,
+                envVars,
+                contentsManager,
+                extractListener,
+            )
+        }
         // Input DLLs for the wine builds that need them -- both are
         // no-ops for any other build, and which build a prefix runs is
         // the prefix's own field, so the gate is gamenative's.
-        extractArm64ecInputDLLs(context, prefix)
-        extractx86_64InputDlls(context, prefix)
-        extractGraphicsDriverFiles(
+        steps.time("input DLLs") {
+            extractArm64ecInputDLLs(context, prefix)
+            extractx86_64InputDlls(context, prefix)
+        }
+        steps.time("graphics driver") { extractGraphicsDriverFiles(
             context,
             state.value.graphicsDriver,
             // setupWineSystemFiles normalises "dxvk"/"vkd3d" into the
@@ -160,7 +167,7 @@ internal object WinePrefixPreparation {
                 sharpnessLevel = prefix.getExtra("sharpnessLevel", "100").toIntOrNull() ?: 100,
                 sharpnessDenoise = prefix.getExtra("sharpnessDenoise", "100").toIntOrNull() ?: 100,
             ),
-        )
+        ) }
         // XAudio2's classes back on their own DLLs where the prefix template put them on xapofx (Droidtop/tracker#898).
         runCatching { WineXAudioRegistry.repair(File(prefix.rootDir, ".wine/system.reg")) }
             .onSuccess { if (it > 0) Timber.i("Repaired %d XAudio2 class registrations in prefix %s", it, prefix.id) }
@@ -172,16 +179,39 @@ internal object WinePrefixPreparation {
         // Which backend WINE itself hands audio to. The server droidtop
         // starts (PulseAudio or ALSA) is the other half of the same
         // decision, and both read the prefix's one audioDriver field.
-        changeWineAudioDriver(prefix.audioDriver, prefix, imageFs)
-        setImagefsContainerVariant(context, prefix)
+        steps.time("audio and variant") {
+            changeWineAudioDriver(prefix.audioDriver, prefix, imageFs)
+            setImagefsContainerVariant(context, prefix)
+        }
         // ICU 68 for .NET 5+ games (docs/SPEC.md 9, "ICU for .NET games"): copied from the Wine build when the prefix
         // lacks it; without it, .NET is told to use Windows' NLS. In this base env, so a prefix's or game's own value
         // of the variable wins.
-        val icu = runCatching {
-            WineIcu.ensure(File(imageFs.winePath, "lib/wine"), File(prefix.rootDir, ".wine/drive_c/windows"), wineInfo.isArm64EC, wineInfo.isWin64)
-        }.getOrDefault(false)
+        val icu = steps.time("ICU") {
+            runCatching {
+                WineIcu.ensure(File(imageFs.winePath, "lib/wine"), File(prefix.rootDir, ".wine/drive_c/windows"), wineInfo.isArm64EC, wineInfo.isWin64)
+            }.getOrDefault(false)
+        }
         if (!icu) envVars.put(WineIcu.NLS_VAR, "1")
         Timber.i("ICU 68 in prefix %s: %s", prefix.id, if (icu) "present" else "missing, .NET uses NLS")
+        Timber.i("Wine prefix %s prepared (first boot: %s): %s", prefix.id, firstTimeBoot, steps.summary())
         return envVars
+    }
+
+    /** Wall time per named step of one preparation, for the launch log line. */
+    private class StepTimes {
+        private val started = System.nanoTime()
+        private val parts = ArrayList<Pair<String, Long>>()
+
+        inline fun <T> time(name: String, block: () -> T): T {
+            val start = System.nanoTime()
+            try {
+                return block()
+            } finally {
+                parts += name to (System.nanoTime() - start) / 1_000_000
+            }
+        }
+
+        fun summary(): String =
+            "${(System.nanoTime() - started) / 1_000_000} ms in all; " + parts.joinToString(", ") { (name, ms) -> "$name $ms ms" }
     }
 }
