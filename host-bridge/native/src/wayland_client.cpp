@@ -1,6 +1,7 @@
 #include "wayland_client.h"
 #include "default_keymap.h"
 #include "output_match.h"
+#include "pixel_swizzle.h"
 
 #include <android/api-level.h>
 #include <android/log.h>
@@ -1098,13 +1099,13 @@ void allocateShmBuffer(OutputCapture* cap) {
     cap->bufferFormat = cap->format;
 }
 
-// Copies the just-captured shm frame onto the target ANativeWindow, with a
-// naive per-pixel BGRA<->RGBA channel swap: wl_shm's common format
-// (WL_SHM_FORMAT_ARGB8888/XRGB8888) is native-endian 0xAARRGGBB, i.e. bytes
-// B,G,R,A on a little-endian device — Android's WINDOW_FORMAT_RGBA_8888 is
-// bytes R,G,B,A. Alpha is written opaque (see the loop). Correct, not optimized: fine for a first working version,
-// worth revisiting (GPU blit / shader) once this is actually running against
-// a live compositor and framerate is measurable.
+// Copies the just-captured shm frame onto the target ANativeWindow, swapping
+// each pixel's B and R and writing it opaque (pixel_swizzle.h): wl_shm's
+// XRGB8888/ARGB8888 are bytes B,G,R,X on a little-endian device, Android's
+// WINDOW_FORMAT_RGBA_8888 is R,G,B,A. A row at a time, with NEON on arm64 and
+// SSSE3 on x86_64 (Droidtop/tracker#950, item 1; it was a byte-at-a-time loop,
+// 2.2 M pixels a frame at 1920x1152). Handing Android BGRA with no swap, and a
+// GPU blit, are the issue's next steps.
 void blitFrameToWindow(OutputCapture* cap) {
     if (!cap->window || !cap->shmData) return;
 
@@ -1125,17 +1126,7 @@ void blitFrameToWindow(OutputCapture* cap) {
     for (uint32_t y = 0; y < rows; y++) {
         const uint8_t* srcRow = src + static_cast<size_t>(y) * cap->stride;
         uint8_t* dstRow = dst + static_cast<size_t>(y) * buf.stride * 4;
-        for (uint32_t x = 0; x < cols; x++) {
-            const uint8_t* p = srcRow + x * 4; // B, G, R, A
-            uint8_t* q = dstRow + x * 4;       // R, G, B, A
-            q[0] = p[2];
-            q[1] = p[1];
-            q[2] = p[0];
-            // Opaque, whatever the source byte holds: the desktop output
-            // is opaque, and in the XRGB8888 frames a pixman compositor
-            // sends that byte is undefined, not alpha.
-            q[3] = 0xFF;
-        }
+        hostbridge::swizzleRow(srcRow, dstRow, cols);
     }
 
     ANativeWindow_unlockAndPost(cap->window);
