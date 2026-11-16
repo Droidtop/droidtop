@@ -156,6 +156,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     private var gamingDeepLinkToken by mutableStateOf(0)
     private var gamingStartSection by mutableStateOf<String?>(null)
     private var gamingQuickMenu by mutableStateOf(false)
+    // Whether the last arrival was a HOME press (Droidtop/tracker#936): with no game running, the shell goes Home.
+    private var gamingHomePress by mutableStateOf(false)
     private var gamingTriggerRescan by mutableStateOf(false)
     private var gamingTriggerBrowseThemes by mutableStateOf(false)
 
@@ -218,6 +220,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // (the warm HOME forwarded by Launcher carries the reinit extra): the person is coming back from the
         // game, and the shell opens the running game's sheet, Resume first (docs/SPEC.md 7f, "Sleep and return to game").
         val homePress = intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, false)
+        gamingHomePress = homePress
         val running = dev.droidtop.library.LaunchDisplay.runningGame
         gamingQuickMenu = intent.getBooleanExtra(dev.droidtop.library.OwnGameScreens.EXTRA_QUICK_MENU, false) ||
             (homePress && running != null)
@@ -408,6 +411,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                     deepLinkToken = gamingDeepLinkToken,
                     startSectionName = gamingStartSection,
                     openQuickMenu = gamingQuickMenu,
+                    homePress = gamingHomePress,
                     triggerRescan = gamingTriggerRescan,
                     triggerBrowseThemes = gamingTriggerBrowseThemes,
                 )
