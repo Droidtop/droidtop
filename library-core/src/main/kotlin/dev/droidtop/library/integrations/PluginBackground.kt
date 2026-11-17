@@ -138,12 +138,29 @@ object PluginBackground {
      */
     private fun clearEarlierFailures(service: Entry, keep: String?) {
         val capability = LegacyManifest.jobCapabilityFor(BackgroundProtocol.SERVICE_POINT)
-        PluginJobsCenter.entries().value
-            .filter {
-                it.jobId != keep && it.pluginId == service.record.manifest.id && it.title == service.label && it.via == null &&
-                    (it.capability == null || it.capability == capability) && failed(it)
+        val named = PluginJobsCenter.entries().value.filter { it.title == service.label }
+        var cleared = 0
+        val kept = ArrayList<String>()
+        named.forEach {
+            val why = when {
+                it.jobId == keep -> null
+                it.pluginId != service.record.manifest.id -> "plugin ${it.pluginId}"
+                it.via != null -> "via ${it.via}"
+                it.capability != null && it.capability != capability -> "capability ${it.capability}"
+                !failed(it) -> "state ${it.state}"
+                else -> ""
             }
-            .forEach { PluginJobsCenter.clear(it.jobId) }
+            when {
+                why == "" -> if (PluginJobsCenter.clear(it.jobId)) cleared++ else kept += "${it.jobId}: not cleared"
+                why != null -> kept += "${it.jobId}: $why"
+            }
+        }
+        // What the clearing did, so a row that stays can be told apart (rig, AVD dev.3367: rows stayed after a restart).
+        android.util.Log.i(
+            "droidtop.jobs",
+            "${service.key}: cleared $cleared earlier failed rows of ${named.size} named ${service.label}" +
+                (if (kept.isEmpty()) "" else "; kept " + kept.take(5).joinToString(", ")),
+        )
     }
 
     /**
