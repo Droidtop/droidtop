@@ -1170,11 +1170,14 @@ private fun CatalogPane(
     // first row ran under it with its value hidden (rig, AVD dev.3347, Game folders: "8 games (4 ROMs)").
     val density = LocalDensity.current
     var headerHeight by remember { mutableStateOf(0.dp) }
-    val clusterBelow = maxOf(0.dp, StatusClusterRoom.size.height - (if (title != null) headerHeight else 0.dp))
+    // A page that opens with its own header card under the same name (a plugin's page) draws no screen title over it:
+    // the name stood twice, one above the other (rig, AVD dev.3354, Settings > Plugins > Syncthing).
+    val shownTitle = title?.takeUnless { (rows.firstOrNull()?.item as? PageHeaderItem)?.header?.title == it }
+    val clusterBelow = maxOf(0.dp, StatusClusterRoom.size.height - (if (shownTitle != null) headerHeight else 0.dp))
     Column(modifier) {
-        if (title != null) {
+        if (shownTitle != null) {
             MenuHeader(
-                title,
+                shownTitle,
                 iconFile = titleIcon,
                 modifier = Modifier.onSizeChanged { headerHeight = with(density) { it.height.toDp() } },
             )
