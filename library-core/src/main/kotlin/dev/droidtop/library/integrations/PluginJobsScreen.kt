@@ -229,7 +229,7 @@ object PluginJobsScreen {
                             NestedScreenItem(
                                 id = "plugin_jobs_history_${entry.jobId}",
                                 title = entry.title,
-                                subtitle = jobSource(entry) + " · " + outcome(entry),
+                                subtitle = listOfNotNull(jobSource(entry), outcome(entry)).joinToString(" · "),
                                 valueLabel = ValueFormat.ago(nowMs, entry.finishedAtMs ?: entry.startedAtMs).let { ago -> { _: Context -> ago } },
                                 inline = archivedPage(entry),
                             ),
@@ -381,7 +381,10 @@ object PluginJobsScreen {
      * own name, so a list of jobs from one plugin is not ten rows that all read "Downloads: ..." once cut to the
      * row's width (Droidtop/tracker#85, rig 2026-10-14).
      */
-    private fun jobSource(entry: PluginJobsCenter.Entry): String = entry.pluginLabel + (entry.via?.let { " (via $it)" } ?: "")
+    private fun jobSource(entry: PluginJobsCenter.Entry): String? =
+        // Not when it is the row's own title: a service named after its plugin read "Syncthing" over "Syncthing · 1
+        // failed" (rig, AVD dev.3354).
+        if (entry.via == null && entry.pluginLabel == entry.title) null else entry.pluginLabel + (entry.via?.let { " (via $it)" } ?: "")
 
     private fun outcome(entry: PluginJobsCenter.Entry): String =
         if (entry.state != JobState.FAILED) entry.result?.values?.get("summary") ?: "Done" else (entry.result?.error ?: "Failed")
@@ -568,7 +571,7 @@ object PluginJobsScreen {
             return NestedScreenItem(
                 id = "plugin_job_${entry.jobId}",
                 title = entry.title,
-                subtitle = "${jobSource(entry)} · $said",
+                subtitle = listOfNotNull(jobSource(entry), said).joinToString(" · "),
                 inline = jobPage(entry.jobId, jobTitle(entry)),
                 progressLook = lookOf(entry),
                 summaryShown = true,
@@ -578,7 +581,7 @@ object PluginJobsScreen {
         return NestedScreenItem(
             id = "plugin_job_${entry.jobId}",
             title = entry.title,
-            subtitle = listOfNotNull(standingLine(entry), jobSource(entry)).filter { it.isNotBlank() }.joinToString(" · "),
+            subtitle = listOfNotNull(standingLine(entry), jobSource(entry)).filter { it.isNotBlank() }.joinToString(" · ").ifEmpty { null },
             inline = jobPage(entry.jobId, jobTitle(entry)),
             progress = entry.fraction,
             progressLook = lookOf(entry),
