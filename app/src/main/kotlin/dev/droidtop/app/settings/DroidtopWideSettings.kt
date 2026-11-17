@@ -356,7 +356,7 @@ object DroidtopWideSettings {
                         ChoiceItem(
                             id = "pref_desktop_panel",
                             title = "Desktop panel",
-                            subtitle = "Applies at next start",
+                            subtitle = dev.droidtop.app.DesktopSetupPrefs.panel(context).about + ". Applies at next start",
                             options = dev.droidtop.runtime.DesktopPanel.entries.map { ChoiceOption(it.id, it.label) },
                             current = dev.droidtop.app.DesktopSetupPrefs.panel(context).id,
                             onSelect = { ctx, value ->
@@ -520,7 +520,9 @@ object DroidtopWideSettings {
         val options = listOf(
             ChoiceOption(
                 dev.droidtop.runtime.KeyboardLayouts.AUTOMATIC,
-                "Automatic (${dev.droidtop.app.DesktopKeyboardLayout.describe(auto, names)})",
+                // The layout's name only; where it came from is on the row's line. "Automatic (English (US) (us), from
+                // the attached keyboard)" was cut in the value column (rig, AVD dev.3354).
+                "Automatic · " + (names[auto.layout.layout] ?: auto.layout.id),
             ),
         ) + (ids + listOfNotNull(stored.takeIf { it != dev.droidtop.runtime.KeyboardLayouts.AUTOMATIC }))
             .distinct()

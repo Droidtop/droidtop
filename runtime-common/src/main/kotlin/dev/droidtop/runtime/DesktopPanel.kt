@@ -15,10 +15,12 @@ import java.io.File
  *
  * Only sway takes a panel here: labwc's plan has none of its own.
  */
-enum class DesktopPanel(val id: String, val label: String) {
-    NONE("none", "None, droidtop's bar only"),
-    WAYBAR("waybar", "Waybar: workspaces and the Linux tray"),
-    SWAYBAR("swaybar", "Sway's own bar"),
+enum class DesktopPanel(val id: String, val label: String, val about: String) {
+    // A short value for the stepping row, what it is on the row's line: the long labels wrapped to two lines
+    // (rig, AVD dev.3354).
+    NONE("none", "None", "droidtop's bar only"),
+    WAYBAR("waybar", "Waybar", "Workspaces and the Linux tray"),
+    SWAYBAR("swaybar", "Sway's bar", "Sway's own bar, for your own sway config"),
     ;
 
     companion object {
