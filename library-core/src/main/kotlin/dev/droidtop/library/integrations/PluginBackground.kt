@@ -116,20 +116,29 @@ object PluginBackground {
     private suspend fun start(context: Context, service: Entry) {
         // A new run takes the place of the last failed one's row.
         lastFailed.remove(service.key)?.let { PluginJobsCenter.clear(it) }
-        // And of the failed rows earlier runs of droidtop left: [lastFailed] lives only as long as the process, so every
-        // update or restart kept one more (rig, AVD dev.3354: a dozen "Syncthing · 1 failed" rows in Finished).
-        val capability = LegacyManifest.jobCapabilityFor(BackgroundProtocol.SERVICE_POINT)
-        PluginJobsCenter.entries().value
-            .filter {
-                it.pluginId == service.record.manifest.id && it.title == service.label && it.capability == capability &&
-                    it.state == dev.droidtop.pluginhost.JobState.FAILED
-            }
-            .forEach { PluginJobsCenter.clear(it.jobId) }
+        clearEarlierFailures(service, keep = null)
         val args = JSONObject().put("serviceId", BackgroundProtocol.entryId(service.entry))
         val jobId = startPluginJob(context, service.record, BackgroundProtocol.SERVICE_POINT, "run", args, "background", service.label) { result ->
             stopped(context, service, result)
         }
         if (jobId != null) running[service.key] = jobId else lastStop[service.key] = "${service.record.manifest.label} could not start it"
+    }
+
+    /**
+     * Clears the finished, failed rows of [service] other than [keep]: the ones earlier runs of droidtop left, which
+     * [lastFailed] does not know (it lives only as long as the process), so every update or restart kept one more (rig,
+     * AVD dev.3354: a dozen "Syncthing · 1 failed" rows in Finished). A row restored from disk has no capability, so any
+     * row of this plugin under the service's name, run through no other plugin, is one of them. Run when the service
+     * starts and again when a run fails, because at start the history may not have been read back yet (rig, AVD dev.3363).
+     */
+    private fun clearEarlierFailures(service: Entry, keep: String?) {
+        val capability = LegacyManifest.jobCapabilityFor(BackgroundProtocol.SERVICE_POINT)
+        PluginJobsCenter.entries().value
+            .filter {
+                it.jobId != keep && it.pluginId == service.record.manifest.id && it.title == service.label && it.via == null &&
+                    (it.capability == null || it.capability == capability) && it.state == dev.droidtop.pluginhost.JobState.FAILED
+            }
+            .forEach { PluginJobsCenter.clear(it.jobId) }
     }
 
     private fun stopped(context: Context, service: Entry, result: PluginResult) {
@@ -139,6 +148,7 @@ object PluginBackground {
         lastStop[service.key] = if (result.ok) "Stopped" else dev.droidtop.pluginhost.JobFailureLine.of(service.record.manifest.label, result.error).sentence
         if (!result.ok) {
             lastFailed[service.key] = jobId
+            clearEarlierFailures(service, keep = jobId)
             // Retry starts it now, as a fresh run with no failures counted, whatever the restart schedule says.
             PluginJobsCenter.offerRetry(jobId) {
                 failures.remove(service.key)
