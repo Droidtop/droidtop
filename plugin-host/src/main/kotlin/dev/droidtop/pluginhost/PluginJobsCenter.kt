@@ -209,6 +209,8 @@ object PluginJobsCenter {
     @Volatile
     var onRestored: () -> Unit = {}
 
+    private val attached = java.util.concurrent.atomic.AtomicBoolean(false)
+
     /** Completed once [attach] has read the saved jobs back into the live list. */
     private val restoredOnce = kotlinx.coroutines.CompletableDeferred<Unit>()
 
@@ -220,6 +222,14 @@ object PluginJobsCenter {
 
     /** Connects the registry to app storage and restores interrupted resumable jobs as paused. */
     fun attach(context: Context) {
+        // Once per process. A second attach read the saved list back again and put every job cleared since the first
+        // back on it: on the rig the log said "restored 74 saved jobs", then a background service's clearing took 25
+        // rows off, then "restored 73 saved jobs" again ten seconds later and the 25 were back (AVD dev.3369,
+        // Droidtop/tracker#790).
+        if (!attached.compareAndSet(false, true)) {
+            android.util.Log.w("droidtop.jobs", "attach asked again; the saved jobs are restored once per process", Throwable("second attach"))
+            return
+        }
         persistenceContext = context.applicationContext
         persistenceScope.launch {
             val app = context.applicationContext
