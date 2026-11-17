@@ -209,6 +209,15 @@ object PluginJobsCenter {
     @Volatile
     var onRestored: () -> Unit = {}
 
+    /** Completed once [attach] has read the saved jobs back into the live list. */
+    private val restoredOnce = kotlinx.coroutines.CompletableDeferred<Unit>()
+
+    /**
+     * Waits until the saved jobs are back in the live list ([attach]), so a caller that looks for a row an earlier run
+     * of droidtop left finds it (a background service's earlier failed rows, Droidtop/tracker#790).
+     */
+    suspend fun awaitRestored() = restoredOnce.await()
+
     /** Connects the registry to app storage and restores interrupted resumable jobs as paused. */
     fun attach(context: Context) {
         persistenceContext = context.applicationContext
@@ -220,6 +229,7 @@ object PluginJobsCenter {
             // was still waiting: it stays in history only, never in both (Droidtop/tracker#940).
             val archived = runCatching { JobHistory.has(app, saved.filter { it.done }.map { it.jobId }) }.getOrDefault(emptySet())
             restore(saved.filter { it.jobId !in archived })
+            restoredOnce.complete(Unit)
             runCatching { onRestored() }
             // Finished jobs past the person's Keep finished jobs choice go, from history and from the live list.
             runCatching { JobHistory.prune(app) }

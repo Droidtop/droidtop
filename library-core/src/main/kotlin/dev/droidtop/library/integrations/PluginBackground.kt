@@ -116,7 +116,12 @@ object PluginBackground {
     private suspend fun start(context: Context, service: Entry) {
         // A new run takes the place of the last failed one's row.
         lastFailed.remove(service.key)?.let { PluginJobsCenter.clear(it) }
-        clearEarlierFailures(service, keep = null)
+        // After the saved jobs are back: at start they may not be read yet, and the clearing found none (rig, AVD
+        // dev.3365). Bounded, for a process where nothing restores them.
+        scope.launch {
+            kotlinx.coroutines.withTimeoutOrNull(RESTORE_WAIT_MS) { PluginJobsCenter.awaitRestored() }
+            clearEarlierFailures(service, keep = running[service.key])
+        }
         val args = JSONObject().put("serviceId", BackgroundProtocol.entryId(service.entry))
         val jobId = startPluginJob(context, service.record, BackgroundProtocol.SERVICE_POINT, "run", args, "background", service.label) { result ->
             stopped(context, service, result)
@@ -136,10 +141,21 @@ object PluginBackground {
         PluginJobsCenter.entries().value
             .filter {
                 it.jobId != keep && it.pluginId == service.record.manifest.id && it.title == service.label && it.via == null &&
-                    (it.capability == null || it.capability == capability) && it.state == dev.droidtop.pluginhost.JobState.FAILED
+                    (it.capability == null || it.capability == capability) && failed(it)
             }
             .forEach { PluginJobsCenter.clear(it.jobId) }
     }
+
+    /**
+     * Whether a finished row ended badly: failed, or done with every item of its report failed, which its row marks as
+     * failed too (PluginJobsScreen.lookOf). A service that stopped on its own reported "1 failed" that way.
+     */
+    private fun failed(entry: PluginJobsCenter.Entry): Boolean =
+        entry.state == dev.droidtop.pluginhost.JobState.FAILED ||
+            (entry.state == dev.droidtop.pluginhost.JobState.DONE &&
+                entry.report?.items?.let { items -> items.isNotEmpty() && items.all { it.outcome == dev.droidtop.pluginhost.Outcome.FAILED } } == true)
+
+    private const val RESTORE_WAIT_MS = 15_000L
 
     private fun stopped(context: Context, service: Entry, result: PluginResult) {
         // Cancelled by droidtop (switched off): already out of [running], nothing to do.
