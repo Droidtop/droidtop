@@ -1121,7 +1121,8 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         about.homepage?.let { url ->
             ActionItem(
                 id = "plugin_${m.id}_homepage",
-                title = "Its page",
+                // "Its page" is the plugin's own page in droidtop (PluginFacets.PLUGIN_PAGE); this opens its website.
+                title = "Website",
                 subtitle = url.removePrefix("https://").removeSuffix("/"),
                 value = "Open",
                 run = { ctx ->
