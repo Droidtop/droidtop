@@ -893,7 +893,7 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 NestedScreenItem(
                     id = "plugin_${m.id}_consent",
                     title = if (pending) "What you're allowing" else "What it adds and can do",
-                    subtitle = groups.mapNotNull { it.title }.joinToString(", "),
+                    // No line that only repeats the group headings inside ("Adds, Can"): the title says what opens.
                     inline = CatalogScreen(
                         id = "plugin_consent_${m.id}",
                         title = if (pending) "What you're allowing" else "What it adds and can do",
@@ -916,7 +916,11 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         null
     } else {
         val rows = permissionRows(record, grantSnapshot)
-        val summary = "${rows.count { it.state == GrantState.GRANTED }} allowed, ${rows.count { it.state == GrantState.ASK }} ask first, ${rows.count { it.state == GrantState.DENIED }} blocked"
+        // Only the states some permission is in: "3 allowed, 0 ask first, 2 blocked" counted a zero and took two lines.
+        val summary = listOf(GrantState.GRANTED to "allowed", GrantState.ASK to "ask first", GrantState.DENIED to "blocked")
+            .mapNotNull { (state, word) -> rows.count { it.state == state }.takeIf { it > 0 }?.let { "$it $word" } }
+            .joinToString(", ")
+            .ifEmpty { "None" }
         CatalogGroup(
             id = "plugin_${m.id}_permissions_group",
             title = "Permissions",
@@ -1827,17 +1831,21 @@ private const val CATALOG_CHANNEL = "catalog"
 internal fun AppSettingsCatalogs.categoryLabel(category: String): String =
     dev.droidtop.pluginhost.PluginPresentation.CATEGORY_LABELS.getValue(dev.droidtop.pluginhost.PluginPresentation.category(category))
 
-/** What a plugin adds, in plain words, for the installed-list row and the detail page's provides row. */
+/**
+ * What a plugin adds, in plain words, for the installed-list row and the detail page's provides row. Each label is a
+ * name of its own, so they are listed with the design language's separator, not run into a sentence: joined with commas
+ * they read "Get games from a source, Its information and controls in droidtop" (rig, AVD dev.3354).
+ */
 internal fun AppSettingsCatalogs.pluginSummary(m: dev.droidtop.pluginhost.PluginManifest, enabledPoints: Set<String>): String =
     if (m.v2.provides.isNotEmpty()) {
         m.v2.provides
             .filter { PluginPermissions.PROVIDE_PREFIX + it.point in enabledPoints }
             .mapNotNull { ExtensionPoints.find(it.point)?.label }
             .distinct()
-            .joinToString()
+            .joinToString(" · ")
             .ifEmpty { "No extensions allowed" }
     } else {
-        m.capabilities.joinToString { it.display }.ifEmpty { "No capabilities declared" }
+        m.capabilities.joinToString(" · ") { it.display }.ifEmpty { "No capabilities declared" }
     }
 
 /**
