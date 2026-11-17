@@ -44,6 +44,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.AppCategoryRules
 import dev.droidtop.library.Library
@@ -1180,10 +1181,16 @@ internal fun PcGamesSection(
                     true
                 },
         ) {
+            // The status pill floats over the top-right corner and is taller than the strip, which ends short of it:
+            // a grid that began right under the strip put its first row's last card under the pill (UI review,
+            // AVD dev.3372, All games). The grid and the tiles start below whichever is lower.
+            var stripHeight by remember { mutableStateOf(0.dp) }
+            val gridTop = maxOf(Space.Sm, StatusClusterRoom.size.height - stripHeight + Space.Sm)
             // The one strip above the shelves or the grid, with L1 and R1 at
             // its ends: it owns the shoulders while this tab is up
             // (OwnShoulders above), and the active filter is its last pill.
             if (!state.home) ViewStrip(
+                modifier = Modifier.onSizeChanged { px -> stripHeight = with(density) { px.height.toDp() } },
                 labels = tabs.map { pcTabLabel(it, counts) },
                 active = activeChip,
                 focused = if (state.stripFocused) state.stripIndex else null,
@@ -1226,6 +1233,7 @@ internal fun PcGamesSection(
                         tiles.getOrNull(index)?.let { tileMenu = it }
                     },
                     empty = COLLECTIONS_EMPTY,
+                    top = gridTop,
                 )
                 state.onShelves -> PcShelvesHome(
                     shelves = shelves,
@@ -1292,7 +1300,7 @@ internal fun PcGamesSection(
                         LazyVerticalGrid(
                             state = gridState,
                             columns = GridCells.FixedSize(width),
-                            contentPadding = PaddingValues(start = window.edgePadding, end = window.edgePadding, top = Space.Sm, bottom = Space.Lg),
+                            contentPadding = PaddingValues(start = window.edgePadding, end = window.edgePadding, top = gridTop, bottom = Space.Lg),
                             horizontalArrangement = Arrangement.spacedBy(Space.Md, Alignment.CenterHorizontally),
                             verticalArrangement = Arrangement.spacedBy(Space.Md),
                             modifier = Modifier.fillMaxSize(),

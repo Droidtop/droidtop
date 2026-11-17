@@ -261,7 +261,11 @@ internal fun HomeTopBand(
                     Box(Modifier.size(34.dp).border(2.dp, ring, CircleShape))
                 }
             }
-            Box(Modifier.padding(horizontal = Space.Xs).width(1.dp).height(24.dp).background(MenuTokens.CardOutline))
+            // The rule parts the band's buttons from the pill; with neither button there it stood alone beside the pill
+            // (UI review, AVD dev.3372).
+            if (bellCount > 0 || presence != null) {
+                Box(Modifier.padding(horizontal = Space.Xs).width(1.dp).height(24.dp).background(MenuTokens.CardOutline))
+            }
             // The facts, on the one status pill, here on a solid plate in full ink.
             StatusPill(onClick = onQuickMenu, plate = MenuTokens.Surface, onActivity = onActivity)
         }

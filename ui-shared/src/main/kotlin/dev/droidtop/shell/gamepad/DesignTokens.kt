@@ -350,6 +350,13 @@ fun Typography.compact(): Typography = copy(
 val LocalNarrowPane = staticCompositionLocalOf { false }
 
 /**
+ * True inside a sheet whose own header already names the page it hosts (the Quick Menu's "L1 Social R1"): a catalog's
+ * root draws no title of its own there, where "Social" stood twice, one under the other (UI review, AVD dev.3372).
+ * A screen pushed from that root still names itself.
+ */
+val LocalSheetNamesPage = staticCompositionLocalOf { false }
+
+/**
  * A sheet's or a side panel's pane (docs/SPEC.md 7k, "Type"): under [WIDTH_DP] wide, what is drawn in it reads the
  * compact ladder ([compact]). Keyed on the pane's own width, never the device, so it holds on any display and on the
  * companion and follows Interface size (#656), which already sizes the dp.

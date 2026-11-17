@@ -958,8 +958,10 @@ fun CatalogNavigator(
     // A pushed screen names itself over the pane; a category's own rows
     // do not (the column names them). Without a column, as before: a
     // pushed screen or a root that describes itself.
+    val sheetNamesPage = LocalSheetNamesPage.current
     val paneTitle = when {
         categoryMode -> screen.title.takeIf { depth > 0 }
+        sheetNamesPage && stack.size == 1 -> null
         stack.size > 1 || screen.subtitle != null -> screen.title
         else -> null
     }

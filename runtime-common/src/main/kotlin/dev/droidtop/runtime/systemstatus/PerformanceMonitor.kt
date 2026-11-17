@@ -188,7 +188,8 @@ object PerformanceMonitor {
     private fun readMaxCpuMhz(): Int? = runCatching {
         File("/sys/devices/system/cpu").listFiles { f -> f.name.matches(CPU_DIR) }
             ?.mapNotNull { File(it, "cpufreq/scaling_cur_freq").takeIf(File::canRead)?.readText()?.trim()?.toLongOrNull() }
-            ?.maxOrNull()?.let { (it / 1000).toInt() }
+            // A core that reports 0 kHz (a virtual CPU's cpufreq, AVD dev.3372: "0 MHz fastest core") has no clock to tell.
+            ?.maxOrNull()?.let { (it / 1000).toInt() }?.takeIf { it > 0 }
     }.getOrNull()
 
     private val CPU_DIR = Regex("cpu\\d+")

@@ -68,6 +68,7 @@ internal fun PadButton(
             .padding(horizontal = Space.Xl, vertical = Space.Sm),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = if (filled) MenuTokens.OverlaySurface else color, style = TypeRole.button)
+        // OnAccent is picked against the accent itself; OverlaySurface on it read grey on dark blue in the light palette (What's new, AVD dev.3372).
+        Text(label, color = if (filled) MenuTokens.OnAccent else color, style = TypeRole.button)
     }
 }

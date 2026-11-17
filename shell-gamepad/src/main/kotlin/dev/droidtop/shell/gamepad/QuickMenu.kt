@@ -270,7 +270,7 @@ internal fun QuickMenu(
                             // large", Droidtop/tracker#649). They now see the pane as their window, so the gutter is the
                             // scale's floor, 16dp, and it is the only one.
                             QuickSection.SOCIAL, QuickSection.DOWNLOADS, QuickSection.PLUGINS, QuickSection.PROFILE ->
-                                CompositionLocalProvider(LocalShellWindow provides window.pane(paneWidthDp)) {
+                                CompositionLocalProvider(LocalShellWindow provides window.pane(paneWidthDp), LocalSheetNamesPage provides true) {
                                     when (section) {
                                         QuickSection.SOCIAL -> PlaceCatalogView(PLACE_SOCIAL_SCREEN_ID, onBack = close)
                                         QuickSection.DOWNLOADS -> DownloadsSection(close)

@@ -193,6 +193,7 @@ internal fun PcCollectionsView(
     onTap: (Int) -> Unit,
     onLongPress: (Int) -> Unit,
     empty: String,
+    top: androidx.compose.ui.unit.Dp = Space.Sm,
 ) {
     val window = LocalShellWindow.current
     if (groups.isEmpty()) {
@@ -204,7 +205,7 @@ internal fun PcCollectionsView(
     LazyVerticalGrid(
         state = state,
         columns = GridCells.Fixed(columns),
-        contentPadding = PaddingValues(start = window.edgePadding, end = window.edgePadding, top = Space.Sm, bottom = Space.Lg),
+        contentPadding = PaddingValues(start = window.edgePadding, end = window.edgePadding, top = top, bottom = Space.Lg),
         horizontalArrangement = Arrangement.spacedBy(Space.Md),
         verticalArrangement = Arrangement.spacedBy(Space.Md),
         modifier = Modifier.fillMaxSize(),
