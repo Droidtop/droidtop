@@ -26,6 +26,12 @@ class CardTitleTest {
     }
 
     @Test
+    fun aRunTogetherWordInASpacedTitleBreaksBetweenItsWords() {
+        assertEquals("RP Alpha${zw}Quest", cardTitle("RP AlphaQuest"))
+        assertEquals("The XML${zw}Parser 2", cardTitle("The XMLParser 2"))
+    }
+
+    @Test
     fun aSingleUnbreakableWordUsesOneLine() {
         assertEquals(1, CardTitle.of("Supercalifragilistic").lines)
         assertEquals(2, CardTitle.of("HeartOfTheMachine").lines)

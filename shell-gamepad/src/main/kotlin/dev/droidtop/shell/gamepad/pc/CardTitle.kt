@@ -12,21 +12,24 @@ import androidx.compose.runtime.remember
  * ellipsis ([CardTitle.lines]). Pure.
  */
 internal fun cardTitle(title: String): String {
-    if (title.length < 2 || title.any { it.isWhitespace() }) return title
+    if (title.length < 2) return title
+    // A spaced title still gets a break where a run-together word changes case ("RP AlphaQuest" showed as "RP AlphaQue"
+    // and an orphaned "st", rig AVD dev.3354), but not at a digit or a separator: "Vol.2" and "Mr." stay whole.
+    val spaced = title.any { it.isWhitespace() }
     val out = StringBuilder(title.length + 8)
     for (i in title.indices) {
         val c = title[i]
         if (i > 0) {
             val prev = title[i - 1]
             val wordStart = (prev.isLowerCase() && c.isUpperCase()) ||
-                (prev.isLetter() && c.isDigit()) || (prev.isDigit() && c.isLetter()) ||
+                (!spaced && ((prev.isLetter() && c.isDigit()) || (prev.isDigit() && c.isLetter()))) ||
                 // "XMLParser": the last capital of a run starts the next word.
                 (prev.isUpperCase() && c.isUpperCase() && i + 1 < title.length && title[i + 1].isLowerCase())
             if (wordStart) out.append(ZERO_WIDTH_SPACE)
         }
         out.append(c)
         // After a separator a break is always fine.
-        if ((c == '_' || c == '.' || c == '-' || c == '/') && i + 1 < title.length) out.append(ZERO_WIDTH_SPACE)
+        if (!spaced && (c == '_' || c == '.' || c == '-' || c == '/') && i + 1 < title.length) out.append(ZERO_WIDTH_SPACE)
     }
     return out.toString()
 }
