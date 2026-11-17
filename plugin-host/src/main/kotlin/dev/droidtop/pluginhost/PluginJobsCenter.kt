@@ -211,6 +211,15 @@ object PluginJobsCenter {
 
     private val attached = java.util.concurrent.atomic.AtomicBoolean(false)
 
+    /**
+     * Attaches a registry nothing attached yet (a job started in a process the init provider did not run in). The three
+     * job starts called [attach] whenever they had a context, which restored the saved jobs a second time and put back
+     * every job cleared since start (rig, AVD dev.3370, the stack of "attach asked again"; Droidtop/tracker#790).
+     */
+    private fun ensureAttached(context: Context?) {
+        if (context != null && !attached.get()) attach(context)
+    }
+
     /** Completed once [attach] has read the saved jobs back into the live list. */
     private val restoredOnce = kotlinx.coroutines.CompletableDeferred<Unit>()
 
@@ -366,7 +375,7 @@ object PluginJobsCenter {
         /** The person started it (a page's button, a context action): it counts as their call while it runs ([PluginBrokers.jobRunning]). */
         userInitiated: Boolean = false,
     ): String? {
-        context?.let(::attach)
+        ensureAttached(context)
         val jobId = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<PluginResult>()
         // Every registered connection now hears every job's events
@@ -451,7 +460,7 @@ object PluginJobsCenter {
         /** The person started the outer job: it counts as their call while it runs ([PluginBrokers.jobRunning]). */
         userInitiated: Boolean = true,
     ): PluginResult {
-        context?.let(::attach)
+        ensureAttached(context)
         val jobId = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<PluginResult>()
         val runner = runnerFactory(
@@ -511,7 +520,7 @@ object PluginJobsCenter {
         owner: String = NATIVE_OWNER_LABEL,
         pausable: Boolean = true,
     ): String? {
-        context?.let(::attach)
+        ensureAttached(context)
         if (!nativeRunners.containsKey(kind)) return null
         nativeSpecs.entries.firstOrNull { (id, spec) -> spec.kind == kind && spec.args == args && find(id)?.done == false }?.let { (id, _) ->
             nativeCompletions[id] = onComplete
