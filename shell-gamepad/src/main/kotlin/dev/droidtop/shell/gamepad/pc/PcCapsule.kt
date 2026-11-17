@@ -307,11 +307,14 @@ internal fun PcCapsule(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    // Breaks between run-together words, never inside one (Droidtop/tracker#942).
+                    val heroName = rememberCardTitle(title, max = 3)
                     Text(
-                        title,
+                        heroName.text,
                         color = MenuTokens.OnSurface,
                         style = TypeRole.heroTitle,
-                        maxLines = 3,
+                        maxLines = heroName.lines,
+                        softWrap = heroName.softWrap,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -329,11 +332,15 @@ internal fun PcCapsule(
                 modifier = Modifier.fillMaxSize().padding(Space.Md),
                 verticalArrangement = Arrangement.Center,
             ) {
+                // The plate's name breaks between run-together words, never inside one: "RP BetaRunner" read "RP",
+                // "BetaRunn", "er" on Home (rig, AVD dev.3365, Droidtop/tracker#942).
+                val plateName = rememberCardTitle(title, max = 3)
                 Text(
-                    title,
+                    plateName.text,
                     color = MenuTokens.OnSurface,
                     style = TypeRole.rowTitle,
-                    maxLines = 3,
+                    maxLines = plateName.lines,
+                    softWrap = plateName.softWrap,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(

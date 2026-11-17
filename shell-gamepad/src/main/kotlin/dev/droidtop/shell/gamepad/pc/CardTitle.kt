@@ -53,6 +53,6 @@ internal class CardTitle(val text: String, val lines: Int) {
 
 /** [CardTitle.of], worked out once per title rather than on every frame a card is drawn. */
 @Composable
-internal fun rememberCardTitle(title: String): CardTitle = remember(title) { CardTitle.of(title) }
+internal fun rememberCardTitle(title: String, max: Int = 2): CardTitle = remember(title, max) { CardTitle.of(title, max) }
 
 private const val ZERO_WIDTH_SPACE = '​'
