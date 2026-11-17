@@ -229,6 +229,8 @@ object PluginJobsCenter {
             // was still waiting: it stays in history only, never in both (Droidtop/tracker#940).
             val archived = runCatching { JobHistory.has(app, saved.filter { it.done }.map { it.jobId }) }.getOrDefault(emptySet())
             restore(saved.filter { it.jobId !in archived })
+            // How many came back, so a row that returns after it was cleared can be traced (Droidtop/tracker#790).
+            android.util.Log.i("droidtop.jobs", "restored ${saved.size - archived.size} saved jobs (${archived.size} already in history); the list holds ${state.value.size}")
             restoredOnce.complete(Unit)
             runCatching { onRestored() }
             // Finished jobs past the person's Keep finished jobs choice go, from history and from the live list.
@@ -290,12 +292,20 @@ object PluginJobsCenter {
         persistenceScope.launch {
             delay(PERSIST_INTERVAL_MS)
             writeQueued.set(false)
-            val snapshot = encodeEntries(state.value)
+            val list = state.value
+            val snapshot = encodeEntries(list)
             context.pluginJobsStore.edit { it[persistedKey] = snapshot }
+            // Each change of how many jobs are saved, once (Droidtop/tracker#790: cleared rows came back after a restart).
+            if (list.size != lastSavedCount) {
+                lastSavedCount = list.size
+                android.util.Log.i("droidtop.jobs", "saved ${list.size} jobs")
+            }
         }
     }
 
     internal const val PERSIST_INTERVAL_MS = 1_000L
+
+    @Volatile private var lastSavedCount = -1
 
     /** Live, ordered (newest first) view of every tracked job, running or recently finished -- what the Jobs screen and any inline progress row both read. */
     fun entries(): StateFlow<List<Entry>> = state
