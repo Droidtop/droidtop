@@ -114,7 +114,8 @@ static void audit(void *context, const struct sbx_access *access, int result) {
 JNIEXPORT jint JNICALL
 Java_dev_droidtop_pluginhost_SandboxBroker_nativeServe(JNIEnv *env, jclass clazz, jstring plugin, jobjectArray paths,
                                                       jintArray modes, jobjectArray alias_from, jobjectArray alias_to,
-                                                      jstring quota_root, jlong quota_bytes, jint net_grants) {
+                                                      jstring quota_root, jlong quota_bytes, jint net_grants,
+                                                      jboolean folders_by_path) {
     (void) clazz;
     jsize count = (*env)->GetArrayLength(env, paths);
     if (count != (*env)->GetArrayLength(env, modes)) return -EINVAL;
@@ -122,6 +123,12 @@ Java_dev_droidtop_pluginhost_SandboxBroker_nativeServe(JNIEnv *env, jclass clazz
     if (aliases != (*env)->GetArrayLength(env, alias_to)) return -EINVAL;
     struct sbx_policy *policy = sbx_policy_new();
     if (!policy) return -ENOMEM;
+    /*
+     * A contained process is an Android isolated process: SELinux refuses it any folder descriptor its app sends it
+     * (file_receive), so its handler holds such a folder by its path (fibrewall 8be4adc, Droidtop/tracker#741). With
+     * this the broker does not send folders' descriptors at all, so no denial is logged for each one.
+     */
+    if (folders_by_path) sbx_policy_set_folders_by_path(policy, 1);
     jint *mode = (*env)->GetIntArrayElements(env, modes, NULL);
     for (jsize i = 0; i < count; i++) {
         jstring path = (jstring) (*env)->GetObjectArrayElement(env, paths, i);

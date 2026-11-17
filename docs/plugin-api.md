@@ -4607,12 +4607,24 @@ names to the plugin's own folder (`plugins/<id>/data/app-data` and
 `app-data-de`, beside its data store, removed with it), read and written.
 So `getFilesDir`, `getCacheDir`, `getDatabasePath`, Flutter's
 `path_provider` and `app_flutter` and SQLite find real folders, and
-droidtop's own files are not among them under any name. One limit in the
-contained tier (emulator-5560, 2026-10-14): SELinux lets an isolated
-process use a file the app hands it but not list a folder it hands it
-(`avc: denied { read } ... app-data/code_cache ... isolated_app`), so code
-that lists its folder fails there (ART then skips its vdex cache); a
-open process, under droidtop's UID, lists them. A contained process locks down in passthrough
+droidtop's own files are not among them under any name. SELinux lets an
+isolated process use a file the app hands it but not a folder (it checks
+`file_receive`), so in the contained tier the broker sends no folder
+descriptor and the process's handler holds each folder by its path
+(fibrewall 8be4adc, `sbx_policy_set_folders_by_path`, Droidtop/tracker#741):
+listing, `mkdirs`, `realpath`, `chdir` and the `*at` calls on a folder go to
+the broker by path and work as in an open process.
+
+**Config and cache folders (2026-11-17, owner, Droidtop/tracker#741).**
+Every plugin has two explicit folders in its own folder, scoped to it,
+read, written and listed by path in every tier: `config`, for what it
+keeps (settings files, keys, a native engine's home), kept until the
+plugin is removed, and `cache`, for what can be made again, which droidtop
+may empty (it is also where Android's `getCacheDir` points). droidtop
+makes both before the plugin starts. A Kotlin plugin reads them from
+`PluginContext.configDir()` and `cacheDir()`; native code in the plugin's
+process finds them as `XDG_CONFIG_HOME` and `XDG_CACHE_HOME`, and `HOME` is
+the plugin's own folder. A contained process locks down in passthrough
 (`SBX_LOCK_PASSTHROUGH`): only those names go to the broker, and every
 other path is made by the handler with the kernel deciding, where the
 isolated UID and SELinux keep droidtop's files out as before. The

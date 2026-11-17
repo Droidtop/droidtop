@@ -129,6 +129,14 @@ class PluginResult private constructor(val ok: Boolean, val values: Map<String, 
  * because the manifest never declared that capability.
  */
 interface PluginContext {
+    companion object {
+        /** [configDir]'s name in the plugin's own folder. */
+        const val CONFIG_DIR = "config"
+
+        /** [cacheDir]'s name in the plugin's own folder (where Android's getCacheDir points too). */
+        const val CACHE_DIR = "cache"
+    }
+
     /**
      * `host.call` (docs/plugin-api.md 1.4): one call to droidtop's broker,
      * or through it to a provider plugin. [argsJson] is a JSON object; the
@@ -154,6 +162,21 @@ interface PluginContext {
      * own folder (docs/plugin-api.md 5.3, "The plugin's own folder by path"). Empty where a host has none.
      */
     fun privateDataDir(): String
+
+    /**
+     * The plugin's config folder: `config` in its own folder ([privateDataDir]), made by droidtop before the plugin
+     * starts, read, written and listed by path in every tier, kept until the plugin is removed. For what the plugin
+     * keeps (its settings files, keys, a native engine's home). Empty where the host has no folder for the plugin
+     * (owner, 2026-11-17, Droidtop/tracker#741). Native code finds it as `XDG_CONFIG_HOME` too.
+     */
+    fun configDir(): String = privateDataDir().takeIf { it.isNotEmpty() }?.let { "$it/$CONFIG_DIR" }.orEmpty()
+
+    /**
+     * The plugin's cache folder: `cache` in its own folder, made by droidtop before the plugin starts, read, written and
+     * listed by path in every tier, for what can be made again (droidtop may empty it). Empty where the host has no
+     * folder for the plugin (Droidtop/tracker#741). Native code finds it as `XDG_CACHE_HOME` too.
+     */
+    fun cacheDir(): String = privateDataDir().takeIf { it.isNotEmpty() }?.let { "$it/$CACHE_DIR" }.orEmpty()
 
     /**
      * The plugin's preferences named [name]: droidtop's own store in its folder (docs/plugin-api.md 5.3, "Preferences

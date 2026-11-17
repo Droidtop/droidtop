@@ -26222,7 +26222,16 @@ Advanced.
   plugin depends on the plugin API only, never on Android's services or on
   the Android it runs on: its preferences and its SQLite are droidtop's own,
   in both tiers (2026-10-29, Droidtop/tracker#741; `docs/plugin-api.md` §5.3
-  "Preferences and SQLite are droidtop's"). Its
+  "Preferences and SQLite are droidtop's"). It has two explicit folders in
+  its own storage, a config folder and a cache folder (owner, 2026-11-17,
+  Droidtop/tracker#741: "plugins should be given explicit config and cache
+  directories in their storage that are scoped for them to read from and
+  write to"): `config` and `cache` in its own folder, made by droidtop before
+  it starts, read, written and listed by path in both tiers
+  (`PluginContext.configDir`, `cacheDir`; `XDG_CONFIG_HOME` and
+  `XDG_CACHE_HOME` for native code). In the contained tier its folders are
+  held by path (fibrewall's folders by path), since Android refuses an
+  isolated process any folder descriptor. Its
   code arrives as file descriptors, and everything it does
   beyond its process goes through its broker, where the caller's grant, the
   parameters it declared, the quota and the activity log apply. **For a
@@ -27166,10 +27175,9 @@ the secondary path for sources that publish no key.
   run (the latest successful one on `main`, or the run it is given) and runs them on an x86_64 AOSP emulator with
   `scripts/emulator-tests.sh`, started as Droidtop/enginehost's `conformance-emulator.yml` starts its own (the same
   pinned `ReactiveCircus/android-emulator-runner`), on Android 13 and 14. It fails when a test fails or droidtop is not
-  running, or has crashed, 30 s after it is started, except that the two `ContainedFilesRigTest` tests are listed as
-  known failing under Droidtop/tracker#741 (the contained plugin folder failed in an isolated process on stock Android
-  13 and 14, the first run of those tests anywhere): they are reported and do not fail the run, and one of them passing
-  fails it, so the entry (`KNOWN_FAILING` in the script) is removed when #741 is fixed. `PluginStartRigTest` is run and reported without failing the run,
+  running, or has crashed, 30 s after it is started. A test known to fail can be listed in `KNOWN_FAILING` in the
+  script with its issue: it is then reported and does not fail the run, and its passing fails it, so the entry is
+  removed when the issue is fixed. The list is empty since #741's contained folder works (2026-11-17). `PluginStartRigTest` is run and reported without failing the run,
   since the start-time budget it holds is the rig's and not an emulator's. `PythonPluginStartRigTest` is run and
   reported the same way: it times a contained python plugin's start step by step (the runtime's download and extract,
   the first plugin, a second in its own process, a warm call, four at once), Droidtop/tracker#848. Each number a rig test

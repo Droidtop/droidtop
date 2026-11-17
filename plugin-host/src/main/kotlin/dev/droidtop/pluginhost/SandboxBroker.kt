@@ -52,6 +52,7 @@ internal object SandboxBroker {
         quotaRoot: String?,
         quotaBytes: Long,
         netGrants: Int,
+        foldersByPath: Boolean,
     ): Int
 
     /**
@@ -68,10 +69,17 @@ internal object SandboxBroker {
     /** Every name in [privateRoots], for the lockdown's claims. */
     fun claims(info: ApplicationInfo): Array<String> = privateRoots(info).let { (credential, device) -> (credential + device).toTypedArray() }
 
-    /** The plugin's own stand-in for droidtop's private folder: credential-encrypted and device-encrypted halves. */
+    /**
+     * The plugin's own stand-in for droidtop's private folder: credential-encrypted and device-encrypted halves. Its
+     * config and cache folders ([PluginContext.configDir], [PluginContext.cacheDir]) are made here, before the process
+     * starts, so they are there in every tier (owner, 2026-11-17, Droidtop/tracker#741).
+     */
     fun appDataFor(context: Context, pluginId: String): Pair<File, File> {
         val data = PluginStore.dataDirFor(context, pluginId)
-        return File(data, "app-data").apply { mkdirs() } to File(data, "app-data-de").apply { mkdirs() }
+        val credential = File(data, "app-data").apply { mkdirs() }
+        File(credential, PluginContext.CONFIG_DIR).mkdirs()
+        File(credential, PluginContext.CACHE_DIR).mkdirs()
+        return credential to File(data, "app-data-de").apply { mkdirs() }
     }
 
     /**
@@ -142,6 +150,8 @@ internal object SandboxBroker {
             PluginStore.dataDirFor(context, pluginId).path, PluginDataStore.LIMIT_BYTES,
             // The network hole: out, in and name lookups, made by this broker for a process that may make no socket (5.6).
             if (PluginTiers.NET_SOCKETS in holes) NET_CONNECT or NET_LISTEN or NET_RESOLVE else 0,
+            // An isolated process holds its folders by path; a process under droidtop's UID takes their descriptors.
+            PluginTiers.runsIsolated(holes) || tier == PluginTier.CONTAINED,
         )
         if (fd < 0) {
             android.util.Log.w("droidtop.sandbox", "$pluginId: the file broker did not start (errno ${-fd})")

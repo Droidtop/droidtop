@@ -538,6 +538,18 @@ interface HostedScreen {
  * process overrides them ([PluginRuntimeService]).
  */
 internal open class BrokerPluginContext(private val broker: IPluginHostBroker, private val folder: String = "") : PluginContext {
+    init {
+        // Native code in the plugin (a Go or C engine) finds the plugin's config and cache folders where it looks for its
+        // own (XDG; Go's os.UserConfigDir and os.UserCacheDir), and its home in the plugin's folder (Droidtop/tracker#741).
+        if (folder.isNotEmpty()) {
+            runCatching {
+                android.system.Os.setenv("XDG_CONFIG_HOME", configDir(), true)
+                android.system.Os.setenv("XDG_CACHE_HOME", cacheDir(), true)
+                android.system.Os.setenv("HOME", folder, true)
+            }
+        }
+    }
+
     private fun request(api: String, version: Int, op: String, argsJson: String): String =
         JSONObject().put("api", api).put("version", version).put("op", op)
             .put("args", runCatching { JSONObject(argsJson) }.getOrDefault(JSONObject())).toString()
