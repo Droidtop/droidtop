@@ -1114,7 +1114,7 @@ object AppSettingsCatalogs {
                         id = "accounts_integrations_screen",
                         title = "App integrations",
                         registryId = SCREEN_INTEGRATIONS,
-                        valueLabel = { if (activeIntegrations == 0) "none" else "$activeIntegrations active" },
+                        valueLabel = { if (activeIntegrations == 0) "None" else "$activeIntegrations active" },
                         icon = CatalogIcon.INTEGRATIONS,
                     ),
                 ),

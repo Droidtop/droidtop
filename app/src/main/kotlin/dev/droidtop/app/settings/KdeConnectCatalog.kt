@@ -42,7 +42,7 @@ object KdeConnectCatalog {
         id = "accounts_kdeconnect_link",
         title = "KDE Connect",
         registryId = SCREEN_ID,
-        valueLabel = { if (on) "on" else "off" },
+        valueLabel = { if (on) "On" else "Off" },
         icon = CatalogIcon.DESKTOP,
     )
 

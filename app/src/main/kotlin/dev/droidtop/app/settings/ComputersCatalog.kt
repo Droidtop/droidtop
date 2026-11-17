@@ -56,7 +56,7 @@ object ComputersCatalog {
         id = "accounts_computers_link",
         title = "Computers",
         registryId = SCREEN_ID,
-        valueLabel = { if (paired == 0) "none paired" else "$paired paired" },
+        valueLabel = { if (paired == 0) "None" else "$paired paired" },
         icon = CatalogIcon.DESKTOP,
     )
 

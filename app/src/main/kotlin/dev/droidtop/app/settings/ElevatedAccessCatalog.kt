@@ -100,7 +100,9 @@ object ElevatedAccessCatalog {
     }
 
     private fun label(choice: ElevatedChoice, activeLabel: String?): String = when (choice) {
-        ElevatedChoice.AUTO -> "${choice.label} (${activeLabel ?: "none available"})"
+        // The provider in use after a dot; none in use, the row's line says why (unavailableReason), so the value is
+        // "Auto" alone: "Auto (none available)" wrapped to two lines (rig, AVD dev.3354).
+        ElevatedChoice.AUTO -> activeLabel?.let { "${choice.label} · $it" } ?: choice.label
         else -> choice.label
     }
 }
