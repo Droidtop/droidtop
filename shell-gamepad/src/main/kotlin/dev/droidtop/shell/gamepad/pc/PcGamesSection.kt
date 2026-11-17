@@ -462,20 +462,37 @@ internal fun PcGamesSection(
     // there is no per-card lookup.
     var systemNames by remember { mutableStateOf(emptyMap<String, String>()) }
     var others by remember { mutableStateOf(emptyList<LibraryEntry>()) }
+    // Home's search pool besides PC games: every Retro game shown anywhere and the game apps. It used to be [others],
+    // which keeps only Retro games with a time to place them by (the strip's rule), so a DOS game found nothing from
+    // Home (rig, AVD dev.3354: "doom" listed only the Doom system).
+    var searchOthers by remember { mutableStateOf(emptyList<LibraryEntry>()) }
+    // The systems that have a game here: a system row in Home's search is a way to its games, not a list of every
+    // system droidtop knows (the Doom system, with none, was the only hit for "doom").
+    var systemsWithGames by remember { mutableStateOf(emptyMap<String, String>()) }
     LaunchedEffect(retro, apps) {
         val loaded = withContext(Dispatchers.IO) {
             val rules = if (apps.isEmpty()) null else AppCategoryRules.load(context)
             val names = if (retro.isEmpty()) emptyMap<String, String>() else ConsoleSystemsRepository.allSystems(context).associate { it.id to it.displayName }
             val gameApps = if (rules == null) emptyList<LibraryEntry>() else apps.filter { rules.isGame(it.id, it.appFacts) }
-            names to (retro.filter { !it.hidden && it.addedEpochMs() + (it.lastPlayedEpochMs ?: 0L) > 0L } + gameApps)
+            val shown = retro.filter { !it.hidden }
+            val withGames = shown.mapNotNullTo(HashSet()) { it.systemId }
+            HomePools(
+                names = names,
+                strip = shown.filter { it.addedEpochMs() + (it.lastPlayedEpochMs ?: 0L) > 0L } + gameApps,
+                search = shown + gameApps,
+                systems = names.filterKeys { it in withGames },
+            )
         }
-        systemNames = loaded.first
-        others = loaded.second
+        systemNames = loaded.names
+        others = loaded.strip
+        searchOthers = loaded.search
+        systemsWithGames = loaded.systems
     }
     fun badgeOf(entry: LibraryEntry): KindBadge? = kindBadgeOf(entry, systemNames, origins, badgeStyle, pcRoots.orEmpty())
     // Home's strip and band (docs/SPEC.md 7i, "Home"; Droidtop/tracker#485 F7a), built off the main thread from what
     // the shell already holds. Only while Home is showing.
     val homeAll = remember(games, others) { games.orEmpty() + others }
+    val homeSearchAll = remember(games, searchOthers) { games.orEmpty() + searchOthers }
     val homeStrip = if (state.home) rememberHomeStrip(homeAll, systemNames, keep = null) else HomeStripData()
     val homeTabs = homeStrip.tabs
     LaunchedEffect(homeTabs.size) { state.homeTab = state.homeTab.coerceIn(0, (homeTabs.size - 1).coerceAtLeast(0)) }
@@ -1412,18 +1429,18 @@ internal fun PcGamesSection(
             LibrarySearchDialog(
                 query = LibraryQuery(text = text),
                 matchCount = 0,
-                totalCount = homeAll.size,
+                totalCount = homeSearchAll.size,
                 onTextChange = { text = it },
                 onDismiss = { state.searchOpen = false },
                 suggestions = suggestions,
-                localKey = homeAll to systemNames,
+                localKey = homeSearchAll to systemsWithGames,
                 local = { q ->
-                    SearchEntry.matchingSystems(q, systemNames).map { (_, name) ->
-                        LocalSearchRow("system:$name", SearchRowKind.GAME, name, "System") {
+                    SearchEntry.matchingSystems(q, systemsWithGames).map { (_, name) ->
+                        LocalSearchRow("system:$name", SearchRowKind.GAME, name, "Game system") {
                             state.searchOpen = false
                             onOpenSection(GamingSection.GAMES)
                         }
-                    } + homeAll.filter { matchesSearchText(it, q) }.take(SEARCH_GAME_ROWS).map { game ->
+                    } + homeSearchAll.filter { matchesSearchText(it, q) }.take(SEARCH_GAME_ROWS).map { game ->
                         LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), badgeOf(game)?.text ?: "Game") {
                             state.searchOpen = false
                             openPage(game)
@@ -2048,3 +2065,11 @@ private fun HomeRowMenu(
         onDismiss = onDismiss,
     )
 }
+
+/** What Home loads off the main thread from the Retro list and the apps: names, the strip's pool, the search's pool. */
+private class HomePools(
+    val names: Map<String, String>,
+    val strip: List<LibraryEntry>,
+    val search: List<LibraryEntry>,
+    val systems: Map<String, String>,
+)
