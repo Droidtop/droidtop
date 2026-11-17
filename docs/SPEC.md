@@ -26277,6 +26277,15 @@ Advanced.
   Android's `LinkProperties`, the active one first. Next: the Syncthing
   plugin itself, paired through droidtop's own device pairing
   (Droidtop/tracker#556).
+  **A hole left at Ask first is asked at the point of use** (2026-11-16,
+  Droidtop/tracker#926): a plugin used to be started without a hole the
+  person had not answered and was never asked, so Syncthing ran with no
+  sockets and failed every 30 s. Now, before the tier is chosen, a start the
+  person made asks once per such hole on the first-use sheet (Allow and Never
+  are kept, Not now lasts the run as below); any other start notes it as
+  wanted, which the permission's row says ("It tried to use this but could
+  not ask you first"). A plugin with full access granted is not asked
+  (`PluginCrashPolicy.askUnansweredHoles`).
 - **Declining one permission costs only what needs it** (2026-10-16,
   Droidtop/tracker#518). Not now on the first-use sheet lasts the run of
   droidtop (`PluginRefusals`), so a page does not ask on every visit; a

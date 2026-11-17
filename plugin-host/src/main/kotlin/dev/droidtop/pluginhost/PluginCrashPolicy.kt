@@ -40,6 +40,7 @@ class PluginCrashPolicy(
     private suspend fun tierFor(record: PluginRecord, userInitiated: Boolean): Pair<PluginTier?, String?> = withContext(Dispatchers.IO) {
         val store = PluginGrants.forContext(context)
         var grants = store.read(record.manifest.id)
+        if (askUnansweredHoles(record, grants, userInitiated)) grants = store.read(record.manifest.id)
         val refusal = PluginTiers.refusal(record, grants) ?: return@withContext PluginTiers.of(record, grants) to null
         val state = PluginGrants.stateOf(record, grants, PluginTiers.FULL_TRUST)
         if (state == GrantState.ASK && userInitiated) {
@@ -52,6 +53,37 @@ class PluginCrashPolicy(
         }
         if (state == GrantState.ASK) store.noteWanted(record.manifest.id, PluginTiers.FULL_TRUST)
         null to refusal
+    }
+
+    /**
+     * The hole permissions ([PluginTiers.HOLES]) [record] declares and the person has not answered (Ask first), asked at
+     * the point of use (#830): on a start the person made, once each on the first-use sheet, where Allow and Never are
+     * kept and Not now holds for the rest of this run ([PluginRefusals]); on any other start, noted as wanted, which its
+     * permission row says. A plugin left at Ask first used to be started without the hole and never asked: Syncthing,
+     * whose network is such a hole, ran with no sockets and failed every 30 s (rig, AVD dev.3354,
+     * Droidtop/tracker#926). True when an answer changed its grants. Blocks while the sheet is up: on [Dispatchers.IO].
+     */
+    private fun askUnansweredHoles(record: PluginRecord, grants: PluginGrants.Snapshot, userInitiated: Boolean): Boolean {
+        val id = record.manifest.id
+        val unanswered = PluginTiers.HOLES.filter { hole ->
+            record.manifest.v2.permissions.any { it.id == hole } && PluginGrants.stateOf(record, grants, hole) == GrantState.ASK
+        }
+        if (unanswered.isEmpty() || PluginTiers.containmentBlocker(record.manifest) != null) return false
+        // Full access already granted: no hole applies.
+        if (PluginTiers.declaresFullTrust(record.manifest) && PluginGrants.stateOf(record, grants, PluginTiers.FULL_TRUST) == GrantState.GRANTED) return false
+        var changed = false
+        unanswered.forEach { hole ->
+            when {
+                !userInitiated -> PluginGrants.forContext(context).noteWanted(id, hole)
+                PluginRefusals.isNotNow(id, hole) -> Unit
+                else -> {
+                    PluginGrants.askPermission(context, record, hole)
+                    val now = PluginGrants.stateOf(record, PluginGrants.forContext(context).read(id), hole)
+                    if (now == GrantState.ASK) PluginRefusals.rememberNotNow(id, hole) else changed = true
+                }
+            }
+        }
+        return changed
     }
 
     /**
