@@ -116,6 +116,15 @@ object PluginBackground {
     private suspend fun start(context: Context, service: Entry) {
         // A new run takes the place of the last failed one's row.
         lastFailed.remove(service.key)?.let { PluginJobsCenter.clear(it) }
+        // And of the failed rows earlier runs of droidtop left: [lastFailed] lives only as long as the process, so every
+        // update or restart kept one more (rig, AVD dev.3354: a dozen "Syncthing · 1 failed" rows in Finished).
+        val capability = LegacyManifest.jobCapabilityFor(BackgroundProtocol.SERVICE_POINT)
+        PluginJobsCenter.entries().value
+            .filter {
+                it.pluginId == service.record.manifest.id && it.title == service.label && it.capability == capability &&
+                    it.state == dev.droidtop.pluginhost.JobState.FAILED
+            }
+            .forEach { PluginJobsCenter.clear(it.jobId) }
         val args = JSONObject().put("serviceId", BackgroundProtocol.entryId(service.entry))
         val jobId = startPluginJob(context, service.record, BackgroundProtocol.SERVICE_POINT, "run", args, "background", service.label) { result ->
             stopped(context, service, result)
