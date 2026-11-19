@@ -23,6 +23,17 @@ class Convention(unittest.TestCase):
         with self.assertRaises(cc.ConventionError):
             cc.check("Subject\n\nOnboarding:")
 
+    def test_a_required_trailer(self):
+        # Commit hygiene requires one: a subject is a developer's words, not a person's (Droidtop/tracker#954 item 9).
+        cc.check("Subject\n\nWhy.\n\nChangelog: none", require=True)
+        cc.check("Subject\n\nWhy.\n\nChangelog: Fixed: Search answers at once", require=True)
+        with self.assertRaises(cc.ConventionError):
+            cc.check("Subject only", require=True)
+        with self.assertRaises(cc.ConventionError):
+            cc.check("Subject\n\nWhy.\n\nNeeds a rig check\n1. Open it", require=True)
+        with self.assertRaises(cc.ConventionError):
+            cc.check("Subject\n\nWhy.\n\nOnboarding: Sign in again", require=True)
+
 
 class Lines(unittest.TestCase):
     def test_a_trailer_is_the_line_and_none_is_internal(self):

@@ -14,8 +14,9 @@ jobs:
     uses: Droidtop/droidtop-platforms/.github/workflows/commit-hygiene.yml@84f44633fc5a8441abae8d6679d2fd27b39cd2ee
 
   # droidtop's own: the commit convention its changelog is made from (docs/SPEC.md 10b, "Every build carries its
-  # changelog"; changelog.d/README.md). A Changelog or Onboarding trailer must be well formed; a commit without one
-  # passes. The generator's own cases run first.
+  # changelog"; changelog.d/README.md). Every commit carries a well-formed Changelog trailer, the line a person reads
+  # in What's new, or "Changelog: none" (the owner, 2026-11-19: clean user-facing lines, Droidtop/tracker#954 item 9).
+  # The generator's own cases run first.
   changelog-convention:
     runs-on: ubuntu-latest
     steps:
@@ -42,4 +43,4 @@ jobs:
           while read -r sha; do
             gh api "repos/$REPO/commits/$sha" --jq '.commit.message' > "$dir/$sha.txt"
           done < "$dir/shas"
-          python3 build-scripts/changelog_commits.py check "$dir"/*.txt
+          python3 build-scripts/changelog_commits.py check --require "$dir"/*.txt

@@ -20,9 +20,10 @@ as git trailers, a commit may say:
 - `Onboarding:` is a line under "After updating" in the release notes and in What's new: something a person must do
   after this update (sign in again, turn a setting on). Every build's lines between the installed version and the
   new one are shown, so an update that skips builds misses none.
-- Without a `Changelog:` trailer, the commit's subject is its line: under Fixed when it says it fixes something, Added
-  when it adds something, else Changed; a subject about tests, CI, docs or a fragment counts as internal. Subjects are
-  written for developers, so a change people will notice should carry a trailer or a fragment.
+- Every commit carries a `Changelog:` trailer (the owner, 2026-11-19): commit hygiene fails one without. What's new
+  lists these lines, so they name what a person notices in their words, never the code. Older commits without one
+  still read as their subject: under Fixed when it says it fixes something, Added when it adds something, else
+  Changed; a subject about tests, CI, docs or a fragment counts as internal.
 - Commit hygiene fails a malformed trailer (`Changelog: Fixed the thing` instead of `Changelog: Fixed: the thing`).
 
 ## Fragments

@@ -22264,6 +22264,8 @@ The model is `CatalogPage(header, buttons, more, groups)`, built once per refres
 
 **A page in a sheet that names it** (the Quick Menu's Social, Downloads, Plugins and Profile, `LocalSheetNamesPage`) draws no title over its root: the sheet's own header ("L1 Social R1") already says it, and the root's title under it said it twice (UI review 2026-11-17). A screen pushed from that root still names itself.
 
+**Text is edited where it stands** (owner, 2026-11-19, Droidtop/tracker#954 item 12: "We don't want a separate fullscreen editor anywhere if we can avoid it"). A text setting is its row's own field (`TextInputItem`), and a press on it opens the editing panel over the page, which stays visible behind it (`TextEditDialog`), never a page of its own.
+
 **Empty, loading and error** are one `StateBlock`: a 48 dp glyph, a title of at most 32 characters, one body line and a next action (an empty state always has one); loading names what is slow after two seconds, never a bare title or an endless spinner; an error is a caution notice with one action and the raw text in Details. **Offline (Droidtop/tracker#594):** a screen that needs the network says so (`CatalogScreen.needsNetwork`: Updates, a store's page, the plugin catalogs, More catalogs, a source's record page and the Scraper); while the device has no network (`SystemStatus`, `NetworkKind.NONE`) the Gaming renderer heads it with one caution notice, "You're offline", saying what it shows may be out of date and its actions wait for a connection, instead of letting Check now or Sync fail first. The pages drawn on their own say the same: the theme browser draws the one notice (`Offline`, ui-shared) under its title, and Get games opens with one "You're offline" row (section 13).
 
 **The focus ring** (`FocusRingInks`) is two opaque edges: a 3 dp outer edge in the theme's accent (4 dp with high contrast) and a 1 dp inner edge in black or white, whichever is farther from the accent. Whatever the ring lands on, pure white, pure black or the accent's own colour, one of the two edges stands out by at least 3:1 (`GamingThemeMappingTest`). It no longer fades or breathes: a 60 percent ring that breathed to 24 percent vanished over light capsule art (low-vision review, R.4 #7).
@@ -24935,6 +24937,12 @@ tracker link, a private plugin name, or an AI model/tool name in it.
 notes").** Until then a build's notes were its commit subjects, written for
 developers ("Container audio: bridge proot..."), and nothing in droidtop
 showed them. Now:
+- *Every commit says what a person notices (owner, 2026-11-19, Droidtop/tracker#954
+  item 9: "we want clean user-facing names to list").* A commit's message ends with a
+  `Changelog: Added|Changed|Fixed: <plain words>` trailer, or `Changelog: none` for a change
+  nobody notices. Commit hygiene fails a commit without one (`changelog_commits.py check
+  --require`), so What's new never lists a developer's subject again. Older commits without
+  one still read as their subject.
 - *Fragments.* Every change that reaches `main` adds one file under
   `changelog.d/` (its README is the rule), in Keep a Changelog's headings
   (`### Added`, `### Changed`, `### Fixed`) over `- ` lines, in plain words
