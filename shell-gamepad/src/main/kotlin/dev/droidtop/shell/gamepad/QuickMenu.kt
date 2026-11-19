@@ -269,8 +269,18 @@ internal fun QuickMenu(
                             // 1280dp, 54dp + 16dp at 1920dp (owner: "The plugin pages have margins that are ridiculously
                             // large", Droidtop/tracker#649). They now see the pane as their window, so the gutter is the
                             // scale's floor, 16dp, and it is the only one.
-                            QuickSection.SOCIAL, QuickSection.DOWNLOADS, QuickSection.PLUGINS, QuickSection.PROFILE ->
-                                CompositionLocalProvider(LocalShellWindow provides window.pane(paneWidthDp), LocalSheetNamesPage provides true) {
+                            QuickSection.SOCIAL, QuickSection.DOWNLOADS, QuickSection.PLUGINS, QuickSection.PROFILE -> {
+                                // A catalog page names its presses to the shell's footer (declaresHints), which the sheet covers:
+                                // Social, Downloads, Plugins and Profile had no hint row at all (UI review, Droidtop/tracker#954
+                                // item 10). Here the page declares to the sheet's own, drawn under it like every other section's.
+                                val paneHints = remember(section) { dev.droidtop.shell.gamepad.input.FocusedHints() }
+                                CompositionLocalProvider(
+                                    LocalShellWindow provides window.pane(paneWidthDp),
+                                    LocalSheetNamesPage provides true,
+                                    dev.droidtop.shell.gamepad.input.LocalFocusedHints provides paneHints,
+                                ) {
+                                    Column(Modifier.fillMaxSize()) {
+                                        Box(Modifier.weight(1f)) {
                                     when (section) {
                                         QuickSection.SOCIAL -> PlaceCatalogView(PLACE_SOCIAL_SCREEN_ID, onBack = close)
                                         QuickSection.DOWNLOADS -> DownloadsSection(close)
@@ -281,7 +291,13 @@ internal fun QuickMenu(
                                         )
                                         else -> PluginsTab(runningEntry, placeAvailable, close)
                                     }
+                                        }
+                                        paneHints.bindings?.let { bindings ->
+                                            HintRow(bindings = bindings, background = Color.Transparent, modifier = Modifier.padding(top = 8.dp))
+                                        }
+                                    }
                                 }
+                            }
                             else -> Box(Modifier.padding(horizontal = 16.dp)) {
                                 when (section) {
                                     QuickSection.APPS -> AppsTab(close)
@@ -798,7 +814,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                 !granted -> item(key = "access") {
                     MenuRow(
                         title = words(R.string.gamepad_notification_access),
-                        value = if (restricted) dev.droidtop.runtime.systemstatus.RestrictedSettings.TITLE else "Needs permission",
+                        value = if (restricted) dev.droidtop.runtime.systemstatus.RestrictedSettings.TITLE else "Allow",
                         selected = systemIndex == 0,
                         onClick = {
                             focusIndex = recent.size

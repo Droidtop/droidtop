@@ -774,7 +774,9 @@ object GamingSettingsCatalog {
                             // like any other state (ui-polish item 15).
                             title = words(R.string.gaming_brightness),
                             subtitle = words(R.string.gaming_opens_the_system_screen_where_droidtop),
-                            value = "Needs permission",
+                            // Which grant, by Android's own name for it: "Needs permission" said nothing of what A would
+                            // open (UI review, Droidtop/tracker#954 item 11).
+                            value = "Needs Modify system settings",
                             run = { ctx -> SettingsLaunch.start(ctx, controls.brightnessGrantIntent(ctx)) },
                         ),
                     )
@@ -796,7 +798,7 @@ object GamingSettingsCatalog {
                         ActionItem(
                             id = ID_SYSTEM_DND_GRANT,
                             title = words(R.string.gaming_do_not_disturb),
-                            value = "Needs permission",
+                            value = "Needs Do Not Disturb access",
                             run = { ctx -> SettingsLaunch.start(ctx, controls.dndGrantIntent()) },
                         ),
                     )
