@@ -33,7 +33,14 @@ import kotlinx.coroutines.launch
 import dev.droidtop.shell.gamepad.ShellDialog
 
 /** One game the picker offers: its name, and why it is offered and where it is. */
-internal data class SameGameChoice(val title: String, val subtitle: String)
+internal data class SameGameChoice(val title: String, val subtitle: String, val typed: TypedChoice? = null)
+
+/**
+ * A choice that is typed in its own row (owner, 2026-11-19, Droidtop/tracker#954 item 12: no editor and no panel):
+ * A puts the cursor in it at once, with no second press, since typing changes nothing until it is done. What was
+ * typed goes to the picker's onTyped.
+ */
+internal data class TypedChoice(val initial: String, val hint: String, val search: Boolean = false)
 
 /**
  * "This game IS that one": the one picker behind every "these two are the
@@ -66,15 +73,24 @@ internal fun SameGamePicker(
     onPick: suspend (index: Int) -> String,
     onDone: (String) -> Unit,
     onDismiss: () -> Unit,
+    /** What was typed in a [TypedChoice]'s row, by its index. */
+    onTyped: (index: Int, text: String) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     var focusIndex by remember(choices) { mutableIntStateOf(0) }
     var armed by remember(choices) { mutableStateOf<Int?>(null) }
     var working by remember(choices) { mutableStateOf(false) }
+    // The typed choice being typed in: while it is, the pad belongs to its field.
+    var typing by remember(choices) { mutableStateOf<Int?>(null) }
 
     fun press(index: Int) {
         if (working) return
         focusIndex = index
+        if (choices.getOrNull(index)?.typed != null) {
+            armed = null
+            typing = index
+            return
+        }
         if (armed != index) {
             armed = index
             return
@@ -101,6 +117,7 @@ internal fun SameGamePicker(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(620.dp)),
             focusLabel = focusLabel,
             onPad = { pad ->
+                if (typing != null) return@MenuPanel false
                 when (pad.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> {
                         val next = menuStep(focusIndex, choices.size, if (pad.action == GamepadAction.UP) -1 else 1)
@@ -123,12 +140,25 @@ internal fun SameGamePicker(
                 MenuRow(title = words(R.string.gamepad_no_game_here_has_a_name))
             } else {
                 choices.forEachIndexed { index, choice ->
-                    MenuRow(
-                        title = choice.title,
-                        subtitle = if (armed == index) confirmLine(choice) else choice.subtitle,
-                        selected = index == focusIndex,
-                        onClick = { press(index) },
-                    )
+                    val typed = choice.typed
+                    if (typed != null && typing == index) {
+                        dev.droidtop.shell.gamepad.InPlaceTextField(
+                            initial = typed.initial,
+                            hint = typed.hint,
+                            search = typed.search,
+                            onDone = { text ->
+                                typing = null
+                                onTyped(index, text)
+                            },
+                        )
+                    } else {
+                        MenuRow(
+                            title = choice.title,
+                            subtitle = if (armed == index) confirmLine(choice) else choice.subtitle,
+                            selected = index == focusIndex,
+                            onClick = { press(index) },
+                        )
+                    }
                 }
             }
             if (working) NoticeCard(Notice(NoticeTone.Info, workingLine), NoticePlacement.Group)

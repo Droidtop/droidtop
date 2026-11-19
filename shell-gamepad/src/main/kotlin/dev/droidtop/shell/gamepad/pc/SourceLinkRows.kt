@@ -14,7 +14,6 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.SourceKey
 import dev.droidtop.library.SourceLink
 import dev.droidtop.library.UpdateSources
-import dev.droidtop.shell.gamepad.TextEditDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -191,36 +190,8 @@ internal fun SourceLinkSheet(
     say: (String?) -> Unit,
     onClose: () -> Unit,
 ) {
-    var typing by remember(source.key) { mutableStateOf(false) }
     var query by remember(source.key, gameTitle) { mutableStateOf(gameTitle) }
-    var editingQuery by remember(source.key) { mutableStateOf(false) }
-    if (editingQuery) {
-        TextEditDialog(
-            title = words(R.string.gamepad_search_x, source.label),
-            subtitle = SEARCH_HELP,
-            initial = query,
-            search = true,
-            onCommit = { text ->
-                query = searchText(text, gameTitle)
-                editingQuery = false
-            },
-            onDismiss = { editingQuery = false },
-        )
-        return
-    }
-    if (typing) {
-        TextEditDialog(
-            title = source.label,
-            subtitle = source.hint ?: SOURCE_LINK_HELP,
-            initial = current?.answer?.url ?: current?.externalId.orEmpty(),
-            onCommit = { text ->
-                onClose()
-                scope.launch { linkSourceFromText(library, gameIds, source, text, say) }
-            },
-            onDismiss = { typing = false },
-        )
-        return
-    }
+    val typedLink = current?.answer?.url ?: current?.externalId.orEmpty()
     val found by produceState<List<UpdateSources.Found>?>(null, source.key, query) {
         value = null
         value = library.sourceMatches(source.key, query, versions)
@@ -230,7 +201,8 @@ internal fun SourceLinkSheet(
     val first = 1
     val typeIndex = first + matches.size
     val choices = buildList {
-        add(SameGameChoice(searchRowTitle(query), "Change what is searched for"))
+        // The search and the typed link are typed in their own rows (no editor, no panel: Droidtop/tracker#954 item 12).
+        add(SameGameChoice(searchRowTitle(query), "Change what is searched for", TypedChoice(query, gameTitle, search = true)))
         matches.forEach { match ->
             add(
                 SameGameChoice(
@@ -239,7 +211,7 @@ internal fun SourceLinkSheet(
                 ),
             )
         }
-        add(SameGameChoice("Type a link or id", source.hint ?: SOURCE_LINK_HELP))
+        add(SameGameChoice("Type a link or id", source.hint ?: SOURCE_LINK_HELP, TypedChoice(typedLink, source.hint ?: SOURCE_LINK_HELP)))
         if (current != null) add(SameGameChoice("Unlink", "#${current.externalId}"))
     }
     SameGamePicker(
@@ -252,8 +224,6 @@ internal fun SourceLinkSheet(
         choices = choices,
         confirmLine = { choice ->
             when (val index = choices.indexOf(choice)) {
-                0 -> "Press again to change the search"
-                typeIndex -> "Press again to type it"
                 typeIndex + 1 -> "Press again: ${source.label} stops checking this game"
                 else -> "Press again: link this game to ${matches[index - first].title ?: "#" + matches[index - first].externalId}"
             }
@@ -262,25 +232,28 @@ internal fun SourceLinkSheet(
         onPick = { index ->
             var said: String? = null
             when (index) {
-                0 -> editingQuery = true
-                typeIndex -> typing = true
                 typeIndex + 1 -> linkSourceFromText(library, gameIds, source, "") { said = it }
                 else -> linkFound(library, gameIds, source, matches[index - first]) { said = it }
             }
             said.orEmpty()
         },
         onDone = { message ->
-            if (!typing && !editingQuery) {
-                say(message.ifEmpty { null })
-                onClose()
-            }
+            say(message.ifEmpty { null })
+            onClose()
         },
         onDismiss = onClose,
+        onTyped = { index, text ->
+            when (index) {
+                0 -> query = searchText(text, gameTitle)
+                // A typed link applies once the sheet closes; left as it was, or blank, it changes nothing (Unlink unlinks).
+                typeIndex -> if (text.isNotBlank() && text.trim() != typedLink.trim()) {
+                    onClose()
+                    scope.launch { linkSourceFromText(library, gameIds, source, text, say) }
+                }
+            }
+        },
     )
 }
-
-/** What a search row and its text entry say (Droidtop/tracker#861). */
-internal const val SEARCH_HELP = "Search with other words than the folder's name"
 
 /** The search row's title: what is searched for now. Pure. */
 internal fun searchRowTitle(query: String): String = "Search for: $query"
