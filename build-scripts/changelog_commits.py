@@ -19,7 +19,8 @@ Changed), or counts as internal when its subject is about tests, CI or docs.
 
 Pure functions only; release_channel.py does the GitHub calls. Run as a script:
 
-    changelog_commits.py check MESSAGE_FILE...   each message's trailers are well formed (commit-hygiene)
+    changelog_commits.py check [--require] MESSAGE_FILE...   each message's trailers are well formed; with
+                                                  --require each has a Changelog trailer (commit-hygiene)
 """
 
 import re
@@ -66,8 +67,19 @@ def trailers(message):
     return found
 
 
-def check(message):
-    """Raises ConventionError naming the first malformed trailer in [message]; a message without any passes."""
+def check(message, require=False):
+    """Raises ConventionError naming the first malformed trailer in [message].
+
+    With [require], a message with no Changelog trailer fails too: What's new listed developers' subjects ("Downloads:
+    starting a job attaches the jobs registry only if nothing has yet") where a commit had none, and the owner wants
+    clean lines a person reads (2026-11-19, Droidtop/tracker#954 item 9). Commit hygiene requires it of every new
+    commit; the generator still reads older commits' subjects.
+    """
+    if require and not any(key == "Changelog" for key, _ in trailers(message)):
+        raise ConventionError(
+            "no 'Changelog:' trailer: add 'Changelog: Added|Changed|Fixed: <what a person notices>' or 'Changelog: none' "
+            "as the message's last paragraph"
+        )
     for key, value in trailers(message):
         if key == "Changelog":
             if value.lower() in NONE_VALUES:
@@ -215,12 +227,15 @@ def merged(builds, after, through):
 
 def main(argv):
     if len(argv) >= 2 and argv[0] == "check":
+        # "check --require FILE...": every message must carry a Changelog trailer (commit hygiene).
+        require = argv[1] == "--require"
+        paths = argv[2:] if require else argv[1:]
         bad = 0
-        for path in argv[1:]:
+        for path in paths:
             with open(path) as f:
                 message = f.read()
             try:
-                check(message)
+                check(message, require=require)
             except ConventionError as e:
                 bad += 1
                 print(f"{path}: {subject_of(message)}: {e}")
