@@ -12,6 +12,12 @@ data class SettingsSearchResult(
     val itemTitle: String,
     val itemSubtitle: String?,
     val icon: CatalogIcon?,
+    /**
+     * How the root reaches [target]: each row that opened a screen, with that screen, from the root's own row down to
+     * [target]; empty for a row of the root itself. A category screen picks its column entry from the first step
+     * (a plugin's page found by search opened under Modes, the category on show, Droidtop/tracker#954 item 15).
+     */
+    val trail: List<Pair<String, CatalogScreen>> = emptyList(),
 )
 
 /**
@@ -55,7 +61,7 @@ object SettingsSearchIndex {
         // 7.3 s of it Game sources and 3.0 s Containers), where side by side it takes about the slowest one's
         // (Droidtop/tracker#954 item 14). The order of the results, and so which of two paths to one row wins, is
         // the same as before.
-        suspend fun indexScreen(screen: CatalogScreen, depth: Int): List<SettingsSearchResult> {
+        suspend fun indexScreen(screen: CatalogScreen, depth: Int, trail: List<Pair<String, CatalogScreen>>): List<SettingsSearchResult> {
             // Which screen holds the index up: any one that takes a quarter second is named in the log with its time.
             val opened = android.os.SystemClock.elapsedRealtime()
             val groups = screen.indexGroups?.invoke(context) ?: screen.groups(context)
@@ -78,19 +84,20 @@ object SettingsSearchIndex {
                         itemTitle = item.title,
                         itemSubtitle = item.subtitle,
                         icon = item.icon,
+                        trail = trail,
                     )
                     val page = if ((depth <= 1 || screen.indexesItsPages) && item is NestedScreenItem) item.resolve() else null
                     rows += result to page
                 }
             }
             val pages = kotlinx.coroutines.coroutineScope {
-                rows.map { (_, page) ->
-                    page?.let { async(kotlinx.coroutines.Dispatchers.IO) { indexScreen(it, depth + 1) } }
+                rows.map { (row, page) ->
+                    page?.let { async(kotlinx.coroutines.Dispatchers.IO) { indexScreen(it, depth + 1, trail + (row.itemId to it)) } }
                 }.map { it?.await().orEmpty() }
             }
             return rows.flatMapIndexed { index, (result, _) -> listOf(result) + pages[index] }
         }
-        val results = indexScreen(root, 0)
+        val results = indexScreen(root, 0, emptyList())
         android.util.Log.i(LOG_TAG, "index built: ${results.size} rows in ${android.os.SystemClock.elapsedRealtime() - started} ms")
         // A screen reachable along two paths (the Plugins row sits under
         // Accounts and sources, which more than one parent opens) would be

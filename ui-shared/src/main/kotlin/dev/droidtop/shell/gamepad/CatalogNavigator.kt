@@ -669,6 +669,33 @@ fun CatalogNavigator(
     // screen opens that category (its rows are the pane's first level);
     // anything deeper is pushed onto the pane as before.
     fun openSearchResult(result: SettingsSearchResult) {
+        // A row on a screen below the root: the category its first step belongs to, then each screen down to it, so
+        // the column marks where it lives. Pushed onto the category on show instead, a plugin's page found by search
+        // sat under Modes (BlueStacks dev.3374, Droidtop/tracker#954 item 15).
+        if (categoryMode && result.trail.isNotEmpty()) {
+            val (firstRow, firstScreen) = result.trail.first()
+            val linked = categories.indexOfFirst { linkScreen(it)?.id == firstScreen.id }
+            val index = if (linked >= 0) {
+                linked
+            } else {
+                categories.indexOfFirst { cat ->
+                    rootGroups.orEmpty().any { group -> group.id in cat.groupIds && group.items.any { it.id == firstRow } }
+                }
+            }
+            if (index >= 0) {
+                inColumn = false
+                columnOnSearch = false
+                if (categories[index].key != category?.key) chooseCategory(index) else leavePushedScreens()
+                // A linked category's pane is its first screen already.
+                val pushes = if (linked >= 0) result.trail.drop(1) else result.trail
+                pushes.forEach { (_, pushed) ->
+                    stack.add(pushed)
+                    selectionByDepth[stack.lastIndex] = 0
+                }
+                if (pushes.isNotEmpty()) refresh()
+                return
+            }
+        }
         if (categoryMode) {
             inColumn = false
             columnOnSearch = false
