@@ -120,7 +120,6 @@ internal fun PcGamePage(
     val scope = rememberCoroutineScope()
     var scrapeStatus by remember(entry.id) { mutableStateOf<String?>(null) }
     // What the action band's Edit metadata and Options open over the page.
-    var renaming by remember(entry.id) { mutableStateOf(false) }
     var pickingMatch by remember(entry.id) { mutableStateOf(false) }
     var viewingMedia by remember(entry.id) { mutableStateOf(false) }
     var editingCollections by remember(entry.id) { mutableStateOf(false) }
@@ -538,10 +537,23 @@ internal fun PcGamePage(
                     listOfNotNull(
                         scrapeRow(entry, scrapeStatus, "the PC sources") { scrape() },
                         // The person's own title for the game (docs/SPEC.md 7n), kept by the library.
+                        // Typed in the row itself, with the panel still open (no editor, no panel: Droidtop/tracker#954 item 12).
                         if (library != null) {
-                            ActionRow("Title", entry.gameName?.takeIf { it.isNotBlank() } ?: "From the folder name") {
-                                close()
-                                renaming = true
+                            dev.droidtop.shell.gamepad.ActionTextRow(
+                                title = "Title",
+                                value = entry.gameName.orEmpty(),
+                                hint = "From the folder name",
+                                detail = words(R.string.gamepad_blank_uses_the_title_read_from_folder),
+                            ) { text ->
+                                if (text.trim() != entry.gameName.orEmpty().trim()) {
+                                    scope.launch {
+                                        library.renameGame(gameIds, text)
+                                        dev.droidtop.library.settings.Notices.flash(
+                                            if (text.isBlank()) "Title reset" else "Renamed",
+                                            context = context,
+                                        )
+                                    }
+                                }
                             }
                         } else {
                             null
@@ -607,24 +619,6 @@ internal fun PcGamePage(
         }
     }
     PluginPageScreen(pluginRows)
-    if (renaming && library != null) {
-        TextEditDialog(
-            title = words(R.string.gamepad_title),
-            subtitle = words(R.string.gamepad_blank_uses_the_title_read_from_folder),
-            initial = entry.gameName.orEmpty(),
-            onCommit = { text ->
-                renaming = false
-                scope.launch {
-                    library.renameGame(gameIds, text)
-                    dev.droidtop.library.settings.Notices.flash(
-                        if (text.isBlank()) "Title reset" else "Renamed",
-                        context = context,
-                    )
-                }
-            },
-            onDismiss = { renaming = false },
-        )
-    }
     if (pickingMatch) {
         dev.droidtop.shell.gamepad.ManualMatchPicker(
             entry = entry,

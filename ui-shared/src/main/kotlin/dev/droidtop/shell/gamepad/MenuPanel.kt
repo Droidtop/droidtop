@@ -5,7 +5,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.heading
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
+import dev.droidtop.ui.shared.holdKeyFocus
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.graphicsLayer
@@ -122,8 +121,9 @@ fun MenuPanel(
         Box {
             Column(
                 modifier = Modifier
-                    .focusRequester(focus)
-                    .focusable()
+                    // Held: a row typed in (ActionTextRow) takes the cursor into its field, and when the field lets
+                    // go the panel takes it back, so the pad keeps working in the sheet.
+                    .holdKeyFocus(focus)
                     .onPad(preview = true) { press ->
                         MenuRowEnd.atEdge = false
                         val handled = onPad(press)

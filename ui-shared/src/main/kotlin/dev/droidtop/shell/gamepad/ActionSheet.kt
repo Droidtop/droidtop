@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -33,6 +34,21 @@ class ActionRow(
     val switchOn: Boolean? = null,
     // Last, so a row's action can follow it as a trailing lambda.
     val onSelect: (() -> Unit)?,
+) : ActionSheetItem
+
+/**
+ * A row whose value is typed in the row itself (owner, 2026-11-19, Droidtop/tracker#954 item 12: no editor and no
+ * panel): it shows [title] and [value] ([hint] while blank); A or a tap turns it into an [InPlaceTextField], and when
+ * the person is done [onDone] gets the text, with the sheet still open.
+ */
+class ActionTextRow(
+    val title: String,
+    val value: String,
+    val hint: String = "Type here",
+    val detail: String? = null,
+    val secret: Boolean = false,
+    val search: Boolean = false,
+    val onDone: (String) -> Unit,
 ) : ActionSheetItem
 
 /** A heading over the rows that follow it, named in the section-label style. */
@@ -97,16 +113,23 @@ internal fun ActionSheetBody(
     modifier: Modifier = Modifier,
 ) {
     var focusIndex by focus
-    val choices = rows.filterIsInstance<ActionRow>()
+    val choices = rows.filter { it is ActionRow || it is ActionTextRow }
+    // The text row being typed in: while it is, the pad belongs to its field.
+    var typing by remember(rows) { mutableStateOf<ActionTextRow?>(null) }
     MenuPanel(
         modifier = modifier,
         focusLabel = focusLabel,
         title = title,
         hints = ACTION_SHEET_HINTS,
         onPad = { press ->
+            if (typing != null) return@MenuPanel false
             when (press.action) {
                 GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, choices.size, press)
-                GamepadAction.A -> choices.getOrNull(focusIndex)?.onSelect?.invoke()
+                GamepadAction.A -> when (val chosen = choices.getOrNull(focusIndex)) {
+                    is ActionRow -> chosen.onSelect?.invoke()
+                    is ActionTextRow -> typing = chosen
+                    else -> Unit
+                }
                 // The release of the same press cannot step out a second time; it belongs to this press (SPEC 6e).
                 GamepadAction.B -> onBack()
                 GamepadAction.SELECT, GamepadAction.L2 -> onDismiss()
@@ -121,6 +144,34 @@ internal fun ActionSheetBody(
             when (item) {
                 is ActionHeading -> MenuSectionLabel(item.title)
                 is ActionNote -> Text(item.text, color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall)
+                is ActionTextRow -> {
+                    val index = rowIndex++
+                    if (typing === item) {
+                        InPlaceTextField(
+                            initial = item.value,
+                            hint = item.hint,
+                            title = item.title,
+                            secret = item.secret,
+                            search = item.search,
+                            onDone = { text ->
+                                typing = null
+                                item.onDone(text)
+                            },
+                        )
+                    } else {
+                        MenuRow(
+                            title = item.title,
+                            subtitle = item.detail?.ifBlank { null },
+                            value = if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifBlank { item.hint },
+                            placeholder = item.value.isBlank(),
+                            selected = index == focusIndex,
+                            onClick = {
+                                focusIndex = index
+                                typing = item
+                            },
+                        )
+                    }
+                }
                 is ActionRow -> {
                     val index = rowIndex++
                     MenuRow(

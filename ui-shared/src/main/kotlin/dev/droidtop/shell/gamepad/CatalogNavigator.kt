@@ -63,7 +63,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.geometry.Offset
@@ -1784,97 +1783,19 @@ private class CatalogTextEdit(val id: String, val done: (String?) -> Unit)
 
 private val LocalCatalogTextEdit = androidx.compose.runtime.compositionLocalOf<CatalogTextEdit?> { null }
 
-/**
- * A text row typed in where it stands (owner, 2026-11-19: no separate editor anywhere, Droidtop/tracker#954 item 12):
- * the row's own box takes the cursor, with Android's keyboard where droidtop does not serve the field and droidtop's
- * own under it where it does, as the settings search field above it does. Done, B, Back, or Up and Down off a one-line
- * field keep the text and hand the pad back to the list; leaving the box by a tap elsewhere keeps it too.
- */
+/** A text row typed in where it stands: the shared [InPlaceTextField], under the row's title. */
 @Composable
 private fun CatalogInputEditing(title: String, hint: String, edit: CatalogTextEdit, item: TextInputItem) {
-    val initial = item.value
-    var text by remember(edit) {
-        mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(initial, androidx.compose.ui.text.TextRange(initial.length)))
-    }
-    val focus = remember { FocusRequester() }
-    val view = androidx.compose.ui.platform.LocalView.current
-    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
-    var finished by remember(edit) { mutableStateOf(false) }
-    var hadFocus by remember(edit) { mutableStateOf(false) }
-    fun finish() {
-        if (finished) return
-        finished = true
-        keyboard?.hide()
-        edit.done(text.text)
-    }
-    fun androidKeyboard() {
-        if (!KeyboardTargets.servesField(view.display?.displayId)) keyboard?.show()
-    }
-    LaunchedEffect(edit) {
-        requestFocusWhenAttached(focus, "Settings text field")
-        androidKeyboard()
-    }
-    BackHandler { finish() }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-        Text(title, style = MaterialTheme.typography.labelLarge, color = MenuTokens.OnSurfaceMuted)
-        Box(
-            modifier = Modifier
-                .padding(top = 4.dp)
-                .fillMaxWidth()
-                .clip(Corners.Crisp)
-                .background(MenuTokens.SurfaceSelected)
-                .focusRing(true, Corners.Crisp)
-                .padding(12.dp),
-        ) {
-            if (text.text.isEmpty()) {
-                Text(hint, color = MenuTokens.Placeholder, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
-            }
-            BasicTextField(
-                value = text,
-                onValueChange = { text = it },
-                singleLine = !item.multiline,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    imeAction = when {
-                        item.multiline -> androidx.compose.ui.text.input.ImeAction.Default
-                        item.search -> androidx.compose.ui.text.input.ImeAction.Search
-                        else -> androidx.compose.ui.text.input.ImeAction.Done
-                    },
-                    showKeyboardOnFocus = raisesKeyboardWithFocus,
-                ),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { finish() }, onSearch = { finish() }),
-                visualTransformation = if (item.secret) PasswordVisualTransformation() else VisualTransformation.None,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(MenuTokens.Accent),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focus)
-                    .onFocusChanged { state ->
-                        if (state.isFocused) hadFocus = true else if (hadFocus) finish()
-                    }
-                    // After the field: the keys it types never reach here, only the pad's.
-                    .onPad { press ->
-                        when (press.action) {
-                            GamepadAction.B -> {
-                                finish()
-                                true
-                            }
-                            // Off a one-line field the list moves on as usual: the text is kept and the press passes.
-                            GamepadAction.UP, GamepadAction.DOWN -> {
-                                if (!item.multiline) finish()
-                                false
-                            }
-                            GamepadAction.A -> {
-                                androidKeyboard()
-                                true
-                            }
-                            else -> false
-                        }
-                    },
-            )
-        }
-        // droidtop's own keyboard where it serves this screen (SPEC 4c).
-        OwnFieldKeyboard()
-    }
+    InPlaceTextField(
+        initial = item.value,
+        hint = hint,
+        onDone = { edit.done(it) },
+        title = title,
+        secret = item.secret,
+        multiline = item.multiline,
+        search = item.search,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+    )
 }
 
 private const val CONFIRM_CANCEL = "cancel"

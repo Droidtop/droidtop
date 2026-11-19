@@ -146,7 +146,7 @@ internal fun GamePageFrame(
     rowsByTab: Map<PageTab, List<PageFact>>,
     // Edit metadata's rows, Scrape first ([scrapeRow]), each given the menu's close; null draws no Edit metadata
     // button (an app has no metadata of its own to edit).
-    editMetadataRows: ((close: () -> Unit) -> List<ActionRow>)?,
+    editMetadataRows: ((close: () -> Unit) -> List<dev.droidtop.shell.gamepad.ActionSheetItem>)?,
     // Options' rows, only the ones this game has, each given the menu's close.
     optionsRows: (close: () -> Unit) -> List<ActionRow>,
     // The primary action, from the band and from X; the page decides what it does in each [play] state.
