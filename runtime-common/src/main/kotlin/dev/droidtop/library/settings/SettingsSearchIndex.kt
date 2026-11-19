@@ -43,11 +43,22 @@ data class SettingsSearchResult(
  * platform list instead of growing with it.
  */
 object SettingsSearchIndex {
+    private const val LOG_TAG = "droidtop.SettingsIndex"
+    private const val SLOW_SCREEN_MS = 250L
+
     suspend fun build(context: Context, root: CatalogScreen): List<SettingsSearchResult> {
         val results = mutableListOf<SettingsSearchResult>()
 
+        val started = android.os.SystemClock.elapsedRealtime()
+
         suspend fun indexScreen(screen: CatalogScreen, depth: Int) {
-            for (group in screen.indexGroups?.invoke(context) ?: screen.groups(context)) {
+            // Which screen holds the index up (Droidtop/tracker#954 item 14: 75-150 s on BlueStacks with 216 games):
+            // any one that takes a quarter second is named in the log with its time.
+            val opened = android.os.SystemClock.elapsedRealtime()
+            val groups = screen.indexGroups?.invoke(context) ?: screen.groups(context)
+            val took = android.os.SystemClock.elapsedRealtime() - opened
+            if (took >= SLOW_SCREEN_MS) android.util.Log.i(LOG_TAG, "${screen.id} (${screen.title}): $took ms")
+            for (group in groups) {
                 // Live device state, not configuration (docs/SPEC.md 7f) --
                 // the Quick Menu draws these, Settings does not, and
                 // neither does its search.
@@ -70,6 +81,7 @@ object SettingsSearchIndex {
             }
         }
         indexScreen(root, 0)
+        android.util.Log.i(LOG_TAG, "index built: ${results.size} rows in ${android.os.SystemClock.elapsedRealtime() - started} ms")
         // A screen reachable along two paths (the Plugins row sits under
         // Accounts and sources, which more than one parent opens) would be
         // indexed twice; the results list keys rows by item id, so a
