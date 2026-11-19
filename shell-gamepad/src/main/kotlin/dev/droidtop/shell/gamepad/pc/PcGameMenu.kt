@@ -71,7 +71,6 @@ import dev.droidtop.library.scraper.kindAndDate
 import dev.droidtop.library.scraper.line
 import dev.droidtop.shell.gamepad.CollectionMembershipEditor
 import dev.droidtop.shell.gamepad.ManualMatchPicker
-import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.ActionHeading
 import dev.droidtop.shell.gamepad.ActionNote
 import dev.droidtop.shell.gamepad.ActionRow
@@ -187,7 +186,6 @@ private fun PcGameMenuSheet(
     var pickingSameGame by remember(entry) { mutableStateOf(false) }
     // "Not the same game as <store>": the first press arms it, the second unlinks (Droidtop/tracker#745).
     var unlinkArmed by remember(entry) { mutableStateOf(false) }
-    var renaming by remember(entry) { mutableStateOf(false) }
     var progressToken by remember(entry) { mutableStateOf(0) }
     var editingSource by remember(entry) { mutableStateOf<UpdateSources.Source?>(null) }
     // A linked source's row opens its record (at Downloads while an update waits); linking is only for a source not
@@ -562,21 +560,6 @@ private fun PcGameMenuSheet(
             onDismiss = { pickingSameGame = false },
         )
     }
-    if (renaming) {
-        TextEditDialog(
-            title = words(R.string.gamepad_title),
-            subtitle = words(R.string.gamepad_blank_uses_the_folder_name_x, folderNameOf(entry)),
-            initial = entry.gameName.orEmpty(),
-            onCommit = { text ->
-                renaming = false
-                scope.launch {
-                    library.renameGame(gameIds, text)
-                    status = if (text.isBlank()) "Back to the title read from the folder name." else "Renamed to ${text.trim()}."
-                }
-            },
-            onDismiss = { renaming = false },
-        )
-    }
     val linking = editingSource
     if (linking != null) {
         SourceLinkSheet(
@@ -631,16 +614,21 @@ private fun PcGameMenuSheet(
     val partOf = grouping?.game?.takeIf { it.segments.size > 1 }?.segments
         ?.firstOrNull { segment -> segment.versions.any { version -> version.copies.any { it.path == entry.id } } }
     val finishedHere = grouping?.finished?.contains(entry.id) == true
-    val titleRows = listOfNotNull(
-        ActionRow(
-            "Title",
-            if (entry.gameName.isNullOrBlank()) {
-                "From the folder name"
-            } else {
-                "Your own title"
-            },
-            onSelect = { renaming = true },
-        ),
+    val titleRows = listOfNotNull<ActionSheetItem>(
+        // Typed in the row itself, the menu still open (no editor, no panel: Droidtop/tracker#954 item 12).
+        dev.droidtop.shell.gamepad.ActionTextRow(
+            title = "Title",
+            value = entry.gameName.orEmpty(),
+            hint = "From the folder name",
+            detail = words(R.string.gamepad_blank_uses_the_folder_name_x, folderNameOf(entry)),
+        ) { text ->
+            if (text.trim() != entry.gameName.orEmpty().trim()) {
+                scope.launch {
+                    library.renameGame(gameIds, text)
+                    status = if (text.isBlank()) "Back to the title read from the folder name." else "Renamed to ${text.trim()}."
+                }
+            }
+        },
         partOf?.let { part ->
             ActionRow(
                 if (finishedHere) "Not finished with ${part.label}" else "Finished with ${part.label}",
@@ -1288,7 +1276,7 @@ private fun PcGameMenuSheet(
         }
     }
 
-    val rowCount = entries.count { it is ActionRow }
+    val rowCount = entries.count { it is ActionRow || it is dev.droidtop.shell.gamepad.ActionTextRow }
     // The row list changes under the cursor (a page opens, a row goes
     // away); it never points past the end it is drawn against.
     LaunchedEffect(rowCount, page) {
@@ -1310,7 +1298,7 @@ private fun PcGameMenuSheet(
     // it, the menu showed round the smaller sheet with its own Close row
     // (console, build 1519, Droidtop/tracker#371).
     val childOpen = (contentOpen && ownStore != null) || storeOffer != null || pickingMatch ||
-        pickingReplacement || (pickingSameGame && grouping != null) || renaming || editingSource != null
+        pickingReplacement || (pickingSameGame && grouping != null) || editingSource != null
     if (!childOpen) {
         ActionSheet(
             title = gameName,
@@ -1420,8 +1408,8 @@ private fun LibraryEntry.identityLine(update: String?): String = if (missing) "b
  */
 private data class PcMenuSections(
     val play: List<ActionRow>,
-    val info: List<ActionRow>,
-    val organise: List<ActionRow>,
+    val info: List<ActionSheetItem>,
+    val organise: List<ActionSheetItem>,
     val install: List<ActionRow>,
     val updates: List<ActionRow>,
     val runs: List<ActionRow>,
@@ -1457,7 +1445,7 @@ private data class EngineChoice(val folder: String?, val pinned: Boolean, val en
  */
 @Composable
 private fun rememberPcActions(
-    titleRows: List<ActionRow>,
+    titleRows: List<ActionSheetItem>,
     // A store game: its store's rows. Null for a game no store owns.
     storeRows: StoreRows?,
     // "Stream from <computer>", one per paired computer that has the game.
