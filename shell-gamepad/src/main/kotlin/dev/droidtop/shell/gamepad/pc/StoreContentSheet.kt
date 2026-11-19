@@ -36,7 +36,6 @@ import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
-import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
@@ -125,30 +124,23 @@ internal fun StoreContentSheet(
     }
 
     BackHandler { onDismiss() }
-    asking?.let { branch ->
-        TextEditDialog(
-            title = words(R.string.gamepad_password_for_x, branch.title),
-            subtitle = null,
-            initial = "",
-            secret = true,
-            onCommit = { typed ->
-                asking = null
-                working = true
-                scope.launch {
-                    store.unlockBranch(context, gameId, branch.id, typed)
-                        .onSuccess {
-                            working = false
-                            choice = choice?.copy(branchId = branch.id)
-                            reload++
-                        }
-                        .onFailure {
-                            working = false
-                            status = userFacingErrorMessage(it)
-                        }
+    // A locked version's password is typed in its own row (no editor, no panel: Droidtop/tracker#954 item 12).
+    fun unlock(branch: StoreBranch, typed: String) {
+        asking = null
+        if (typed.isEmpty()) return
+        working = true
+        scope.launch {
+            store.unlockBranch(context, gameId, branch.id, typed)
+                .onSuccess {
+                    working = false
+                    choice = choice?.copy(branchId = branch.id)
+                    reload++
                 }
-            },
-            onDismiss = { asking = null },
-        )
+                .onFailure {
+                    working = false
+                    status = userFacingErrorMessage(it)
+                }
+        }
     }
     ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
@@ -156,6 +148,8 @@ internal fun StoreContentSheet(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(520.dp)),
             focusLabel = "Store content",
             onPad = { pad ->
+                // While a password is typed in its row, the pad is the field's.
+                if (asking != null) return@MenuPanel false
                 when (pad.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> {
                         val next = menuStep(selected, rowCount, if (pad.action == GamepadAction.UP) -1 else 1)
@@ -200,13 +194,23 @@ internal fun StoreContentSheet(
                 if (shown.branches.size > 1) SectionLabel("Version")
                 shown.branches.forEachIndexed { i, branch ->
                     val index = shown.extras.size + i
-                    MenuRow(
-                        title = branch.title,
-                        subtitle = branch.build,
-                        value = branchValue(branch, picked),
-                        selected = selected == index,
-                        onClick = { press(index) },
-                    )
+                    if (asking?.id == branch.id) {
+                        dev.droidtop.shell.gamepad.InPlaceTextField(
+                            initial = "",
+                            hint = words(R.string.gamepad_password_for_x, branch.title),
+                            title = branch.title,
+                            secret = true,
+                            onDone = { typed -> unlock(branch, typed) },
+                        )
+                    } else {
+                        MenuRow(
+                            title = branch.title,
+                            subtitle = branch.build,
+                            value = branchValue(branch, picked),
+                            selected = selected == index,
+                            onClick = { press(index) },
+                        )
+                    }
                 }
                 MenuRow(
                     title = if (shown.installed) "Apply" else "Save",
