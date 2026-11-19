@@ -842,8 +842,8 @@ fun CatalogNavigator(
     }
 
     val navFocus = remember { FocusRequester() }
-    LaunchedEffect(screen, textItem == null, infoRow == null) {
-        if (textItem == null && infoRow == null) requestFocusWhenAttached(navFocus, "Settings catalog")
+    LaunchedEffect(screen, editingText == null, infoRow == null) {
+        if (editingText == null && infoRow == null) requestFocusWhenAttached(navFocus, "Settings catalog")
     }
     // A held direction follows the cursor without animating each step.
     var heldStep by remember { mutableStateOf(false) }
