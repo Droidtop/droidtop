@@ -180,11 +180,13 @@ object RootProcess {
      * What root this device offers -- the question callers ask instead of
      * inferring it from a failed command. Waits up to [HELPER_WAIT_MS] for
      * the helper's binder, which arrives a moment after the process starts.
+     * [waitMs] 0 asks once, for a reader that only lists (settings search): with no helper at all the wait was 3 s
+     * of every index (BlueStacks dev.3376, Droidtop/tracker#954 item 14).
      */
-    suspend fun access(): RootAccess = withContext(Dispatchers.IO) {
+    suspend fun access(waitMs: Long = HELPER_WAIT_MS): RootAccess = withContext(Dispatchers.IO) {
         var result = run(TaskManager.shell, listOf("id", "-u"), null)
         var waited = 0L
-        while (!result.launched && waited < HELPER_WAIT_MS) {
+        while (!result.launched && waited < waitMs) {
             delay(HELPER_POLL_MS)
             waited += HELPER_POLL_MS
             result = run(TaskManager.shell, listOf("id", "-u"), null)

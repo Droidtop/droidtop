@@ -46,13 +46,15 @@ object ContainerRuntimeFactory {
         OciImageStore.of(app).evictToFit(DesktopSetupPrefs.imageCachePolicy(app), keep)
     }
 
-    suspend fun select(context: Context): ContainerRuntime {
+    /** The runtime for this device. [waitForRoot] false asks for root once, without waiting for the helper (a reader that only lists). */
+    suspend fun select(context: Context, waitForRoot: Boolean = true): ContainerRuntime {
         val app = context.applicationContext
         val store = OciImageStore.of(app)
         // Settings > Containers' image cache rows, read at each pull so a change applies without a new runtime
         // (docs/SPEC.md 3, "Storage is checked before it is spent"; Droidtop/tracker#911).
         val policy: () -> ImageCachePolicy = { DesktopSetupPrefs.imageCachePolicy(app) }
-        return if (rootAccess().available) {
+        val root = if (waitForRoot) rootAccess() else RootProcess.access(waitMs = 0)
+        return if (root.available) {
             DroidSpacesRuntime(
                 context = app,
                 rootfsPuller = CraneRootfsPuller({ Crane.binaryPath(app) }, store, RootTarUnpacker()),

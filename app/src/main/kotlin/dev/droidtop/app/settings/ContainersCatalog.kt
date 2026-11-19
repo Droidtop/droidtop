@@ -162,7 +162,8 @@ object ContainersCatalog {
 
     /** The list. [measure] false is the settings search index's reading: the same rows, with no size measured. */
     private suspend fun rootGroups(context: Context, measure: Boolean = true): List<CatalogGroup> {
-        val runtime = ContainerRuntimeFactory.select(context)
+        // The index lists names only, so it does not wait for a root helper to appear (3 s of every settings search).
+        val runtime = ContainerRuntimeFactory.select(context, waitForRoot = measure)
         val containers = runCatching { runtime.listContainers() }
         val create = createItem()
         val rows: List<CatalogItem> = containers.fold(
@@ -375,7 +376,7 @@ object ContainersCatalog {
     )
 
     private suspend fun containerGroups(context: Context, id: String, measure: Boolean = true): List<CatalogGroup> {
-        val runtime = ContainerRuntimeFactory.select(context)
+        val runtime = ContainerRuntimeFactory.select(context, waitForRoot = measure)
         val info = runtime.listContainers().firstOrNull { it.container.id == id }
             ?: return listOf(
                 CatalogGroup(
