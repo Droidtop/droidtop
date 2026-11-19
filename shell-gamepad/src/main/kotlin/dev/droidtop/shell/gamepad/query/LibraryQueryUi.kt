@@ -85,7 +85,6 @@ import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuSectionLabel
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.ShellChip
-import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
@@ -110,6 +109,8 @@ private sealed interface FilterEntry {
         val onLongClick: (() -> Unit)? = null,
         /** What A does here, in the hint bar, where "Select" would not say it (a save row's own words). */
         val hint: String? = null,
+        /** A save row: the name is typed in this row, as a tab (true) or a saved view only (false). Null: not one. */
+        val names: Boolean? = null,
         val onClick: (() -> Unit)? = null,
     ) : FilterEntry
 }
@@ -214,10 +215,10 @@ internal fun LibraryFilterSheet(
                         FilterEntry.Row("Save \"$editingName\"", subtitle = words(R.string.gamepad_these_filters_and_sort_in_the), hint = "Save") { onSaveView(editingName) },
                     )
                     onSaveOnly != null -> {
-                        add(FilterEntry.Row("Save as a tab", subtitle = words(R.string.gamepad_a_tab_on_the_strip_after), hint = "Save as a tab") { naming = true })
-                        add(FilterEntry.Row("Save only", subtitle = words(R.string.gamepad_listed_with_your_saved_views_in), hint = "Save only") { naming = false })
+                        add(FilterEntry.Row("Save as a tab", subtitle = words(R.string.gamepad_a_tab_on_the_strip_after), hint = "Save as a tab", names = true) { naming = true })
+                        add(FilterEntry.Row("Save only", subtitle = words(R.string.gamepad_listed_with_your_saved_views_in), hint = "Save only", names = false) { naming = false })
                     }
-                    else -> add(FilterEntry.Row("Save this view", hint = "Save") { naming = true })
+                    else -> add(FilterEntry.Row("Save this view", hint = "Save", names = true) { naming = true })
                 }
                 footerActions.forEach { add(FilterEntry.Row(it.title, subtitle = it.subtitle, onClick = it.onClick)) }
             } else {
@@ -251,20 +252,6 @@ internal fun LibraryFilterSheet(
         focusIndex = focusIndex.coerceIn(0, (rows.size - 1).coerceAtLeast(0))
     }
 
-    naming?.let { asTab ->
-        TextEditDialog(
-            title = if (onSaveOnly == null) "Save this view" else if (asTab) "Save as a tab" else "Save only",
-            subtitle = words(R.string.gamepad_current_filters_and_sort),
-            initial = query.text.takeIf { it.isNotBlank() } ?: "",
-            onCommit = { name ->
-                naming = null
-                if (name.isNotBlank()) if (asTab || onSaveOnly == null) onSaveView(name.trim()) else onSaveOnly(name.trim())
-            },
-            onDismiss = { naming = null },
-        )
-        return
-    }
-
     ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
@@ -277,6 +264,8 @@ internal fun LibraryFilterSheet(
                 HintBinding(GamepadAction.B, if (openFacet != null) "Back" else "Close"),
             ),
             onPad = { press ->
+                // While a view's name is typed in its row, the pad is the field's.
+                if (naming != null) return@MenuPanel false
                 when (press.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, rows.size, press)
                     GamepadAction.A -> rows.getOrNull(focusIndex)?.onClick?.invoke()
@@ -303,16 +292,30 @@ internal fun LibraryFilterSheet(
             entries.forEach { entry ->
                 when (entry) {
                     is FilterEntry.Header -> MenuSectionLabel(entry.text)
-                    is FilterEntry.Row -> MenuRow(
-                        title = entry.title,
-                        value = entry.value,
-                        subtitle = entry.subtitle,
-                        chevron = entry.chevron,
-                        danger = entry.danger,
-                        selected = rows.indexOf(entry) == focusIndex,
-                        onLongClick = entry.onLongClick,
-                        onClick = entry.onClick ?: {},
-                    )
+                    // The view's name is typed in the save row itself (no editor, no panel: Droidtop/tracker#954 item 12).
+                    is FilterEntry.Row -> if (entry.names != null && entry.names == naming) {
+                        dev.droidtop.shell.gamepad.InPlaceTextField(
+                            initial = query.text.takeIf { it.isNotBlank() } ?: "",
+                            hint = "Name",
+                            title = entry.title,
+                            onDone = { name ->
+                                val asTab = naming == true
+                                naming = null
+                                if (name.isNotBlank()) if (asTab || onSaveOnly == null) onSaveView(name.trim()) else onSaveOnly(name.trim())
+                            },
+                        )
+                    } else {
+                        MenuRow(
+                            title = entry.title,
+                            value = entry.value,
+                            subtitle = entry.subtitle,
+                            chevron = entry.chevron,
+                            danger = entry.danger,
+                            selected = rows.indexOf(entry) == focusIndex,
+                            onLongClick = entry.onLongClick,
+                            onClick = entry.onClick ?: {},
+                        )
+                    }
                 }
             }
         }
