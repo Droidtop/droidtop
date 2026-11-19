@@ -65,7 +65,6 @@
         <item quantity="one">%d file</item>
         <item quantity="other">%d files</item>
     </plurals>
-    <string name="gamepad_search">Search</string>
     <string name="gamepad_change_what_is_searched_for">Change what is searched for</string>
     <string name="gamepad_searching">Searching...</string>
     <string name="gamepad_search_2">Search</string>

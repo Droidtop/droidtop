@@ -73,21 +73,6 @@ internal fun ManualMatchPicker(
     var query by remember(entry) { mutableStateOf(suggestion) }
     var editingQuery by remember(entry) { mutableStateOf(false) }
 
-    if (editingQuery) {
-        TextEditDialog(
-            title = words(R.string.gamepad_search),
-            subtitle = dev.droidtop.shell.gamepad.pc.SEARCH_HELP,
-            initial = query,
-            search = true,
-            onCommit = { text ->
-                query = dev.droidtop.shell.gamepad.pc.searchText(text, suggestion)
-                editingQuery = false
-            },
-            onDismiss = { editingQuery = false },
-        )
-        return
-    }
-
     LaunchedEffect(entry, query) {
         candidates = null
         status = null
@@ -158,6 +143,8 @@ internal fun ManualMatchPicker(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(620.dp)),
             focusLabel = "Manual match",
             onPad = { press ->
+                // While the search is typed in its row, the pad is the field's.
+                if (editingQuery) return@MenuPanel false
                 val list = candidates.orEmpty()
                 // Row 0 is the search; the candidates follow it.
                 when (press.action) {
@@ -176,15 +163,28 @@ internal fun ManualMatchPicker(
                 fontWeight = FontWeight.SemiBold,
             )
             // The search first (Droidtop/tracker#861): A types other words, with the touch keyboard or the pad's.
-            MenuRow(
-                title = dev.droidtop.shell.gamepad.pc.searchRowTitle(query),
-                subtitle = words(R.string.gamepad_change_what_is_searched_for),
-                selected = focusIndex == 0,
-                onClick = {
-                    focusIndex = 0
-                    editingQuery = true
-                },
-            )
+            // Typed in the row itself, the picker still open (no editor, no panel: Droidtop/tracker#954 item 12).
+            if (editingQuery) {
+                dev.droidtop.shell.gamepad.InPlaceTextField(
+                    initial = query,
+                    hint = suggestion,
+                    search = true,
+                    onDone = { text ->
+                        editingQuery = false
+                        query = dev.droidtop.shell.gamepad.pc.searchText(text, suggestion)
+                    },
+                )
+            } else {
+                MenuRow(
+                    title = dev.droidtop.shell.gamepad.pc.searchRowTitle(query),
+                    subtitle = words(R.string.gamepad_change_what_is_searched_for),
+                    selected = focusIndex == 0,
+                    onClick = {
+                        focusIndex = 0
+                        editingQuery = true
+                    },
+                )
+            }
             when {
                 candidates == null -> MenuRow(title = words(R.string.gamepad_searching))
                 candidates!!.isEmpty() -> MenuRow(title = status ?: "Nothing found")
