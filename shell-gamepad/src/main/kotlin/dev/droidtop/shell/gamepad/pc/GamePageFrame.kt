@@ -2,7 +2,7 @@ package dev.droidtop.shell.gamepad.pc
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
+import dev.droidtop.ui.shared.holdKeyFocus
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -178,6 +178,8 @@ internal fun GamePageFrame(
     var button by remember(entry.id) { mutableIntStateOf(0) }
     var tab by remember(entry.id) { mutableIntStateOf(0) }
     var row by remember(entry.id) { mutableIntStateOf(0) }
+    // The fact typed in its own row, by its index on the tab shown (PageFact.typed); null while none is.
+    var typingRow by remember(entry.id) { mutableStateOf<Int?>(null) }
     var heldStep by remember { mutableStateOf(false) }
     val current = rowsByTab[tabs[tab]].orEmpty()
     val selectedButton = buttons.getOrElse(button) { PageButton.PRIMARY }
@@ -247,7 +249,7 @@ internal fun GamePageFrame(
                 when (zone) {
                     PageZone.ACTIONS -> selectedButton != PageButton.PRIMARY || play.pressable
                     PageZone.TABS -> current.isNotEmpty()
-                    PageZone.CONTENT -> current.getOrNull(row)?.onActivate != null
+                    PageZone.CONTENT -> current.getOrNull(row)?.let { it.onActivate != null || it.typed != null } == true
                 }
             },
             HintBinding(GamepadAction.X, verb) { (play.pressable || play.chooseEngine) && xNamesPlay(zone, selectedButton) },
@@ -266,6 +268,8 @@ internal fun GamePageFrame(
             // nearer the focus target, so they are answered first.
             .ownPadButtons(onBack = onBack)
             .onPad { press ->
+                // While a fact is typed in its row, the pad is the field's.
+                if (typingRow != null) return@onPad false
                 heldStep = press.repeat
                 when (press.action) {
                     GamepadAction.UP -> when (zone) {
@@ -327,7 +331,9 @@ internal fun GamePageFrame(
                             zone = PageZone.CONTENT
                             row = 0
                         }
-                        PageZone.CONTENT -> current.getOrNull(row)?.onActivate?.invoke()
+                        PageZone.CONTENT -> current.getOrNull(row)?.let { fact ->
+                            if (fact.typed != null) typingRow = row else fact.onActivate?.invoke()
+                        }
                     }
                     // X plays from anywhere on the page, as on the library tile; Y is Favourite
                     // (owner decision, Droidtop/tracker#644 slice 4, proposal 6.C).
@@ -341,8 +347,8 @@ internal fun GamePageFrame(
                 }
                 true
             }
-            .focusRequester(focus)
-            .focusable()
+            // Held: a fact typed in its row takes the cursor into its field, and the page takes it back after.
+            .holdKeyFocus(focus)
             .groundBackground(),
     ) {
         // One value column for the tab, content-sized to its widest
@@ -438,14 +444,25 @@ internal fun GamePageFrame(
                                 .fillMaxWidth()
                                 .padding(horizontal = window.edgePadding, vertical = MenuTokens.RowSpacing / 2),
                         ) {
-                            MenuRow(
+                            val typed = fact.typed
+                            if (typed != null && typingRow == index) {
+                                dev.droidtop.shell.gamepad.InPlaceTextField(
+                                    initial = typed.initial,
+                                    hint = typed.hint,
+                                    title = fact.title,
+                                    onDone = { text ->
+                                        typingRow = null
+                                        typed.onDone(text)
+                                    },
+                                )
+                            } else MenuRow(
                                 title = fact.title,
                                 subtitle = fact.subtitle,
                                 value = fact.value,
                                 switchOn = fact.on,
                                 valuePath = fact.path,
                                 statusMark = fact.mark,
-                                chevron = fact.onActivate != null,
+                                chevron = fact.onActivate != null || fact.typed != null,
                                 selected = zone == PageZone.CONTENT && row == index,
                                 uniformHeight = true,
                                 // A row with no second line keeps no room for one, row by row as Settings' rows do
@@ -456,7 +473,7 @@ internal fun GamePageFrame(
                                 onClick = {
                                     zone = PageZone.CONTENT
                                     row = index
-                                    fact.onActivate?.invoke()
+                                    if (fact.typed != null) typingRow = index else fact.onActivate?.invoke()
                                 },
                                 // A copy's Options, Select's on a pad, is a long press by touch (Droidtop/tracker#839).
                                 onLongClick = fact.onOptions?.let { options ->
@@ -597,7 +614,12 @@ internal data class PageFact(
     val path: Boolean = false,
     /** A state drawn as its glyph beside the title (synced, offline, working); null for none. */
     val mark: dev.droidtop.library.settings.StatusMark? = null,
-)
+    /** A value typed in the row itself (no editor, no panel: Droidtop/tracker#954 item 12); A puts the cursor in it. */
+    val typed: Typed? = null,
+) {
+    /** What a typed fact starts from, its hint while blank, and what takes the text when the person is done. */
+    class Typed(val initial: String, val hint: String, val onDone: (String) -> Unit)
+}
 
 /** A fact from outside the library as a row of [tab]: A opens its page of rows or its address. */
 internal fun dev.droidtop.shell.gamepad.GameInfoRow.toPageFact(

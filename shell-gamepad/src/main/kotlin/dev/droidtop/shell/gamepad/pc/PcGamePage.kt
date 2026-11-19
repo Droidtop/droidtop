@@ -50,7 +50,6 @@ import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.UiSound
-import dev.droidtop.shell.gamepad.TextEditDialog
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -199,7 +198,6 @@ internal fun PcGamePage(
         }
     }
     var versionToken by remember(entry.id) { mutableIntStateOf(0) }
-    var editingVersion by remember(entry.id) { mutableStateOf(false) }
     var moreOpen by remember(entry.id) { mutableStateOf(false) }
     val setVersion by produceState<String?>(null, entry.id, versionToken) {
         value = withContext(Dispatchers.IO) { dev.droidtop.library.SetVersions.get(context, entry.id) }
@@ -289,7 +287,20 @@ internal fun PcGamePage(
             offline = offlineRow,
             cloudSaves = cloudRow,
             setVersion = setVersion,
-            onSetVersion = if (isFolder) ({ editingVersion = true }) else null,
+            // Typed in its own row (no editor, no panel: Droidtop/tracker#954 item 12); blank goes back to the folder's name.
+            onSetVersion = if (isFolder) {
+                PageFact.Typed(
+                    initial = setVersion ?: dev.droidtop.library.SetVersions.shown(entry, null)?.first.orEmpty(),
+                    hint = words(R.string.gamepad_blank_uses_the_folder_s_name),
+                ) { text ->
+                    scope.launch {
+                        withContext(Dispatchers.IO) { dev.droidtop.library.SetVersions.set(context, entry.id, text) }
+                        versionToken++
+                    }
+                }
+            } else {
+                null
+            },
             onClearVersion = {
                 scope.launch {
                     withContext(Dispatchers.IO) { dev.droidtop.library.SetVersions.set(context, entry.id, null) }
@@ -698,22 +709,6 @@ internal fun PcGamePage(
             onExit = { copyOptions = null },
         )
     }
-    if (editingVersion) {
-        // Prefilled with what the folder's name says, or what was set; blank goes back to the folder's name.
-        TextEditDialog(
-            title = words(R.string.gamepad_set_version),
-            subtitle = words(R.string.gamepad_blank_uses_the_folder_s_name),
-            initial = setVersion ?: dev.droidtop.library.SetVersions.shown(entry, null)?.first.orEmpty(),
-            onCommit = { text ->
-                editingVersion = false
-                scope.launch {
-                    withContext(Dispatchers.IO) { dev.droidtop.library.SetVersions.set(context, entry.id, text) }
-                    versionToken++
-                }
-            },
-            onDismiss = { editingVersion = false },
-        )
-    }
     val viewing = viewingRecord
     if (viewing != null && library != null) {
         SourceRecordPage(
@@ -943,7 +938,7 @@ private fun pageRows(
     offline: PageFact? = null,
     cloudSaves: PageFact? = null,
     setVersion: String? = null,
-    onSetVersion: (() -> Unit)? = null,
+    onSetVersion: PageFact.Typed? = null,
     onClearVersion: (() -> Unit)? = null,
     moreOpen: Boolean = false,
     onToggleMore: () -> Unit = {},
@@ -973,12 +968,12 @@ private fun pageRows(
                 "Version",
                 availableVersions.first(),
                 subtitle = if (availableVersions.size > 1) "Also here: ${availableVersions.drop(1).joinToString(", ")}" else null,
-                onActivate = onSetVersion,
+                typed = onSetVersion,
                 tab = PageTab.VERSIONS,
             ),
         )
     } else if (onSetVersion != null) {
-        add(PageFact("Version", "Set", subtitle = words(R.string.gamepad_the_folder_s_name_says_no), onActivate = onSetVersion, tab = PageTab.VERSIONS))
+        add(PageFact("Version", "Set", subtitle = words(R.string.gamepad_the_folder_s_name_says_no), typed = onSetVersion, tab = PageTab.VERSIONS))
     }
     if (setVersion != null && onClearVersion != null) {
         add(PageFact(CLEAR_VERSION_ROW, "Use folder name", onActivate = onClearVersion, tab = PageTab.VERSIONS))
