@@ -170,7 +170,7 @@ internal fun CompanionCatalogItems(
     var nested by remember { mutableStateOf<CatalogScreen?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // The rows the host used to leave out (Droidtop/tracker#786 S2a2): a text field opens the shared editor, a folder
+    // The rows the host used to leave out (Droidtop/tracker#786 S2a2): a text field is typed in its own row, a folder
     // or document the system's picker as Gaming's Settings opens it (CatalogPickers), each line kept by row id.
     val statusById = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
     // A picker needs an activity to answer it: the companion's own activity has one, a Presentation on the second
@@ -191,28 +191,6 @@ internal fun CompanionCatalogItems(
     val open = nested
     if (open != null) {
         CompanionNestedScreen(open, onBack = { nested = null }, onChanged = onChanged, asks = asks)
-        return
-    }
-    // The field opens in place of the list, as a nested screen does: a dialog window cannot open over a Presentation.
-    val field = editing
-    if (field != null) {
-        dev.droidtop.shell.gamepad.TextEditPanel(
-            title = field.title,
-            subtitle = field.subtitle,
-            initial = field.value,
-            multiline = field.multiline,
-            secret = field.secret,
-            search = field.search,
-            onCommit = { text ->
-                editing = null
-                // The write first, then the re-read, so the row shows what was saved.
-                scope.launch {
-                    field.onChange(context, text)
-                    onChanged()
-                }
-            },
-            onDismiss = { editing = null },
-        )
         return
     }
     askingPick?.let { pick ->
@@ -241,11 +219,34 @@ internal fun CompanionCatalogItems(
                 // A page's header and bar (docs/SPEC.md 7k, "Page anatomy"): the shared pieces, touch only.
                 is dev.droidtop.library.settings.PageHeaderItem -> dev.droidtop.ui.shared.PageHeaderView(item.header)
                 is dev.droidtop.library.settings.ButtonBarItem -> CompanionButtonBar(item, onChanged)
-                is TextInputItem -> CatalogRow(
-                    item.title,
-                    item.subtitle,
-                    if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifEmpty { null },
-                ) { editing = item }
+                // Typed in its own row, the list still there (no editor, no panel: Droidtop/tracker#954 item 12).
+                is TextInputItem -> if (editing?.id == item.id) {
+                    dev.droidtop.shell.gamepad.InPlaceTextField(
+                        initial = item.value,
+                        hint = if (item.search) "Type to search" else "Type here",
+                        title = item.title,
+                        secret = item.secret,
+                        multiline = item.multiline,
+                        search = item.search,
+                        onDone = { text ->
+                            editing = null
+                            // The write first, then the re-read, so the row shows what was saved.
+                            if (text != item.value) {
+                                scope.launch {
+                                    item.onChange(context, text)
+                                    onChanged()
+                                }
+                            }
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                } else {
+                    CatalogRow(
+                        item.title,
+                        item.subtitle,
+                        if (item.secret && item.value.isNotEmpty()) "••••" else item.value.ifEmpty { null },
+                    ) { editing = item }
+                }
                 is FolderPickItem -> CatalogRow(item.title, item.subtitle, statusById[item.id]) { pickHere(item.id) { pickers?.pickFolder(item) } }
                 is DocumentPickItem -> CatalogRow(item.title, item.subtitle, statusById[item.id]) {
                     if (item.confirmTitle != null) askingPick = item else pickHere(item.id) { pickers?.pickDocument(item) }

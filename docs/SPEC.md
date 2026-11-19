@@ -6509,9 +6509,10 @@ rig check in the commit message.
     each pad key's printed button (from the host's controller layout, so a Nintendo pad's Backspace keycap reads Y)
     in its lower right, at least 14 sp; every press, by pad or touch, an 80 ms flash and a keyboard haptic tick. It is
     never a focus target: the host forwards the pad's keys to it and the field keeps focus.
-  - Hosted by `TextEntry` (`:ui-shared`) in two forms: `TextEntryField`, a plate in place with the slab under it (B
-    keeps the text and leaves; R2 submits), and `TextEntryPrompt`, Steam's rename dialog (a card at most 560 dp wide
-    above the slab, the page dimmed at 0.6, a 20 sp title, the plate, small Cancel and Save buttons; B cancels). The
+  - Hosted by `TextEntry` (`:ui-shared`) as `TextEntryField`, a plate in place with the slab under it (B keeps the
+    text and leaves; R2 submits). There is no prompt form: text is typed where it stands, never in a card or panel
+    over the page (owner, 2026-11-19, Droidtop/tracker#954 item 12; `TextEntryPrompt` and `TextEditDialog` are gone,
+    and every field types in place through `InPlaceTextField`). The
     plate is a real text field whose input method stays away (`showKeyboardOnFocus = false`), at least 64 dp (56 dp
     for search) on 6 dp corners with a 2 dp accent underline. The slab's presses edit the value directly
     (`TextEntryEdits`, tested: typing at the caret replacing a selection, Backspace, the caret's moves, the length

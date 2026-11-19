@@ -49,9 +49,8 @@ import org.pocketworkstation.pckeyboard.SlabView
  * popup appears a lot different than steams, which is weird"). Two forms of one thing:
  *
  * - [TextEntryField]: a field in place (a search bar docked under its header, a form field), with the slab under it.
- *   B keeps the text and leaves.
- * - [TextEntryPrompt]: Steam's rename dialog, a centred card (at most 560 dp) above the slab over a dimmed page, a
- *   title line, the plate, and small Cancel and Save buttons for touch. B cancels and restores the old value.
+ *   B keeps the text and leaves. The prompt form (Steam's rename dialog) is gone: text is typed where it stands,
+ *   never in a panel (owner, 2026-11-19, Droidtop/tracker#954 item 12).
  *
  * The plate is a real text field (TalkBack reads its text, caret and selection) whose input method stays away: keys
  * come from the slab, which the pad drives through this entry's key handling while the field keeps focus. Where the
@@ -197,78 +196,6 @@ fun TextEntryField(
         Plate(value, onValueChange, placeholder, colors, focus, system.cue ?: elsewhereCue.takeIf { !slabHere }, kind == Slab.Kind.SEARCH)
         if (slabHere && !system.active) SlabKeys(kind, Slab.Form.FIELD, enter, colors, capLabel, ::deliver) { slab = it }
     }
-}
-
-/**
- * Steam's rename dialog: [title], the plate, Cancel and Save, above the slab over a dimmed page. [onSave] gets the
- * text (R2, or Save); [onCancel] is B or Cancel, and the caller restores the old value.
- */
-@Composable
-fun TextEntryPrompt(
-    title: String,
-    initial: String,
-    colors: TextEntryColors,
-    capLabel: (Slab.PadButton) -> String,
-    onSave: (String) -> Unit,
-    onCancel: () -> Unit,
-    placeholder: String = "",
-    kind: Slab.Kind = Slab.Kind.PLAIN,
-    enter: Slab.EnterPurpose = Slab.EnterPurpose.SAVE,
-    maxLength: Int = 500,
-    slabHere: Boolean = true,
-    elsewhereCue: String? = null,
-) {
-    var value by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
-    var slab by remember { mutableStateOf<SlabView?>(null) }
-    val focus = remember { FocusRequester() }
-    val system = rememberSystemKeyboard()
-    fun deliver(output: Slab.Output) {
-        when (output) {
-            Slab.Output.Close -> onCancel()
-            Slab.Output.UseSystemKeyboard -> system.use()
-            is Slab.Output.Press -> if (output.keyCode == android.view.KeyEvent.KEYCODE_ENTER) onSave(value.text) else value = TextEntryEdits.apply(value, output, maxLength)
-            else -> value = TextEntryEdits.apply(value, output, maxLength)
-        }
-    }
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(colors.scrim)
-            .onPreviewKeyEvent { event -> system.leave(event.nativeKeyEvent) || slab?.handleKey(event.nativeKeyEvent) == true },
-        verticalArrangement = Arrangement.Bottom,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Column(
-            Modifier
-                .padding(16.dp)
-                .widthIn(max = 560.dp)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(colors.ground)
-                .padding(16.dp),
-        ) {
-            Text(title, color = colors.text, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold)
-            Plate(value, { value = it }, placeholder, colors, focus, system.cue ?: elsewhereCue.takeIf { !slabHere }, search = false, modifier = Modifier.padding(top = 12.dp))
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                SmallButton("Cancel", colors, onCancel)
-                SmallButton(SlabView.word(LocalContext.current, enter.word), colors) { onSave(value.text) }
-            }
-        }
-        if (slabHere && !system.active) SlabKeys(kind, Slab.Form.PROMPT, enter, colors, capLabel, ::deliver) { slab = it }
-    }
-}
-
-@Composable
-private fun SmallButton(text: String, colors: TextEntryColors, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .heightIn(min = 36.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(colors.plate)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) { Text(text, color = colors.text, fontSize = 15.sp) }
 }
 
 /**
