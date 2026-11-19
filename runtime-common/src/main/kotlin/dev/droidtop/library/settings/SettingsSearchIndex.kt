@@ -1,6 +1,7 @@
 package dev.droidtop.library.settings
 
 import android.content.Context
+import kotlinx.coroutines.async
 
 /** One matchable row: what it says, and the screen it lives on. */
 data class SettingsSearchResult(
@@ -47,17 +48,21 @@ object SettingsSearchIndex {
     private const val SLOW_SCREEN_MS = 250L
 
     suspend fun build(context: Context, root: CatalogScreen): List<SettingsSearchResult> {
-        val results = mutableListOf<SettingsSearchResult>()
-
         val started = android.os.SystemClock.elapsedRealtime()
 
-        suspend fun indexScreen(screen: CatalogScreen, depth: Int) {
-            // Which screen holds the index up (Droidtop/tracker#954 item 14: 75-150 s on BlueStacks with 216 games):
-            // any one that takes a quarter second is named in the log with its time.
+        // A screen's rows, then each of its pages' rows in the order the rows name them. The pages a screen opens are
+        // read side by side: one after another, the index took the sum of every page's time (12.9 s on BlueStacks,
+        // 7.3 s of it Game sources and 3.0 s Containers), where side by side it takes about the slowest one's
+        // (Droidtop/tracker#954 item 14). The order of the results, and so which of two paths to one row wins, is
+        // the same as before.
+        suspend fun indexScreen(screen: CatalogScreen, depth: Int): List<SettingsSearchResult> {
+            // Which screen holds the index up: any one that takes a quarter second is named in the log with its time.
             val opened = android.os.SystemClock.elapsedRealtime()
             val groups = screen.indexGroups?.invoke(context) ?: screen.groups(context)
             val took = android.os.SystemClock.elapsedRealtime() - opened
             if (took >= SLOW_SCREEN_MS) android.util.Log.i(LOG_TAG, "${screen.id} (${screen.title}): $took ms")
+            // Each row, and the page it opens when that page is indexed too, in order.
+            val rows = mutableListOf<Pair<SettingsSearchResult, CatalogScreen?>>()
             for (group in groups) {
                 // Live device state, not configuration (docs/SPEC.md 7f) --
                 // the Quick Menu draws these, Settings does not, and
@@ -66,7 +71,7 @@ object SettingsSearchIndex {
                 for (item in group.items) {
                     // A page's header names the page itself, and its bar's buttons are actions, not settings.
                     if (item is TextBlockItem || item is PageHeaderItem || item is ButtonBarItem) continue
-                    results += SettingsSearchResult(
+                    val result = SettingsSearchResult(
                         target = screen,
                         screenTitle = screen.title,
                         itemId = item.id,
@@ -74,13 +79,18 @@ object SettingsSearchIndex {
                         itemSubtitle = item.subtitle,
                         icon = item.icon,
                     )
-                    if ((depth <= 1 || screen.indexesItsPages) && item is NestedScreenItem) {
-                        item.resolve()?.let { indexScreen(it, depth + 1) }
-                    }
+                    val page = if ((depth <= 1 || screen.indexesItsPages) && item is NestedScreenItem) item.resolve() else null
+                    rows += result to page
                 }
             }
+            val pages = kotlinx.coroutines.coroutineScope {
+                rows.map { (_, page) ->
+                    page?.let { async(kotlinx.coroutines.Dispatchers.IO) { indexScreen(it, depth + 1) } }
+                }.map { it?.await().orEmpty() }
+            }
+            return rows.flatMapIndexed { index, (result, _) -> listOf(result) + pages[index] }
         }
-        indexScreen(root, 0)
+        val results = indexScreen(root, 0)
         android.util.Log.i(LOG_TAG, "index built: ${results.size} rows in ${android.os.SystemClock.elapsedRealtime() - started} ms")
         // A screen reachable along two paths (the Plugins row sits under
         // Accounts and sources, which more than one parent opens) would be

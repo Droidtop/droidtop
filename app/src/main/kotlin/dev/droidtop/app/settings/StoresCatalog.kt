@@ -215,6 +215,9 @@ internal object StoresCatalog {
         id = SCREEN_ID,
         title = "Game sources",
         groups = { context -> rootGroups(context) },
+        // Settings search wants the rows, not the counts: counting every store's games, every folder's and the
+        // imports took this page 7.3 s of the index's 12.9 s on BlueStacks with 216 games (Droidtop/tracker#954 item 14).
+        indexGroups = { context -> rootGroups(context, counted = false) },
         live = storeJobChanges,
     )
 
@@ -237,15 +240,16 @@ internal object StoresCatalog {
     private fun busyProgress(jobs: List<PluginJobsCenter.Entry>): Float? =
         jobs.firstOrNull { !it.paused }?.fraction
 
-    private suspend fun rootGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+    /** The page's groups; [counted] false (settings search) leaves out the library-sized counts and the imports row. */
+    private suspend fun rootGroups(context: Context, counted: Boolean = true): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val signedInByStore = PcStore.entries.associateWith { it.signedIn(context) }
         // A store signed in before marks were cached gets its mark now, in the background (#503).
         signedInByStore.filterValues { it }.keys.forEach { store -> store.own?.let { dev.droidtop.library.stores.StoreMarks.ensureLater(context, it) } }
         val installing = PcStore.entries.sumOf { store -> storeJobs(store).count { !it.paused } }
         val anySignedIn = signedInByStore.values.any { it }
-        val storeGames = runCatching { PcLibrary.storeGames(context) }.getOrDefault(emptyList())
-        val folders = FoldersCatalog.counts(context)
-        val imported = runCatching { dev.droidtop.library.PcLaunchers.viaByEntry(context) }.getOrDefault(emptyMap())
+        val storeGames = if (!counted) emptyList() else runCatching { PcLibrary.storeGames(context) }.getOrDefault(emptyList())
+        val folders = if (!counted) FolderCounts(emptyList(), 0) else FoldersCatalog.counts(context)
+        val imported = if (!counted) emptyMap() else runCatching { dev.droidtop.library.PcLaunchers.viaByEntry(context) }.getOrDefault(emptyMap())
         fun storeRow(store: PcStore): CatalogItem =
             storeItem(context, store, signedInByStore[store] == true, storeCounts(storeGames, store.key).total, id = "store_${store.key}")
         val (signedInStores, signedOutStores) = PcStore.entries.partition { signedInByStore[it] == true }
