@@ -1085,6 +1085,19 @@ internal fun LibrarySearchDialog(
                     },
                 ),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
+                // An empty field says what it searches, and that A types (UI review, Droidtop/tracker#954 item 8).
+                decorationBox = { inner ->
+                    androidx.compose.foundation.layout.Box {
+                        if (field.text.isEmpty()) {
+                            Text(
+                                if (getGames) "A game's name" else "Games and apps",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MenuTokens.OnSurfaceMuted,
+                            )
+                        }
+                        inner()
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)

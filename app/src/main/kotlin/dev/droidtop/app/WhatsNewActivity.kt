@@ -60,6 +60,25 @@ class WhatsNewActivity : AppCompatActivity() {
 
     private var closing = false
 
+    /**
+     * Over Gaming or Desktop, whose screens hide Android's bars, What's new hides them too: it drew the status bar
+     * over a Gaming screen (UI review, Droidtop/tracker#954 item 9). Mobile keeps them, as its own screens do. The mode
+     * is the one the shell last switched to, already read into memory by the shell that opened this.
+     */
+    private fun applySystemBars() {
+        val mode = dev.droidtop.library.settings.Modes.lastMode(this)
+        val controller = androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
+        if (mode == dev.droidtop.library.settings.Mode.GAMING.id || mode == dev.droidtop.library.settings.Mode.DESKTOP.id) {
+            controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) applySystemBars()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val all = intent.getBooleanExtra(EXTRA_ALL, false)

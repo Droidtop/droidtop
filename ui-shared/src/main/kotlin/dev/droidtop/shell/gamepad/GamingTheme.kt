@@ -240,6 +240,13 @@ fun Typography.withFamilies(body: FontFamily?, display: FontFamily?, capsOnly: B
  */
 object GamingTheme {
     private var current by mutableStateOf(GamingPalette.Default)
+
+    /**
+     * Whether [refresh] has resolved the theme's palette once in this process. Until it has, a Gaming surface draws
+     * with [outsidePalette] rather than the dark default: a cold start drew Home dark for the seconds the theme took to
+     * parse, then turned light, while What's new between them was already light (UI review, Droidtop/tracker#954 item 5).
+     */
+    private var resolved by mutableStateOf(false)
     private var holders by mutableIntStateOf(0)
 
     /**
@@ -253,7 +260,7 @@ object GamingTheme {
     private val following = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /** What a Gaming surface draws with right now: the theme's palette while one is on screen, [outsidePalette] otherwise. */
-    val palette: GamingPalette get() = if (holders > 0) current else outsidePalette
+    val palette: GamingPalette get() = if (holders > 0 && resolved) current else outsidePalette
 
     /**
      * What everything outside Gaming draws with (docs/SPEC.md 7k, "Colours outside Gaming"): the colours
@@ -301,7 +308,7 @@ object GamingTheme {
         // The role tokens UI droidtop does not draw reads (docs/SPEC.md 7k, Droidtop/tracker#559): the theme's while a
         // Gaming surface holds one; otherwise droidtop's own for the appearance, which RoleTokens works out itself.
         dev.droidtop.library.theme.RoleTokens.provider = {
-            if (holders > 0) current.let { dev.droidtop.library.theme.RoleTokens.of(it.colors, it.highContrast) } else null
+            if (holders > 0 && resolved) current.let { dev.droidtop.library.theme.RoleTokens.of(it.colors, it.highContrast) } else null
         }
     }
 
@@ -338,6 +345,7 @@ object GamingTheme {
             paletteFor(app)
         }
         if (next !== current) current = next
+        resolved = true
         dev.droidtop.library.theme.RoleTokens.checkSoon()
     }
 
