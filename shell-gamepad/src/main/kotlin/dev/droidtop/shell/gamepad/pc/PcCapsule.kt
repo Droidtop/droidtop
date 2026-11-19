@@ -263,6 +263,9 @@ internal fun PcCapsule(
                 shape,
                 rest = MenuTokens.Card,
                 restOutline = MenuTokens.CardOutline,
+                // Opaque, as at rest: the selection's translucent fill let the raised card's own shadow show through
+                // a card with no art, as a dark band round a lighter box (UI review, Droidtop/tracker#954 item 2).
+                selectedFill = MenuTokens.CardFocused,
                 art = true,
             )
             .focusZoom(lift, shape, wide = hero)
