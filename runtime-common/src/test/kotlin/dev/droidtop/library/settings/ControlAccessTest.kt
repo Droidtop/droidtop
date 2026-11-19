@@ -62,7 +62,7 @@ class ControlAccessTest {
     fun `the items that control the restriction are hidden in Kid and Kiosk only`() {
         val ids = listOf(
             GamingSettingsCatalog.ID_UI_MODE, ControlAccess.ID_KID_VOLUME_CAP, ControlAccess.ID_UI_MODE_PASSKEY,
-            PlayTimeSettings.ID_LINK,
+            ControlAccess.ID_UI_MODE_PASSKEY_REMOVE, PlayTimeSettings.ID_LINK,
         )
         for (mode in listOf(UiMode.KID, UiMode.KIOSK, UiMode.GUEST)) {
             ids.forEach { assertFalse("$mode shows $it", ControlAccess.shows(mode, it)) }

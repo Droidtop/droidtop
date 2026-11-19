@@ -272,7 +272,7 @@ object GamingSettingsCatalog {
                         title = words(R.string.gaming_passkey_to_leave_kid_kiosk_and),
                         subtitle = (
                             if (passkeySet) {
-                                "Set: leaving asks for it. Clear the field to remove it. "
+                                "Set: leaving asks for it. "
                             } else {
                                 "None: leaving takes one press. Enter 4 to 8 digits to ask for them. "
                             }
@@ -282,6 +282,18 @@ object GamingSettingsCatalog {
                         onChange = { ctx, value -> UiModePasskey.set(ctx, value.trim()) },
                     ),
                 )
+                // Removing it is a row of its own: the field is typed in place and shows nothing of the passkey, so a blank
+                // field cannot say "remove" without leaving the row removing it by accident (Droidtop/tracker#954 item 12).
+                if (passkeySet) {
+                    add(
+                        ActionItem(
+                            id = ControlAccess.ID_UI_MODE_PASSKEY_REMOVE,
+                            title = words(R.string.gaming_remove_the_passkey),
+                            confirmTitle = "Remove the passkey? Leaving Kid, Kiosk and Guest will take one press.",
+                            run = { ctx -> UiModePasskey.set(ctx, "") },
+                        ),
+                    )
+                }
                 // Kid's maximum volume, applied in the one volume write path (VolumeControl); off by default.
                 dev.droidtop.runtime.systemstatus.VolumeControl.load(context)
                 add(

@@ -105,6 +105,7 @@
     <string name="gaming_kids_and_guests">Kids and guests</string>
     <string name="gaming_ui_mode">UI mode</string>
     <string name="gaming_passkey_to_leave_kid_kiosk_and">Passkey to leave Kid, Kiosk and Guest</string>
+    <string name="gaming_remove_the_passkey">Remove the passkey</string>
     <string name="gaming_kid_mode_s_highest_volume">Kid mode\'s highest volume</string>
     <string name="gaming_in_kid_mode_no_slider_or">The highest volume in Kid mode</string>
     <string name="gaming_library">Library</string>

@@ -80,6 +80,7 @@ object ControlAccess {
 
     /** The optional passkey for leaving Kid, Kiosk and Guest. */
     const val ID_UI_MODE_PASSKEY = "pref_ui_mode_passkey"
+    const val ID_UI_MODE_PASSKEY_REMOVE = "pref_ui_mode_passkey_remove"
 
     /** Panels only the companion draws: the Quick Menu never lists them, whatever the mode. */
     val COMPANION_ONLY: Set<ControlPanel> = setOf(ControlPanel.DEVICE, ControlPanel.DROIDTOP)
@@ -129,6 +130,7 @@ object ControlAccess {
         alwaysAsk = true,
         hiddenItemIds = setOf(
             GamingSettingsCatalog.ID_UI_MODE, GamingSettingsCatalog.ID_DISPLAY_COMPANION, ID_KID_VOLUME_CAP, ID_UI_MODE_PASSKEY,
+            ID_UI_MODE_PASSKEY_REMOVE,
             PlayTimeSettings.ID_LINK,
         ),
         hiddenGroupIds = setOf(GROUP_COMPANION),
