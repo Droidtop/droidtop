@@ -106,8 +106,6 @@
     <string name="gamepad_a_searches_the_source_again">A searches the source again</string>
     <string name="gamepad_no_game_here_has_a_name">No game here has a name like this one</string>
     <string name="gamepad_search_x">Search %1$s</string>
-    <string name="gamepad_rename_tab">Rename tab</string>
-    <string name="gamepad_then_change_its_filters_and_sort">Then change its filters and sort, and save</string>
     <string name="gamepad_needs_attention">Needs attention</string>
     <string name="gamepad_add_your_x_x_collections_as">Add your %1$s %2$s collections as tabs after Updates?</string>
     <string name="gamepad_use_droidtop_s_default_again">Use droidtop\'s default again</string>

@@ -453,7 +453,6 @@ internal fun PcGamesSection(
     // A pinned tab being edited (Select > Edit): its new name, saved in place from the Filter sheet.
     var editing by remember { mutableStateOf<NamedLibraryView?>(null) }
     var tabMenu by remember { mutableStateOf<NamedLibraryView?>(null) }
-    var renaming by remember { mutableStateOf<NamedLibraryView?>(null) }
 
     // What Home's Continue playing and Recently added take besides PC games:
     // Retro games that have a time to be placed by, and the launcher apps that
@@ -1674,9 +1673,19 @@ internal fun PcGamesSection(
     tabMenu?.let { view ->
         PinnedTabMenu(
             view = view,
-            onEdit = {
+            // The name is typed in its row, the menu still open (no editor, no panel: Droidtop/tracker#954 item 12).
+            onRename = { name ->
+                val trimmed = name.trim()
+                if (trimmed.isNotEmpty() && trimmed != view.name) {
+                    savedViews.replaceAll(savedViews.views.map { if (it.id == view.id) it.copy(name = trimmed) else it })
+                    tabMenu = view.copy(name = trimmed)
+                }
+            },
+            onEditFilters = {
                 tabMenu = null
-                renaming = view
+                editing = view
+                state.showGrid(view.query)
+                state.filterOpen = true
             },
             onUnpin = {
                 tabMenu = null
@@ -1693,21 +1702,6 @@ internal fun PcGamesSection(
             onDismiss = { tabMenu = null },
         )
     }
-    // Edit: the name first, then the Filter sheet over the tab's own filters and sort.
-    renaming?.let { view ->
-        dev.droidtop.shell.gamepad.TextEditDialog(
-            title = words(R.string.gamepad_rename_tab),
-            subtitle = words(R.string.gamepad_then_change_its_filters_and_sort),
-            initial = view.name,
-            onCommit = { name ->
-                renaming = null
-                editing = view.copy(name = name.trim().ifBlank { view.name })
-                state.showGrid(view.query)
-                state.filterOpen = true
-            },
-            onDismiss = { renaming = null },
-        )
-    }
 }
 
 /** What the Collections tab says while it holds nothing (docs/SPEC.md 7i). */
@@ -1715,47 +1709,34 @@ internal const val COLLECTIONS_EMPTY =
     "Add a game to a collection from its menu (L2). Collections a store keeps appear here after it syncs."
 
 /**
- * A pinned tab's Options (docs/SPEC.md 7i): Edit (a new name, then the Filter
- * sheet over its filters, saved in place), Unpin (it stays a saved view in
- * Collections), Move left, Move right, Move to first.
+ * A pinned tab's Options (docs/SPEC.md 7i): Name (typed in its row), Filters
+ * and sort (the Filter sheet over its filters, saved in place), Unpin (it
+ * stays a saved view in Collections), Move left, Move right, Move to first.
  */
 @Composable
 private fun PinnedTabMenu(
     view: NamedLibraryView,
-    onEdit: () -> Unit,
+    onRename: (String) -> Unit,
+    onEditFilters: () -> Unit,
     onUnpin: () -> Unit,
     onMove: (step: Int, toFirst: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val rows: List<Pair<String, () -> Unit>> = listOf(
-        "Edit" to onEdit,
-        "Unpin" to onUnpin,
-        "Move left" to { onMove(-1, false) },
-        "Move right" to { onMove(1, false) },
-        "Move to first" to { onMove(0, true) },
-        "Close" to onDismiss,
+    // The one sheet of choices (Droidtop/tracker#610), its name typed in place.
+    dev.droidtop.shell.gamepad.ActionSheet(
+        title = view.name,
+        rows = listOf(
+            dev.droidtop.shell.gamepad.ActionTextRow("Name", value = view.name, hint = view.name, onDone = onRename),
+            dev.droidtop.shell.gamepad.ActionRow("Filters and sort", onSelect = onEditFilters),
+            dev.droidtop.shell.gamepad.ActionRow("Unpin", onSelect = onUnpin),
+            dev.droidtop.shell.gamepad.ActionRow("Move left") { onMove(-1, false) },
+            dev.droidtop.shell.gamepad.ActionRow("Move right") { onMove(1, false) },
+            dev.droidtop.shell.gamepad.ActionRow("Move to first") { onMove(0, true) },
+            dev.droidtop.shell.gamepad.ActionRow("Close", onSelect = onDismiss),
+        ),
+        onDismiss = onDismiss,
+        focusLabel = "Tab options",
     )
-    var focusIndex by remember { mutableIntStateOf(0) }
-    ShellDialog(onDismissRequest = onDismiss) {
-        dev.droidtop.shell.gamepad.MenuPanel(
-            modifier = Modifier.width(LocalShellWindow.current.panelWidth(420.dp)),
-            focusLabel = "Tab options",
-            title = view.name,
-            onPad = { press ->
-                when (press.action) {
-                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = dev.droidtop.shell.gamepad.menuMove(focusIndex, rows.size, press)
-                    GamepadAction.A -> rows.getOrNull(focusIndex)?.second?.invoke()
-                    GamepadAction.B, GamepadAction.SELECT -> onDismiss()
-                    else -> Unit
-                }
-                true
-            },
-        ) {
-            rows.forEachIndexed { index, (title, action) ->
-                dev.droidtop.shell.gamepad.MenuRow(title = title, selected = index == focusIndex, onClick = action)
-            }
-        }
-    }
 }
 
 /**

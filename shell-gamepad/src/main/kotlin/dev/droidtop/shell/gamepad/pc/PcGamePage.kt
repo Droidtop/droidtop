@@ -540,7 +540,7 @@ internal fun PcGamePage(
                         // Typed in the row itself, with the panel still open (no editor, no panel: Droidtop/tracker#954 item 12).
                         if (library != null) {
                             dev.droidtop.shell.gamepad.ActionTextRow(
-                                title = "Title",
+                                "Title",
                                 value = entry.gameName.orEmpty(),
                                 hint = "From the folder name",
                                 detail = words(R.string.gamepad_blank_uses_the_title_read_from_folder),

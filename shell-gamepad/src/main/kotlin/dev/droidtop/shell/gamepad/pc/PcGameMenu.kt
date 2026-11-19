@@ -617,7 +617,7 @@ private fun PcGameMenuSheet(
     val titleRows = listOfNotNull<ActionSheetItem>(
         // Typed in the row itself, the menu still open (no editor, no panel: Droidtop/tracker#954 item 12).
         dev.droidtop.shell.gamepad.ActionTextRow(
-            title = "Title",
+            "Title",
             value = entry.gameName.orEmpty(),
             hint = "From the folder name",
             detail = words(R.string.gamepad_blank_uses_the_folder_name_x, folderNameOf(entry)),
