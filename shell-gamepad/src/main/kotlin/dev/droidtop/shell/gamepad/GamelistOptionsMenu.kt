@@ -167,8 +167,9 @@ internal fun GamelistOptionsMenu(
             add("Update platform databases")
         } else {
             // Sort and filter are the one shared query model's sheets
-            // (dev.droidtop.shell.gamepad.query, docs/SPEC.md 7j); the PC
-            // Games tab opens them from X and Y and passes no rows here.
+            // (dev.droidtop.shell.gamepad.query, docs/SPEC.md 7j), the PC
+            // Games tab's among them. A list never passes its own rows by these
+            // names: this case catches them first (Droidtop/tracker#954 15b).
             if (onOpenSort != null) add(SORT_BY)
             if (onOpenFilter != null) add(FILTER)
             if (onSearchTextChange != null && systemId != PC_SYSTEM_ID) add(searchRowLabel)

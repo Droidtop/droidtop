@@ -1354,16 +1354,7 @@ internal fun PcGamesSection(
 
     // The windows this tab opens over itself. Each is its own window and
     // takes the pad through the pipeline's front (docs/SPEC.md 6e).
-    // List options > Filter (and Sort by) closed List options and opened nothing on BlueStacks dev.3392, while the same
-    // sheet opened from a pinned tab's menu (Droidtop/tracker#954 15b): each window's coming and going is logged.
-    androidx.compose.runtime.LaunchedEffect(state.filterOpen, state.sortOpen, state.optionsOpen) {
-        android.util.Log.i("droidtop.PcWindows", "filter=${state.filterOpen} sort=${state.sortOpen} options=${state.optionsOpen}")
-    }
     if (state.filterOpen) {
-        androidx.compose.runtime.DisposableEffect(Unit) {
-            android.util.Log.i("droidtop.PcWindows", "filter sheet composed")
-            onDispose { android.util.Log.i("droidtop.PcWindows", "filter sheet left") }
-        }
         LibraryFilterSheet(
             scope = scope,
             base = games.orEmpty(),
@@ -1390,7 +1381,6 @@ internal fun PcGamesSection(
             editingName = editing?.name,
             onForgetView = { name -> savedViews.forget(name) },
             onDismiss = {
-                android.util.Log.i("droidtop.PcWindows", "filter sheet dismissed", Throwable("who dismissed it"))
                 state.filterOpen = false
                 editing = null
             },
@@ -1505,19 +1495,14 @@ internal fun PcGamesSection(
             onScraped = onRequestRescan,
             onDismiss = { state.optionsOpen = false },
             games = listed,
+            // X is Play now on a game (Droidtop/tracker#641) and Y is Search (#644 slice 4), so Filter and Sort by are
+            // here: the menu's own two rows, which close it and open the sheets. Passed as list options under the same
+            // names, they were caught by those rows' own case, which opened nothing (Droidtop/tracker#954 15b).
+            onOpenSort = { state.sortOpen = true },
+            onOpenFilter = { state.filterOpen = true },
             // The ownership List options (docs/SPEC.md 7j) and the strip's
             // optional tabs (7i): global, not part of a view.
             listOptions = listOf(
-                // X is Play now on a game (Droidtop/tracker#641), so the list's filter is here.
-                ListOption("Filter") {
-                    state.optionsOpen = false
-                    state.filterOpen = true
-                },
-                // Y is Search (Droidtop/tracker#644 slice 4), so Sort By is here beside Filter.
-                ListOption("Sort by") {
-                    state.optionsOpen = false
-                    state.sortOpen = true
-                },
                 ListOption("Favourites tab", on = stripTabs.favourites) {
                     setStripTabs(stripTabs.copy(favourites = !stripTabs.favourites))
                 },
