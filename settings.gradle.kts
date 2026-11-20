@@ -55,6 +55,8 @@ rootProject.name = "droidtop"
 
 // Application shell — hosts the default touch UI and wires the other modules together.
 include(":app")
+// Records :app's baseline profile on a device: the start and a walk through Gaming (docs/SPEC.md 10b).
+include(":baselineprofile")
 include(":net-core")
 
 // Qubes-style host bridge: Android's ONLY privileged surface. Does not implement a

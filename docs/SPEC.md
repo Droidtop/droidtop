@@ -25104,6 +25104,15 @@ the updater reads the name from `release-info.json`, so installed debug
 builds update to it by themselves. The debug variant still exists for local
 work and is what lint and the unit tests run on.
 
+
+**droidtop carries a baseline profile of its own (owner, 2026-11-19, Droidtop/tracker#954 item 13).** The libraries'
+profiles were installed, droidtop's code had none, so Android compiled it from nothing on the first start after every
+update (22.7 s on the test emulator, about half a second to the first frame afterwards on BlueStacks). `:baselineprofile`
+(the `androidx.baselineprofile` plugin) records the code a person runs first: the start into Gaming's Home with
+onboarding already done and Gaming as Home's mode, then the left menu's PC Games and Settings. The Baseline profile
+workflow records it on an Android 13 emulator, by hand and monthly, and uploads it; a person commits it to
+`app/src/release/generated/baselineProfiles/`, which the release build carries. A build never records one
+(`automaticGenerationDuringBuild = false`: it needs a device), and CI never commits.
 **The release build is shrunk by R8 (decided 2026-10-02).** The unshrunk
 release carried 114 MB of dex in 11 files, and packaging it in the one Gradle
 daemon heap was one of the two things behind the intermittent
