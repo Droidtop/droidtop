@@ -1354,7 +1354,16 @@ internal fun PcGamesSection(
 
     // The windows this tab opens over itself. Each is its own window and
     // takes the pad through the pipeline's front (docs/SPEC.md 6e).
+    // List options > Filter (and Sort by) closed List options and opened nothing on BlueStacks dev.3392, while the same
+    // sheet opened from a pinned tab's menu (Droidtop/tracker#954 15b): each window's coming and going is logged.
+    androidx.compose.runtime.LaunchedEffect(state.filterOpen, state.sortOpen, state.optionsOpen) {
+        android.util.Log.i("droidtop.PcWindows", "filter=${state.filterOpen} sort=${state.sortOpen} options=${state.optionsOpen}")
+    }
     if (state.filterOpen) {
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            android.util.Log.i("droidtop.PcWindows", "filter sheet composed")
+            onDispose { android.util.Log.i("droidtop.PcWindows", "filter sheet left") }
+        }
         LibraryFilterSheet(
             scope = scope,
             base = games.orEmpty(),
@@ -1381,6 +1390,7 @@ internal fun PcGamesSection(
             editingName = editing?.name,
             onForgetView = { name -> savedViews.forget(name) },
             onDismiss = {
+                android.util.Log.i("droidtop.PcWindows", "filter sheet dismissed", Throwable("who dismissed it"))
                 state.filterOpen = false
                 editing = null
             },
