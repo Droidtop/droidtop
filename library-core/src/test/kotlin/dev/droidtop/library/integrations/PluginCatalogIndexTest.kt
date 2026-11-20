@@ -357,6 +357,22 @@ class PluginCatalogIndexTest {
         assertEquals("1.6", PluginCatalog.updateFor(plugin, installed("1.5"), PluginChannel.STABLE)?.version)
     }
 
+    @Test
+    fun `a stopped plugin whose signature no longer verifies is offered the re-signed copy of its version`() {
+        // The 2026-11-05 rotation re-signed every release in place: App releases 0.1.3 installed before it stopped after
+        // the old root expired, and the catalog's 0.1.3 (the re-signed one) was never offered (BlueStacks dev.3398).
+        val plugin = channelled(Triple("stable", "1.6", "6".repeat(64)))
+        val installed = sampleRecord("f".repeat(64)).let { it.copy(manifest = it.manifest.copy(version = "1.6")) }
+        val stopped = installed.copy(
+            enabled = false,
+            disabledReason = "${dev.droidtop.pluginhost.PluginRecord.SIGNATURE_FAILED}: the chain does not lead to droidtop's signing root",
+        )
+        assertEquals("6".repeat(64), PluginCatalog.updateFor(plugin, stopped, PluginChannel.STABLE)?.manifestSha256)
+        assertNull("a working plugin is not offered its own version again", PluginCatalog.updateFor(plugin, installed, PluginChannel.STABLE))
+        val older = stopped.copy(manifest = stopped.manifest.copy(version = "1.7"))
+        assertNull("never an older version, stopped or not", PluginCatalog.updateFor(plugin, older, PluginChannel.STABLE))
+    }
+
     private fun channelled(vararg releases: Triple<String, String, String>) = PluginCatalogPlugin(
         id = "droidtop.sample",
         label = "Sample",

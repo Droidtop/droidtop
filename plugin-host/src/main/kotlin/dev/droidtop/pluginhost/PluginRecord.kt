@@ -107,6 +107,9 @@ data class PluginRecord(
         /** [PluginBundleInstaller.verifyInstalled]'s reason when the version's files are not there at all. */
         const val FILES_MISSING = "plugin files are missing"
 
+        /** How [PluginBundleInstaller.verifyInstalled]'s reason starts when the signature no longer verifies. */
+        const val SIGNATURE_FAILED = "signature no longer verifies"
+
         /**
          * A field written as `value ?: JSONObject.NULL` (description,
          * entryClass, disabledReason) comes back from org.json's own
@@ -204,6 +207,12 @@ data class PluginRecord(
         return !enabled && trust == PluginTrustState.APPROVED &&
             (reason.endsWith(CHANGED_ON_DISK) || reason == FILES_MISSING)
     }
+
+    /**
+     * Stopped because its signature no longer verifies: the copy a catalog holds of the same version is then a real
+     * update (re-signed in place, as every release was in the 2026-11-05 key rotation), not the same plugin again.
+     */
+    fun signatureFailed(): Boolean = disabledReason?.startsWith(SIGNATURE_FAILED) == true
 
     /** Whether this plugin is actually allowed to run right now, folding every gate into one check so a runner never has to re-derive it. */
     fun runnable(): Boolean = trust == PluginTrustState.APPROVED && enabled && disabledReason == null

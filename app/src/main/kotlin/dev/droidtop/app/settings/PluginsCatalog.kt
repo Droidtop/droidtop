@@ -1369,7 +1369,8 @@ internal fun AppSettingsCatalogs.pluginPageTop(
         }
         offer != null && (record.disabledReason != null || record.trust == PluginTrustState.APPROVED) -> buttons += PageButton(
             id = "plugin_${m.id}_update_button",
-            label = "Update to ${offer.release.version}",
+            // The same version as installed is the re-signed copy of a plugin that no longer verifies: a reinstall.
+            label = if (offer.release.version == m.version) "Reinstall" else "Update to ${offer.release.version}",
             role = ButtonRole.PRIMARY,
             // Said at once and where its bar is, then how it ended: the press used to show nothing until the download and
             // install were over, and a refusal read like any other line (Droidtop/tracker#882).
@@ -1390,7 +1391,19 @@ internal fun AppSettingsCatalogs.pluginPageTop(
             id = "plugin_${m.id}_retry",
             label = "Try again",
             role = ButtonRole.PRIMARY,
-            run = { ctx -> PluginStore.setEnabled(ctx, m.id, true); pluginsChanged(ctx) },
+            // Checked first: it comes back on only when its files and signature verify, else it says why it stays stopped.
+            run = {
+                later { ctx ->
+                    val stays = withContext(Dispatchers.IO) { PluginStore.retry(ctx, m.id) }
+                    pluginsChanged(ctx)
+                    if (stays != null) {
+                        Notices.flash("Still stopped", tone = dev.droidtop.library.settings.NoticeTone.Caution, source = m.label, context = ctx)
+                        null
+                    } else {
+                        "Running"
+                    }
+                }
+            },
         )
         record.trust == PluginTrustState.APPROVED && !record.enabled -> buttons += PageButton(
             id = "plugin_${m.id}_turn_on",

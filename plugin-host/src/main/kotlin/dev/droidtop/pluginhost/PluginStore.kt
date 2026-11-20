@@ -166,6 +166,24 @@ object PluginStore {
         if (!enabled) PluginRecording.clear(pluginId)
     }
 
+    /**
+     * Try again on a stopped plugin: its files and signature are checked first, and it is switched back on only when
+     * they verify. A blind switch read "Running" over a plugin whose signature still failed (App releases 0.1.3, signed
+     * under the root that expired on 2026-11-11), until the next check stopped it again. Returns the reason it stays
+     * stopped, or null when it is on. Disk: off the main thread.
+     */
+    fun retry(context: Context, pluginId: String): String? {
+        val dir = root(context)
+        val record = PluginBundleInstaller.readRecord(dir, pluginId) ?: return null
+        val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+        PluginBundleInstaller.verifyInstalled(dir, record, userKeys)?.let { problem ->
+            disableWithReason(context, pluginId, problem.reason)
+            return problem.reason
+        }
+        setEnabled(context, pluginId, true)
+        return null
+    }
+
     /** [PluginCrashPolicy]'s write path -- the only other place [PluginRecord.disabledReason] gets set. */
     fun disableWithReason(context: Context, pluginId: String, reason: String, detail: String? = null) {
         val dir = root(context)
