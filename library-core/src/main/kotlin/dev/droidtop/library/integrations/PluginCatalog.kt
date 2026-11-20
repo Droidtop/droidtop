@@ -320,7 +320,11 @@ object PluginCatalog {
         if (installed != null && (compareReleases(latest, installed) ?: 0) <= 0) return null
         // A build the catalog does not list (from a repository's unstable line, a file) is judged by its own version:
         // RetroArch 1.7.0 from its repository was offered the catalog's 1.6.0 as an update (Droidtop/tracker#882).
-        if (installed == null && Versions.compareLoose(latest.version, record.manifest.version) <= 0) return null
+        // ... except where the installed copy no longer verifies: the catalog's copy of the same version is then the
+        // re-signed one (the 2026-11-05 rotation re-signed every release in place), and the only way back. App releases
+        // and F-Droid 0.1.3 installed before it stayed stopped with nothing offered (BlueStacks dev.3398).
+        val version = Versions.compareLoose(latest.version, record.manifest.version)
+        if (installed == null && (version < 0 || (version == 0 && !record.signatureFailed()))) return null
         return latest
     }
 

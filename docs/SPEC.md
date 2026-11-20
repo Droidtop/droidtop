@@ -27771,6 +27771,13 @@ what the index says is display data, never a trust decision.
   answers stored (sent back by a key change, or denied before) starts the
   approval list from those answers, not the defaults
   (`PluginGrants.approvalTicked`); the person still sees every tick.
+  **A plugin whose signature no longer verifies is offered its version's re-signed copy (2026-11-20).** The
+  2026-11-05 rotation re-signed every release in place, under the same tag and version. A copy installed before it
+  stops once the old root expires ("signature no longer verifies"), and the catalog's copy of that same version, under
+  another digest, is then a real update (`PluginRecord.signatureFailed`, `PluginCatalog.updateFor`): its row says
+  Reinstall, and automatic updates take it. A working plugin is never offered its own version again. Try again on a
+  stopped plugin checks its files and signature first (`PluginStore.retry`) and keeps it stopped, with the reason, when
+  they still fail; it used to switch the plugin on blindly.
   **A source can mark a key superseded (Droidtop/tracker#887, owner 2026-11-05).** The owner: "Every key is
   superceded by the current key. It's a simple check: if it's marked as "superceded", then trust the key it's
   superceded by, which'll be denoted. We still tell the user the key is changing, of course", and "the place that

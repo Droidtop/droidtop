@@ -347,7 +347,7 @@ object PluginBundleInstaller {
             )
         }
         if (verdict is BundleVerdict.Refused && !approvedUnderPredecessor(pluginsRoot, record, if (jwsFile.isFile) jwsFile.readText() else null, revocations)) {
-            return PluginInstallError("signature no longer verifies: ${verdict.reason}")
+            return PluginInstallError("${PluginRecord.SIGNATURE_FAILED}: ${verdict.reason}")
         }
         for (file in record.manifest.payload) {
             val target = File(dir, file.path)
