@@ -20657,8 +20657,9 @@ Sideloaded, another store, System). Sorts: A to Z, Recently used, Most
 used, Recently installed.
 - **Category is a default plus an override.** Games is seeded from
   Android's own game flag (the manifest's game flag or the game category)
-  and a short list of game stores and launchers; Emulators is every
-  emulator in droidtop's player database; System is a preinstalled app.
+  and a short list of game stores and launchers (Play Games among them, Droidtop/tracker#944); Emulators is every
+  emulator in droidtop's player database, and Enginehost; System is a preinstalled app that is not a game store or
+  launcher.
   **Mark as game** (and "Not a game") is the person's answer and beats every
   default; it is a row in the app's Options menu (L2, or a long press on the app), writing the one answer
   (`AppGameMarks`).

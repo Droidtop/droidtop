@@ -26,6 +26,15 @@ class AppFactsTest {
     }
 
     @Test
+    fun `a game store that came with the device is still Games`() {
+        val rules = AppCategoryRules()
+
+        // Play Games is preinstalled; the Apps grid had it under Tools (Droidtop/tracker#944).
+        assertEquals(AppCategory.GAMES, rules.categoryOf("com.google.android.play.games", system))
+        assertEquals(AppCategory.SYSTEM, rules.categoryOf("com.android.settings", system))
+    }
+
+    @Test
     fun `a known emulator is Emulators and a system app is System`() {
         val rules = AppCategoryRules(emulatorPackages = setOf("an.emulator"))
 

@@ -55,7 +55,8 @@ class AppCategoryRules(
         if (facts == null) return null
         if (packageName in markedGames) return AppCategory.GAMES
         if (packageName in emulatorPackages) return AppCategory.EMULATORS
-        if (facts.system) return AppCategory.SYSTEM
+        // A game store or launcher is a game place even when it came with the device (Play Games is preinstalled).
+        if (facts.system && packageName !in GAME_STORE_PACKAGES) return AppCategory.SYSTEM
         val seeded = facts.flaggedGame || packageName in GAME_STORE_PACKAGES
         return if (seeded && packageName !in markedNotGames) AppCategory.GAMES else AppCategory.OTHER
     }
@@ -77,11 +78,16 @@ class AppCategoryRules(
             "com.nvidia.geforcenow",
             "com.limelight",
             "com.winlator",
+            // Google's own games launcher: on BlueStacks the Apps grid had it under Tools (Droidtop/tracker#944).
+            "com.google.android.play.games",
         )
 
         /** Reads the player database and the person's marks: disk work, never on the main thread. */
         fun load(context: Context): AppCategoryRules {
-            val emulators = runCatching { KnownPlayers.all(context).mapTo(HashSet()) { it.pkg } }.getOrDefault(emptySet())
+            // Every player droidtop knows how to launch, and Enginehost, which runs engine games and is to droidtop just
+            // another emulator (docs/SPEC.md): the Apps grid showed Emulators 0 with Enginehost installed (#944).
+            val emulators = runCatching { KnownPlayers.all(context).mapTo(HashSet()) { it.pkg } }.getOrDefault(HashSet()) +
+                EngineHost.PACKAGE_NAME
             val (games, notGames) = AppGameMarks.read(context)
             return AppCategoryRules(emulators, games, notGames)
         }
