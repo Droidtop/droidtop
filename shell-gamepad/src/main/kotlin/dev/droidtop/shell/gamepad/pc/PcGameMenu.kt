@@ -176,7 +176,7 @@ private fun PcGameMenuSheet(
     var picking by remember(entry) { mutableStateOf(false) }
     // "Run once with…" (docs/SPEC.md 7i, Droidtop/tracker#636): the same choices as Runs with, for one launch.
     var pickingOnce by remember(entry) { mutableStateOf(false) }
-    var status by remember(entry) { mutableStateOf<String?>(null) }
+    var status by remember(entry.id) { mutableStateOf<String?>(null) }
     var viewingMedia by remember(entry) { mutableStateOf(false) }
     var pickingMatch by remember(entry) { mutableStateOf(false) }
     // "Rescrape with…" (Droidtop/tracker#67): one game, from a source the person picks.
@@ -214,8 +214,10 @@ private fun PcGameMenuSheet(
     // Which page of the menu is showing and which row of it the cursor is
     // on (docs/SPEC.md 7i): the short top page, or one of the two longer
     // lists it opens. A sub-page's B goes back to the top, never out.
-    var page by remember(entry) { mutableStateOf(PcMenuPage.Root) }
-    val focus = remember(entry) { mutableIntStateOf(0) }
+    // Keyed by the game, not the entry: renaming it in its Title row makes a new entry, and the menu stayed on the
+    // page and row it was on, with its "Renamed to" line, only once these outlived that (BlueStacks dev.3392).
+    var page by remember(entry.id) { mutableStateOf(PcMenuPage.Root) }
+    val focus = remember(entry.id) { mutableIntStateOf(0) }
     var focusIndex by focus
     // Uninstall is a two-step press (the design language's confirm): moving
     // to another row disarms it.
