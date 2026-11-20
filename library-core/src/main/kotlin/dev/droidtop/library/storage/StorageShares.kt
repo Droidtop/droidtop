@@ -345,6 +345,12 @@ object StorageShares {
         update(context, id) { it.copy(state = NOT_TESTED, stateDetail = null, testedAtMs = 0) }
     }
 
+    /** Whether [id] has a password or secret key kept in the vault. Reads the vault: off the main thread. */
+    fun hasPassword(context: Context, id: String): Boolean {
+        val share = get(context, id) ?: return false
+        return CredentialStore.get(context, share.passwordKey).isNotEmpty()
+    }
+
     /** Takes [id] off the list and forgets its password. Nothing on the share is touched. */
     fun remove(context: Context, id: String) {
         val share = get(context, id) ?: return

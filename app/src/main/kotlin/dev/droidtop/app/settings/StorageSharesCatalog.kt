@@ -170,6 +170,7 @@ object StorageSharesCatalog {
                 subtitle = share.url,
                 groups = { ctx ->
                     val now = withContext(Dispatchers.IO) { StorageShares.get(ctx, share.id) } ?: share
+                    val hasPassword = withContext(Dispatchers.IO) { StorageShares.hasPassword(ctx, share.id) }
                     listOf(
                         CatalogGroup(
                             id = "${id}_state",
@@ -241,7 +242,18 @@ object StorageSharesCatalog {
                                     subtitle = "Kept locked on this device, never in a backup",
                                     value = "",
                                     secret = true,
-                                    onChange = { c, v -> withContext(Dispatchers.IO) { StorageShares.setPassword(c, now.id, v) } },
+                                    // Typed in place, the field never shows what is kept, so a blank one writes nothing; removing it
+                                    // is the row below (owner, 2026-11-19, Droidtop/tracker#954 item 12).
+                                    onChange = { c, v -> if (v.isNotEmpty()) withContext(Dispatchers.IO) { StorageShares.setPassword(c, now.id, v) } },
+                                ),
+                                if (!hasPassword) null else AsyncActionItem(
+                                    id = "${id}_password_remove",
+                                    title = if (now.kind == StorageShares.S3) "Remove the secret key" else "Remove the password",
+                                    confirmTitle = "Remove the ${if (now.kind == StorageShares.S3) "secret key" else "password"} for ${now.name}?",
+                                    run = { c, _ ->
+                                        withContext(Dispatchers.IO) { StorageShares.setPassword(c, now.id, "") }
+                                        "Removed"
+                                    },
                                 ),
                                 if (now.isServerKind()) null else ToggleItem(
                                     id = "${id}_plain",
