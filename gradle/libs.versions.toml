@@ -84,6 +84,7 @@ jacson-databind = "2.16.1"
 maven-plugin-api = "3.9.11"
 richeditor-compose = "1.0.0-beta02"
 uiautomatorV18 = "2.1.3"
+uiautomator = "2.3.0"
 window = "1.5.1"
 savedstate = "1.2.1"
 core-v116 = "1.16.0"
@@ -219,6 +220,9 @@ maven-plugin-api = { module = "org.apache.maven:maven-plugin-api", version.ref =
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 uiautomator-v18 = { module = "com.android.support.test.uiautomator:uiautomator-v18", version.ref = "uiautomatorV18" }
+# droidtop's own baseline profile (:baselineprofile, docs/SPEC.md 10b): the journey on a device, and the rule that records it.
+androidx-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "uiautomator" }
+androidx-benchmark-macro-junit4 = { module = "androidx.benchmark:benchmark-macro-junit4", version.ref = "baselineprofile" }
 
 # droidtop-specific
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }

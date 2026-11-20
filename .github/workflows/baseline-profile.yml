@@ -1,0 +1,72 @@
+name: Baseline profile
+
+# Records droidtop's own baseline profile (docs/SPEC.md 10b, Droidtop/tracker#954 item 13) on an Android emulator, with
+# :baselineprofile's walk (the start into Gaming's Home, PC Games and Settings), and uploads it. A person copies it to
+# app/src/release/generated/baselineProfiles/ in a commit of their own: a build never records one (it needs a device),
+# and CI never commits. By hand, and monthly so the profile follows the code. The emulator starts as emulator-tests.yml
+# starts its own.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 5 3 * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  record:
+    name: Record the profile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up the Android build
+        uses: ./.github/actions/android-setup
+
+      - name: Let the emulator use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Record on the emulator
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        env:
+          # droidtop's TheGamesDB application key, as android-build passes it: blank without the secret.
+          THEGAMESDB_APP_KEY: ${{ secrets.THEGAMESDB_APP_KEY }}
+        with:
+          # Android 13, the rig's (BlueStacks). The plain AOSP image: its shell has root, which the walk needs to mark
+          # onboarding done before the start, and Google Play services' processes do not come and go under it.
+          api-level: 33
+          target: default
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: ./gradlew :app:generateReleaseBaselineProfile --stacktrace
+
+      - name: Upload the profile
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: droidtop-baseline-profile
+          path: app/src/release/generated/baselineProfiles/
+          if-no-files-found: error
+
+      - name: Upload the device's test output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: baseline-profile-test-output
+          path: |
+            baselineprofile/build/outputs/
+            baselineprofile/build/reports/
+          if-no-files-found: warn

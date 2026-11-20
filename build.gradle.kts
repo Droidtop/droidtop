@@ -8,6 +8,9 @@ plugins {
     // unused until now.
     alias(libs.plugins.google.ksp) apply false
     alias(libs.plugins.kotlin.compose) apply false
+    // droidtop's own baseline profile (:baselineprofile records it, :app carries it; docs/SPEC.md 10b).
+    alias(libs.plugins.android.test) apply false
+    alias(libs.plugins.androidx.baselineprofile) apply false
 }
 
 // The classes Compose may treat as stable (compose-stability.conf, Droidtop/tracker#941), for every module that uses
