@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    // droidtop's own baseline profile (docs/SPEC.md 10b): recorded by :baselineprofile, kept in src/release/generated.
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 // windowcast's Android library (docs/SPEC.md 7a): its version is the pin's tag (windowcast.pin), the one place it is written.
@@ -247,7 +249,15 @@ configurations.all {
     }
 }
 
+// The profile is recorded by the Baseline profile workflow on an emulator and kept in the source tree, never made during
+// an ordinary build: a build needs no device (docs/SPEC.md 10b).
+baselineProfile {
+    automaticGenerationDuringBuild = false
+    saveInSrc = true
+}
+
 dependencies {
+    baselineProfile(project(":baselineprofile"))
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.junit)
     implementation(project(":net-core"))
