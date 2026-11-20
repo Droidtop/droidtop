@@ -245,8 +245,9 @@ internal fun SourceLinkSheet(
         onTyped = { index, text ->
             when (index) {
                 0 -> query = searchText(text, gameTitle)
-                // A typed link applies once the sheet closes; left as it was, or blank, it changes nothing (Unlink unlinks).
-                typeIndex -> if (text.isNotBlank() && text.trim() != typedLink.trim()) {
+                // A typed link applies once the sheet closes. The field starts from the link in force, so a change is meant:
+                // cleared, it unlinks, as every source's line says ("blank unlinks"); left as it was, nothing happens.
+                typeIndex -> if (text.trim() != typedLink.trim()) {
                     onClose()
                     scope.launch { linkSourceFromText(library, gameIds, source, text, say) }
                 }
