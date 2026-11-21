@@ -102,8 +102,10 @@ class ComputerLaunchTest {
     fun `an address the answer gave wins, and a bad one is not used`() {
         assertEquals("203.0.113.5:5000", ComputerLaunch.streamExtras(pcAt("192.168.1.20:47610"), "203.0.113.5:5000", "g")!![ComputerLaunch.EXTRA_ADDRESS])
         assertEquals("192.168.1.20:47100", ComputerLaunch.streamExtras(pcAt("192.168.1.20:47610"), "not an address", "g")!![ComputerLaunch.EXTRA_ADDRESS])
-        assertEquals("203.0.113.5:5000", say("""{"result":"started","stream":"windowcast","address":"203.0.113.5:5000"}""").streamAddress)
-        assertNull(say("""{"result":"started","stream":"windowcast","address":"http://x/y"}""").streamAddress)
+        assertEquals("203.0.113.5:5000", say("""{"result":"started","stream":"windowcast","stream_address":"203.0.113.5:5000"}""").streamAddress)
+        assertNull(say("""{"result":"started","stream":"windowcast","stream_address":"http://x/y"}""").streamAddress)
+        // `address` is where the agent answered (the native layer adds it to every reply): never the stream's.
+        assertNull(say("""{"result":"started","stream":"windowcast","address":"100.91.90.11:47610"}""").streamAddress)
     }
 
     @Test

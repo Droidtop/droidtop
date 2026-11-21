@@ -979,6 +979,15 @@ fn launch_game(args: &Value) -> Outcome {
             other => return Err(Failure::Error(format!("the computer answered {other:?}"))),
         }
     };
+    // Where the computer's windowcast listens, when it said, goes as `stream_address`: `located` writes the session's
+    // own address into `address`, and the handheld streamed to the agent's port instead of windowcast's (console,
+    // droidtop dev.3417: "Connecting to 100.91.90.11:47610", then a signaling frame of 352518912 bytes).
+    let mut outcome = outcome;
+    if let Some(fields) = outcome.as_object_mut() {
+        if let Some(stream_address) = fields.remove("address") {
+            fields.insert("stream_address".into(), stream_address);
+        }
+    }
     let v = located(outcome, &s);
     bye(s);
     Ok(v)
@@ -1525,6 +1534,9 @@ mod tests {
         let started = ask("steam:440", Value::Null);
         assert_eq!(started["result"], "started", "{started}");
         assert_eq!(started["computer"], "Away PC");
+        // The session's address is where the agent answered, never a stream address.
+        assert_eq!(started["address"], json!(at.to_string()));
+        assert!(started.get("stream_address").is_none(), "no stream address was stated: {started}");
         assert_eq!(ask("steam:1", Value::Null)["result"], "not_allowed");
         // This computer states no `stream`: asked to watch, it is not asked to start anything.
         let watch = json!({ "via": "windowcast", "viewer": "ab".repeat(32) });

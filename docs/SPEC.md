@@ -24010,7 +24010,11 @@ owner's Sandustry from his Windows desktop to the Retroid Pocket 5.
 - **One path.** `ComputerLaunch.stream` (`:library-core`) sends `launch_game`
   with `stream {via: windowcast, viewer}`, words the answer as every launch is
   worded, and opens the stream screen (`RemoteStreamActivity`, 7a) at the
-  game's window on `started` with `stream: windowcast`.
+  game's window on `started` with `stream: windowcast`. The address it opens is
+  the one the answer states for windowcast, which droidtop's native layer
+  passes on as `stream_address`, else the computer's address on windowcast's
+  own port (47100). Never `address`, which is where the agent answered: the
+  console streamed to the agent's port that way (dev.3417).
 - **No PIN.** `viewer` is this device's windowcast client identity, the one
   the stream screen connects with (`filesDir/windowcast/client-identity.key`,
   made in windowcast's form by `ComputerLaunch.viewerId` when the screen has

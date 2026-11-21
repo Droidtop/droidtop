@@ -77,7 +77,9 @@ object ComputerLaunch {
                 true,
                 "$game is starting on $computer.",
                 stream = reply.optString("stream").takeIf { it.isNotBlank() },
-                streamAddress = reply.optString("address").takeIf { isHostPort(it) },
+                // `stream_address`, not `address`: that one is where the agent answered (droidtop's native layer adds it to
+                // every reply), and streaming to it reached the agent's port, not windowcast's (console, dev.3417).
+                streamAddress = reply.optString("stream_address").takeIf { isHostPort(it) },
             )
             "agent_too_old" -> Outcome(false, "droidtop-agent on $computer is too old to start games. Update it on the computer.")
             "cannot_stream" -> Outcome(
