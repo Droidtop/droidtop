@@ -163,4 +163,14 @@ class AppInterfaceTrustTest {
         assertNull(AppInterfaceTrust.mismatch("Enginehost", null, null))
         assertNull(AppInterfaceTrust.mismatch("Enginehost", bytes("""{"kind":"app_interface","contractVersion":3}"""), manifest()!!))
     }
+
+    @Test
+    fun `an app that passes its check is not refused`() {
+        val record = PluginRecord(manifest()!!, "d".repeat(64), a, PluginTrustState.APPROVED, enabled = true, rootApproved = false, disabledReason = null)
+        // The check passing (null) stays a pass: the elvis this replaced turned it into "could not be checked".
+        assertNull(AppInterfaces.verifyWith("context", record) { _, _ -> null })
+        val refused = PluginInstallError("its app was updated; approve the new version")
+        assertEquals(refused, AppInterfaces.verifyWith("context", record) { _, _ -> refused })
+        assertEquals(AppInterfaceTrust.UNCHECKABLE, AppInterfaces.verifyWith<String>(null, record) { _, _ -> null }?.reason)
+    }
 }

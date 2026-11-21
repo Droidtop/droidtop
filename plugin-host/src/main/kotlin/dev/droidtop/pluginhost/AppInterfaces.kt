@@ -56,8 +56,18 @@ object AppInterfaces {
     }
 
     /** [verifyRecord] with the attached context; a refusal when droidtop has not been given one yet. */
-    fun verifyAttached(record: PluginRecord): PluginInstallError? =
-        app?.let { verifyRecord(it, record) } ?: PluginInstallError(AppInterfaceTrust.UNCHECKABLE)
+    fun verifyAttached(record: PluginRecord): PluginInstallError? = verifyWith(app, record, ::verifyRecord)
+
+    /**
+     * [verify] with [context], or the refusal "could not be checked" when there is none. Written out rather than
+     * `context?.let { verify(it, record) } ?: refusal`: [verify] answers null when the app passes, and that elvis turned
+     * every pass into the refusal, so droidtop turned Enginehost's plugin off on every build while its signature was fine
+     * (console, dev.3412 to dev.3418; checkApk and the package lookup never logged a failure). Pure, for the test.
+     */
+    internal fun <C> verifyWith(context: C?, record: PluginRecord, verify: (C, PluginRecord) -> PluginInstallError?): PluginInstallError? {
+        if (context == null) return PluginInstallError(AppInterfaceTrust.UNCHECKABLE)
+        return verify(context, record)
+    }
 
     private val cache = HashMap<String, Cached>()
 
