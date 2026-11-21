@@ -7,7 +7,7 @@ import dev.droidtop.library.PcSource
 import dev.droidtop.library.appSourceLabel
 import dev.droidtop.library.stores.StoreHolding
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
-import dev.droidtop.shell.gamepad.pc.engineLabel
+import dev.droidtop.shell.gamepad.pc.engineGroup
 import dev.droidtop.shell.gamepad.pc.isInstalled
 import org.json.JSONObject
 
@@ -103,7 +103,7 @@ enum class LibraryFacet(val key: String, val label: String) {
         KIND -> listOf(if (dev.droidtop.shell.gamepad.pc.isPcKind(entry.kind)) KIND_PC else KIND_ENGINE)
         IMPORTED_FROM -> context.viaOf(entry)?.let { listOf(it) }.orEmpty()
         COLLECTION -> context.collectionsOf(entry).toList()
-        ENGINE -> entry.engineLabel()?.let { listOf(it) }.orEmpty()
+        ENGINE -> entry.engineGroup()?.let { listOf(it) }.orEmpty()
         RUNNER -> context.runnerLabelOf(entry)?.let { listOf(it) }.orEmpty()
         // The one answer the Installed shelf reads too (LibraryEntry.isInstalled): a
         // store row says so, a folder the walk still finds is installed.

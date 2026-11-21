@@ -4,6 +4,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.PcSource
 import dev.droidtop.library.displayName
+import dev.droidtop.library.engineFamily
 import dev.droidtop.library.scraper.isPcOrEngineGame
 
 /**
@@ -29,8 +30,19 @@ internal val LibraryEntry.onPcGamesTab: Boolean
 /** Where this game came from ([PcSource]): its store's name, "Folder", "Wine shortcut". */
 internal fun LibraryEntry.sourceLabel(): String = PcSource.of(this)?.detail() ?: "Folder"
 
-/** The detected engine, or null for a PC entry that has none -- a Steam game is still a game. */
+/**
+ * The detected engine by name ("Ren'Py", "RPG Maker MV"), or null for a PC entry that has none -- a Steam game is
+ * still a game. The page's Engine row and the menu's line say it; the group heading ("Visual Novels") read as the
+ * engine of a Ren'Py game (console, dev.3406, Projekt: Passion).
+ */
 internal fun LibraryEntry.engineLabel(): String? =
+    if (kind == LibraryEntryKind.WINE_PROFILE) null else kind.engineFamily()
+
+/**
+ * The engine group the Engine filter lists ("Visual Novels", "RPG Maker"), as the shelves group by; a saved view
+ * keeps these values.
+ */
+internal fun LibraryEntry.engineGroup(): String? =
     if (kind == LibraryEntryKind.WINE_PROFILE) null else kind.displayName()
 
 /**
