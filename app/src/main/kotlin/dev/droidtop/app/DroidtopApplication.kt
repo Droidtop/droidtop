@@ -153,6 +153,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         PluginHostStart.armAfterStart(this)
         // What Enginehost can run decides a game's runner: its list is asked at start (docs/plugin-api.md 3 A7b).
         dev.droidtop.library.integrations.EngineCoreList.refreshAll(this)
+        // The library goes to and from the paired computers by itself (docs/SPEC.md 7o, "When the library syncs").
+        dev.droidtop.library.computers.ComputerLibraryCycle.install(this) { LibraryCore.library(it) }
         // The task manager asks one privileged shell to force-stop an app and to read the system's task list:
         // the Shizuku app (or Sui) or the Shizuku plugin, whichever the user picked; with none, it says what to
         // enable (docs/SPEC.md "The task manager"). Runs in every process: the binder is shared across them.
@@ -204,11 +206,15 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             private fun Activity.isParkedSurface() =
                 this is CompanionActivity || this is dev.droidtop.display.SecondaryDisplayActivity
+            // droidtop's own screens a person browses: the computers' library cycle runs while one is in front.
+            private fun Activity.isShell() =
+                this is MainActivity || this is com.android.launcher3.Launcher || this is CatalogScreenActivity
             // The launch audio timeline (tracker#160): every droidtop activity transition, with the screen it is on.
             private fun Activity.note(what: String) =
                 AudioHandOff.mark("${javaClass.simpleName} $what (display ${window?.decorView?.display?.displayId})")
             override fun onActivityPaused(activity: Activity) {
                 activity.note("paused")
+                if (activity.isShell()) dev.droidtop.library.computers.ComputerLibraryCycle.hidden()
                 WhatsNew.onScreenPaused(activity)
                 if (!activity.isParkedSurface()) AudioHandOff.releaseNow("${activity.javaClass.simpleName} paused")
             }
@@ -221,6 +227,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 if (!activity.isParkedSurface()) AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
                 // The first of droidtop's own screens in front after an update opens What's new (SPEC 7b, "Update onboarding").
                 // Not over the storage-full screen, which only says that storage is full (Droidtop/tracker#849).
+                if (activity.isShell()) dev.droidtop.library.computers.ComputerLibraryCycle.shown(activity)
                 if ((activity is MainActivity && !activity.storageFull) || activity is com.android.launcher3.Launcher || activity is CatalogScreenActivity) {
                     WhatsNew.onShellResumed(activity)
                     // Back at droidtop's own screen: the game was left, so its power goes back (SPEC "Power policy").

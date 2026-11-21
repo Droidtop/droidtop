@@ -23508,10 +23508,28 @@ streamed by windowcast's host, which the agent embeds (Stream from
 - **No resident process.** droidtop reaches a computer only:
   - before a game starts and after it ends;
   - when the person presses "Sync the library now";
+  - on the library's own cycle (below);
   - when a plugin calls `context.sync` or `devices.announce`;
   - while the pairing screen is open.
   The one listener is the handhelds' server above, and only while a plugin
-  has something for them. Nothing polls.
+  has something for them.
+- **When the library syncs** (owner, 2026-11-21: "desktop libraries should
+  sync on a cycle, and update dynamically"; `ComputerLibraryCycle`). The
+  library goes to and from every paired computer by itself, through the same
+  exchange as "Sync the library now":
+  - while one of droidtop's own screens (Gaming, the launcher, Settings) is
+    in front, every 15 minutes, and at once on coming back to one when the
+    last sync is more than 5 minutes old. A game, another app or the screen
+    off stops the cycle; an exchange already started finishes;
+  - 30 seconds after this device's games or their marks stop changing (an
+    install, a favourite, a session played). A collection change alone
+    waits for the next cycle;
+  - one exchange at a time, skipped until the library has been scanned once
+    (an empty list would tell the computers this device has no games).
+  The library is read again only when an exchange brought something (games,
+  marks), so a computer's changes show in Home and PC Games without a visit
+  to Settings. Only the games on this device are sent as installed here: a
+  computer's game shown in this library stays that computer's.
 
 ### Pairing with Pythia (Pythia UX review A19, AG5)
 

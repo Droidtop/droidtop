@@ -186,9 +186,11 @@ object ComputerLibrary {
      * ([ComputerShare]), the same exchange goes through the folder instead.
      * Network and disk work: never on the main thread.
      */
-    suspend fun sync(context: Context, computer: Computer, library: Library, games: List<LibraryEntry>): String {
+    suspend fun sync(context: Context, computer: Computer, library: Library, games: List<LibraryEntry>): Synced {
         val scan = JSONArray()
-        games.forEach { entry ->
+        // Only what is on this device is installed here: a computer's game shown in this library is that computer's,
+        // and sending it back as this device's would hide it from the library on the next scan (installedKeys).
+        games.filter { it.kind != LibraryEntryKind.COMPUTER_GAME && it.kind != LibraryEntryKind.REMOTE_STREAM }.forEach { entry ->
             val install = JSONObject()
                 .put("installed", true)
                 .put("launcher", "droidtop")
@@ -223,8 +225,12 @@ object ComputerLibrary {
                 "Library: ${reply.optInt("pushed")} changes sent to ${computer.name}, ${reply.optInt("pulled")} received$marked"
             }
         Computers.noteSync(context, computer.id, line)
-        return line
+        val arrived = AgentNative.failure(reply) == null && (written > 0 || reply.optInt("pulled") > 0 || reply.optInt("applied") > 0)
+        return Synced(line, arrived)
     }
+
+    /** What one [sync] did: its [line], and whether anything [arrived] that the library shows (games, marks). */
+    data class Synced(val line: String, val arrived: Boolean)
 
     /** The source a computer's versions are answers of (docs/SPEC.md 7o, "Versions"). */
     fun versionSource(computer: Computer): String = "computer:${computer.id}"

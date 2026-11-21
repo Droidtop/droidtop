@@ -54,9 +54,9 @@ data class Computer(
  * `files/agent/<id>/` for the save baselines, the conflict archive and the
  * library state.
  *
- * Nothing here listens or polls: droidtop reaches a computer around a game's
- * launch and exit, when the person starts a sync, and while the pairing screen
- * is open.
+ * Nothing here listens: droidtop reaches a computer around a game's launch and
+ * exit, when the person starts a sync, on the library's own cycle
+ * (ComputerLibraryCycle), and while the pairing screen is open.
  */
 object Computers {
     const val KIND_COMPUTER = "computer"

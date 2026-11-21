@@ -304,7 +304,7 @@ object ComputersCatalog {
                     ActionItem(
                         id = "computer_last",
                         title = "Last sync",
-                        subtitle = computer.lastLine ?: "Saves sync when a game starts and ends; the library when you sync it here",
+                        subtitle = computer.lastLine ?: "Saves sync when a game starts and ends; the library every few minutes while droidtop is open",
                         value = last ?: "never",
                     ),
                     AsyncActionItem(
@@ -315,7 +315,7 @@ object ComputersCatalog {
                             val entries = libraryGames(ctx) ?: return@AsyncActionItem "The library is still being scanned; try again in a moment"
                             onStatus("Talking to ${computer.name}…")
                             withContext(Dispatchers.IO) { ComputerLibrary.sync(ctx, computer, LibraryCore.library(ctx), entries) }
-                                .also { refreshLibrary(ctx) }
+                                .also { if (it.arrived) refreshLibrary(ctx) }.line
                         },
                     ),
                     ActionItem(
