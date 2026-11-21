@@ -370,8 +370,14 @@ private fun PcGameMenuSheet(
                             onLaunch()
                         }
                         setup != null -> scope.launch {
-                            status = PcRunnerOptions.runAction(context, entry, setup) { line -> status = line }
-                                ?: "Set up. Choose Run once with again to start it that way"
+                            var launched = false
+                            val failure = PcRunnerOptions.runAction(context, entry, setup, onLaunch = {
+                                launched = true
+                                LaunchStrategyOverridePrefs.runOnce(entry.id, option.strategy)
+                                onClose()
+                                onLaunch()
+                            }) { line -> status = line }
+                            if (!launched) status = failure ?: "Set up. Choose Run once with again to start it that way"
                             reloadToken++
                         }
                         else -> status = option.reason ?: "That runner can't start this game yet"
@@ -1080,7 +1086,10 @@ private fun PcGameMenuSheet(
                                 } else if (setupAction != null) {
                                     scope.launch {
                                         status = "Working…"
-                                        val failure = PcRunnerOptions.runAction(context, entry, setupAction) { status = it }
+                                        val failure = PcRunnerOptions.runAction(context, entry, setupAction, onLaunch = {
+                                            onClose()
+                                            onLaunch()
+                                        }) { status = it }
                                         status = failure
                                         reloadToken++
                                     }

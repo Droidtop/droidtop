@@ -72,7 +72,7 @@ class PcRunnerOptionsConsentTest {
         PcRunnerOptions.windowsSetupConsent = { false }
 
         val failure = PcRunnerOptions.runAction(
-            RuntimeEnvironment.getApplication(), entry, RunnerAction.SET_UP_WINDOWS_GAMES,
+            RuntimeEnvironment.getApplication(), entry, RunnerAction.SET_UP_WINDOWS_GAMES, onLaunch = {},
         )
 
         assertNull(failure)
@@ -85,7 +85,7 @@ class PcRunnerOptionsConsentTest {
         PcRunnerOptions.windowsSetupConsent = { true }
 
         val failure = PcRunnerOptions.runAction(
-            RuntimeEnvironment.getApplication(), entry, RunnerAction.SET_UP_WINDOWS_GAMES,
+            RuntimeEnvironment.getApplication(), entry, RunnerAction.SET_UP_WINDOWS_GAMES, onLaunch = {},
         )
 
         assertNull(failure)
@@ -98,7 +98,7 @@ class PcRunnerOptionsConsentTest {
         PcRunnerOptions.windowsSetupConsent = null
 
         val failure = PcRunnerOptions.runAction(
-            RuntimeEnvironment.getApplication(), entry, RunnerAction.SET_UP_WINDOWS_GAMES,
+            RuntimeEnvironment.getApplication(), entry, RunnerAction.SET_UP_WINDOWS_GAMES, onLaunch = {},
         )
 
         assertNull(failure)

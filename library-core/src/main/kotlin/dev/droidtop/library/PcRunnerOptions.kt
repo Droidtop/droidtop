@@ -123,16 +123,28 @@ object PcRunnerOptions {
      * step, a store page for an app droidtop does not bundle. droidtop
      * never side-loads a plugin itself (docs/SPEC.md 7d): it asks
      * enginehost to.
+     *
+     * A missing Enginehost core is got by launching ([onLaunch]): the
+     * contract's LAUNCH with `autoinstallPlugin` is where Enginehost offers
+     * the core from its catalog and then starts the game. Its CONFIGURE
+     * screen is the engine settings and offers no core (console,
+     * dev.3406: "Get Ren'Py 7.6 support" opened Game setup, which read
+     * "Nothing to change: Play runs it as detected").
      */
     suspend fun runAction(
         context: Context,
         entry: LibraryEntry,
         action: RunnerAction,
+        onLaunch: () -> Unit,
         onStatus: (String) -> Unit = {},
     ): String? = when (action) {
         RunnerAction.INSTALL_ENGINEHOST -> openStorePage(context, EngineHost.PACKAGE_NAME)
         RunnerAction.INSTALL_KIRIKIROID2 -> openStorePage(context, Kirikiroid2.PACKAGE_NAME)
-        RunnerAction.INSTALL_ENGINEHOST_PLUGIN, RunnerAction.CHOOSE_ENGINE_VERSION -> configureWithEnginehost(context, entry)
+        RunnerAction.INSTALL_ENGINEHOST_PLUGIN -> {
+            onLaunch()
+            null
+        }
+        RunnerAction.CHOOSE_ENGINE_VERSION -> configureWithEnginehost(context, entry)
         RunnerAction.SET_UP_WINDOWS_GAMES -> {
             val runtime = PcGameRuntimeRegistry.runtime
             when {
@@ -198,7 +210,7 @@ object PcRunnerOptions {
         when {
             runner?.option?.state == RunnerState.READY -> onLaunch()
             setupAction != null -> {
-                val failure = runAction(context, entry, setupAction, onStatus)
+                val failure = runAction(context, entry, setupAction, onLaunch, onStatus)
                 if (failure != null) onFailure(failure)
             }
             else -> onFailure(runner?.option?.reason ?: runners.noRunnerLine)

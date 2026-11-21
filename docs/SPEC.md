@@ -19983,7 +19983,11 @@ open decision, not built.
 
 droidtop routes; enginehost resolves. droidtop reads enginehost's
 capabilities provider to say what is installed, asks enginehost to install
-a missing plugin through enginehost's own configure intent, and links to
+a missing plugin by launching the game (`dev.enginehost.LAUNCH` with
+`autoinstallPlugin`, §7d: Enginehost offers the core from its catalog,
+then starts the game; "Get … support" is that launch), keeps the configure
+intent for engine settings and an engine version droidtop could not tell
+(its Game setup offers no core: console, dev.3406), and links to
 enginehost's own per-engine controller and save screens rather than
 modelling them again. droidtop never side-loads a plugin itself and never
 reimplements an engine's input model.
