@@ -184,7 +184,8 @@ object WineOptions {
     private const val SETUP_ENTRY = "droidtop:setup-defaults"
     private const val WINE_KEY = "wine"
 
-    private const val NOT_HERE = "downloads when used"
+    // What a build not on the device says (owner, 2026-11-20: ""Downloads when used" isn't useful; "Not downloaded" is").
+    private const val NOT_HERE = "Not downloaded"
 
     // Settings rows choose synchronously on the main thread; the write is
     // disk work, so it runs here, and the next read waits for it.
@@ -942,7 +943,7 @@ object WineOptions {
                 fun manifest(type: String): List<ManifestEntry> =
                     ManifestComponentHelper.filterManifestByVariant(availability.manifest.items[type].orEmpty(), "bionic")
                 // Not on the device yet: says so, and names the source when it
-                // is not droidtop's own mirror ("Banners-Turnip, downloads when used").
+                // is not droidtop's own mirror ("Banners-Turnip · Not downloaded").
                 fun versions(base: List<String>, have: List<String>, type: String): List<WineOptionChoice> {
                     val entries = manifest(type)
                     val list = ManifestComponentHelper.buildVersionOptionList(base.map(::bare), have, entries)
@@ -954,7 +955,7 @@ object WineOptions {
                             entry?.source?.takeIf { it != ComponentCatalog.SOURCE_MIRROR }?.let { sourceLabels[it] ?: it },
                             NOT_HERE.takeIf { list.muted[i] },
                         )
-                        WineOptionChoice(list.ids[i], if (note.isEmpty()) label else "$label (${note.joinToString(", ")})")
+                        WineOptionChoice(list.ids[i], if (note.isEmpty()) label else "$label (${note.joinToString(" · ")})")
                     }
                 }
                 val bundledWine = res.getStringArray(R.array.bionic_wine_entries).toList()

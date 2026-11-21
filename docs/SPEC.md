@@ -7785,7 +7785,7 @@ source (now `:runtime-windows`, §9):
     separate piece); the catalog already carries them, marked
     `linux-glibc`, so that engine needs no new source model. The rows offer
     the enabled sources' items, each not on the device yet labelled with its
-    source and "downloads when used"; what a prefix already names is fetched
+    source and "Not downloaded" (owner, 2026-11-20: ""Downloads when used" isn't useful"); what a prefix already names is fetched
     even after its source is turned off. The earlier "More driver builds"
     screen is gone: those builds are ordinary choices of the Driver build row.
   - **Components on this device** (Droidtop/tracker#233; the issue: "a list of

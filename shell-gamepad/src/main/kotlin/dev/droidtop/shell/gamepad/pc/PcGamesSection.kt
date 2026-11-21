@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import dev.droidtop.library.AppCategoryRules
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.needsInstall
 import dev.droidtop.library.RunnerAction
 import dev.droidtop.library.RunnerState
 import dev.droidtop.library.stores.StoreInstallJob
@@ -489,6 +490,10 @@ internal fun PcGamesSection(
         systemsWithGames = loaded.systems
     }
     fun badgeOf(entry: LibraryEntry): KindBadge? = kindBadgeOf(entry, systemNames, origins, badgeStyle, pcRoots.orEmpty())
+    // A search row's line: what the card's badge says and, for an owned game not on the device, that it is not
+    // installed (the owner, 2026-11-20, could not tell from a row reading "Game" that a Steam game was his to install).
+    fun searchLine(entry: LibraryEntry): String =
+        listOfNotNull(badgeOf(entry)?.text, "Not installed".takeIf { entry.needsInstall() }).joinToString(" · ").ifEmpty { "Game" }
     // Home's strip and band (docs/SPEC.md 7i, "Home"; Droidtop/tracker#485 F7a), built off the main thread from what
     // the shell already holds. Only while Home is showing.
     val homeAll = remember(games, others) { games.orEmpty() + others }
@@ -1448,7 +1453,7 @@ internal fun PcGamesSection(
                             onOpenSection(GamingSection.GAMES)
                         }
                     } + homeSearchAll.filter { matchesSearchText(it, q) }.take(SEARCH_GAME_ROWS).map { game ->
-                        LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), badgeOf(game)?.text ?: "Game") {
+                        LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), searchLine(game)) {
                             state.searchOpen = false
                             openPage(game)
                         }
@@ -1473,7 +1478,7 @@ internal fun PcGamesSection(
             localKey = all to consoleNames,
             local = { text ->
                 all.filter { matchesSearchText(it, text) }.take(SEARCH_GAME_ROWS).map { game ->
-                    LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), "Game") { openPage(game) }
+                    LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), searchLine(game)) { openPage(game) }
                 }
             },
             sourceFilter = { result ->
