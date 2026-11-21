@@ -24,7 +24,11 @@ internal object PhantomProcessRow {
             PhantomProcesses.read(TaskManager.shell, sdk, android.os.Process.myUid(), context.packageName)
         }
         val limitText = status.limit?.takeIf { it < PhantomProcesses.LIFTED }?.toString() ?: PhantomProcesses.DEFAULT_LIMIT.toString()
-        val value = if (status.applies) "${status.ours} of $limitText" else "${status.ours}, no limit"
+        val value = when {
+            status.applies -> "${status.ours} of $limitText"
+            status.ours == 0 -> "No limit"
+            else -> "${status.ours} running, no limit"
+        }
         val noShell = if (sdk >= PhantomProcesses.FLAG_SDK) {
             "Android ends extras. Developer options: Disable child process restrictions"
         } else {
