@@ -86,7 +86,8 @@ object ComputerLaunch {
             )
             "not_allowed" -> Outcome(
                 false,
-                "$computer hasn't allowed $handheld to start games. On $computer open droidtop-agent, Settings, Offered, and turn on Starting games here for $handheld.",
+                // Pythia and droidtop-agent both answer here, and droidtop does not know which one runs there.
+                "$computer hasn't let $handheld start games. Allow it there: in Pythia, Devices, Let it start games here; in droidtop-agent, Settings, Offered, Starting games here.",
             )
             "unknown_game" -> Outcome(
                 false,

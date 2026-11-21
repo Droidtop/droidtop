@@ -693,9 +693,11 @@ private fun PcGameMenuSheet(
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val computers = dev.droidtop.net.peer.Computers.list(context)
+                // A computer's own game already streams from it on the menu's first row ("Stream"): only the others.
+                val own = entry.id.takeIf { it.startsWith("computer:") }?.removePrefix("computer:")?.substringBefore(':')
                 dev.droidtop.library.computers.ComputerLaunch.order(
                     dev.droidtop.library.computers.ComputerLibrary.computersWith(context, streamKey, computers),
-                )
+                ).filter { it.id != own }
             }.getOrNull().orEmpty()
         }
     }
@@ -1080,7 +1082,7 @@ private fun PcGameMenuSheet(
                                     }
                                 } else if (playState.chooseEngine) {
                                     if (engineChoice.folder != null) pickingEngine = true else status = "No game folder to pick an engine for"
-                                } else if (isReady) {
+                                } else if (isReady || playState.ready) {
                                     onClose()
                                     onLaunch()
                                 } else if (setupAction != null) {

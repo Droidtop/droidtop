@@ -18915,6 +18915,14 @@ Deck's library tabs are the better shape.
 
 ### The game page
 
+**The button is worked out again on coming back (owner, 2026-11-21: "Better
+UX").** The page asks for the game's runner when it opens, when a Windows
+setup starts or ends, and when droidtop comes back to the front after the
+screen was left (`rememberPcPlayState`). On the console (dev.3411) Projekt:
+Passion's page stayed on "Get Ren'Py 7.6 support" after the launch had got the
+core and the game had run; reopened, it read "Starts now on Enginehost
+(Ren'Py)".
+
 **Which copy the button acts on (Droidtop/tracker#397 slice H).** A card can
 stand for several copies (a Steam row and a GOG row of one game, a GOG offline
 install and the account's row). Highest first, its button acts on: an
@@ -23990,6 +23998,13 @@ owner's Sandustry from his Windows desktop to the Retroid Pocket 5.
   library (`COMPUTER_GAME`, "On <computer>") does the same for that computer,
   Steam games included: they no longer only point at Steam Link.
   "Stream with Steam Link" stays in a Steam game's menu as Steam's own way.
+- **A computer's own game says Stream** (owner, 2026-11-21: "Better UX").
+  Its page's one button and its menu's first row read "Stream", "Starts it on
+  <computer> and shows it here", and A streams it, never "Choose a runner" for
+  a folder this device does not have (`computerPlayState`). Its menu lists
+  "Stream from" only for the other computers that have it. A store id on it
+  is for matching: it is not this device's store row, so it offers no Install
+  (`isStoreRow`).
 - **One path.** `ComputerLaunch.stream` (`:library-core`) sends `launch_game`
   with `stream {via: windowcast, viewer}`, words the answer as every launch is
   worded, and opens the stream screen (`RemoteStreamActivity`, 7a) at the
@@ -24007,7 +24022,9 @@ owner's Sandustry from his Windows desktop to the Retroid Pocket 5.
   not state the `stream` feature (too old, or not on Windows) is not asked to
   start anything: the line says the computer cannot stream yet and to update
   droidtop-agent there. A computer that has not allowed this device names
-  the agent's place for it: Settings, Offered, Starting games here.
+  both places for it, since droidtop does not know which program answers:
+  Pythia's Devices, Let it start games here, and droidtop-agent's Settings,
+  Offered, Starting games here.
 - **Not built:** streaming from away (the stream travels on the home network
   only), a computer other than Windows, and showing only the game's own
   windows (droidtop-agent DESIGN section 22).

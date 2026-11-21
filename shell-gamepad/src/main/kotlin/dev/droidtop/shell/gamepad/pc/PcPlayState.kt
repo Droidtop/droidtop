@@ -9,6 +9,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.LibraryEntry
@@ -102,7 +108,9 @@ internal fun LibraryEntry.storeLabel(): String? = (dev.droidtop.library.PcSource
 
 /** Whether a store owns this row: it carries a store's id and is not a folder or a Wine shortcut. */
 internal fun LibraryEntry.isStoreRow(): Boolean =
-    dev.droidtop.library.PcSource.storeIdOf(pcInfo?.storeId) != null
+    // A computer's game keeps its store id to be matched, but it is that computer's: this device's own store row of the
+    // same game is a row of its own.
+    kind != dev.droidtop.library.LibraryEntryKind.COMPUTER_GAME && dev.droidtop.library.PcSource.storeIdOf(pcInfo?.storeId) != null
 
 /** The store id an entry's live download is filed under, or null for a game no store owns. */
 internal fun LibraryEntry.downloadKey(): String? = pcInfo?.storeId
@@ -182,6 +190,10 @@ internal fun playStateOf(
     if (entry.missing) {
         return PcPlayState("Folder is missing", missingFolderLine(entry), pressable = false, ready = false)
     }
+    // A game only on one of the person's computers streams from there (docs/SPEC.md 7o): its page says so on its one
+    // button, and A opens it the way the library does (ComputerEntriesProvider.launch), not a runner picker for a
+    // folder this device does not have.
+    if (entry.kind == dev.droidtop.library.LibraryEntryKind.COMPUTER_GAME) return computerPlayState(entry)
     storeStageOf(entry, download)?.let { return storePlayState(it, entry, download) }
     // A GOG installer in a games folder: A installs it, whatever runs the game afterwards (docs/SPEC.md 7g).
     entry.pcInfo?.installer?.let { return installerPlayState(it) }
@@ -204,6 +216,13 @@ internal fun playStateOf(
         else ->
             PcPlayState("Choose a runner", option?.reason ?: noRunnerLine, pressable = true, ready = false, chooseEngine = true)
     }
+}
+
+/** A computer's game: "Stream", starting it on that computer and showing it here. Pure. */
+internal fun computerPlayState(entry: LibraryEntry): PcPlayState {
+    val computerId = entry.id.removePrefix("computer:").substringBefore(':')
+    val name = dev.droidtop.library.PcSource.computerNames[computerId] ?: "your computer"
+    return PcPlayState("Stream", "Starts it on $name and shows it here", pressable = true, ready = true)
 }
 
 /**
@@ -260,7 +279,19 @@ internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, Resolve
     // page stayed on "Set up Windows games" after it finished because nothing
     // re-asked (Droidtop/tracker#300). Progress lines do not re-ask.
     val setupRunning = windowsSetup is WindowsSetup.State.Installing
-    val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id, setupRunning) {
+    // And again on coming back to droidtop: what a launch did while the page waited (Enginehost got the core it
+    // needed, a runner was set up) shows, where the page stayed on "Get Ren'Py 7.6 support" after the game had run
+    // (console, dev.3411). Only after the screen was left, not for the resume that opened it.
+    var left by remember { mutableStateOf(false) }
+    var returns by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { left = true }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (left) {
+            left = false
+            returns++
+        }
+    }
+    val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id, setupRunning, returns) {
         // Keep the last answer on screen while it is re-asked after a setup, so the button does not flash.
         if (!value.first) value = Triple(false, null, null)
         val (runner, line) = withContext(Dispatchers.IO) {
