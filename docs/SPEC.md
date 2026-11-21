@@ -5455,6 +5455,9 @@ a close path of its own. Every call works off the main thread.
   Kill and Quit left RetroArch's pid unchanged and nothing anywhere said why). The Game tab and the Now card show
   "Ending <game>…" at once, then nothing when it ended or the reason where it was pressed, as well as on the
   banner; after 15 s without an outcome they say it has not ended yet, and the stop goes on.
+- **The running game is the app used last (owner, 2026-11-20).** "The "running game" is just the most recently
+  used application": an Android app such as Syncthing-Fork, launched last, is shown and offered as the running game
+  (Resume, the L2 sheet) like any game, by design (Droidtop/tracker#957, closed).
 - **The running game's session ends in one place** (`SessionMonitor`, `SessionLiveness`, Droidtop/tracker#289,
   #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, the running game's L2 sheet,
   companion Game tab and Now card, keep-awake) follows it and none polls for itself. `SessionMonitor` looks
@@ -7775,11 +7778,13 @@ source (now `:runtime-windows`, §9):
       app) and, once the owner provisions a catalog key, a signature the app
       checks against its pinned master key (§9).
   - **Sources are options with defaults.** "Wine builds and sources" under
-    Wine and graphics turns each source on or off. On by default:
-    droidtop's mirror, droidtop's Wine builds, Banners-Turnip and WinNative
-    (the Turnip feeds droidtop already offered). Off until chosen: K11MCH1's
-    drivers, The412Banner's winlator-contents and Arihany's WinlatorWCPHub
-    (bionic `.wcp` feeds). Listed but not available: GE-Proton,
+    Wine and graphics turns each source on or off. Every source is on by default
+    (owner, 2026-11-20: "Yes, turn all the Wine sources on by default", so every
+    downloadable Wine and Proton build can be chosen in the Wine build row): droidtop's
+    mirror, droidtop's Wine builds, Banners-Turnip, WinNative, K11MCH1's drivers,
+    The412Banner's winlator-contents and Arihany's WinlatorWCPHub. The default is the
+    catalog's (`defaultEnabled` in droidtop-components' `sources/feeds.json`); a source
+    the person turned on or off keeps that choice. Listed but not available: GE-Proton,
     proton-cachyos, Kron4ek's builds and Steam's Proton, which are Linux
     (glibc) builds that need a Linux engine (the DroidDeck Proton layer, a
     separate piece); the catalog already carries them, marked
