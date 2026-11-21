@@ -249,6 +249,10 @@ internal object SteamDownload {
         // The downloader sends every event from its own coroutine, so they arrive at once and out of order.
         private val progress = DepotProgress()
 
+        /** Whether content has started to arrive; from then on the row reads [DepotProgress.DOWNLOADING]. */
+        @Volatile
+        private var receiving = false
+
         @Volatile
         var failure: Throwable? = null
             private set
@@ -259,7 +263,7 @@ internal object SteamDownload {
         override fun onItemAdded(item: DownloadItem) {}
 
         override fun onDownloadStarted(item: DownloadItem) {
-            info.updateStatusMessage("Downloading")
+            info.updateStatusMessage(DepotProgress.DOWNLOADING)
         }
 
         override fun onDownloadCompleted(item: DownloadItem) {
@@ -276,6 +280,9 @@ internal object SteamDownload {
         override fun onStatusUpdate(message: String) {
             // The phase, not the file: one line per file ("Allocating file: <name>") changed the row thousands of
             // times while the files were being prepared.
+            // Once content arrives the row says so: the downloader allocates each file and queues its chunks before
+            // the next, so its "Allocating file" lines keep coming between the chunks.
+            if (receiving) return
             val phase = DepotProgress.phaseOf(message)
             if (phase != info.getCurrentStatusMessage()) info.updateStatusMessage(phase)
         }
@@ -290,7 +297,13 @@ internal object SteamDownload {
 
         private fun record(depotId: Int, fraction: Float, soFar: Long) {
             val step = progress.record(depotId, fraction, soFar)
-            if (step.newBytes > 0L) info.updateBytesDownloaded(step.newBytes, System.currentTimeMillis())
+            if (step.newBytes > 0L) {
+                info.updateBytesDownloaded(step.newBytes, System.currentTimeMillis())
+                // The downloader names no phase for content, so the row kept the last one it did name
+                // ("About 5 min left · Allocating files" while 3 GB came down; console, dev.3406).
+                receiving = true
+                if (info.getCurrentStatusMessage() != DepotProgress.DOWNLOADING) info.updateStatusMessage(DepotProgress.DOWNLOADING)
+            }
             if (step.moved) depotIndex[depotId]?.let { info.setProgress(step.fraction, it) }
             info.persistProgressSnapshot()
         }
@@ -322,9 +335,16 @@ internal class DepotProgress {
     }
 
     companion object {
-        /** The phase a downloader status line names, without the file it is on ("Allocating file: a.dll" is "Allocating files"). */
+        /** The row's status while content arrives. */
+        const val DOWNLOADING = "Downloading"
+
+        /**
+         * The phase a downloader status line names, without the file or depot it is on ("Allocating file: a.dll" is
+         * "Allocating files"; "Downloading manifest for depot 2173801" is "Downloading manifest", which the row had cut
+         * to "Downloading manifest for…").
+         */
         fun phaseOf(message: String): String {
-            val phase = message.substringBefore(':').trim()
+            val phase = message.substringBefore(':').substringBefore(" for depot ").trim()
             return when {
                 phase.isEmpty() -> message.trim()
                 phase.endsWith(" file") -> phase + "s"
