@@ -59,6 +59,8 @@ object EnginehostCapabilities {
         val supportedVersions: List<String>,
         val supportedSeries: List<String>,
         val origin: String?,
+        /** Inclusive `{min, max}` ranges, as Enginehost's `VersionRange.contains` reads them. */
+        val supportedRanges: List<Pair<String, String>> = emptyList(),
     )
 
     fun installedBundles(context: Context): List<InstalledBundle> = runCatching {
@@ -77,13 +79,12 @@ object EnginehostCapabilities {
                     pluginVersion = str("pluginVersion"),
                     runtimeVersion = str("runtimeVersion"),
                     supportedVersions = jsonStrings(str("supportedVersions")),
-                    // supportedRanges exists in the schema; series is the
-                    // form the responses describe for real bundles (the
-                    // 8.2/8.3 Ren'Py lines). Ranges parse into the same
-                    // list until a real bundle ships one to verify the
-                    // shape against.
-                    supportedSeries = jsonStrings(str("supportedSeries")) + jsonStrings(str("supportedRanges")),
+                    supportedSeries = jsonStrings(str("supportedSeries")),
                     origin = str("origin"),
+                    // Objects, not strings (Enginehost CapabilityProvider: {"min", "max"}): read as strings they
+                    // became series like "{"min":...}" that matched nothing, so a core described by a range was
+                    // never counted as covering its games.
+                    supportedRanges = jsonRanges(str("supportedRanges")),
                 )
             }
         }
@@ -120,6 +121,17 @@ object EnginehostCapabilities {
             }
             .distinctBy { it.engineContext to it.engineVersion }
 
+    private fun jsonRanges(raw: String?): List<Pair<String, String>> = runCatching {
+        if (raw.isNullOrBlank()) return emptyList()
+        val array = JSONArray(raw)
+        (0 until array.length()).mapNotNull { i ->
+            val range = array.optJSONObject(i) ?: return@mapNotNull null
+            val min = range.optString("min").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val max = range.optString("max").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            min to max
+        }
+    }.getOrDefault(emptyList())
+
     private fun jsonStrings(raw: String?): List<String> = runCatching {
         if (raw.isNullOrBlank()) return emptyList()
         val array = JSONArray(raw)
@@ -138,8 +150,14 @@ object EnginehostCapabilities {
         ) return false
         if (version == null) return true
         if (bundle.supportedVersions.any { it == version }) return true
+        if (bundle.supportedRanges.any { (min, max) -> rangeCovers(min, max, version) }) return true
         return bundle.supportedSeries.any { seriesCovers(it, version) }
     }
+
+    /** Whether [version] lies in the inclusive range [min]..[max], compared as droidtop compares versions. */
+    fun rangeCovers(min: String, max: String, version: String): Boolean =
+        dev.droidtop.shared.version.Versions.compareLoose(min, version) <= 0 &&
+            dev.droidtop.shared.version.Versions.compareLoose(version, max) <= 0
 
     /**
      * The series rule, exactly as specified: "8.2" covers every `8.2.*`
