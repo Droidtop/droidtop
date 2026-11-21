@@ -35,6 +35,10 @@
 -keep class dev.droidtop.pluginhost.** { *; }
 -keep class dev.droidtop.app.vpn.TunnelNative { *; }
 -keep class org.pocketworkstation.pckeyboard.** { *; }
+# apksig checks the signature of an app that carries a plugin (AppInterfaces). Its
+# ASN.1 reader fills certificate and signer classes field by field through
+# reflection, so a field nothing in its code writes is not unused.
+-keep class com.android.apksig.** { *; }
 # Started by name through the elevated helper (app_process), never called from
 # droidtop's own code (AddonKeyboardHost, docs/SPEC.md 4c).
 -keep class dev.droidtop.app.ImePolicyTool { public static void main(java.lang.String[]); }

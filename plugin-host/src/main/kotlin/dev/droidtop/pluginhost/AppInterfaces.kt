@@ -238,13 +238,22 @@ object AppInterfaces {
                     }.getOrNull(),
                 )
             }
+            // A refusal names why in the log: "could not be checked" alone left Enginehost turned off on the console
+            // with nothing to say what apksig objected to.
+            if (!result.isVerified) {
+                val errors = result.errors + result.v2SchemeSigners.flatMap { it.errors } + result.v3SchemeSigners.flatMap { it.errors }
+                android.util.Log.w(TAG, "$apk did not verify: ${errors.take(5).joinToString("; ")}")
+            }
             AppInterfaceTrust.ApkCheck(
                 verified = result.isVerified,
                 v2OrV3 = result.isVerifiedUsingV2Scheme || result.isVerifiedUsingV3Scheme,
                 signers = result.signerCertificates.map { Sha256.hex(it.encoded) }.toSet(),
             )
         }
-    }.getOrElse { AppInterfaceTrust.ApkCheck(verified = false, v2OrV3 = false, signers = emptySet()) }
+    }.getOrElse { error ->
+        android.util.Log.w(TAG, "$apk could not be checked", error)
+        AppInterfaceTrust.ApkCheck(verified = false, v2OrV3 = false, signers = emptySet())
+    }
 
     /** The largest manifest asset read: a manifest is a few kilobytes. */
     private const val MAX_MANIFEST_BYTES = 256L * 1024
