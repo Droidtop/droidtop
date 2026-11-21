@@ -2875,7 +2875,9 @@ exist:
   `installed: false` and its `availableVersion`. Reads only: answering
   never fetches anything, and `catalogCheckedAtMs` (0: never) says how
   old the catalog part is. droidtop keeps at most 200 cores per app.
-- **When:** at droidtop's start, when the app connects through the door,
+- **When:** once droidtop's plugin host has started (after it switches
+  back on the plugins an older build turned off, so a plugin that build
+  disabled is asked too), when the app connects through the door,
   after each `engines report_changed`, and when the app is installed or
   updated (droidtop's package watch). Never on a timer. The last answer
   is kept in droidtop's files, so a decision made before the app connects

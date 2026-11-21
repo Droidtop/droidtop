@@ -84,7 +84,7 @@ internal object Seams {
             records = { LibraryCore.records(app) },
         )
         // `engines.cores` (docs/plugin-api.md 3 A7b, Droidtop/tracker#752): what Enginehost can run or get decides a game's
-        // runner, so its list is asked at start, when its app connects through the door and when it says the list changed.
+        // runner, so its list is asked once the plugin host has started (PluginHostStart), when its app connects through the door and when it says the list changed.
         dev.droidtop.pluginhost.PluginBrokers.enginesChanged = { pluginId ->
             dev.droidtop.library.integrations.EngineCoreList.changed(app, pluginId)
         }

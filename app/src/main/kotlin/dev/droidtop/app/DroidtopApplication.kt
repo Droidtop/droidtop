@@ -151,8 +151,6 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // The plugin host starts after droidtop, by droidtop (Droidtop/tracker#775): PluginHostStart, once droidtop's
         // first screen has drawn, or a little after a start with no screen. Nothing above or below needs it.
         PluginHostStart.armAfterStart(this)
-        // What Enginehost can run decides a game's runner: its list is asked at start (docs/plugin-api.md 3 A7b).
-        dev.droidtop.library.integrations.EngineCoreList.refreshAll(this)
         // The library goes to and from the paired computers by itself (docs/SPEC.md 7o, "When the library syncs").
         dev.droidtop.library.computers.ComputerLibraryCycle.install(this) { LibraryCore.library(it) }
         // The task manager asks one privileged shell to force-stop an app and to read the system's task list:

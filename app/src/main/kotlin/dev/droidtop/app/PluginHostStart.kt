@@ -60,6 +60,10 @@ object PluginHostStart {
                 // One disabled by a check that ran mid-update, before installs were atomic, comes back once it verifies.
                 dev.droidtop.pluginhost.PluginStore.recoverVerified(app)
             }
+            // What Enginehost can run decides a game's runner (docs/plugin-api.md 3 A7b): its list is asked once the
+            // retry above has switched back on what an older build turned off. Asked earlier, at droidtop's start, it
+            // found Enginehost still off and nothing asked again (console, dev.3412: Enginehost on, no engine-cores.json).
+            step("engine cores") { dev.droidtop.library.integrations.EngineCoreList.refreshAll(app) }
             // Plugins in every mode (docs/plugin-api.md 1.9): "Plugins" on Standard's home-screen menu.
             step("standard hooks") { dev.droidtop.library.integrations.PluginStandardHooks.install(app) }
             // The plugin services and schedules the person switched on (E8, E9).
