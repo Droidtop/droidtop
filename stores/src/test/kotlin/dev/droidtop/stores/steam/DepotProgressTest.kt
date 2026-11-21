@@ -35,6 +35,7 @@ class DepotProgressTest {
         assertEquals("Allocating files", DepotProgress.phaseOf("Allocating file: bin/game.exe"))
         assertEquals("Validating", DepotProgress.phaseOf("Validating: data/a.pak"))
         assertEquals("Downloading manifest", DepotProgress.phaseOf("Downloading manifest"))
+        assertEquals("Downloading manifest", DepotProgress.phaseOf("Downloading manifest for depot 2173801"))
     }
 }
 
@@ -56,12 +57,30 @@ class SteamDownloadListenerTest {
     @Test
     fun `progress reaches the job only when a depot moves forward`() {
         val info = dev.droidtop.stores.data.DownloadInfo(jobCount = 1, gameId = 1, downloadingAppIds = java.util.concurrent.CopyOnWriteArrayList())
+        val listener = SteamDownload.Listener(info, mapOf(10 to 0))
+        // As a download starts: the row already reads Downloading, so the chunks change no status (a status change
+        // reports the progress too).
+        listener.onDownloadStarted(
+            `in`.dragonbra.javasteam.depotdownloader.data.AppItem(1, installDirectory = "/nowhere", depot = listOf(10), branch = "public", branchPassword = null),
+        )
         val seen = mutableListOf<Float>()
         info.addProgressListener { seen += it }
-        val listener = SteamDownload.Listener(info, mapOf(10 to 0))
         listener.onChunkCompleted(10, 0.4f, 400, 800)
         listener.onChunkCompleted(10, 0.2f, 200, 400)
         listener.onChunkCompleted(10, 0.6f, 600, 1200)
         assertEquals(listOf(0.4f, 0.6f), seen)
+    }
+
+    @Test
+    fun `content arriving after the files are allocated reads Downloading`() {
+        val info = dev.droidtop.stores.data.DownloadInfo(jobCount = 1, gameId = 1, downloadingAppIds = java.util.concurrent.CopyOnWriteArrayList())
+        val listener = SteamDownload.Listener(info, mapOf(10 to 0))
+        listener.onStatusUpdate("Allocating file: game/images.rpa")
+        assertEquals("Allocating files", info.getCurrentStatusMessage())
+        listener.onChunkCompleted(10, 0.1f, 100, 200)
+        assertEquals("Downloading", info.getCurrentStatusMessage())
+        // The next file's allocation comes between chunks; the row stays on Downloading.
+        listener.onStatusUpdate("Allocating file: game/audio.rpa")
+        assertEquals("Downloading", info.getCurrentStatusMessage())
     }
 }
