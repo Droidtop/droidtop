@@ -11,7 +11,9 @@ import `in`.dragonbra.javasteam.steam.handlers.steamapps.PICSRequest
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.SteamApps
 import dev.droidtop.runtime.util.runCatchingCancellable
 import java.util.EnumSet
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 /**
@@ -238,16 +240,26 @@ internal object SteamLibrarySync {
         for (chunk in appIds.map { PICSRequest(id = it, accessToken = tokens[it] ?: 0L) }.chunked(PICS_CHUNK)) {
             val answer = apps.picsGetProductInfo(apps = chunk, packages = emptyList()).await()
             for (result in answer.results) {
-                val changed = result.apps.values.mapNotNull { info ->
+                val changed = ArrayList<SteamApp>()
+                var empty = 0
+                for (info in result.apps.values) {
                     val known = db.apps().find(info.id)
-                    if (known != null && known.receivedPICS && known.lastChangeNumber == info.changeNumber) return@mapNotNull null
-                    SteamPics.appFrom(info.keyValues).copy(
+                    // A row read before at this change number stands, unless it holds no product info at all.
+                    if (known != null && known.receivedPICS && known.lastChangeNumber == info.changeNumber && !SteamPics.isPlaceholder(known)) continue
+                    // A large answer is a file to fetch; none at all is stored as nothing, to be asked again.
+                    val kv = withContext(Dispatchers.IO) { SteamPics.keyValuesOf(info) }
+                    if (kv == null) {
+                        empty++
+                        continue
+                    }
+                    changed += SteamPics.appFrom(kv).copy(
                         id = info.id,
                         packageId = known?.packageId ?: SteamIds.INVALID_PKG_ID,
                         receivedPICS = true,
                         lastChangeNumber = info.changeNumber,
                     )
                 }
+                if (empty > 0) Timber.tag(TAG).w("Steam sent no product info for $empty apps; asked again next sync")
                 if (changed.isNotEmpty()) db.withTransaction { db.apps().insertAll(changed) }
             }
         }
@@ -267,7 +279,8 @@ internal object SteamLibrarySync {
             apps.picsGetProductInfo(apps = listOf(PICSRequest(id = appId, accessToken = token)), packages = emptyList()).await()
                 .results.firstNotNullOfOrNull { it.apps[appId] }
         }.onFailure { Timber.tag(TAG).w(it, "Steam did not answer for app $appId") }.getOrNull() ?: return known
-        val fresh = SteamPics.appFrom(info.keyValues).copy(
+        val kv = withContext(Dispatchers.IO) { SteamPics.keyValuesOf(info) } ?: return known
+        val fresh = SteamPics.appFrom(kv).copy(
             id = appId,
             packageId = known?.packageId ?: SteamIds.INVALID_PKG_ID,
             receivedPICS = true,
@@ -275,7 +288,7 @@ internal object SteamLibrarySync {
         )
         db.apps().insert(fresh)
         // Where the game keeps its cloud saves is read from the same answer, for the save sync.
-        runCatchingCancellable { onUfs(SteamUfsParser.parse(info.keyValues)) }.onFailure { Timber.tag(TAG).w(it, "Could not read the save locations of app $appId") }
+        runCatchingCancellable { onUfs(SteamUfsParser.parse(kv)) }.onFailure { Timber.tag(TAG).w(it, "Could not read the save locations of app $appId") }
         return fresh
     }
 }

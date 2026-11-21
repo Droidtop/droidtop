@@ -1,7 +1,11 @@
 package dev.droidtop.stores.steam
 
+import dev.droidtop.net.Http
+import `in`.dragonbra.javasteam.steam.handlers.steamapps.PICSProductInfo
 import `in`.dragonbra.javasteam.types.KeyValue
+import java.io.ByteArrayInputStream
 import java.util.Date
+import java.util.zip.GZIPInputStream
 
 /**
  * An app's product info (PICS) as a [SteamApp] row: GameNative's
@@ -9,6 +13,44 @@ import java.util.Date
  * keeping the fields droidtop stores, plus each launch entry's arguments.
  */
 internal object SteamPics {
+    /**
+     * [info]'s key-values. Steam sends a large app's product info only as a file on its content servers
+     * ([PICSProductInfo.isUseHttp]: [PICSProductInfo.keyValues] is empty and [PICSProductInfo.httpUri] names the
+     * file), which is read here. Null when Steam sent none (a missing access token, or the file could not be read),
+     * so the caller stores nothing and asks again on the next sync. Before this, such answers were stored as rows
+     * with no name and no type, marked read at Steam's change number and never asked for again: on the console,
+     * 1,150 of the 1,436 games Steam lists as owned, so the library listed 272 (Droidtop/tracker#956).
+     * Blocking: off the main thread.
+     */
+    fun keyValuesOf(info: PICSProductInfo, fetch: (String) -> ByteArray = ::fetchAppInfo): KeyValue? {
+        if (info.keyValues.children.isNotEmpty()) return info.keyValues
+        val uri = info.httpUri?.toString() ?: return null
+        return runCatching { appInfoFile(fetch(uri)) }.getOrNull()
+    }
+
+    /**
+     * The key-values in an appinfo file from Steam's content servers (gzip text, or plain text when it came
+     * already decoded), null when it holds none. A trailing NUL is dropped, as JavaSteam drops it from an inline
+     * answer.
+     */
+    fun appInfoFile(bytes: ByteArray): KeyValue? {
+        val gzip = bytes.size > 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()
+        val text = if (gzip) GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readBytes() } else bytes
+        var end = text.size
+        while (end > 0 && text[end - 1] == 0.toByte()) end--
+        val kv = KeyValue()
+        if (!ByteArrayInputStream(text, 0, end).use { kv.readAsText(it) }) return null
+        return kv.takeIf { it.children.isNotEmpty() }
+    }
+
+    private fun fetchAppInfo(url: String): ByteArray = Http.get(url, maxBytes = 32L * 1024 * 1024).body
+
+    /**
+     * A row stored from an answer that carried no product info: no name and no type. It is read again whatever
+     * its change number says, which heals the rows [keyValuesOf] would not have stored.
+     */
+    fun isPlaceholder(app: SteamApp): Boolean = app.type == AppType.invalid && app.name.isBlank()
+
     fun appFrom(kv: KeyValue): SteamApp = SteamApp(
         id = kv["appid"].asInteger(SteamIds.INVALID_APP_ID),
         depots = kv["depots"].children

@@ -67,7 +67,7 @@ internal class SteamPluginAccount(private val context: Context, private val stor
             val appFacts = HashMap<Int, Map<String, String>>()
             val packageFacts = HashMap<Int, Map<String, String>>()
             for (result in answer.results) {
-                result.apps.forEach { (id, info) -> appFacts[id] = flatten(info.keyValues) }
+                result.apps.forEach { (id, info) -> appFacts[id] = flatten(SteamPics.keyValuesOf(info) ?: info.keyValues) }
                 result.packages.forEach { (id, info) -> packageFacts[id] = flatten(info.keyValues) }
             }
             SteamAccount.ProductInfo(appFacts, packageFacts)
