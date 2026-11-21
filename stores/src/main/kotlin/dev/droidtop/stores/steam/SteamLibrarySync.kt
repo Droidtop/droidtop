@@ -237,48 +237,71 @@ internal object SteamLibrarySync {
                 .onSuccess { tokens.putAll(it) }
                 .onFailure { Timber.tag(TAG).w(it, "Steam gave no access tokens for ${chunk.size} apps") }
         }
-        for (chunk in appIds.map { PICSRequest(id = it, accessToken = tokens[it] ?: 0L) }.chunked(PICS_CHUNK)) {
-            val answer = apps.picsGetProductInfo(apps = chunk, packages = emptyList()).await()
-            for (result in answer.results) {
-                val changed = ArrayList<SteamApp>()
-                var empty = 0
-                // Why Steam sent nothing, counted, with a few app ids (Droidtop/tracker#956: on the console about
-                // 3,000 apps came back with neither key-values nor a file address, for no visible reason).
-                var missingToken = 0
-                var noSha = 0
-                var noHost = 0
-                val sample = ArrayList<Int>()
-                for (info in result.apps.values) {
-                    val known = db.apps().find(info.id)
-                    // A row read before at this change number stands, unless it holds no product info at all.
-                    if (known != null && known.receivedPICS && known.lastChangeNumber == info.changeNumber && !SteamPics.isPlaceholder(known)) continue
-                    // A large answer is a file to fetch; none at all is stored as nothing, to be asked again.
-                    val kv = withContext(Dispatchers.IO) { SteamPics.keyValuesOf(info) }
-                    if (kv == null) {
-                        empty++
-                        if (info.isMissingToken) missingToken++
-                        if (info.shaHash == null || info.shaHash!!.isEmpty()) noSha++ else if (info.httpUri == null) noHost++
-                        if (sample.size < 5) sample += info.id
-                        continue
-                    }
-                    changed += SteamPics.appFrom(kv).copy(
-                        id = info.id,
-                        packageId = known?.packageId ?: SteamIds.INVALID_PKG_ID,
-                        receivedPICS = true,
-                        lastChangeNumber = info.changeNumber,
-                    )
+        val requests = appIds.map { PICSRequest(id = it, accessToken = tokens[it] ?: 0L) }
+        // Steam leaves a large app's product info out of a full answer (a sha, no key-values, no HTTP host), and
+        // sends its file's host only to a metadata-only request (SteamKit2's PICSProductInfo: HTTP is available
+        // when the response is meta_data_only with an http_min_size). So the apps a full request left empty are
+        // asked again metadata-only, and their files are fetched (SteamPics.keyValuesOf). Droidtop/tracker#956:
+        // on the console every one of about 3,000 empty answers had a sha and no host.
+        val empty = ArrayList<PICSRequest>()
+        for (chunk in requests.chunked(PICS_CHUNK)) empty += storeAnswers(db, apps, chunk, metaDataOnly = false, report = false)
+        for (chunk in empty.chunked(PICS_CHUNK)) storeAnswers(db, apps, chunk, metaDataOnly = true, report = true)
+    }
+
+    /**
+     * Asks Steam for [chunk]'s product info and stores every app whose answer holds it; returns the requests whose
+     * answer held none (stored as nothing, so they are asked again). With [report], what stayed empty is counted
+     * by reason in scan.log.
+     */
+    private suspend fun storeAnswers(
+        db: SteamDatabase,
+        apps: SteamApps,
+        chunk: List<PICSRequest>,
+        metaDataOnly: Boolean,
+        report: Boolean,
+    ): List<PICSRequest> {
+        val byId = chunk.associateBy { it.id }
+        val left = ArrayList<PICSRequest>()
+        val answer = apps.picsGetProductInfo(apps = chunk, packages = emptyList(), metaDataOnly = metaDataOnly).await()
+        for (result in answer.results) {
+            val changed = ArrayList<SteamApp>()
+            var emptyHere = 0
+            var missingToken = 0
+            var noSha = 0
+            var noHost = 0
+            val sample = ArrayList<Int>()
+            for (info in result.apps.values) {
+                val known = db.apps().find(info.id)
+                // A row read before at this change number stands, unless it holds no product info at all.
+                if (known != null && known.receivedPICS && known.lastChangeNumber == info.changeNumber && !SteamPics.isPlaceholder(known)) continue
+                // A large answer is a file to fetch; none at all is stored as nothing, to be asked again.
+                val kv = withContext(Dispatchers.IO) { SteamPics.keyValuesOf(info) }
+                if (kv == null) {
+                    emptyHere++
+                    byId[info.id]?.let { left += it }
+                    if (info.isMissingToken) missingToken++
+                    if (info.shaHash == null || info.shaHash!!.isEmpty()) noSha++ else if (info.httpUri == null) noHost++
+                    if (sample.size < 5) sample += info.id
+                    continue
                 }
-                if (empty > 0) {
-                    val tokened = chunk.count { it.accessToken != 0L }
-                    val line = "steam pics: no product info for $empty of ${result.apps.size} apps (missing token $missingToken, " +
-                        "no sha $noSha, sha but no http host $noHost, metadata only ${result.isMetaDataOnly}, unknown " +
-                        "${result.unknownApps.size}, tokens sent $tokened of ${chunk.size}; e.g. ${sample.joinToString()}); asked again next sync"
-                    ScanLog.write(line)
-                    Timber.tag(TAG).w(line)
-                }
-                if (changed.isNotEmpty()) db.withTransaction { db.apps().insertAll(changed) }
+                changed += SteamPics.appFrom(kv).copy(
+                    id = info.id,
+                    packageId = known?.packageId ?: SteamIds.INVALID_PKG_ID,
+                    receivedPICS = true,
+                    lastChangeNumber = info.changeNumber,
+                )
             }
+            if (report && emptyHere > 0) {
+                val tokened = chunk.count { it.accessToken != 0L }
+                val line = "steam pics: no product info for $emptyHere of ${result.apps.size} apps (missing token $missingToken, " +
+                    "no sha $noSha, sha but no http host $noHost, metadata only ${result.isMetaDataOnly}, unknown " +
+                    "${result.unknownApps.size}, tokens sent $tokened of ${chunk.size}; e.g. ${sample.joinToString()}); asked again next sync"
+                ScanLog.write(line)
+                Timber.tag(TAG).w(line)
+            }
+            if (changed.isNotEmpty()) db.withTransaction { db.apps().insertAll(changed) }
         }
+        return left
     }
 
     /**
@@ -291,11 +314,17 @@ internal object SteamLibrarySync {
         val known = db.apps().find(appId)
         val token = runCatchingCancellable { apps.picsGetAccessTokens(appIds = listOf(appId), packageIds = emptyList()).await().appTokens[appId] }
             .getOrNull() ?: 0L
-        val info = runCatchingCancellable {
-            apps.picsGetProductInfo(apps = listOf(PICSRequest(id = appId, accessToken = token)), packages = emptyList()).await()
+        suspend fun ask(metaDataOnly: Boolean) = runCatchingCancellable {
+            apps.picsGetProductInfo(listOf(PICSRequest(id = appId, accessToken = token)), emptyList(), metaDataOnly).await()
                 .results.firstNotNullOfOrNull { it.apps[appId] }
-        }.onFailure { Timber.tag(TAG).w(it, "Steam did not answer for app $appId") }.getOrNull() ?: return known
-        val kv = withContext(Dispatchers.IO) { SteamPics.keyValuesOf(info) } ?: return known
+        }.onFailure { Timber.tag(TAG).w(it, "Steam did not answer for app $appId") }.getOrNull()
+        // A large app's full answer is empty; its metadata-only answer names the file to fetch (as readApps).
+        var info = ask(metaDataOnly = false) ?: return known
+        var kv = withContext(Dispatchers.IO) { SteamPics.keyValuesOf(info) }
+        if (kv == null) {
+            info = ask(metaDataOnly = true) ?: return known
+            kv = withContext(Dispatchers.IO) { SteamPics.keyValuesOf(info) } ?: return known
+        }
         val fresh = SteamPics.appFrom(kv).copy(
             id = appId,
             packageId = known?.packageId ?: SteamIds.INVALID_PKG_ID,

@@ -16883,9 +16883,12 @@ follows:
   rows brought across from GameNative keep its reading until their product
   info changes, so `steam.db` version 2 (and every import) rewrites 0 to the
   invalid id; before that only 725 of the owner's 1,245 games were listed.
-  **Product info that comes as a file (2026-11-20, Droidtop/tracker#956).** Steam answers a large app's
-  product info request with no key-values and the address of a file on its content servers
-  (`PICSProductInfo.isUseHttp`, `httpUri`, a gzip text appinfo). `SteamPics.keyValuesOf` reads that file;
+  **Product info that comes as a file (2026-11-20, Droidtop/tracker#956).** Steam leaves a large app's
+  product info out of a full answer: a sha, no key-values, and no HTTP host (the console, 2026-11-21: every one
+  of about 3,000 empty answers was so). It names the file's host only to a metadata-only request (SteamKit2:
+  HTTP is available when the response is `meta_data_only` with an `http_min_size`), so the apps a full request
+  left empty are asked again metadata-only (`SteamLibrarySync.storeAnswers`, and `refreshApp` for one app), and
+  the file on Steam's content servers (`httpUri`, a gzip text appinfo) is read by `SteamPics.keyValuesOf`;
   an answer with neither (a missing access token, a file that could not be read) is stored as nothing, so the next
   sync asks again. Before this, such answers were stored as rows with no name and no type, marked read at Steam's
   change number and never asked for again: the owner's console held 1,150 of the 1,436 games Steam lists as owned
