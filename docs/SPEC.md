@@ -23993,7 +23993,9 @@ owner's Sandustry from his Windows desktop to the Retroid Pocket 5.
 
 - **The row.** A game's menu lists "Stream from <computer>" in its Play part
   for each paired computer whose library lists the game as installed
-  (`ComputerLibrary.computersWith`, the one met most recently first), on any
+  (`ComputerLibrary.computersWith`, the one met most recently first), looked
+  up by the keys every device uses (`ComputerLibrary.keysOf`: a store id, or
+  `title2:` and the slug, and the older `title:`), never by a folder path, on any
   game a computer has, Steam's or not. Opening a computer's own game in the
   library (`COMPUTER_GAME`, "On <computer>") does the same for that computer,
   Steam games included: they no longer only point at Steam Link.

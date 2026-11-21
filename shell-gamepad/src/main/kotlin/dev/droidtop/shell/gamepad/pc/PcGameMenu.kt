@@ -688,20 +688,35 @@ private fun PcGameMenuSheet(
     }
     // "Stream from <computer>" for each paired computer that has this game (Droidtop/tracker#860, docs/SPEC.md 7o):
     // the computer starts it and its window shows here. Files read, so on IO.
-    val streamKey = dev.droidtop.library.computers.ComputerLaunch.keyOf(entry.id, entry.pcInfo?.storeId)
-    val streamFrom by produceState(emptyList<dev.droidtop.net.peer.Computer>(), entry.id) {
+    // The game goes by the key every device uses (ComputerLibrary.keysOf: its store id, or `title2:` and its slug, and the
+    // older `title:` form). A folder game was looked up by its folder path, which no computer lists, so ARTEMIS, on the
+    // console and on the paired PC alike, offered no "Stream from" (console, dev.3411).
+    val streamKeys = remember(entry.id, entry.pcInfo?.storeId, entry.title) {
+        if (entry.id.startsWith("computer:")) {
+            listOf(dev.droidtop.library.computers.ComputerLaunch.keyOf(entry.id, entry.pcInfo?.storeId))
+        } else {
+            dev.droidtop.library.computers.ComputerLibrary.keysOf(entry)
+        }
+    }
+    // Each computer that has the game, with the key it has it under.
+    val streamFrom by produceState(emptyList<Pair<dev.droidtop.net.peer.Computer, String>>(), entry.id) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val computers = dev.droidtop.net.peer.Computers.list(context)
                 // A computer's own game already streams from it on the menu's first row ("Stream"): only the others.
                 val own = entry.id.takeIf { it.startsWith("computer:") }?.removePrefix("computer:")?.substringBefore(':')
-                dev.droidtop.library.computers.ComputerLaunch.order(
-                    dev.droidtop.library.computers.ComputerLibrary.computersWith(context, streamKey, computers),
-                ).filter { it.id != own }
+                val found = LinkedHashMap<String, Pair<dev.droidtop.net.peer.Computer, String>>()
+                streamKeys.forEach { key ->
+                    dev.droidtop.library.computers.ComputerLibrary.computersWith(context, key, computers)
+                        .forEach { pc -> found.putIfAbsent(pc.id, pc to key) }
+                }
+                dev.droidtop.library.computers.ComputerLaunch.order(found.values.map { it.first })
+                    .filter { it.id != own }
+                    .map { pc -> pc to found.getValue(pc.id).second }
             }.getOrNull().orEmpty()
         }
     }
-    val streamRows = streamFrom.map { pc ->
+    val streamRows = streamFrom.map { (pc, streamKey) ->
         ActionRow(
             dev.droidtop.library.computers.ComputerLaunch.streamTitle(pc),
             "Starts it on ${pc.name} and shows it here, with its sound and your controls",
