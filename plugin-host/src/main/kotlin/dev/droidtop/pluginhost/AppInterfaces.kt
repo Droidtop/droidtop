@@ -118,6 +118,7 @@ object AppInterfaces {
         val app = info.applicationInfo
         val label = runCatching { app?.let { context.packageManager.getApplicationLabel(it).toString() } }.getOrNull() ?: packageName
         val apks = listOfNotNull(app?.sourceDir) + app?.splitSourceDirs.orEmpty().toList()
+        if (apks.isEmpty()) android.util.Log.w(TAG, "$packageName: Android reports no APK for it, so its signature cannot be checked")
         val key = cacheKey(info, apks)
         synchronized(cache) { cache[packageName]?.takeIf { it.key == key }?.let { return it.found.copy(serviceName = serviceName ?: it.found.serviceName) } }
         var manifestBytes: ByteArray? = null
@@ -205,6 +206,10 @@ object AppInterfaces {
         @Suppress("DEPRECATION")
         val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
         context.packageManager.getPackageInfo(packageName, flags)
+    }.onFailure {
+        // A lookup that fails is refused as "could not be checked" (inspect): it says why here. On the console
+        // (dev.3417) Enginehost was refused that way with no line from checkApk, so the APK was never opened.
+        android.util.Log.w(TAG, "$packageName: its package could not be read", it)
     }.getOrNull()
 
     /** What Android reports as the app's current signers: the certificates its contents are signed with now. */
