@@ -242,6 +242,12 @@ internal object SteamLibrarySync {
             for (result in answer.results) {
                 val changed = ArrayList<SteamApp>()
                 var empty = 0
+                // Why Steam sent nothing, counted, with a few app ids (Droidtop/tracker#956: on the console about
+                // 3,000 apps came back with neither key-values nor a file address, for no visible reason).
+                var missingToken = 0
+                var noSha = 0
+                var noHost = 0
+                val sample = ArrayList<Int>()
                 for (info in result.apps.values) {
                     val known = db.apps().find(info.id)
                     // A row read before at this change number stands, unless it holds no product info at all.
@@ -250,6 +256,9 @@ internal object SteamLibrarySync {
                     val kv = withContext(Dispatchers.IO) { SteamPics.keyValuesOf(info) }
                     if (kv == null) {
                         empty++
+                        if (info.isMissingToken) missingToken++
+                        if (info.shaHash == null || info.shaHash!!.isEmpty()) noSha++ else if (info.httpUri == null) noHost++
+                        if (sample.size < 5) sample += info.id
                         continue
                     }
                     changed += SteamPics.appFrom(kv).copy(
@@ -259,7 +268,14 @@ internal object SteamLibrarySync {
                         lastChangeNumber = info.changeNumber,
                     )
                 }
-                if (empty > 0) Timber.tag(TAG).w("Steam sent no product info for $empty apps; asked again next sync")
+                if (empty > 0) {
+                    val tokened = chunk.count { it.accessToken != 0L }
+                    val line = "steam pics: no product info for $empty of ${result.apps.size} apps (missing token $missingToken, " +
+                        "no sha $noSha, sha but no http host $noHost, metadata only ${result.isMetaDataOnly}, unknown " +
+                        "${result.unknownApps.size}, tokens sent $tokened of ${chunk.size}; e.g. ${sample.joinToString()}); asked again next sync"
+                    ScanLog.write(line)
+                    Timber.tag(TAG).w(line)
+                }
                 if (changed.isNotEmpty()) db.withTransaction { db.apps().insertAll(changed) }
             }
         }
