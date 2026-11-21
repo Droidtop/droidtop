@@ -20625,10 +20625,13 @@ so each view keeps its own filters and sort. Pure and unit-tested
   **Ownership** is a PC facet (Owned, Shared with you, Free to play (not in your
   library), No longer in your library, On your wishlist (not owned)) counted over every row that is not
   hidden, so its counts add up to the store rows; other facets count what the
-  list shows. The launcher's **search** has two switches under its field,
-  "Include hidden games" and "Include free-to-play games not in your library",
-  both off each time search opens; each result shows its Retro system or its
-  PC/Engine word.
+  list shows. Every **search** of games (the launcher's, Home's, PC Games')
+  looks through the same pool (`searchablePool`: these rules with the person's
+  List options) and has two switches under its field, "Include hidden games"
+  and "Include free-to-play games not in your library", both off each time
+  search opens; each result shows its Retro system or its PC/Engine word.
+  Home's and PC Games' searches once took the whole list, so a game Steam
+  hides was found (console, dev.3406: "windward").
 - **What a linked source knows about a game (2026-10-17).** The owner, on F95Checker's "filtered views of all the information" (7g, "Getting an update"): **Release status** (Ongoing, Completed, On hold, Abandoned, as the source words it), **Tags** (values OR, like Collection), **Rating** (five bands of the source's rating, "4 stars and up" first) and **Linked to** (the update sources a game is linked to, by their row labels: "F95zone thread"). They are PC facets, read from the source's last answer (`source_answers`, its `facts`), never from the disk, and offered only when some game carries them, as every facet is. With several sources linked, the first in source-key order that gave the fact speaks for the game, as for the version.
 - **Counts.** Every facet is offered with the values the list actually
   holds and how many entries carry each (counted over the whole list, one

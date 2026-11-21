@@ -106,6 +106,7 @@ import dev.droidtop.shell.gamepad.query.LibraryQuery
 import dev.droidtop.shell.gamepad.query.LibraryQueryScope
 import dev.droidtop.shell.gamepad.query.LibrarySearchDialog
 import dev.droidtop.shell.gamepad.query.matchesSearchText
+import dev.droidtop.shell.gamepad.query.searchablePool
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.integrations.LocalSearchRow
 import dev.droidtop.library.integrations.SearchRowKind
@@ -1412,7 +1413,21 @@ internal fun PcGamesSection(
         )
     }
     if (state.searchOpen) {
-        val all = games.orEmpty()
+        // What search looks through is the lists' own rule (docs/SPEC.md 7j, searchablePool), with the two switches
+        // the launcher's search has, off each time search opens: the whole list showed games Steam hides (console,
+        // dev.3406: "windward" listed Windward, hidden in Steam and in droidtop).
+        var includeHidden by remember { mutableStateOf(false) }
+        var includeFree by remember { mutableStateOf(false) }
+        val switches = listOf(
+            dev.droidtop.shell.gamepad.query.SearchSwitch("Include hidden games", includeHidden) { includeHidden = !includeHidden },
+            dev.droidtop.shell.gamepad.query.SearchSwitch("Include free-to-play games not in your library", includeFree) { includeFree = !includeFree },
+        )
+        val all = remember(games, ownership, includeHidden, includeFree) {
+            searchablePool(games.orEmpty(), ownership, includeFree = includeFree, includeHidden = includeHidden)
+        }
+        val homePool = remember(homeSearchAll, ownership, includeHidden, includeFree) {
+            searchablePool(homeSearchAll, ownership, includeFree = includeFree, includeHidden = includeHidden)
+        }
         // Recommendations for the empty field, worked out off the main
         // thread while the dialog is open (docs/SPEC.md 12a).
         val suggestions by produceState(emptyList<dev.droidtop.library.integrations.Recommendation>(), all) {
@@ -1441,18 +1456,19 @@ internal fun PcGamesSection(
             LibrarySearchDialog(
                 query = LibraryQuery(text = text),
                 matchCount = 0,
-                totalCount = homeSearchAll.size,
+                totalCount = homePool.size,
                 onTextChange = { text = it },
                 onDismiss = { state.searchOpen = false },
                 suggestions = suggestions,
-                localKey = homeSearchAll to systemsWithGames,
+                switches = switches,
+                localKey = homePool to systemsWithGames,
                 local = { q ->
                     SearchEntry.matchingSystems(q, systemsWithGames).map { (_, name) ->
                         LocalSearchRow("system:$name", SearchRowKind.GAME, name, "Game system") {
                             state.searchOpen = false
                             onOpenSection(GamingSection.GAMES)
                         }
-                    } + homeSearchAll.filter { matchesSearchText(it, q) }.take(SEARCH_GAME_ROWS).map { game ->
+                    } + homePool.filter { matchesSearchText(it, q) }.take(SEARCH_GAME_ROWS).map { game ->
                         LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), searchLine(game)) {
                             state.searchOpen = false
                             openPage(game)
@@ -1473,6 +1489,7 @@ internal fun PcGamesSection(
                 state.searchOpen = false
             },
             suggestions = suggestions,
+            switches = switches,
             // The PC library's own games are rows of the one list ("One search"), as the launcher's are; the grid
             // behind still narrows to the same text. Matched in memory over the list already loaded.
             localKey = all to consoleNames,
