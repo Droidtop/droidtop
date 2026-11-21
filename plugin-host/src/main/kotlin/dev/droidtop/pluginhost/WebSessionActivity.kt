@@ -94,12 +94,8 @@ class WebSessionActivity : Activity() {
         }
         val titles = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         titles.addView(TextView(this).apply {
-            text = when (asked.mode) {
-                WebSessionRequest.Mode.SIGN_IN -> "Sign in for ${asked.label}"
-                WebSessionRequest.Mode.CHECK -> "${asked.label}: open the site"
-                WebSessionRequest.Mode.OPEN -> "${asked.label}: open in your session"
-                WebSessionRequest.Mode.BROWSE -> asked.label
-            }
+            // The site's name; the address it is on now goes under it (location). What to do is on the buttons.
+            text = asked.label
             setTextColor(tokens.color("onSurface"))
             textSize = 18f
         })
@@ -110,9 +106,16 @@ class WebSessionActivity : Activity() {
         titles.addView(location)
         bar.addView(titles, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         val several = asked.mode == WebSessionRequest.Mode.OPEN && asked.maxDownloads > 1
-        if (asked.mode.endsWithDone || several) {
+        // Each button says what it does (owner, 2026-11-21: a "done" and a "close" button "that don't clearly
+        // differentiate what they're supposed to do"): the one that finishes, named for its mode, and Cancel or Close.
+        val finishLabel = when (asked.mode) {
+            WebSessionRequest.Mode.SIGN_IN -> "Signed in"
+            WebSessionRequest.Mode.CHECK -> "Continue"
+            else -> null
+        }
+        if (finishLabel != null) {
             bar.addView(Button(this).apply {
-                text = "Done"
+                text = finishLabel
                 setOnClickListener { finishWith(completed = true, download = null) }
             })
         }
@@ -126,33 +129,14 @@ class WebSessionActivity : Activity() {
             })
         }
         bar.addView(Button(this).apply {
-            text = "Close"
+            // Sign-in and check views end with the button above, so this one gives up; the others end here.
+            text = if (asked.mode.endsWithDone) "Cancel" else "Close"
             setOnClickListener { finishWith(completed = !asked.mode.endsWithDone, download = null) }
         })
         root.addView(bar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        root.addView(TextView(this).apply {
-            text = when (asked.mode) {
-                WebSessionRequest.Mode.SIGN_IN -> "Sign in on the site's own page. Press Done when you are signed in. B goes back a page."
-                WebSessionRequest.Mode.CHECK -> if (asked.doneCookie != null) {
-                    "Let the site finish its check, then sign in (Sign in above opens the site's own page) to see download links. This closes by itself once you are signed in. B goes back a page."
-                } else {
-                    "Let the site finish its check and show its page, then press Done. B goes back a page."
-                }
-                WebSessionRequest.Mode.OPEN -> if (several) {
-                    "Choose each download on the page, up to ${asked.maxDownloads}; droidtop takes them into Downloads. Press Done when you have them all. B goes back a page."
-                } else {
-                    "Choose the download on the page; droidtop takes the file into Downloads. B goes back a page."
-                }
-                WebSessionRequest.Mode.BROWSE ->
-                    "${asked.label}'s own pages. Paying happens on them; droidtop never sees or keeps payment details. B goes back a page."
-            }
-            setTextColor(tokens.color("onSurfaceMuted"))
-            textSize = 12f
-            setPadding(dp(16), 0, dp(16), dp(6))
-        })
         if (several) {
             takenLine = TextView(this).apply {
-                text = "Nothing taken yet."
+                text = "0 of ${asked.maxDownloads} taken"
                 setTextColor(tokens.color("onSurface"))
                 textSize = 13f
                 setPadding(dp(16), 0, dp(16), dp(6))
@@ -266,7 +250,7 @@ class WebSessionActivity : Activity() {
                 if (captured.size >= asked.maxDownloads) {
                     finishWith(completed = true, download = null)
                 } else {
-                    takenLine?.text = "Taken ${captured.size} of up to ${asked.maxDownloads}. Press Done when you have them all."
+                    takenLine?.text = "${captured.size} of ${asked.maxDownloads} taken"
                 }
             }
         }
