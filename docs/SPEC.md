@@ -12213,7 +12213,7 @@ engines database's strategy order, not a list in the app (coordinator, 2026-10-2
 database's strategy order rather than a hardcoded list, so the next core doesn't need a badge change"): an engine
 whose row puts ENGINEHOST first (Ren'Py, Godot, LOVE, and AGS since droidtop-platforms bf9a195) is "Engine"; one
 whose rows do not (Unity, Unreal: Windows or Linux builds) is "PC", store or local alike. Until the database is read
-(`EngineRunners.defs`, filled by `EnginesDatabase.defs`), an engine kind counts as Enginehost's. The engine stays a fact: the game page's Engine row reads "Unity, runs in Wine".
+(`EngineRunners.defs`, filled by `EnginesDatabase.defs`), an engine kind counts as Enginehost's. The engine stays a fact: the game page's Engine row reads "Unity, runs in Wine". That row and the game menu's line name the engine (`engineFamily`: "Ren'Py", "RPG Maker MV"), never its group heading ("Visual Novels" read as a Ren'Py game's engine; console, dev.3406). The Engine filter keeps listing the groups the shelves use (`engineGroup`), so saved views keep their values.
 A game whose runner the person changed by hand keeps its kind's badge.
 
 "Complete" for coverage means: on an unrooted arm64 handheld every
