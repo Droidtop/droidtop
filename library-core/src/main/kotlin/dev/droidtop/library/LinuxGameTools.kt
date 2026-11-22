@@ -10,6 +10,21 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  */
 object LinuxGameOptionsPrefs {
     private const val KEY_PREFIX = "droidtop_linux_game_own_home_"
+    private const val KEY_OWN_CONTAINER = "droidtop_linux_game_own_container_"
+
+    /**
+     * Whether the game runs in a Linux games container of its own rather than the shared one (docs/SPEC.md 3c, owner
+     * 2026-11-22: "per-game containers, just like wineprefixes"). Off by default, as one prefix serves every Windows
+     * game until a game is given its own.
+     */
+    fun ownContainer(context: Context, entryId: String): Boolean =
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getBoolean(KEY_OWN_CONTAINER + entryId, false)
+
+    fun setOwnContainer(context: Context, entryId: String, on: Boolean) {
+        val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
+        if (on) prefs.putBoolean(KEY_OWN_CONTAINER + entryId, true) else prefs.remove(KEY_OWN_CONTAINER + entryId)
+        prefs.apply()
+    }
 
     fun ownHome(context: Context, entryId: String): Boolean =
         context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getBoolean(KEY_PREFIX + entryId, false)

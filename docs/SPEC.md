@@ -3238,13 +3238,27 @@ model of the desktop stack:
 - Whether FEX works fully under proot's ptrace is not yet known. FEX's documentation says Android's own userspace is
   not a target, but a proot container is a real glibc Linux userspace. This is what the first console check answers.
 
-**Status (2026-11-22): not built.** The tasks, in order:
-1. The container's architecture and translator in the container model and the container screens.
-2. FEX installed into a glibc container, and its x86 rootfs fetched and recorded.
-3. `NativeLinuxGameSession` runs an x86 program through FEX on arm64, and a Ren'Py Linux build starts its own
-   launcher for the right architecture.
-4. Per-game containers: made on a game's first run, with the prefix-style home and sharing choices.
-5. x86 containers: the x86 image as FEX's RootFS behind a small arm64 layer.
+**Where the code is.** What droidtop and Pythia both need is in the shared libraries (Droidtop/tracker#960 step
+1.10): the architecture and translator model in Droidtop/lib-containers (`arch`), and reading a program's
+architecture, the translated command and Ren'Py's launcher choice in Droidtop/lib-runners (`launch`). droidtop
+keeps the Android side: `LinuxGames` (the containers, FEX's install script, its rootfs record) and the launch and
+setup in `DroidtopPcGameRuntime`.
+
+**A game's Linux row.**
+- An x86 build on an arm64 device reads "needs setup" until its container has FEX and the rootfs is unpacked.
+  Its action is **Set up Linux games**, which runs every missing step and says each one.
+- A Ren'Py game counts as an x86 build unless it ships `linux-aarch64` binaries. Another game counts as one when its
+  launcher is `.x86_64`, `.x86` or an x86 ELF.
+- Ren'Py's own launcher runs as it is. It reads `RENPY_PLATFORM` for the `lib/` folder and puts `RENPY_GDB` in
+  front of the game's binary, so droidtop sets those two variables and never rewrites the script.
+- **Give this game its own container** (the game's Linux tools) moves it to a container of its own, set up on its
+  next start.
+
+**Status (2026-11-22).**
+- Built, not yet checked on a device: the Linux games containers (shared and per game), FEX installed through its
+  Ubuntu packages, its rootfs through Downloads, and the launch through FEX (tasks 2 to 4).
+- Not built: the container's architecture and translator on the container screens (task 1, where Box64 becomes a
+  choice; FEX is used until then), and x86 containers (task 5).
 
 ## 3d. User-facing container/distro management (directed 2026-08-30)
 
@@ -8201,13 +8215,14 @@ The pieces behind the seam:
 - **Windows launches** go through the sealed `WineEngine` seam
   (`BionicWineEngine`, §5b), never through `ContainerRuntime`.
 - **Native Linux launches** go through `NativeLinuxGameSession`, which
-  runs the launcher with `ContainerRuntime.exec` in Desktop mode's primary
-  container. `DroidSpacesRuntime.exec` drives droidspaces' own
+  runs the launcher with `ContainerRuntime.exec` in the game's Linux games
+  container (§3c: the shared one, or the game's own), beside Desktop mode,
+  whose desktop shows its windows. `DroidSpacesRuntime.exec` drives droidspaces' own
   `--name=<id> run <cmd...>` subcommand (Documentation/Linux-CLI.md),
   with per-invocation env vars prepended as inline POSIX assignments
   because `run` has no env flag; `ProotRuntime.exec` runs the command as
   its own proot session in the container's rootfs (§3). An x86 Linux
-  binary additionally needs FEX (§3c), which is not built yet.
+  binary runs through FEX on an arm64 device (§3c).
 
 ## 5b. One Wine engine, one prefix store, whichever backend is live (assessed 2026-09-02)
 

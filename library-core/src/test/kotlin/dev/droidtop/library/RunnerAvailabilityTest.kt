@@ -49,6 +49,14 @@ class RunnerAvailabilityTest {
     private fun List<RunnerOption>.of(strategy: GameLaunchStrategy) = single { it.strategy == strategy }
 
     @Test
+    fun `an x86 Linux build before FEX is set up offers Set up Linux games`() {
+        val row = RunnerAvailability.evaluate(facts(hasLinuxBuild = true, x86TranslationRegistered = false))
+            .of(GameLaunchStrategy.LINUX_CONTAINER)
+        assertEquals(RunnerState.NEEDS_SETUP, row.state)
+        assertEquals(RunnerAction.SET_UP_LINUX_GAMES, row.action)
+    }
+
+    @Test
     fun `every runner is reported for every game, never silently absent`() {
         val options = RunnerAvailability.evaluate(facts(engine = null))
         assertEquals(GameLaunchStrategy.entries.toSet(), options.map { it.strategy }.toSet())

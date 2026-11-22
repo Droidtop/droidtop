@@ -106,7 +106,7 @@ object PcRunnerOptions {
                 windowsEnvironmentReady = runtime?.isProvisioned == true,
                 wineRendererWired = RunnerAvailability.WINE_RENDERER_WIRED,
                 linuxContainerAvailable = runtime?.isLinuxContainerAvailable == true,
-                x86TranslationRegistered = x86TranslationReady(gameRoot),
+                x86TranslationRegistered = linuxBuildRunsHere(gameRoot, entry.id),
                 preferredOrder = engine?.let { EnginesDatabase.priorityFor(context, it) },
             ),
         )
@@ -145,6 +145,15 @@ object PcRunnerOptions {
             null
         }
         RunnerAction.CHOOSE_ENGINE_VERSION -> configureWithEnginehost(context, entry)
+        RunnerAction.SET_UP_LINUX_GAMES -> {
+            val runtime = PcGameRuntimeRegistry.runtime
+            if (runtime == null) {
+                "droidtop's PC runtime isn't registered in this process."
+            } else {
+                val result = runtime.setUpLinuxGames(entry.id, entry.title, onStatus)
+                if (result.succeeded) null else result.detail
+            }
+        }
         RunnerAction.SET_UP_WINDOWS_GAMES -> {
             val runtime = PcGameRuntimeRegistry.runtime
             when {
@@ -279,22 +288,22 @@ object PcRunnerOptions {
     }
 
     /**
-     * Whether this folder's native Linux build can actually execute here.
-     *
-     * A build whose launcher is `<Game>.x86_64`/`.x86` is x86 code and
-     * needs binary translation registered with the kernel (`binfmt_misc`,
-     * docs/SPEC.md 3c); an arm64 build or a shell wrapper needs nothing,
-     * so it is not held to a requirement that does not apply to it. Read
-     * from the real registration directory rather than assumed either
-     * way -- on a device where it is not mounted the listing is null,
-     * which is the honest "not registered".
+     * Whether this folder's native Linux build can run here (docs/SPEC.md 3c). An x86 build on an arm64 device runs
+     * through FEX in the game's Linux games container, so it runs once that is set up; a build for this device's own
+     * architecture needs nothing. A Ren'Py game is an x86 build unless it ships `linux-aarch64` binaries; another game
+     * is one when its launcher is `<Game>.x86_64` or `.x86`, or an ELF built for x86.
      */
-    private fun x86TranslationReady(gameRoot: File): Boolean {
-        val x86Launcher = gameRoot.listFiles()
-            ?.any { it.isFile && it.extension.lowercase() in setOf("x86_64", "x86") } == true
-        if (!x86Launcher) return true
-        return File("/proc/sys/fs/binfmt_misc").listFiles()
-            ?.any { it.name.contains("fex", ignoreCase = true) || it.name.contains("x86", ignoreCase = true) } == true
+    private fun linuxBuildRunsHere(gameRoot: File, entryId: String): Boolean {
+        val host = dev.droidtop.shared.containers.ContainerArch.host(android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty())
+        if (host != dev.droidtop.shared.containers.ContainerArch.ARM64) return true
+        val renPy = File(gameRoot, "lib").list()?.filter { it.startsWith("py2-linux") || it.startsWith("py3-linux") }.orEmpty()
+        val needsTranslation = if (renPy.isNotEmpty()) {
+            renPy.none { it.endsWith("-aarch64") }
+        } else {
+            gameRoot.listFiles()?.any { it.isFile && it.extension.lowercase() in setOf("x86_64", "x86") } == true
+        }
+        if (!needsTranslation) return true
+        return PcGameRuntimeRegistry.runtime?.linuxGameReady(entryId) == true
     }
 }
 
