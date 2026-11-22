@@ -9,7 +9,7 @@ import dev.droidtop.pluginhost.debrid.RealDebridSignIn
 import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
- * The person's debrid accounts (Droidtop/tracker#638): the keys they entered under Settings > Accounts and sources, in
+ * The person's debrid accounts (Droidtop/tracker#638): the keys they entered under Settings > Internet, in
  * the person's order (TorBox, then Real-Debrid, until moved), which settles a tie between accounts a job costs the
  * same ([dev.droidtop.pluginhost.debrid.DebridChoice]); whether each is used for downloads; spread mode; and whether a
  * torrent no account has yet waits for the service or falls back to peers (falls back unless the person chose to wait).

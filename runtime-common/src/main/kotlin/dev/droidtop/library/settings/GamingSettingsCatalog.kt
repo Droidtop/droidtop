@@ -52,9 +52,13 @@ object GamingSettingsCatalog {
         // "Settings would be very wise to reconfigure, yes").
         // Nine since Droidtop/tracker#621 M8 (owner, 2026-10-23: "let's do all nine of those proposals"): Kids and
         // guests is a section of Modes, as who the device is handed to is a mode, and Accessibility one of Appearance.
-        "Modes", "Library", "Accounts and sources", "Appearance",
+        // Internet since 2026-11-22 (owner: "reflow the settings to put internet settings together, so we can present our
+        // own browser with deeper integration"): droidtop Browser and the sign-ins droidtop keeps for the web.
+        "Modes", "Library", "Accounts and sources", "Internet", "Appearance",
         "Controls and keyboard", "Displays", "Companion screen", "Shell behaviour", "System",
     )
+    const val GROUP_INTERNET = "gaming_internet"
+    const val ID_INTERNET = "pref_gaming_internet"
     const val GROUP_KIDS = "gaming_kids"
     const val GROUP_KEYBOARD = "gaming_keyboard"
     const val GROUP_COMPANION_SCREEN = "gaming_companion_screen"
@@ -399,6 +403,20 @@ object GamingSettingsCatalog {
                     subtitle = words(R.string.gaming_accounts_and_plugins),
                     registryId = "accounts_and_sources",
                     icon = CatalogIcon.INTEGRATIONS,
+                ),
+            ),
+        ),
+        // The web, in one place (docs/SPEC.md "Settings layout", "Internet"): droidtop Browser and the web sign-ins.
+        CatalogGroup(
+            id = GROUP_INTERNET,
+            title = null,
+            items = listOf(
+                NestedScreenItem(
+                    id = ID_INTERNET,
+                    title = words(R.string.gaming_internet),
+                    subtitle = words(R.string.gaming_internet_summary),
+                    registryId = "internet",
+                    icon = CatalogIcon.DOWNLOADS,
                 ),
             ),
         ),
