@@ -29,6 +29,10 @@ android {
             // The pad model droidtop and Enginehost share: Droidtop/lib-input's PadFamily, PadFamilies.classify (SDL's ids)
             // and FaceLayout (Droidtop/tracker#867 D4), compiled in the same way.
             java.srcDir("../vendor/lib-input/pads/src/main/kotlin")
+            // A container's architecture and translator (Droidtop/lib-containers :arch), and running x86 programs and
+            // Ren'Py's Linux launcher through it (Droidtop/lib-runners :launch): docs/SPEC.md 3c, Droidtop/tracker#962.
+            java.srcDir("../vendor/lib-containers/arch/src/main/kotlin")
+            java.srcDir("../vendor/lib-runners/launch/src/main/kotlin")
         }
         getByName("test") {
             resources.srcDirs("src/main/assets")

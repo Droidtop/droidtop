@@ -25,6 +25,12 @@ import dev.droidtop.library.WindowsLaunchResolver
 import dev.droidtop.library.lutris.DllOverrides
 import dev.droidtop.library.lutris.WinePrefixChanges
 import dev.droidtop.runtime.NativeLinuxGameSession
+import dev.droidtop.runtime.LinuxGames
+import dev.droidtop.shared.containers.ContainerArch
+import dev.droidtop.shared.containers.Translator
+import dev.droidtop.shared.runners.ElfHeader
+import dev.droidtop.shared.runners.RenPyLinuxLaunch
+import dev.droidtop.shared.runners.TranslatedCommand
 import dev.droidtop.runtime.PrimaryContainerSession
 import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.SafeDelete
@@ -629,31 +635,97 @@ class DroidtopPcGameRuntime(
         }
 
     override suspend fun launchLinux(executable: File, gameRoot: File, entryId: String?): PcLaunchResult {
-        val session = primarySession()
-            ?: return PcLaunchResult(false, "a native Linux build runs inside Desktop mode's container, and it isn't running")
-        return linuxExec(session, executable, entryId)
+        val (session, container) = linuxGameContainer(entryId)
+            ?: return PcLaunchResult(false, linuxNotReadyReason())
+        return linuxExec(session, container, executable, gameRoot, entryId)
     }
 
     override suspend fun runLinuxProgram(program: File, gameRoot: File, entryId: String): PcLaunchResult {
-        val session = primarySession()
-            ?: return PcLaunchResult(false, "Linux programs run inside Desktop mode's container, and it isn't running")
+        val (session, container) = linuxGameContainer(entryId)
+            ?: return PcLaunchResult(false, linuxNotReadyReason())
         val inside = withContext(Dispatchers.IO) { program.isFile && PrefixFolderView.isInside(gameRoot, program) }
         if (!inside) return PcLaunchResult(false, "${program.name} is not a file inside the game's folder")
-        return linuxExec(session, program, entryId)
+        return linuxExec(session, container, program, gameRoot, entryId)
     }
 
-    /** [program] in the container, in the environment the game starts in: its own home when it has one. */
-    private suspend fun linuxExec(session: PrimaryContainerSession, program: File, entryId: String?): PcLaunchResult {
-        val env = withContext(Dispatchers.IO) { linuxEnvironment(session, entryId) }
+    /** Whether [entryId]'s game has a container of its own (its Linux tools setting), else the shared one. */
+    private fun ownLinuxContainer(entryId: String?): Boolean =
+        entryId != null && dev.droidtop.library.LinuxGameOptionsPrefs.ownContainer(context, entryId)
+
+    /**
+     * The Linux games container [entryId]'s game runs in (docs/SPEC.md 3c): its own or the shared one, as its settings
+     * say, once "Set up Linux games" made it. Null while Desktop mode is not running (siblings show their windows on
+     * its desktop) or before setup.
+     */
+    private suspend fun linuxGameContainer(entryId: String?): Pair<PrimaryContainerSession, dev.droidtop.runtime.Container>? {
+        val session = primarySession() ?: return null
+        val key = LinuxGames.key(entryId, ownLinuxContainer(entryId))
+        val id = withContext(Dispatchers.IO) { LinuxGames.recordedId(context.filesDir, key) } ?: return null
+        val info = session.runtime.listContainers().firstOrNull { it.container.id == id } ?: return null
+        // proot runs a command straight in a container's files; the rooted backend runs it in a started container.
+        if (!info.running && info.container.backend != dev.droidtop.runtime.ContainerBackend.PROOT) session.runtime.start(info.container)
+        return session to info.container
+    }
+
+    private fun linuxNotReadyReason(): String =
+        if (primarySession() == null) {
+            "a native Linux build runs beside Desktop mode, and it isn't running"
+        } else {
+            "set up Linux games first, from the game's page"
+        }
+
+    /**
+     * [program] in [container], in the environment the game starts in: its own home when it has one, and on an arm64
+     * device its x86 binaries through FEX (docs/SPEC.md 3c). A Ren'Py game's own launcher runs as it is, told which of
+     * its lib/ folders to use and to start that binary through FEX (lib-runners' RenPyLinuxLaunch).
+     */
+    private suspend fun linuxExec(
+        session: PrimaryContainerSession,
+        container: dev.droidtop.runtime.Container,
+        program: File,
+        gameRoot: File,
+        entryId: String?,
+    ): PcLaunchResult {
+        val launcher = withContext(Dispatchers.IO) { LinuxGames.recordedLauncher(context.filesDir, container.id) }
+        val plan = withContext(Dispatchers.IO) { linuxCommand(session, program, gameRoot, launcher) }
+            .getOrElse { return PcLaunchResult(false, it.message ?: it.toString()) }
+        val env = withContext(Dispatchers.IO) { linuxEnvironment(session, entryId) } + plan.second
         val result = runCatching {
-            NativeLinuxGameSession(session.container, session.runtime)
-                .launch(session.runtime.hostStorageToContainerPath(program), env = env)
+            NativeLinuxGameSession(container, session.runtime).launch(plan.first.first(), plan.first.drop(1), env)
         }.getOrElse { return PcLaunchResult(false, it.message ?: it.toString()) }
 
         return PcLaunchResult(
             succeeded = result.succeeded,
             detail = if (result.succeeded) "ok" else "exit ${result.exitCode}: ${result.stderr.ifBlank { result.stdout }}",
         )
+    }
+
+    /** The command and extra variables that run [program] here; a sentence when nothing here can. Reads files. */
+    private fun linuxCommand(
+        session: PrimaryContainerSession,
+        program: File,
+        gameRoot: File,
+        launcher: String?,
+    ): Result<Pair<List<String>, Map<String, String>>> = runCatching {
+        val host = ContainerArch.host(android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty()) ?: ContainerArch.ARM64
+        val path = session.runtime.hostStorageToContainerPath(program)
+        val libFolders = File(gameRoot, "lib").list()?.toList().orEmpty()
+        val renPy = program.extension.equals("sh", ignoreCase = true) &&
+            libFolders.any { it.startsWith("py2-linux") || it.startsWith("py3-linux") }
+        if (renPy) {
+            val launch = RenPyLinuxLaunch.choose(libFolders, host, Translator.FEX)
+                ?: error("This Ren'Py game ships no Linux build this device can run")
+            if (launch.translator != null && launcher == null) error("set up Linux games first: FEX isn't installed in this game's container")
+            val env = launch.environment(launcher) + if (launch.translator != null) LinuxGames.fexEnvironment() else emptyMap()
+            return@runCatching listOf("sh", path) to env
+        }
+        val head = program.inputStream().use { input -> ByteArray(ElfHeader.SIZE).also { input.read(it) } }
+        val arch = ElfHeader.arch(head)
+        val translator = arch?.let { Translator.forProgram(it, host, Translator.FEX) }
+        if (arch != null && translator == null && !arch.runsNativelyOn(host)) error("${program.name} is built for ${arch.label}, which this device can't run")
+        if (translator != null && launcher == null) error("set up Linux games first: FEX isn't installed in this game's container")
+        TranslatedCommand.of(launcher.takeIf { translator != null }, path) to
+            (if (translator != null) LinuxGames.fexEnvironment() else emptyMap())
     }
 
     /** Empty for a game on the container's home; the game's own home otherwise, made when it is not there yet. */
@@ -663,20 +735,72 @@ class DroidtopPcGameRuntime(
         return LinuxGameHome.environment(session.runtime.hostStorageToContainerPath(home))
     }
 
+    override fun linuxGameReady(entryId: String?): Boolean =
+        LinuxGames.translationReady(context.filesDir, LinuxGames.key(entryId, ownLinuxContainer(entryId)))
+
+    /**
+     * Makes [entryId]'s Linux games container (its own or the shared one), installs FEX in it, and fetches and unpacks
+     * FEX's x86 rootfs once for every container (docs/SPEC.md 3c). Each step is skipped when it is done already, so
+     * running it again finishes what an interrupted run left.
+     */
+    override suspend fun setUpLinuxGames(entryId: String?, gameTitle: String?, onStatus: (String) -> Unit): PcProvisionResult {
+        val session = primarySession() ?: return PcProvisionResult(false, "Start Desktop mode first: Linux games run beside it")
+        val runtime = session.runtime
+        val files = context.filesDir
+        val own = ownLinuxContainer(entryId)
+        val key = LinuxGames.key(entryId, own)
+        return runCatching {
+            onStatus("Getting the Linux games container")
+            val name = if (own && entryId != null) LinuxGames.ownName(gameTitle, entryId) else LinuxGames.SHARED_NAME
+            val container = LinuxGames.container(runtime, files, key, name)
+            if (withContext(Dispatchers.IO) { LinuxGames.recordedLauncher(files, container.id) } == null) {
+                onStatus("Installing FEX")
+                val install = runtime.exec(container, listOf("sh", "-c", LinuxGames.installScript), emptyMap())
+                check(install.succeeded) { "FEX didn't install: ${lastLines(install)}" }
+                val found = runtime.exec(container, listOf("sh", "-c", LinuxGames.FIND_LAUNCHER), emptyMap())
+                val launcher = found.stdout.trim().takeIf { found.succeeded && it.isNotEmpty() }
+                    ?: error("FEX installed, but its launcher isn't on the path")
+                withContext(Dispatchers.IO) { LinuxGames.recordLauncher(files, container.id, launcher) }
+            }
+            if (!withContext(Dispatchers.IO) { LinuxGames.rootfsReady(files) }) {
+                onStatus("Getting FEX's x86 system files")
+                val list = withContext(Dispatchers.IO) { dev.droidtop.net.Http.get(LinuxGames.ROOTFS_LIST).text() }
+                val (url, hash) = LinuxGames.rootfsFromList(list) ?: error("FEX's list has no Ubuntu 24.04 system files")
+                val image = LinuxGames.rootfsImage(files).also { it.parentFile?.mkdirs() }
+                RuntimeDownloads.fetchUrl(context, url, image, title = "Linux games: FEX's x86 system files") { }
+                onStatus("Unpacking FEX's x86 system files")
+                val unpack = runtime.exec(container, listOf("sh", "-c", LinuxGames.unpackScript(hash)), emptyMap())
+                check(unpack.succeeded) { lastLines(unpack).ifBlank { "FEX's x86 system files didn't unpack" } }
+            }
+            PcProvisionResult(true, "Linux games are set up")
+        }.getOrElse { PcProvisionResult(false, it.message ?: it.toString()) }
+    }
+
+    /** The last lines a command said, for a failure's one sentence. */
+    private fun lastLines(result: dev.droidtop.runtime.ContainerExecResult): String =
+        result.stderr.ifBlank { result.stdout }.trim().lines().takeLast(3).joinToString(" ")
+
     override suspend fun stopLinuxProcesses(gameRoot: File): String {
         val session = primarySession() ?: return "Desktop mode's container is not running, so nothing of this game is"
         return runCatching {
             val pattern = session.runtime.hostStorageToContainerPath(gameRoot)
-            val result = session.runtime.exec(
-                session.container,
-                listOf("sh", "-c", LinuxGameHome.STOP_SCRIPT),
-                mapOf("DT_STOP_PATTERN" to pattern),
-            )
-            val stopped = result.stdout.trim().toIntOrNull()
-            when {
-                !result.succeeded -> "Couldn't look for the game's processes: ${result.stderr.ifBlank { result.stdout }.trim()}"
-                stopped == null || stopped == 0 -> "No process of this game was running"
-                stopped == 1 -> "Stopped the 1 process of this game"
+            // A game may run in the primary container (an arm64 build) or in a Linux games container: each is asked.
+            val recorded = withContext(Dispatchers.IO) { LinuxGames.recordedIds(context.filesDir) }
+            val containers = listOf(session.container) +
+                session.runtime.listContainers().map { it.container }.filter { it.id in recorded && it.id != session.container.id }
+            var stopped = 0
+            for (container in containers) {
+                val result = session.runtime.exec(
+                    container,
+                    listOf("sh", "-c", LinuxGameHome.STOP_SCRIPT),
+                    mapOf("DT_STOP_PATTERN" to pattern),
+                )
+                if (!result.succeeded) return@runCatching "Couldn't look for the game's processes: ${lastLines(result)}"
+                stopped += result.stdout.trim().toIntOrNull() ?: 0
+            }
+            when (stopped) {
+                0 -> "No process of this game was running"
+                1 -> "Stopped the 1 process of this game"
                 else -> "Stopped the $stopped processes of this game"
             }
         }.getOrElse { "Couldn't stop the game's processes: ${it.message ?: it}" }

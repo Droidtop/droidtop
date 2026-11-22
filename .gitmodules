@@ -107,3 +107,9 @@
 	path = shell-default
 	url = https://github.com/Droidtop/murine-launcher
 	branch = droidtop
+[submodule "vendor/lib-containers"]
+	path = vendor/lib-containers
+	url = https://github.com/Droidtop/lib-containers
+[submodule "vendor/lib-runners"]
+	path = vendor/lib-runners
+	url = https://github.com/Droidtop/lib-runners

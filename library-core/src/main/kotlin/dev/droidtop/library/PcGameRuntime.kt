@@ -119,6 +119,19 @@ interface PcGameRuntime {
     suspend fun runLinuxProgram(program: File, gameRoot: File, entryId: String): PcLaunchResult =
         PcLaunchResult(false, "this build cannot run Linux programs")
 
+    /**
+     * Whether [entryId]'s game can run x86 Linux programs: its Linux games container (its own or the shared one) has
+     * FEX, and FEX's x86 rootfs is unpacked (docs/SPEC.md 3c). Reads small files; off the main thread.
+     */
+    fun linuxGameReady(entryId: String?): Boolean = false
+
+    /**
+     * "Set up Linux games" (docs/SPEC.md 3c): makes [entryId]'s Linux games container, installs FEX in it and fetches
+     * FEX's x86 rootfs, saying each step through [onStatus]. [gameTitle] names a game's own container.
+     */
+    suspend fun setUpLinuxGames(entryId: String?, gameTitle: String?, onStatus: (String) -> Unit): PcProvisionResult =
+        PcProvisionResult(false, "this build cannot run Linux games")
+
     /** Ends the processes in the container that were started from [gameRoot]; returns the line to show. */
     suspend fun stopLinuxProcesses(gameRoot: File): String = "this build cannot run Linux programs"
 

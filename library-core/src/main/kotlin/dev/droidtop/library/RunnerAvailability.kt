@@ -34,6 +34,7 @@ enum class RunnerAction(val id: String) {
     CHOOSE_ENGINE_VERSION("choose_engine_version"),
     INSTALL_KIRIKIROID2("install_kirikiroid2"),
     SET_UP_WINDOWS_GAMES("set_up_windows_games"),
+    SET_UP_LINUX_GAMES("set_up_linux_games"),
 }
 
 /**
@@ -106,7 +107,10 @@ data class RunnerFacts(
     val wineRendererWired: Boolean = true,
     /** Whether Desktop mode's Linux container is live, the only place a native Linux build can run (docs/SPEC.md 5a). */
     val linuxContainerAvailable: Boolean = true,
-    /** Whether x86 binaries are registered for translation (`binfmt_misc` + FEX, docs/SPEC.md §3c). */
+    /**
+     * Whether this game's Linux build runs here: it needs no translation (an arm64 build), or its Linux games
+     * container has FEX and FEX's x86 rootfs (docs/SPEC.md 3c).
+     */
     val x86TranslationRegistered: Boolean = true,
     /** The engines database's declared priority; ranks what is already available, never decides availability. */
     val preferredOrder: List<GameLaunchStrategy> = emptyList(),
@@ -298,13 +302,13 @@ object RunnerAvailability {
             )
         }
         if (!facts.x86TranslationRegistered) {
-            // Also no action id: registering x86 binaries for translation
-            // (docs/SPEC.md 3c) is container-side work droidtop has not
-            // built, so the row states it rather than offering a button.
+            // An x86 build on an arm64 device runs through FEX in a Linux games container (docs/SPEC.md 3c): the
+            // action makes the container and installs FEX and its x86 system files.
             return RunnerOption(
                 strategy,
                 RunnerState.NEEDS_SETUP,
-                "this build's x86 translation isn't registered in the container",
+                "This x86 build runs through FEX, which needs setting up once",
+                RunnerAction.SET_UP_LINUX_GAMES,
             )
         }
         return RunnerOption(strategy, RunnerState.READY)
