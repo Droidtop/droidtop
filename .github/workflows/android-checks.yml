@@ -141,6 +141,17 @@ jobs:
             exit 1
           fi
 
+      # Robolectric downloads its Android jars (android-all-instrumented, about 100 MB each) from Maven Central on
+      # first use; a dropped connection there failed library-core's tests with MavenArtifactFetcher IOExceptions
+      # (runs 44972417720 and 45001009237, 2026-11-22). Kept between runs, they are fetched once per Robolectric
+      # version.
+      - name: Robolectric's Android jars
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml', '**/src/test/resources/robolectric.properties') }}
+          restore-keys: robolectric-
+
       - name: Run unit tests
         # Every module that actually has a src/test tree (app, library-core, runtime-common, shell-gamepad,
         # input-seat, runtime-windows, input-keyboard, host-bridge, display, net-core and the rest), not just
