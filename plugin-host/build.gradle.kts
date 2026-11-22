@@ -44,6 +44,11 @@ android {
             // so two hand-kept copies drifted (Enginehost's IPluginRuntime still described contract 1).
             aidl.srcDir("../vendor/lib-plugins/android/aidl")
         }
+        // The contracts droidtop and an app plugin both implement (docs/contracts, web-view.json first): the tests check
+        // droidtop against them, and the app's CI checks the app against the same files.
+        getByName("test") {
+            resources.srcDir("../docs/contracts")
+        }
     }
 
     // The IPluginRuntime binder contract (docs/SPEC.md 12a): :app talks to
