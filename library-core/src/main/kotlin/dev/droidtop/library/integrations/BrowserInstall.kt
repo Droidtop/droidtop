@@ -73,6 +73,10 @@ object BrowserInstall {
             extra = AppCatalogs.Expected(PACKAGE, 0L, signers).toArgs() + (AppCatalogs.ARG_LABEL to LABEL),
             onStatus = onStatus,
         )
-        return if (result.ok) "In Downloads" else result.error ?: "Download failed"
+        if (!result.ok) return result.error ?: "Download failed"
+        // The job ends when Android installed it, or early while Android waits for the person to confirm. The row shows
+        // this line until its screen is left, so it says which: "In Downloads" stayed after the install on the console
+        // (dt.16 over an adb-installed dt.13, 2026-11-22).
+        return withContext(Dispatchers.IO) { installedVersion(context) }?.takeIf { isCurrent(it, release.tag) } ?: "Confirm in Android"
     }
 }
