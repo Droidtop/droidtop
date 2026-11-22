@@ -176,7 +176,39 @@ internal object HostWebApis {
                 .put("download", described.first())
                 .put("downloads", org.json.JSONArray(described))
         },
+        // docs/plugin-api.md 3 G3a: the app that shows droidtop's pages (droidtop Browser). Only an app's plugin that provides
+        // web.view, with that point still allowed, and only for a page droidtop gave it ([WebViewProviders]).
+        HostOp("web.view", "take_request") { _, record, args ->
+            viewer(record)
+            WebViewProviders.take(record.manifest.id, token(args))
+        },
+        HostOp("web.view", "report_page", target = { NetScope.hostOf(it.optString("url")).orEmpty() }) { _, record, args ->
+            viewer(record)
+            val url = args.optString("url").trim().takeIf { it.length <= MAX_VIEW_TEXT && NetScope.hostOf(it) != null } ?: invalid("url must be a web address")
+            val title = args.optString("title").takeIf { it.length <= MAX_VIEW_TEXT }
+            val cookies = args.optString("cookies").takeIf { it.isNotBlank() && it.length <= MAX_VIEW_TEXT * 4 }
+            val signedIn = if (args.has("signedIn") && !args.isNull("signedIn")) args.optBoolean("signedIn") else null
+            WebViewProviders.page(record.manifest.id, token(args), url, title, cookies, signedIn)
+        },
+        HostOp("web.view", "finish", alwaysAudit = true, target = { if (it.optBoolean("completed")) "completed" else "closed" }) { env, record, args ->
+            viewer(record)
+            val done = env.webViewFinish(record.manifest.id, token(args), args)
+                ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop shows no web pages")
+            JSONObject().put("accepted", done)
+        },
     )
+
+    private const val MAX_VIEW_TEXT = 4096
+
+    private fun token(args: JSONObject): String =
+        args.optString("token").takeIf { it.length in 1..64 } ?: invalid("token is required")
+
+    /** Only an app's plugin that provides `web.view` shows droidtop's pages; [WebViewProviders] checks the point is allowed. */
+    private fun viewer(record: PluginRecord) {
+        if (record.manifest.kind != PluginKind.APP_INTERFACE || record.manifest.v2.provides.none { it.point == WebViewProviders.POINT }) {
+            throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "only an app that shows droidtop's web pages may")
+        }
+    }
 }
 
 /** What droidtop's web view ([WebSessionActivity]) is asked to show: a plugin's session, or a store's own pages. */

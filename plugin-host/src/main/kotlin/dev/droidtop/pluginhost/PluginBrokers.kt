@@ -525,6 +525,8 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun webSession(request: WebSessionRequest): WebSessionResult? = WebSessionActivity.show(appContext, request)
 
+    override fun webViewFinish(pluginId: String, token: String, args: JSONObject): Boolean = WebViewProviders.finish(appContext, pluginId, token, args)
+
     private val mediaLibrary by lazy { AndroidMediaLibrary(appContext) }
 
     override fun media(): MediaLibrary = mediaLibrary

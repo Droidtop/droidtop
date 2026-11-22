@@ -331,11 +331,14 @@ class WebSessionActivity : Activity() {
          * main thread. False when the view could not be started, and then [onClosed] is never called.
          */
         fun open(context: Context, request: WebSessionRequest, onClosed: (WebSessionResult) -> Unit): Boolean {
+            val sites = runCatching { DownloadSites.cookies(context, except = request.domains) }.getOrNull().orEmpty()
+            // An app that provides web.view (droidtop Browser) shows the page on its own engine when the person has it
+            // (docs/plugin-api.md 3 G3a); droidtop keeps the session and the downloads either way.
+            if (WebViewProviders.open(context, request, sites, onClosed)) return true
             val id = UUID.randomUUID().toString()
             closers[id] = onClosed
             requests[id] = request
-            runCatching { DownloadSites.cookies(context, except = request.domains) }.getOrNull()
-                ?.takeIf { it.isNotEmpty() }?.let { siteCookies[id] = it }
+            sites.takeIf { it.isNotEmpty() }?.let { siteCookies[id] = it }
             val intent = Intent(context, WebSessionActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(EXTRA_ID, id)

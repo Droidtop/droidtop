@@ -44,6 +44,9 @@ object ExtensionPoints {
         // saves, as roots, never files. Used only past the checks C10 and D12; droidtop writes nothing for them alone.
         ExtensionPoint("engines.cores", "Which game engines it runs", PointRisk.LOW, lets = "Lets it tell droidtop which game engines its app can run, and which it can get."),
         ExtensionPoint("saves.roots", "Where your games' saves are kept", PointRisk.MEDIUM, lets = "Lets it tell droidtop the folders its app keeps your games' saves in."),
+        // docs/plugin-api.md 3 G3a: an app (droidtop Browser) that shows droidtop's sign-in, check and download pages on
+        // its own engine. High: it sees your sign-in on the sites your plugins use while a page is open.
+        ExtensionPoint("web.view", "Show droidtop's web pages", PointRisk.HIGH, lets = "Lets its app show droidtop's sign-in, browser-check and download pages, with your sign-in on those sites while a page is open."),
         ExtensionPoint("achievements.provider", "Achievements", PointRisk.MEDIUM, lets = "Lets it show achievements for your games."),
         ExtensionPoint("launch.provider", "Launch games", PointRisk.HIGH, lets = "Lets it decide what runs when you launch a game."),
         ExtensionPoint("launch.game_settings", "Per-game settings", PointRisk.LOW, lets = "Lets it add settings to a game's own page."),
