@@ -7,12 +7,11 @@ package dev.droidtop.runtime
  * PC runner model's decision (`library-core`'s `RunnerAvailability`), not
  * this class's.
  *
- * If the binary is x86/x86-64 (the common case), translation would have
- * to happen transparently through FEX's `binfmt_misc` registration
- * (docs/SPEC.md 3c), which droidtop does not set up; the runner model
- * reads the registration and holds such a build at "needs setup" rather
- * than launching it. A genuinely ARM64-native binary runs through this
- * class as it is.
+ * The container is the game's Linux games container ([LinuxGames]). On an
+ * arm64 device an x86 binary runs through FEX: the caller builds the
+ * command ([dev.droidtop.shared.runners.TranslatedCommand], or a Ren'Py
+ * launcher's variables) and passes FEX's own variables in [launch]'s env
+ * (docs/SPEC.md 3c). An arm64 binary runs as it is.
  */
 class NativeLinuxGameSession(
     val container: Container,

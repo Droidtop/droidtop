@@ -247,6 +247,7 @@ internal fun primaryActionLabel(option: dev.droidtop.library.RunnerOption): Stri
     RunnerAction.INSTALL_ENGINEHOST_PLUGIN -> "Get engine support"
     RunnerAction.INSTALL_KIRIKIROID2 -> "Install Kirikiroid2"
     RunnerAction.SET_UP_WINDOWS_GAMES -> "Set up Windows games"
+    RunnerAction.SET_UP_LINUX_GAMES -> "Set up Linux games"
     RunnerAction.CHOOSE_ENGINE_VERSION,
     null -> "Choose a runner"
 }

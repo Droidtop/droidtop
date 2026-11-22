@@ -52,6 +52,7 @@ object LinuxGameToolsCatalog {
         }
         val runtime = PcGameRuntimeRegistry.runtime
         val ownHome = withContext(Dispatchers.IO) { LinuxGameOptionsPrefs.ownHome(context, target.entryId) }
+        val ownContainer = withContext(Dispatchers.IO) { LinuxGameOptionsPrefs.ownContainer(context, target.entryId) }
         val up = runtime?.isLinuxContainerAvailable == true
         val gameRoot = File(target.gameRoot)
         return listOf(
@@ -61,9 +62,17 @@ object LinuxGameToolsCatalog {
                 items = listOf(
                     ActionItem(
                         id = "linux_tools_where",
-                        title = "Runs in Desktop mode's container",
-                        subtitle = if (up) "The container is running" else "The container is not running. Start Desktop mode first: these tools act inside it",
+                        // docs/SPEC.md 3c: a Linux games container beside Desktop mode, the game's own or the shared one.
+                        title = if (ownContainer) "Runs in its own Linux games container" else "Runs in the shared Linux games container",
+                        subtitle = if (up) "Desktop mode is running" else "Desktop mode is not running. Start it first: these tools act beside it",
                         value = if (ownHome) "Own home" else "Shared home",
+                    ),
+                    ToggleItem(
+                        id = "linux_tools_own_container",
+                        title = "Give this game its own container",
+                        subtitle = "Set up on its next start, as a prefix of its own",
+                        current = ownContainer,
+                        onToggle = { ctx, on -> withContext(Dispatchers.IO) { LinuxGameOptionsPrefs.setOwnContainer(ctx, target.entryId, on) } },
                     ),
                     ToggleItem(
                         id = "linux_tools_own_home",
