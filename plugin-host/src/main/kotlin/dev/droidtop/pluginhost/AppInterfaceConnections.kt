@@ -17,6 +17,14 @@ import kotlinx.coroutines.withTimeoutOrNull
  * is shared by the runners that use it and let go a while after the last one releases it, so the app is not kept
  * running for nothing. The broker droidtop hands the app does not depend on the binding: the app keeps it.
  */
+/**
+ * Whether a binding can be used again: its runtime is alive, or it is still connecting for the first time. One whose
+ * app went away (disconnected, runtime null) after it had connected is not: its first answer is spent, so reusing it
+ * waited on nothing or handed back the dead runtime. Before, `isBinderAlive != false` let a null runtime through.
+ */
+internal fun appBindingReusable(runtimeAlive: Boolean?, firstAnswerSpent: Boolean): Boolean =
+    runtimeAlive == true || (runtimeAlive == null && !firstAnswerSpent)
+
 internal object AppInterfaceConnections {
     /** How long a binding nobody uses is kept before droidtop lets the app go. */
     private const val IDLE_MS = 2 * 60_000L
@@ -38,7 +46,7 @@ internal object AppInterfaceConnections {
         val target = record.manifest.app ?: return null
         val app = context.applicationContext ?: context
         val entry = synchronized(this) {
-            bound[id]?.takeIf { it.runtime?.asBinder()?.isBinderAlive != false }?.also { it.users++ } ?: run {
+            bound[id]?.takeIf { appBindingReusable(it.runtime?.asBinder()?.isBinderAlive, it.ready.isCompleted) }?.also { it.users++ } ?: run {
                 bound.remove(id)?.let { old -> runCatching { app.unbindService(old.connection) } }
                 val ready = CompletableDeferred<IPluginRuntime?>()
                 val connection = object : ServiceConnection {

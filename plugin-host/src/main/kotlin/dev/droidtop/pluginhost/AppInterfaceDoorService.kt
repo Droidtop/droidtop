@@ -18,8 +18,6 @@ import kotlinx.coroutines.launch
  * door carries no data: everything after it goes through the plugin's broker, under its grants.
  */
 class AppInterfaceDoorService : Service() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     private val door = object : IAppInterfaceDoor.Stub() {
         override fun knock(): Boolean {
             val uid = Binder.getCallingUid()
@@ -34,11 +32,14 @@ class AppInterfaceDoorService : Service() {
                 }
                 // Checked again here, before saying yes: the app may have been re-signed since it was approved.
                 if (AppInterfaces.verifyRecord(context, record) != null) return false
-                scope.launch {
+                connecting.launch {
                     val policy = PluginCrashPolicy(context)
                     try {
                         when (val refusal = policy.connectApp(record)) {
-                            null -> PluginBrokers.enginesChanged(record.manifest.id)
+                            null -> {
+                                Log.i("droidtop.plugin", "${record.manifest.id}: the door connected it")
+                                PluginBrokers.enginesChanged(record.manifest.id)
+                            }
                             else -> Log.w("droidtop.plugin", "${record.manifest.id}: the door did not connect it: $refusal")
                         }
                     } finally {
@@ -54,12 +55,15 @@ class AppInterfaceDoorService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = if (intent?.action == AppInterfaceTrust.DOOR_ACTION) door else null
 
-    override fun onDestroy() {
-        super.onDestroy()
-        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
-    }
-
     companion object {
+        /**
+         * Where a knock's connection runs: the process's, not this service's. A knocking app unbinds the door as soon as it
+         * is answered, which destroys this service; a scope of the service's own was cancelled with it, so the connection
+         * never finished and nothing said so (droidtop Browser on the console, 2026-11-22: "droidtop opened its door" and
+         * then no broker, and no line from droidtop).
+         */
+        private val connecting = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
         /**
          * The plugin of the app calling as [uid]: an app interface plugin whose app is one of the uid's packages, and
          * which may run (approved and turned on). Null for anyone else.
