@@ -62,9 +62,10 @@ object WebViewProviders {
      */
     fun provider(context: Context): PluginRecord? {
         val grants = PluginGrants.forContext(context)
+        val resolution = PluginApiResolver.current(context)
         return PluginStore.installed(context)
             .asSequence()
-            .filter { it.manifest.kind == PluginKind.APP_INTERFACE && it.runnable() && !PluginApiResolver.isWaiting(it.manifest.id) }
+            .filter { it.manifest.kind == PluginKind.APP_INTERFACE && it.runnable() && !resolution.isWaiting(it.manifest.id) }
             .filter { record -> record.manifest.v2.provides.any { it.point == POINT && ExtensionPoints.supports(it.point, it.version) } }
             .filter { PluginGrants.pointRefusal(it, grants.read(it.manifest.id), POINT) == null }
             .firstOrNull { record -> AppInterfaces.verifyRecord(context, record) == null }
