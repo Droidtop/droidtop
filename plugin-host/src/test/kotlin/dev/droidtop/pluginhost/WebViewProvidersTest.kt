@@ -135,4 +135,16 @@ class WebViewProvidersTest {
         assertEquals(10L, result.download!!.size)
         assertFalse("a page is answered once", call(app(), "finish", JSONObject().put("token", token)).ok)
     }
+
+    @Test
+    fun `a page the app never takes is withdrawn from it, and one it took stays its own`() {
+        val untaken = WebViewProviders.register("dev.droidtop.browser", request(WebSessionRequest.Mode.SIGN_IN), emptyMap()) { results += it }
+        assertTrue(WebViewProviders.withdrawUntaken(untaken))
+        assertFalse("a withdrawn page is refused to the app", call(app(), "take_request", JSONObject().put("token", untaken)).ok)
+        assertTrue("withdrawing answers nobody: droidtop's own view does", results.isEmpty())
+
+        val taken = WebViewProviders.register("dev.droidtop.browser", request(WebSessionRequest.Mode.SIGN_IN), emptyMap()) { results += it }
+        call(app(), "take_request", JSONObject().put("token", taken))
+        assertFalse(WebViewProviders.withdrawUntaken(taken))
+    }
 }

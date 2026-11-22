@@ -334,7 +334,16 @@ class WebSessionActivity : Activity() {
             val sites = runCatching { DownloadSites.cookies(context, except = request.domains) }.getOrNull().orEmpty()
             // An app that provides web.view (droidtop Browser) shows the page on its own engine when the person has it
             // (docs/plugin-api.md 3 G3a); droidtop keeps the session and the downloads either way.
-            if (WebViewProviders.open(context, request, sites, onClosed)) return true
+            val app = context.applicationContext
+            val shownInApp = WebViewProviders.open(context, request, sites, onClosed) {
+                // The app never took the page: droidtop's own view shows it, and the caller is answered from there.
+                if (!openOwn(app, request, sites, onClosed)) onClosed(WebSessionResult(false, null, null))
+            }
+            return shownInApp || openOwn(context, request, sites, onClosed)
+        }
+
+        /** droidtop's own view for [request], with droidtop's signed-in download [sites]: false when it could not be started. */
+        private fun openOwn(context: Context, request: WebSessionRequest, sites: Map<String, String>, onClosed: (WebSessionResult) -> Unit): Boolean {
             val id = UUID.randomUUID().toString()
             closers[id] = onClosed
             requests[id] = request

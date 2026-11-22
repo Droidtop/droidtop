@@ -1324,7 +1324,15 @@ internal fun AppSettingsCatalogs.pluginPageTop(
     val state = pluginState(record, grants, runtimeNeed, offer != null, PluginApiResolver.current(context).waiting[m.id])
     val chips = listOfNotNull(
         CatalogChip(state, ok = state == "Running"),
-        CatalogChip(if (isUnofficial(m.origin, userKeys)) "Unofficial" else pluginTrustBadge(m.origin, userKeys, catalogNames)),
+        CatalogChip(
+            when {
+                // An app's plugin is trusted by its app's signature, not an origin key (Droidtop/tracker#547), as its row in the
+                // list says: the console showed droidtop Browser, signed by its pinned key, as "NOT TRUSTED" here (2026-11-22).
+                m.kind == PluginKind.APP_INTERFACE -> if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) "Official" else "Unofficial"
+                isUnofficial(m.origin, userKeys) -> "Unofficial"
+                else -> pluginTrustBadge(m.origin, userKeys, catalogNames)
+            },
+        ),
         PluginTiers.badge(record, grants)?.let { CatalogChip("Full access") },
     )
     val icon = PluginStore.iconFile(context, record)

@@ -55,13 +55,13 @@ object BrowserInstall {
      */
     suspend fun install(context: Context, onStatus: (String) -> Unit): String {
         val signers = AppInterfaceTrust.OFFICIAL[PACKAGE].orEmpty()
-        if (signers.isEmpty()) return "This droidtop does not know $LABEL's signing key"
-        onStatus("Looking for the newest $LABEL")
+        if (signers.isEmpty()) return "No signing key known"
+        onStatus("Checking")
         val release = withContext(Dispatchers.IO) {
             runCatching { pick(Http.getJson(RELEASES), Build.SUPPORTED_ABIS.toList().filter { it in ABIS }.ifEmpty { ABIS }) }.getOrNull()
-        } ?: return "GitHub did not say where $LABEL is for this device"
+        } ?: return "None for this device"
         val installed = installedVersion(context)
-        if (isCurrent(installed, release.tag)) return "$LABEL is up to date (${release.tag})"
+        if (isCurrent(installed, release.tag)) return "Up to date"
         val result: PluginResult = DownloadJobs.run(
             context = context,
             title = if (installed == null) "Install $LABEL" else "Update $LABEL",
@@ -73,6 +73,6 @@ object BrowserInstall {
             extra = AppCatalogs.Expected(PACKAGE, 0L, signers).toArgs() + (AppCatalogs.ARG_LABEL to LABEL),
             onStatus = onStatus,
         )
-        return if (result.ok) result.values["message"] ?: "$LABEL ${release.tag} is in Downloads" else result.error ?: "$LABEL could not be downloaded"
+        return if (result.ok) "In Downloads" else result.error ?: "Download failed"
     }
 }

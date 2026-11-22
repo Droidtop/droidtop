@@ -36,6 +36,9 @@ object WebViewProviders {
 
     /** How long a page shown in the app waits for the person; then the answer is "nothing done", as in droidtop's view. */
     private const val TIMEOUT_MS = 10L * 60 * 1000
+
+    /** How long the app has to take a page it was started for before droidtop shows it in its own view instead. */
+    private const val TAKE_MS = 30_000L
     private const val MAX_TEXT = 4096
     private const val TAG = "droidtop.WebSession"
 
@@ -74,8 +77,17 @@ object WebViewProviders {
     /**
      * Shows [request] in the provider's app and returns at once, true when it was started; [onClosed] gets the answer on
      * the main thread. False (and [onClosed] never called) when no app provides `web.view` or it could not be started.
+     * When the app has not taken the page within [TAKE_MS] (it crashed starting, as droidtop Browser's first build did on
+     * the console, 2026-11-22), the page is withdrawn from it and [fallback] shows it in droidtop's own view instead, on
+     * the main thread, so the person is never left waiting on an app that is not there.
      */
-    fun open(context: Context, request: WebSessionRequest, sites: Map<String, String>, onClosed: (WebSessionResult) -> Unit): Boolean {
+    fun open(
+        context: Context,
+        request: WebSessionRequest,
+        sites: Map<String, String>,
+        onClosed: (WebSessionResult) -> Unit,
+        fallback: () -> Unit,
+    ): Boolean {
         if (request.mode == WebSessionRequest.Mode.BROWSE) return false
         val record = runCatching { provider(context) }.onFailure { Log.w(TAG, "web.view provider could not be read", it) }.getOrNull() ?: return false
         val packageName = record.manifest.app?.packageName ?: return false
@@ -90,8 +102,21 @@ object WebViewProviders {
             return false
         }
         Log.i(TAG, "${request.mode.name.lowercase()} for ${request.label} shown in ${record.manifest.label}")
+        main.postDelayed({
+            if (withdrawUntaken(token)) {
+                Log.w(TAG, "${record.manifest.label} did not take the page in ${TAKE_MS / 1000} s; showing it in droidtop's own view")
+                fallback()
+            }
+        }, TAKE_MS)
         main.postDelayed({ close(token, WebSessionResult(false, null, null)) }, TIMEOUT_MS)
         return true
+    }
+
+    /** Takes back a page its app never took, true when it did: the caller then shows it another way, and the app is refused it. */
+    internal fun withdrawUntaken(token: String): Boolean {
+        val asked = pending[token] ?: return false
+        if (asked.taken) return false
+        return pending.remove(token, asked)
     }
 
     /** A page given to [pluginId]'s app, by its new one-use token. */
