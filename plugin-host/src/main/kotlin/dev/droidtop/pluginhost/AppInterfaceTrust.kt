@@ -53,10 +53,12 @@ object AppInterfaceTrust {
     /**
      * The official app certificates, by package: the SHA-256 of each one's signing certificate (lowercase hex). An app
      * signed by one of these is Official. Enginehost's is its release certificate (the v2 signer of enginehost-latest.apk,
-     * Droidtop/tracker#547).
+     * Droidtop/tracker#547). droidtop Browser's is the APK leaf derived from the droidtop root for subject
+     * "apk:Droidtop/droidtop-browser" (`plugin-key-provision apk`, deterministic, so it never changes; Droidtop/tracker#605).
      */
     val OFFICIAL: Map<String, Set<String>> = mapOf(
         "dev.enginehost" to setOf("56ad873eefebacfbbd5662b3b8bd0b094b6ac2d86f27933b257080d04951bf35"),
+        "dev.droidtop.browser" to setOf("01c31027da4c4623639563fdb7977d5d62be4182ffcb5c73eacf3bf0e88b3705"),
     )
 
     /**

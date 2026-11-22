@@ -1117,10 +1117,26 @@ object AppSettingsCatalogs {
                         valueLabel = { if (activeIntegrations == 0) "None" else "$activeIntegrations active" },
                         icon = CatalogIcon.INTEGRATIONS,
                     ),
+                    browserRow(context),
                 ),
             ),
             // What droidtop can set on Android itself, through the elevated access above (Droidtop/tracker#816).
             DeviceSetupRows.group(context),
+        )
+    }
+
+    /**
+     * droidtop Browser (docs/SPEC.md 12a, `BrowserInstall`): droidtop installs and updates it, so its sign-in, check and
+     * download pages run on a current engine. Pressing it gets the newest release; the value is the version installed.
+     */
+    private fun browserRow(context: Context): CatalogItem {
+        val installed = dev.droidtop.library.integrations.BrowserInstall.installedVersion(context)
+        return AsyncActionItem(
+            id = "accounts_droidtop_browser",
+            title = dev.droidtop.library.integrations.BrowserInstall.LABEL,
+            subtitle = "Shows sites' sign-in and check pages on a current browser engine",
+            value = installed ?: "Install",
+            run = { ctx, onStatus -> dev.droidtop.library.integrations.BrowserInstall.install(ctx, onStatus) },
         )
     }
 
