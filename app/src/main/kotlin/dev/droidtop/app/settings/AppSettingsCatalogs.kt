@@ -128,6 +128,7 @@ object AppSettingsCatalogs {
     const val SCREEN_PLUGIN_KEYS = "plugin_keys"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
     const val SCREEN_ACCOUNTS_AND_SOURCES = "accounts_and_sources"
+    const val SCREEN_INTERNET = "internet"
     const val SCREEN_ANDROID_SETTINGS = "android_settings"
     const val SCREEN_ENGINEHOST = "enginehost"
     const val SCREEN_UPDATES = "updates"
@@ -199,6 +200,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(StoresCatalog.screen())
         SettingsScreenRegistry.register(SocialCatalog.screen())
         SettingsScreenRegistry.register(accountsAndSourcesScreen())
+        SettingsScreenRegistry.register(internetScreen())
         SettingsScreenRegistry.register(androidSettingsScreen())
         SettingsScreenRegistry.register(enginehostScreen())
         SettingsScreenRegistry.register(UpdatesPage.screen())
@@ -1062,6 +1064,65 @@ object AppSettingsCatalogs {
                     ),
                 ),
             ),
+            // The person's own network shares and cloud storage (docs/SPEC.md "Network and cloud storage", Droidtop/tracker#573).
+            StorageSharesCatalog.group(context),
+            CatalogGroup(
+                id = "accounts_plugins",
+                title = "Plugins and integrations",
+                items = ElevatedAccessCatalog.rows(context) + listOf(
+                    NestedScreenItem(
+                        id = "accounts_plugins_screen",
+                        title = "Plugins",
+                        registryId = SCREEN_PLUGINS,
+                        valueLabel = { pluginsValueLabel },
+                    ),
+                    NestedScreenItem(
+                        id = "accounts_integrations_screen",
+                        title = "App integrations",
+                        registryId = SCREEN_INTEGRATIONS,
+                        valueLabel = { if (activeIntegrations == 0) "None" else "$activeIntegrations active" },
+                        icon = CatalogIcon.INTEGRATIONS,
+                    ),
+                ),
+            ),
+            // What droidtop can set on Android itself, through the elevated access above (Droidtop/tracker#816).
+            DeviceSetupRows.group(context),
+        )
+    }
+
+    /**
+     * Settings > Internet (owner, 2026-11-22: "reflow the settings to put internet settings together, so we can present
+     * our own browser with deeper integration"; docs/SPEC.md "Settings layout"): droidtop Browser and the engine droidtop's
+     * web pages open in, then the sign-ins droidtop keeps for the web: download sites, file hosts and debrid services,
+     * moved here from Accounts and sources (one home per setting).
+     */
+    private fun internetScreen() = CatalogScreen(
+        id = SCREEN_INTERNET,
+        title = "Internet",
+        groups = { context -> internetGroups(context) },
+    )
+
+    private suspend fun internetGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        listOf(
+            CatalogGroup(
+                id = "internet_browser",
+                title = "Browser",
+                items = listOf(browserRow(context), webEngineRow(context)),
+            ),
+            // droidtop's own sign-ins for download sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648).
+            CatalogGroup(
+                id = "accounts_download_sites",
+                title = "Download sites",
+                items = downloadSiteRows(context) + addDownloadSiteRow(),
+            ),
+            CatalogGroup(
+                id = "accounts_hosts",
+                title = "File hosts",
+                items = listOf(
+                    guidedKeyRow(context, ScraperKeyService.PIXELDRAIN, "PixelDrain"),
+                    guidedKeyRow(context, ScraperKeyService.GOFILE, "GoFile"),
+                ),
+            ),
             CatalogGroup(
                 id = "accounts_debrid",
                 title = "Debrid services",
@@ -1084,44 +1145,6 @@ object AppSettingsCatalogs {
                     ),
                 ),
             ),
-            CatalogGroup(
-                id = "accounts_hosts",
-                title = "File hosts",
-                items = listOf(
-                    guidedKeyRow(context, ScraperKeyService.PIXELDRAIN, "PixelDrain"),
-                    guidedKeyRow(context, ScraperKeyService.GOFILE, "GoFile"),
-                ),
-            ),
-            // The person's own network shares and cloud storage (docs/SPEC.md "Network and cloud storage", Droidtop/tracker#573).
-            StorageSharesCatalog.group(context),
-            // droidtop's own sign-ins for download sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648).
-            CatalogGroup(
-                id = "accounts_download_sites",
-                title = "Download sites",
-                items = downloadSiteRows(context) + addDownloadSiteRow(),
-            ),
-            CatalogGroup(
-                id = "accounts_plugins",
-                title = "Plugins and integrations",
-                items = ElevatedAccessCatalog.rows(context) + listOf(
-                    NestedScreenItem(
-                        id = "accounts_plugins_screen",
-                        title = "Plugins",
-                        registryId = SCREEN_PLUGINS,
-                        valueLabel = { pluginsValueLabel },
-                    ),
-                    NestedScreenItem(
-                        id = "accounts_integrations_screen",
-                        title = "App integrations",
-                        registryId = SCREEN_INTEGRATIONS,
-                        valueLabel = { if (activeIntegrations == 0) "None" else "$activeIntegrations active" },
-                        icon = CatalogIcon.INTEGRATIONS,
-                    ),
-                    browserRow(context),
-                ),
-            ),
-            // What droidtop can set on Android itself, through the elevated access above (Droidtop/tracker#816).
-            DeviceSetupRows.group(context),
         )
     }
 
@@ -1137,6 +1160,26 @@ object AppSettingsCatalogs {
             subtitle = "Shows sites' sign-in and check pages on a current browser engine",
             value = installed ?: "Install",
             run = { ctx, onStatus -> dev.droidtop.library.integrations.BrowserInstall.install(ctx, onStatus) },
+        )
+    }
+
+    /**
+     * Which engine droidtop's web pages open in now (docs/plugin-api.md G3a): droidtop Browser when its plugin is approved
+     * and allowed, otherwise the device's WebView, named with its version, since an old one is why a site's check fails.
+     * Reads the plugin store and the browser's APK: off the main thread.
+     */
+    private fun webEngineRow(context: Context): CatalogItem {
+        val browser = runCatching { dev.droidtop.pluginhost.WebViewProviders.provider(context) }.getOrNull()
+        val webView = if (android.os.Build.VERSION.SDK_INT >= 26) android.webkit.WebView.getCurrentWebViewPackage()?.versionName else null
+        return ActionItem(
+            id = "internet_web_engine",
+            title = "Web pages open in",
+            subtitle = "Sign-ins, site checks and download pages",
+            value = when {
+                browser != null -> dev.droidtop.library.integrations.BrowserInstall.LABEL
+                webView != null -> "Android WebView ${webView.substringBefore('.')}"
+                else -> "Android WebView"
+            },
         )
     }
 

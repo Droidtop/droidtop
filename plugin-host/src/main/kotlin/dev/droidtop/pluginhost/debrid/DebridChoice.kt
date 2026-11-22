@@ -24,7 +24,7 @@ sealed interface DebridCost {
  * services and kept a few minutes, so a queue of jobs does not ask once per job.
  */
 object DebridChoice {
-    /** :app sets this: whether spread mode is on (Settings > Accounts and sources > Debrid services). */
+    /** :app sets this: whether spread mode is on (Settings > Internet > Debrid services). */
     @Volatile var spreadMode: () -> Boolean = { false }
 
     /**

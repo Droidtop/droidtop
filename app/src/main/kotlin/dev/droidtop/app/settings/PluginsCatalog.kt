@@ -1798,7 +1798,7 @@ internal fun AppSettingsCatalogs.pluginPermissionGroups(context: Context, plugin
             id = "plugin_permissions_download_sites",
             title = "Use your download-site sign-ins",
             subtitle = "For ${sites.joinToString { it.name }}: when ${record.manifest.label} has no sign-in of its own there, " +
-                "it uses the one under Accounts and sources > Download sites. It never sees your password",
+                "it uses the one under Internet > Download sites. It never sees your password",
             current = dev.droidtop.pluginhost.DownloadSites.sharing(context, pluginId),
             onToggle = { ctx, on -> dev.droidtop.pluginhost.DownloadSites.setSharing(ctx, pluginId, on) },
         )

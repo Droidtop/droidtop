@@ -793,7 +793,7 @@ object DownloadJobs {
             part[ARG_HEADERS]?.let { raw -> JSONObject(raw).let { o -> o.keys().forEach { put(it, o.getString(it)) } } }
             part[ARG_NAME]?.let { secretHeaders[it] }?.let { putAll(it) }
         }
-        // A file on a download site the person signed in to under Accounts and sources sends that site's cookies
+        // A file on a download site the person signed in to under Internet sends that site's cookies
         // (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648): read now, from droidtop's vault, so they are never
         // in the job's persisted arguments and a restarted job still has them.
         val url = part[ARG_URL] ?: return given
