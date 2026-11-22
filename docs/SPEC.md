@@ -27,7 +27,7 @@ commit and, for a design choice, in the section it belongs to here. This holds f
 - [3. Containers](#3-containers)
 - [3a. Image index — populated live, not a pinned/prepopulated catalog](#3a-image-index--populated-live-not-a-pinnedprepopulated-catalog)
 - [3b. Other architectures and OSes via QEMU, the one virtualization layer](#3b-other-architectures-and-oses-via-qemu-the-one-virtualization-layer)
-- [3c. FEX-Emu — x86/x86-64 emulation for Linux software in general, not just Wine](#3c-fex-emu--x86x86-64-emulation-for-linux-software-in-general-not-just-wine)
+- [3c. FEX-Emu: x86 Linux programs, and containers of either architecture](#3c-fex-emu-x86-linux-programs-and-containers-of-either-architecture)
 - [3d. User-facing container/distro management (directed 2026-08-30)](#3d-user-facing-containerdistro-management-directed-2026-08-30)
 - [4. Display](#4-display)
 - [4a. Networking & VPN (directed 2026-08-30)](#4a-networking--vpn-directed-2026-08-30)
@@ -3152,8 +3152,8 @@ That decision settles *whether*, replacing this section's earlier framing as
 an optional value-add. The constraints below stand.
 
 `ContainerRuntime` (§3) covers droidtop's actual workflow — Linux
-containers and Wine/Box64 for Windows, both same-architecture (ARM64
-containers, x86 binaries translated, never a different-arch *guest
+containers and Wine/Box64 for Windows: containers of either architecture,
+x86 programs translated in user space by FEX or Box64 (§3c), never a different-arch *guest
 kernel*). None of that requires this section. What this section adds: let a user boot an **arbitrary-architecture VM** (x86_64,
 RISC-V, another ARM variant, etc.) via QEMU, with libvirt-style management
 around it if that proves worth building — genuinely useful (dev/testing
@@ -3189,60 +3189,62 @@ droidtop's normal desktop/gaming workflow to work.
   (acceleration conditionality, root-when-helpful) now so it isn't designed
   blind later, not committing to an implementation yet.
 
-## 3c. FEX-Emu — x86/x86-64 emulation for Linux software in general, not just Wine
+## 3c. FEX-Emu: x86 Linux programs, and containers of either architecture
 
-GameNative (`:runtime-windows`'s source, §5, §9) already has real, working FEX-Emu integration alongside
-Box64 — `FEXCorePresetsDialog.kt`/`Box64PresetsDialog.kt` in its settings
-UI, both selectable CPU-translation backends for the same Wine prefix.
-Once `:runtime-windows`'s `WineSession.launch()` is actually ported from
-gamenative (§10, still a `TODO()` stub), droidtop inherits FEX-as-a-Wine-
-backend option for free — no new work needed there.
+**Decided (owner, 2026-11-22).** Linux games run natively in containers, through FEX where they are x86, and a
+container is either architecture:
 
-**What's genuinely new here**: FEX is useful independent of Wine
-entirely, for running **x86/x86-64 Linux software** — Flatpaks, native
-Linux apps, anything shipped only as an x86_64 ELF binary — inside
-droidtop's own Alpine/Debian/etc. containers (§3), the same category of
-value as §3b's QEMU/libvirt but scoped to userspace binary translation
-instead of a full VM guest kernel:
+- "We wanna get windows and linux games running normally. Can we test using a renpy game in the linux container, to
+  see if we can just run the game natively using fex?"
+- "We want to be able to run per-game containers, just like wineprefixes"
+- "since we can run x86 wine in fex, or arm wine with fex running the game, can we adapt that same system for
+  containers, letting us run either x86 or arm containers?"
 
-- **Mechanism**: FEX ships real `binfmt_misc` registration files
-  (`FEX-x86_64.conf.in`) so the kernel auto-invokes `FEXLoader` whenever an
-  x86/x86-64 ELF is executed — genuinely transparent ("run it like a
-  native binary") once registered, not a manual wrapper-script
-  invocation. FEX also supports 32-bit x86, not just x86-64 — a real gap
-  Box64 alone has (Box64 is x86-64-only; Steam's own tooling, for one
-  concrete example, needs both).
-- **binfmt_misc registration needs root** — writing to
-  `/proc/sys/fs/binfmt_misc/register` is a host-kernel-level operation.
-  This works cleanly for `DroidSpacesRuntime`'s root path (already
-  requires root for namespaces/cgroups — no new privilege requirement),
-  but the no-root `ProotRuntime` path can't register a kernel-level
-  interpreter at all; FEX would still work there, just via explicit
-  `FEXInterpreter <binary>` invocation instead of transparent execution —
-  a real capability difference between the two backends, not just a
-  performance one, that needs to be visible wherever this gets surfaced in
-  the UI.
-- **Official position, and why it doesn't block droidtop anyway**:
-  FEX-Emu's own docs are explicit that Android is not a target and never
-  will be, because Termux-style proot-over-Android environments have
-  fundamental Linux-compatibility gaps FEX can't paper over. That caveat is
-  about running FEX directly against Android's own userspace — it doesn't
-  apply to droidtop's actual model, where FEX would run *inside* a real
-  Linux container (namespaced under `DroidSpacesRuntime`, or prooted under
-  `ProotRuntime` — either way a real Linux rootfs, not Android's own
-  userspace), which is exactly the environment FEX is built for.
-- **RootFS management**: FEX's own `FEXRootFSFetcher` needs host utilities
-  (curl, squashfuse/unsquashfs or erofsfuse) to pull its translation
-  rootfs — worth checking those are available/buildable in droidtop's
-  container images before assuming this "just works," not verified yet.
-- **Not designed in detail or implemented** — this is a real, grounded
-  value-add candidate (unlike §3b's QEMU/libvirt VMs, which are genuinely
-  optional, FEX for x86 Linux software is closer to a natural extension of
-  §3's existing container model), but nothing here is built: no
-  `binfmt_misc` registration code, no FEX binary bundling/cross-compile
-  step (it would ship in `nativeLibraryDir` like crane and proot, §3 —
-  an extracted asset cannot be executed above targetSdk 28), no UI
-  surface.
+**A container's architecture is its own setting, chosen like a prefix's Wine build (§5a).**
+- **arm64 container:** an arm64 image, run natively. An x86 or x86_64 program inside it runs through FEX, which sees an
+  x86 rootfs laid over the container for that program's libraries. This is the Linux side of "arm Wine with FEX
+  running the game". Most Linux PC games are this case: a Ren'Py build ships `lib/py*-linux-x86_64` (and `i686`), and
+  its `.sh` launcher picks a library folder by `uname -m`, which finds none on arm64. droidtop starts the x86_64
+  launcher through FEX itself.
+- **x86 container:** a `linux/amd64` (or `linux/386`) image, its whole userland translated, as x86 Wine runs in FEX.
+  It is built the way FEX itself is meant to run: a small arm64 glibc layer holding FEX, with the pulled x86 image as
+  FEX's RootFS. No guest kernel is involved (that is §3b's QEMU, a different job).
+- **The translator is a per-container choice with a default**, as for prefixes: FEX, which covers 32- and 64-bit x86,
+  or Box64 for x86_64 only. droidtop picks the default from the device and the program and says which it picked. The
+  person can change it.
+- **FEX needs a glibc host.** droidtop's primary container is Alpine (musl, §3), so FEX never runs in it. A container
+  that runs x86 programs is made from a glibc image (Debian or Ubuntu).
+
+**Per-game containers, as per-game prefixes.** A game may have a container of its own, made for it the first time it
+runs, exactly as a Wine game gets its own prefix (§5b). It is one mechanism with §3's sibling containers and the home
+model of the desktop stack:
+- A game's container is a sibling container with the game attached. It shares the person's home, runs isolated with
+  a private home, or maps a different home, the way prefixes are layered.
+- Several games may share one container, as several games may share one prefix. Which is the default is set in
+  droidtop's game settings, with the same choices as prefixes.
+- The game's files stay where they are and are bound in. droidtop never copies or moves them.
+
+**How FEX gets into a container.** droidtop installs it; the person never does it by hand:
+- FEX's own packages go into a glibc container through the image's package manager, from FEX's published repository
+  for that distro.
+- The x86 rootfs comes from FEX's published images, fetched through droidtop's download system (aria2,
+  DownloadJobs), unpacked into the container's data, and recorded in FEX's config for that container. It is shared
+  between containers of the same distro, never downloaded twice.
+
+**Running FEX without root.** Registering FEX with the kernel (`binfmt_misc`) needs root.
+- With root (`DroidSpacesRuntime`), FEX is registered and x86 programs run like native ones.
+- Without root (`ProotRuntime`, the normal case), droidtop runs x86 programs explicitly as `FEX <program>`. Inside an
+  x86 container every program goes through FEX, so the session's shell and its children start under it.
+- Whether FEX works fully under proot's ptrace is not yet known. FEX's documentation says Android's own userspace is
+  not a target, but a proot container is a real glibc Linux userspace. This is what the first console check answers.
+
+**Status (2026-11-22): not built.** The tasks, in order:
+1. The container's architecture and translator in the container model and the container screens.
+2. FEX installed into a glibc container, and its x86 rootfs fetched and recorded.
+3. `NativeLinuxGameSession` runs an x86 program through FEX on arm64, and a Ren'Py Linux build starts its own
+   launcher for the right architecture.
+4. Per-game containers: made on a game's first run, with the prefix-style home and sharing choices.
+5. x86 containers: the x86 image as FEX's RootFS behind a small arm64 layer.
 
 ## 3d. User-facing container/distro management (directed 2026-08-30)
 
@@ -8205,7 +8207,7 @@ The pieces behind the seam:
   with per-invocation env vars prepended as inline POSIX assignments
   because `run` has no env flag; `ProotRuntime.exec` runs the command as
   its own proot session in the container's rootfs (§3). An x86 Linux
-  binary additionally needs §3c's FEX registration, which is not built.
+  binary additionally needs FEX (§3c), which is not built yet.
 
 ## 5b. One Wine engine, one prefix store, whichever backend is live (assessed 2026-09-02)
 
