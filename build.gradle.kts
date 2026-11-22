@@ -24,6 +24,16 @@ subprojects {
     }
 }
 
+// Robolectric fetches its Android jars from Google's mirror of Maven Central: Maven Central itself answered CI with
+// "Server returned HTTP response code: 429" for android-all-instrumented-14-robolectric-10818077-i7, failing every
+// Robolectric class in library-core (runs 44972417720 and 45001009237, 2026-11-22). The same artifacts, another host.
+subprojects {
+    tasks.withType<Test>().configureEach {
+        systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
+        systemProperty("robolectric.dependency.repo.id", "google-maven-central")
+    }
+}
+
 // Compose compiler reports, with -PcomposeReports (Droidtop/tracker#941): for each module that uses Compose, which
 // composables can skip when their inputs are unchanged and which classes Compose counts as unstable, the reason a
 // screen redraws whole when one value changes. Written to <module>/build/compose-reports and compose-metrics;
