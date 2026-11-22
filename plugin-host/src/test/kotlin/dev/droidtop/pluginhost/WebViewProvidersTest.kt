@@ -72,6 +72,7 @@ class WebViewProvidersTest {
         assertTrue(reply.message, reply.ok)
         assertEquals("sign_in", reply.data.getString("mode"))
         assertEquals("https://f95zone.to/threads/1/", reply.data.getString("url"))
+        assertTrue(reply.data.isNull("doneCookie"))
         val cookies = reply.data.getJSONObject("cookies")
         assertEquals("xf_user=1", cookies.getString("f95zone.to"))
         assertEquals("sid=2", cookies.getString("mega.nz"))

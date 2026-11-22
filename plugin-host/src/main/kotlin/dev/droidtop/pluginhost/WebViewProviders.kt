@@ -117,6 +117,8 @@ object WebViewProviders {
             .put("cookies", cookies)
             .put("maxDownloads", if (request.mode == WebSessionRequest.Mode.OPEN) request.maxDownloads else 0)
             .put("signInUrl", request.signInUrl?.takeIf { NetScope.isHttps(it) } ?: JSONObject.NULL)
+            // The site's "signed in" cookie: the app says in each report_page whether it is set on the request's sites.
+            .put("doneCookie", request.doneCookie ?: JSONObject.NULL)
     }
 
     /**
