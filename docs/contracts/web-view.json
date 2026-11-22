@@ -1,0 +1,26 @@
+{
+  "about": "The web.view contract (docs/plugin-api.md 3 G3a): what droidtop and an app that shows droidtop's pages (droidtop Browser) send each other. droidtop's WebViewProvidersContractTest checks droidtop against it; droidtop Browser's CI checks its adapter against it, at the droidtop commit it pins. Change both sides with it.",
+  "point": "web.view",
+  "version": 1,
+  "intent": {
+    "action": "dev.droidtop.pluginhost.action.WEB_VIEW",
+    "extraToken": "dev.droidtop.pluginhost.web.token"
+  },
+  "api": "web.view",
+  "ops": {
+    "take_request": {
+      "args": ["token"],
+      "reply": ["mode", "label", "url", "domains", "cookies", "maxDownloads", "signInUrl", "doneCookie"]
+    },
+    "report_page": {
+      "args": ["token", "url", "title", "cookies", "signedIn"],
+      "reply": ["finish"]
+    },
+    "finish": {
+      "args": ["token", "completed", "userAgent", "cookies", "downloads"],
+      "reply": ["accepted"]
+    }
+  },
+  "modes": ["sign_in", "check", "open"],
+  "download": ["url", "size", "mimeType", "contentDisposition", "referer", "cookie", "userAgent"]
+}
