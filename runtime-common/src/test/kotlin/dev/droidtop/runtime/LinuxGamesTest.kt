@@ -1,5 +1,8 @@
 package dev.droidtop.runtime
 
+import dev.droidtop.shared.containers.ContainerArch
+import dev.droidtop.shared.containers.ContainerPlatform
+import dev.droidtop.shared.containers.Translator
 import java.io.File
 import java.nio.file.Files
 import org.junit.Assert.assertEquals
@@ -67,5 +70,44 @@ class LinuxGamesTest {
         assertTrue(script.contains("want=\"a1b2c3d4e5f6071\""))
         assertTrue(script.contains("unsquashfs"))
         assertTrue(script.contains(LinuxGames.rootfsInContainer))
+    }
+
+    @Test
+    fun aContainersPlatformSurvivesTheRecord() {
+        val dir = Files.createTempDirectory("linux-games-platform").toFile()
+        try {
+            val arm = ContainerArch.ARM64
+            assertEquals(ContainerPlatform.native(arm), LinuxGames.platform(dir, "shared", arm))
+            val chosen = ContainerPlatform(ContainerArch.X86_64, Translator.BOX64)
+            LinuxGames.recordPlatform(dir, "game.a", chosen, arm)
+            assertEquals(chosen, LinuxGames.platform(dir, "game.a", arm))
+            assertEquals(ContainerPlatform.native(arm), LinuxGames.platform(dir, "shared", arm))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun box64IsOnlyOfferedWhereItCoversTheProgramsAndAStaleChoiceFallsBack() {
+        val arm = ContainerArch.ARM64
+        assertTrue(Translator.BOX64 in LinuxGames.translatorChoices(ContainerArch.X86_64, arm))
+        assertFalse(Translator.BOX64 in LinuxGames.translatorChoices(ContainerArch.X86, arm))
+        assertEquals(listOf(Translator.FEX), LinuxGames.translatorChoices(ContainerArch.X86, arm))
+        assertTrue(LinuxGames.translatorChoices(ContainerArch.X86_64, ContainerArch.X86_64).isEmpty())
+        assertTrue(LinuxGames.architectureChoices(ContainerArch.X86_64).isEmpty())
+        val dir = Files.createTempDirectory("linux-games-platform").toFile()
+        try {
+            LinuxGames.recordPlatform(dir, "shared", ContainerPlatform(ContainerArch.X86, Translator.BOX64), arm)
+            assertEquals(Translator.FEX, LinuxGames.platform(dir, "shared", arm).translator)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun theLauncherFollowsTheTranslator() {
+        assertEquals("FEX", LinuxGames.launcherFor(Translator.FEX, "FEX"))
+        assertNull(LinuxGames.launcherFor(Translator.FEX, null))
+        assertEquals("box64", LinuxGames.launcherFor(Translator.BOX64, "FEX"))
     }
 }

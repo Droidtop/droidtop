@@ -1,5 +1,9 @@
 package dev.droidtop.runtime
 
+import dev.droidtop.shared.containers.ContainerArch
+import dev.droidtop.shared.containers.ContainerPlatform
+import dev.droidtop.shared.containers.Translator
+import dev.droidtop.shared.runners.TranslatedCommand
 import java.io.File
 import java.util.Properties
 import org.json.JSONObject
@@ -74,6 +78,41 @@ object LinuxGames {
 
     /** The FEX launcher found in container [containerId] after FEX was installed there, when it was. */
     fun recordedLauncher(filesDir: File, containerId: String): String? = records(filesDir).getProperty("fex.$containerId")
+
+    /**
+     * The architecture and translator chosen for the container recorded under [key] (a game's own or the shared one),
+     * read with [ContainerPlatform.decode]: [host]'s own and the default translator until the person chooses. Kept by
+     * key, not by container id, so the choice can be made before the container exists (it is made on first run).
+     */
+    fun platform(filesDir: File, key: String, host: ContainerArch): ContainerPlatform =
+        records(filesDir).getProperty("platform.$key")?.let { ContainerPlatform.decode(it, host) } ?: ContainerPlatform.native(host)
+
+    /** Keeps [platform] for [key] through [ContainerPlatform.encode], with a translator that covers its architecture. */
+    fun recordPlatform(filesDir: File, key: String, platform: ContainerPlatform, host: ContainerArch) {
+        val translator = platform.translator.takeIf { it in translatorChoices(platform.arch, host) } ?: Translator.DEFAULT
+        update(filesDir) { it.setProperty("platform.$key", platform.copy(translator = translator).encode()) }
+    }
+
+    /**
+     * What a person may pick as the translator for a container of [arch] on [host]: none where nothing is translated
+     * (a host that is not arm64). An arm64 container's translated programs are x86_64 builds, so it offers what covers
+     * those; an x86_64 container offers the same; an x86 (32-bit) one only FEX, since Box64 is 64-bit only.
+     */
+    fun translatorChoices(arch: ContainerArch, host: ContainerArch): List<Translator> {
+        if (host != ContainerArch.ARM64) return emptyList()
+        val program = if (arch == ContainerArch.ARM64) ContainerArch.X86_64 else arch
+        return Translator.entries.filter { it.covers(program) }
+    }
+
+    /** The architectures offered for a container on [host]: every one only where something is translated. */
+    fun architectureChoices(host: ContainerArch): List<ContainerArch> =
+        if (host == ContainerArch.ARM64) ContainerArch.entries.toList() else emptyList()
+
+    /** The launcher that runs a program through [translator]: [fexLauncher] for FEX, Box64's own name for Box64. */
+    fun launcherFor(translator: Translator, fexLauncher: String?): String? = when (translator) {
+        Translator.FEX -> fexLauncher
+        Translator.BOX64 -> TranslatedCommand.launchers(translator).first()
+    }
 
     fun recordContainer(filesDir: File, key: String, containerId: String) = update(filesDir) { it.setProperty("container.$key", containerId) }
 

@@ -3257,8 +3257,18 @@ setup in `DroidtopPcGameRuntime`.
 **Status (2026-11-22).**
 - Built, not yet checked on a device: the Linux games containers (shared and per game), FEX installed through its
   Ubuntu packages, its rootfs through Downloads, and the launch through FEX (tasks 2 to 4).
-- Not built: the container's architecture and translator on the container screens (task 1, where Box64 becomes a
-  choice; FEX is used until then), and x86 containers (task 5).
+- Built, not yet checked on a device: the container's architecture and translator (task 1). A game's Linux tools
+  screen (`LinuxGameToolsCatalog`) has **Architecture** (arm64, x86_64, x86; the device's own is the default) and
+  **Translator** (FEX, Box64), shown only on an arm64 device, where something is translated. They are kept per
+  container key (the shared container or a game's own, so the choice can be made before the container exists) in
+  `LinuxGames.platform` / `recordPlatform`, written with `ContainerPlatform.encode` and read with `decode`.
+  `LinuxGames.translatorChoices` offers Box64 only where it covers the programs (an arm64 or x86_64 container, whose
+  translated programs are x86_64; never x86, which is FEX only), and a stale Box64 falls back to FEX.
+  `DroidtopPcGameRuntime.linuxCommand` runs programs, and Ren'Py's `RENPY_GDB`, through the recorded translator
+  (`LinuxGames.launcherFor`: FEX's recorded launcher, or `box64` from the container's path).
+- Not built: installing Box64 in a container (a Box64 choice assumes `box64` is on the container's path
+  when it is not, the launch fails with the container's own error), and x86 containers (task 5): choosing x86_64 or x86 as the architecture is recorded, but the
+  container is still made from the arm64 image until then.
 
 ## 3d. User-facing container/distro management (directed 2026-08-30)
 
@@ -8743,7 +8753,7 @@ anything; that is phase 2.
   toggle is not, and that droidtop's private folders and other prefixes
   are denied under every grant.
 - **If the protection cannot start** (the filter fails to install, the
-  broker's socket cannot be made) the launch does not run Wine and says so
+  broker's socket cannot be made) the launch does not run Wine
   (`PcLaunchResult(false, "...")`), the same refusal a missing Wine build
   gets. There is no prompt and no "run anyway" (owner, 2026-10-22: "No, not
   prompted. It can be a presented toggle when 'risky actions' is enabled,

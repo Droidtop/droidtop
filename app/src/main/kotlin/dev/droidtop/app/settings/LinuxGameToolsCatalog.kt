@@ -4,13 +4,23 @@ import dev.droidtop.library.LinuxGameOptionsPrefs
 import dev.droidtop.library.LinuxToolsScreen
 import dev.droidtop.library.PcGameRuntimeRegistry
 import dev.droidtop.library.settings.ActionItem
+import dev.droidtop.library.settings.CatalogItem
+import dev.droidtop.library.settings.ChoiceItem
+import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.runtime.LinuxGames
+import dev.droidtop.shared.containers.ContainerArch
+import dev.droidtop.shared.containers.ContainerPlatform
+import dev.droidtop.shared.containers.Translator
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -26,6 +36,45 @@ object LinuxGameToolsCatalog {
 
     /** The path typed into "Path to a program", until it is run. */
     @Volatile private var typedPath: String = ""
+
+    /** Saving a choice is file work, and the picker's callback is not suspending. */
+    private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val host: ContainerArch =
+        ContainerArch.host(android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty()) ?: ContainerArch.ARM64
+
+    /**
+     * The container's architecture and translator rows (docs/SPEC.md 3c): shown only where something is translated,
+     * which is an arm64 device. Both are kept for the container this game runs in, the shared one or its own. Box64 is
+     * offered only where it covers the programs ([LinuxGames.translatorChoices]).
+     */
+    private fun platformRows(filesDir: File, key: String): List<CatalogItem> {
+        val archs = LinuxGames.architectureChoices(host)
+        if (archs.isEmpty()) return emptyList()
+        val platform = LinuxGames.platform(filesDir, key, host)
+        val save = { context: android.content.Context, change: (ContainerPlatform) -> ContainerPlatform ->
+            val dir = context.filesDir
+            saveScope.launch { LinuxGames.recordPlatform(dir, key, change(LinuxGames.platform(dir, key, host)), host) }
+            Unit
+        }
+        val translators = LinuxGames.translatorChoices(platform.arch, host)
+        return listOf(
+            ChoiceItem(
+                id = "linux_tools_arch",
+                title = "Architecture",
+                options = archs.map { ChoiceOption(it.id, if (it == host) "${it.id} (default)" else it.id) },
+                current = platform.arch.id,
+                onSelect = { ctx, value -> ContainerArch.fromId(value)?.let { arch -> save(ctx) { it.copy(arch = arch) } } },
+            ),
+            ChoiceItem(
+                id = "linux_tools_translator",
+                title = "Translator",
+                options = translators.map { ChoiceOption(it.id, if (it == Translator.DEFAULT) "${it.label} (default)" else it.label) },
+                current = platform.translator.id.takeIf { id -> translators.any { it.id == id } } ?: Translator.DEFAULT.id,
+                onSelect = { ctx, value -> Translator.fromId(value)?.let { translator -> save(ctx) { it.copy(translator = translator) } } },
+            ),
+        )
+    }
 
     fun screen(): CatalogScreen = CatalogScreen(
         id = LinuxToolsScreen.ID,
@@ -53,13 +102,14 @@ object LinuxGameToolsCatalog {
         val runtime = PcGameRuntimeRegistry.runtime
         val ownHome = withContext(Dispatchers.IO) { LinuxGameOptionsPrefs.ownHome(context, target.entryId) }
         val ownContainer = withContext(Dispatchers.IO) { LinuxGameOptionsPrefs.ownContainer(context, target.entryId) }
+        val platformRows = withContext(Dispatchers.IO) { platformRows(context.filesDir, LinuxGames.key(target.entryId, ownContainer)) }
         val up = runtime?.isLinuxContainerAvailable == true
         val gameRoot = File(target.gameRoot)
         return listOf(
             CatalogGroup(
                 id = "linux_tools_state",
                 title = null,
-                items = listOf(
+                items = listOf<CatalogItem>(
                     ActionItem(
                         id = "linux_tools_where",
                         // docs/SPEC.md 3c: a Linux games container beside Desktop mode, the game's own or the shared one.
@@ -74,6 +124,7 @@ object LinuxGameToolsCatalog {
                         current = ownContainer,
                         onToggle = { ctx, on -> withContext(Dispatchers.IO) { LinuxGameOptionsPrefs.setOwnContainer(ctx, target.entryId, on) } },
                     ),
+                ) + platformRows + listOf(
                     ToggleItem(
                         id = "linux_tools_own_home",
                         title = "Give this game its own home folder",

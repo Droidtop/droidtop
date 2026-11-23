@@ -687,7 +687,10 @@ class DroidtopPcGameRuntime(
         entryId: String?,
     ): PcLaunchResult {
         val launcher = withContext(Dispatchers.IO) { LinuxGames.recordedLauncher(context.filesDir, container.id) }
-        val plan = withContext(Dispatchers.IO) { linuxCommand(session, program, gameRoot, launcher) }
+        val plan = withContext(Dispatchers.IO) {
+            val chosen = LinuxGames.platform(context.filesDir, LinuxGames.key(entryId, ownLinuxContainer(entryId)), hostArch()).translator
+            linuxCommand(session, program, gameRoot, launcher, chosen)
+        }
             .getOrElse { return PcLaunchResult(false, it.message ?: it.toString()) }
         val env = withContext(Dispatchers.IO) { linuxEnvironment(session, entryId) } + plan.second
         val result = runCatching {
@@ -700,32 +703,43 @@ class DroidtopPcGameRuntime(
         )
     }
 
-    /** The command and extra variables that run [program] here; a sentence when nothing here can. Reads files. */
+    /** The device's own architecture. */
+    private fun hostArch(): ContainerArch = ContainerArch.host(android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty()) ?: ContainerArch.ARM64
+
+    /**
+     * The command and extra variables that run [program] here, through the container's [chosen] translator (FEX
+     * unless the person picked Box64); a sentence when nothing here can. [fexLauncher] is the one found in the
+     * container. Reads files.
+     */
     private fun linuxCommand(
         session: PrimaryContainerSession,
         program: File,
         gameRoot: File,
-        launcher: String?,
+        fexLauncher: String?,
+        chosen: Translator,
     ): Result<Pair<List<String>, Map<String, String>>> = runCatching {
-        val host = ContainerArch.host(android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty()) ?: ContainerArch.ARM64
+        val host = hostArch()
         val path = session.runtime.hostStorageToContainerPath(program)
         val libFolders = File(gameRoot, "lib").list()?.toList().orEmpty()
         val renPy = program.extension.equals("sh", ignoreCase = true) &&
             libFolders.any { it.startsWith("py2-linux") || it.startsWith("py3-linux") }
+        fun environmentFor(translator: Translator?) = if (translator == Translator.FEX) LinuxGames.fexEnvironment() else emptyMap()
+        fun checkInstalled(translator: Translator?) {
+            if (translator == Translator.FEX && fexLauncher == null) error("set up Linux games first: FEX isn't installed in this game's container")
+        }
         if (renPy) {
-            val launch = RenPyLinuxLaunch.choose(libFolders, host, Translator.FEX)
+            val launch = RenPyLinuxLaunch.choose(libFolders, host, chosen)
                 ?: error("This Ren'Py game ships no Linux build this device can run")
-            if (launch.translator != null && launcher == null) error("set up Linux games first: FEX isn't installed in this game's container")
-            val env = launch.environment(launcher) + if (launch.translator != null) LinuxGames.fexEnvironment() else emptyMap()
+            checkInstalled(launch.translator)
+            val env = launch.environment(launch.translator?.let { LinuxGames.launcherFor(it, fexLauncher) }) + environmentFor(launch.translator)
             return@runCatching listOf("sh", path) to env
         }
         val head = program.inputStream().use { input -> ByteArray(ElfHeader.SIZE).also { input.read(it) } }
         val arch = ElfHeader.arch(head)
-        val translator = arch?.let { Translator.forProgram(it, host, Translator.FEX) }
+        val translator = arch?.let { Translator.forProgram(it, host, chosen) }
         if (arch != null && translator == null && !arch.runsNativelyOn(host)) error("${program.name} is built for ${arch.label}, which this device can't run")
-        if (translator != null && launcher == null) error("set up Linux games first: FEX isn't installed in this game's container")
-        TranslatedCommand.of(launcher.takeIf { translator != null }, path) to
-            (if (translator != null) LinuxGames.fexEnvironment() else emptyMap())
+        checkInstalled(translator)
+        TranslatedCommand.of(translator?.let { LinuxGames.launcherFor(it, fexLauncher) }, path) to environmentFor(translator)
     }
 
     /** Empty for a game on the container's home; the game's own home otherwise, made when it is not there yet. */
