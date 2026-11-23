@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.pluginhost"
-    compileSdk = 36
+    compileSdkVersion("android-37.1")
     // Only for :plugin-host's own bridge (native/ -- libdroidtoppy.so,
     // docs/SPEC.md 12a's "python" kind): dlopen/dlsym glue that never
     // links or bundles CPython itself. Matches input-keyboard's/

@@ -1,5 +1,5 @@
 [versions]
-agp = "8.13.2"
+agp = "9.5.2"
 timber = "5.0.1"
 datastorePreferences = "1.1.7"
 protobuf = "0.9.5"
@@ -34,7 +34,7 @@ compose = "1.13.0-rc01"
 lifecycle = "2.9.1"
 lottie = "6.7.1"
 material = "1.14.0-alpha09"
-material3Version = "1.4.0"
+material3Version = "1.5.0"
 mockitoCore = "5.20.0"
 navigation = "2.9.1"
 
@@ -100,11 +100,10 @@ collection-ktx = "1.6.0-beta01"
 # droidtop-specific — not part of the shell-default (Murine Launcher) fork's
 # own catalog, used by :app/:host-bridge/:shell-desktop/:shell-gamepad.
 lifecycleRuntimeKtx = "2.10.0"
-# The BOM whose Compose is the one the app ships: 1.11.4, the newest Compose that AGP 8 can build. Compose 1.12 and
-# later (1.13 is the line compose-native's Compose Multiplatform 1.13 is built on, Droidtop/tracker#958) declare
-# minAndroidGradlePluginVersion 9.1.0 and compileSdk 37 in their aar-metadata, and AGP 9 needs shell-default's
-# library targetSdk removed. Every module compiles against it too (Droidtop/tracker#566; checkComposeVersions keeps it so).
-composeBom = "2026.06.01"
+# The BOM whose Compose is the one the app ships: 1.13, the line compose-native's Compose Multiplatform 1.13 is built
+# against (Droidtop/tracker#958), so every module compiles against it too (Droidtop/tracker#566; checkComposeVersions
+# keeps it so). Its AARs need AGP 9.1 and compileSdk 37.1 (their aar-metadata).
+composeBom = "2026.11.01"
 media3 = "1.4.1"
 # okhttp 5 (Apache-2.0): :stores and the Windows runtime (:runtime-windows), with its DNS-over-HTTPS module.
 okhttp = "5.1.0"

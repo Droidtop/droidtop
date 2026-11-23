@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.runtime"
-    compileSdk = 36
+    compileSdkVersion("android-37.1")
 
     defaultConfig {
         minSdk = 26 // Presentation API + DisplayManager multi-display needs are stable from here

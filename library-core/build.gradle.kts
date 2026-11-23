@@ -15,7 +15,7 @@ android {
     // shell-default (below) compiles against 36 -- same real AAR-metadata
     // mismatch :app already hit and fixed once this session; any module
     // that depends on shell-default needs to match or exceed it.
-    compileSdk = 36
+    compileSdkVersion("android-37.1")
 
     defaultConfig {
         minSdk = 26

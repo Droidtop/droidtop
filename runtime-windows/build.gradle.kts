@@ -16,7 +16,7 @@ plugins {
  */
 android {
     namespace = "dev.droidtop.runtime.windows"
-    compileSdk = 36
+    compileSdkVersion("android-37.1")
     ndkVersion = "27.0.12077973"
 
     defaultConfig {

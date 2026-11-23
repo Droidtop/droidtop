@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.input"
-    compileSdk = 36
+    compileSdkVersion("android-37.1")
 
     defaultConfig {
         minSdk = 26
