@@ -191,6 +191,16 @@ runs:
           "platform-tools" "platforms;android-34" "build-tools;34.0.0" \
           "platforms;android-36" "build-tools;36.0.0" "platforms;android-37.0" "ndk;${NDK_VERSION}"
 
+    - name: Name platform 37 the way AGP looks for it
+      shell: bash
+      # sdkmanager installs platforms;android-37.0 into platforms/android-37.0, and AGP, asked for compileSdk 37,
+      # looks for platforms/android-37 ("Failed to find target with hash string 'android-37'", runs 45207172640 and
+      # 45207179390). Runs on a cache hit too, so the cached SDK needs no key change.
+      run: |
+        if [ -d "$ANDROID_SDK_ROOT/platforms/android-37.0" ] && [ ! -e "$ANDROID_SDK_ROOT/platforms/android-37" ]; then
+          ln -s android-37.0 "$ANDROID_SDK_ROOT/platforms/android-37"
+        fi
+
     - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel, PulseAudio)
       id: deps-cache
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
