@@ -1,8 +1,8 @@
 # R8 keep rules for the release build (docs/SPEC.md 10b, mytop-project/tracker#283).
 #
-# Posture: R8 shrinks and does not obfuscate or optimise. proguard-android.txt
-# (the base file in build.gradle.kts) carries -dontoptimize; -dontobfuscate is
-# below. The point is to drop code nothing reaches, not to rename it: this app
+# Posture: R8 shrinks and does not obfuscate or optimise. -dontoptimize and
+# -dontobfuscate are below (AGP 9 no longer takes proguard-android.txt, which
+# carried the first, so the base file in build.gradle.kts is the optimize one). The point is to drop code nothing reaches, not to rename it: this app
 # links against native code that looks classes and methods up by name,
 # vendored trees that load classes from strings, and plugin bundles that call
 # into it by name, and a renamed class is a crash on a device nobody can
@@ -13,6 +13,7 @@
 # file in build.gradle.kts, so the launcher tree is kept the way its authors
 # shipped it. The rules here are for everything else.
 
+-dontoptimize
 -dontobfuscate
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod, Exceptions, SourceFile, LineNumberTable, RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
 
