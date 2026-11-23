@@ -906,7 +906,7 @@ private fun CompanionSystemBars(immersive: Boolean) {
         val window = generateSequence(view.context) { (it as? android.content.ContextWrapper)?.baseContext }
             .firstNotNullOfOrNull { (it as? android.app.Activity)?.window }
         if (window != null) {
-            val controller = WindowInsetsControllerCompat(window, window.decorView)
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
             if (immersive) {
                 WindowCompat.setDecorFitsSystemWindows(window, false)
                 controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

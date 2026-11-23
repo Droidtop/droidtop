@@ -21,8 +21,8 @@ class QuitResultTest {
         // The other two outcomes must NOT be Ended: a quit that left the
         // emulator alive (the Android 13 case) or that couldn't even try
         // must not be reported as a success.
-        val notEnded = QuitResult.NotEnded("Couldn't end the emulator's task")
-        val unresolvable = QuitResult.Unresolvable("No emulator is installed")
+        val notEnded: QuitResult = QuitResult.NotEnded("Couldn't end the emulator's task")
+        val unresolvable: QuitResult = QuitResult.Unresolvable("No emulator is installed")
         assertFalse(notEnded is QuitResult.Ended)
         assertFalse(unresolvable is QuitResult.Ended)
     }
@@ -47,8 +47,8 @@ class QuitResultTest {
     fun `NotEnded and Unresolvable are distinct outcomes`() {
         // A provider that couldn't even try (uninstalled game) is not the
         // same as one that tried and failed: the subtitle says which.
-        val notEnded = QuitResult.NotEnded("still running")
-        val unresolvable = QuitResult.Unresolvable("game was uninstalled")
+        val notEnded: QuitResult = QuitResult.NotEnded("still running")
+        val unresolvable: QuitResult = QuitResult.Unresolvable("game was uninstalled")
         assertFalse(notEnded == unresolvable)
         assertTrue(notEnded is QuitResult.NotEnded)
         assertTrue(unresolvable is QuitResult.Unresolvable)
