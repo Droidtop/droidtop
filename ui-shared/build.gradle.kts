@@ -11,7 +11,7 @@ plugins {
 // so none of them depends on another shell for them.
 android {
     namespace = "dev.droidtop.ui.shared"
-    compileSdk = 36
+    compileSdkVersion("android-37.1")
 
     defaultConfig {
         minSdk = 26
