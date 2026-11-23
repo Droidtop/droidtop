@@ -1,6 +1,11 @@
 pluginManagement {
     repositories {
         google()
+        // Google's mirror of Maven Central first, Maven Central after it: Maven Central answered CI with HTTP 429
+        // "Too Many Requests" for org.robolectric:nativeruntime-dist-compat:1.0.18, failing Android checks run
+        // 45087625205 (2026-11-23). The same artifacts from another host; mavenCentral() stays for anything the
+        // mirror lacks.
+        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2") }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -10,6 +15,11 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        // Google's mirror of Maven Central first, Maven Central after it: Maven Central answered CI with HTTP 429
+        // "Too Many Requests" for org.robolectric:nativeruntime-dist-compat:1.0.18, failing Android checks run
+        // 45087625205 (2026-11-23). The same artifacts from another host; mavenCentral() stays for anything the
+        // mirror lacks.
+        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2") }
         mavenCentral()
         // Needed by :shell-default (the forked-in Murine Launcher source —
         // see shell-default/README.md): chickenhook-restrictionbypass and
