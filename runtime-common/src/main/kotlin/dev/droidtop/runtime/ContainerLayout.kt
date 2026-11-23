@@ -450,4 +450,16 @@ object ContainerLayout {
         require(!relative.startsWith("..")) { "$hostPath isn't under the app storage root $appStorageDir" }
         return if (relative.isEmpty()) APP_STORAGE_DIR else "$APP_STORAGE_DIR/$relative"
     }
+
+    /**
+     * Any host file a container can see, as it sees it: under [appStorageDir] through [hostStorageToContainerPath],
+     * else on one of [volumes] through [sharedStorageToContainerPath] (the person's games folders are bound there), else
+     * null. The one mapping for a game's files: a Linux game on the card failed with "isn't under the app storage root"
+     * when only the first was asked (console, Bare Witness, 2026-11-23). Pure.
+     */
+    fun toContainerPath(appStorageDir: File, volumes: List<SharedVolume>, hostPath: File): String? {
+        val relative = hostPath.absoluteFile.toRelativeString(appStorageDir.absoluteFile)
+        if (!relative.startsWith("..") && !File(relative).isAbsolute) return hostStorageToContainerPath(appStorageDir, hostPath)
+        return sharedStorageToContainerPath(volumes, hostPath)
+    }
 }

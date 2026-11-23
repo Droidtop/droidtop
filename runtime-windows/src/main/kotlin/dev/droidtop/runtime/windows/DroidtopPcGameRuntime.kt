@@ -703,6 +703,13 @@ class DroidtopPcGameRuntime(
         )
     }
 
+    /**
+     * A game's file as the Linux games containers see it: app storage, or a games folder on a card or internal storage
+     * (bound at the shared-storage path, ContainerLayout.toContainerPath). Null when no container can see it.
+     */
+    private fun gamePathInContainer(file: File): String? =
+        dev.droidtop.runtime.ContainerLayout.toContainerPath(context.filesDir, dev.droidtop.runtime.SharedVolume.mounted(context), file)
+
     /** The device's own architecture. */
     private fun hostArch(): ContainerArch = ContainerArch.host(android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty()) ?: ContainerArch.ARM64
 
@@ -719,7 +726,8 @@ class DroidtopPcGameRuntime(
         chosen: Translator,
     ): Result<Pair<List<String>, Map<String, String>>> = runCatching {
         val host = hostArch()
-        val path = session.runtime.hostStorageToContainerPath(program)
+        val path = gamePathInContainer(program)
+            ?: error("${program.name} is on storage the Linux games container can't see; add its folder to your games folders")
         val libFolders = File(gameRoot, "lib").list()?.toList().orEmpty()
         val renPy = program.extension.equals("sh", ignoreCase = true) &&
             libFolders.any { it.startsWith("py2-linux") || it.startsWith("py3-linux") }
@@ -797,7 +805,7 @@ class DroidtopPcGameRuntime(
     override suspend fun stopLinuxProcesses(gameRoot: File): String {
         val session = primarySession() ?: return "Desktop mode's container is not running, so nothing of this game is"
         return runCatching {
-            val pattern = session.runtime.hostStorageToContainerPath(gameRoot)
+            val pattern = gamePathInContainer(gameRoot) ?: return@runCatching "No process of this game was running"
             // A game may run in the primary container (an arm64 build) or in a Linux games container: each is asked.
             val recorded = withContext(Dispatchers.IO) { LinuxGames.recordedIds(context.filesDir) }
             val containers = listOf(session.container) +

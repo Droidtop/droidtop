@@ -3230,6 +3230,9 @@ model of the desktop stack:
 - The x86 rootfs comes from FEX's published images, fetched through droidtop's download system (aria2,
   DownloadJobs), unpacked into the container's data, and recorded in FEX's config for that container. It is shared
   between containers of the same distro, never downloaded twice.
+- A game runs from where it is: its folder is one of the person's games folders, bound into every container at its
+  shared-storage path, and the launch names its files by that path (`ContainerLayout.toContainerPath`: app storage,
+  else a games folder on a volume). Nothing is copied into the container.
 
 **Running FEX without root.** Registering FEX with the kernel (`binfmt_misc`) needs root.
 - With root (`DroidSpacesRuntime`), FEX is registered and x86 programs run like native ones.

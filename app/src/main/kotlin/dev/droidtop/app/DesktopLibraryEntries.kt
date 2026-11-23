@@ -218,10 +218,7 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
             uri.startsWith("file:") -> Uri.parse(uri).path?.let { File(it) }
             else -> null
         } ?: return null
-        if (file.absolutePath.startsWith(filesDir.absolutePath + "/")) {
-            return ContainerLayout.hostStorageToContainerPath(filesDir, file)
-        }
-        return ContainerLayout.sharedStorageToContainerPath(volumes, file)
+        return ContainerLayout.toContainerPath(filesDir, volumes, file)
     }
 
     private fun readManifest(): Map<String, Int> =
