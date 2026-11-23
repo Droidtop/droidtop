@@ -39,7 +39,7 @@ object OwnScreens {
 
     private fun task(context: Context, taskId: Int): ActivityManager.AppTask? =
         (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).appTasks
-            .firstOrNull { runCatching { idOf(it.taskInfo) }.getOrNull() == taskId }
+            .firstOrNull { runCatching { it.taskInfo?.let(::idOf) }.getOrNull() == taskId }
 
     // Activity.getTaskId's number: RecentTaskInfo.taskId from Android 10, its persistentId before.
     @Suppress("DEPRECATION")
