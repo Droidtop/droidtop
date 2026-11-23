@@ -73,6 +73,21 @@ class LinuxGamesTest {
     }
 
     @Test
+    fun theHashIsReadFromEitherXxhsumStyle() {
+        val sh = File("/bin/sh")
+        org.junit.Assume.assumeTrue(sh.canExecute())
+        fun parse(line: String): String {
+            val process = ProcessBuilder(sh.path, "-c", "sed -E '${LinuxGames.XXH3_PARSE}'").start()
+            process.outputStream.use { it.write((line + "\n").toByteArray()) }
+            return process.inputStream.bufferedReader().readText().trim().also { process.waitFor() }
+        }
+        // xxhsum 0.8.2's own line for FEX's Ubuntu 24.04 image (console, 2026-11-22), and the older GNU style.
+        assertEquals("3517e0e5ea25a473", parse("XXH3 (/run/droidtop-app-storage/fex-rootfs/Ubuntu_24_04.sqsh) = 3517e0e5ea25a473"))
+        assertEquals("3517e0e5ea25a473", parse("XXH3_3517e0e5ea25a473  Ubuntu_24_04.sqsh"))
+        assertEquals("a1b2", parse("XXH3 (x) = 0000a1b2"))
+    }
+
+    @Test
     fun aContainersPlatformSurvivesTheRecord() {
         val dir = Files.createTempDirectory("linux-games-platform").toFile()
         try {

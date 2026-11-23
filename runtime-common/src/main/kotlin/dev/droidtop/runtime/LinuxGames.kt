@@ -163,7 +163,14 @@ object LinuxGames {
     const val FIND_LAUNCHER = "for c in FEX FEXInterpreter; do if command -v \"\$c\" >/dev/null 2>&1; then echo \"\$c\"; exit 0; fi; done; exit 1"
 
     /**
-     * Checks the downloaded image against FEX's published [hash] (a 64-bit xxHash, which droidtop's download system does
+     * A sed program that turns one line of `xxhsum -H3` output into the bare hash without leading zeros. xxhsum 0.8.2
+     * (Ubuntu 24.04) prints XXH3 in BSD style, `XXH3 (file) = 3517e0e5ea25a473`, where older ones print
+     * `XXH3_3517e0e5ea25a473  file`; taking the first field read "XXH3" and refused every image (console, 2026-11-22).
+     */
+    const val XXH3_PARSE = "s/^.*= //; s/^XXH3_//; s/[[:space:]].*\$//; s/^0*//"
+
+    /**
+     * Checks the downloaded image against FEX's published [hash] (its XXH3, which droidtop's download system does
      * not check), unpacks it beside the rootfs, puts it in place and marks it ready, then removes the image.
      */
     fun unpackScript(hash: String): String {
@@ -171,11 +178,10 @@ object LinuxGames {
         val dest = rootfsInContainer
         return """
             set -eu
-            # FEX's list gives a 64-bit xxHash as a number (leading zeros dropped); XXH3 and XXH64 are both accepted.
+            # FEX's list gives the image's XXH3 (64-bit) as a number, leading zeros dropped.
             want="${hash.lowercase().trimStart('0')}"
-            h3=${'$'}(xxhsum -H3 "$image" | cut -d' ' -f1 | sed 's/^XXH3_//; s/^0*//')
-            h64=${'$'}(xxhsum -H1 "$image" | cut -d' ' -f1 | sed 's/^0*//')
-            [ "${'$'}h3" = "${'$'}want" ] || [ "${'$'}h64" = "${'$'}want" ] || { echo "FEX's rootfs does not match its published checksum" >&2; exit 1; }
+            got=${'$'}(xxhsum -H3 "$image" | sed -E '$XXH3_PARSE')
+            [ "${'$'}got" = "${'$'}want" ] || { echo "FEX's rootfs does not match its published checksum (${'$'}got)" >&2; exit 1; }
             rm -rf "$dest.unpacking"
             unsquashfs -q -n -d "$dest.unpacking" "$image"
             rm -rf "$dest"
