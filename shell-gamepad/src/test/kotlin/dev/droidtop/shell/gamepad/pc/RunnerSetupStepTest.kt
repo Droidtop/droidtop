@@ -50,4 +50,14 @@ class RunnerSetupStepTest {
         assertEquals("FEX didn't install", failed.detail)
         assertEquals(base.pressable, failed.pressable)
     }
+
+    @Test
+    fun aGameWhoseFolderIsGoneSettlesOnItsOwnStateWithNoRunner() {
+        val gone = entry.copy(missing = true)
+        val state = playStateOf(null, gone)
+        assertEquals("Folder is missing", state.verb)
+        assertFalse(state.pressable)
+        assertFalse(state.chooseEngine)
+        assertNull(runnerSetupStep(state, gone, null))
+    }
 }
