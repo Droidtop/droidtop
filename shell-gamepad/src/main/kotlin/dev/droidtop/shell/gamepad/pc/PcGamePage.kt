@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import dev.droidtop.library.PcRunnerOptions
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -108,7 +109,12 @@ internal fun PcGamePage(
 ) {
     val context = LocalContext.current
     val window = LocalShellWindow.current
-    val (play, runner) = rememberPcPlayState(entry)
+    // What a setup step run from the primary button says while it works or when it fails, and a nudge to ask again.
+    var setupLine by remember(entry.id) { mutableStateOf<String?>(null) }
+    var setupRunning by remember(entry.id) { mutableStateOf(false) }
+    var reloadToken by remember(entry.id) { mutableIntStateOf(0) }
+    val (resolvedPlay, runner) = rememberPcPlayState(entry, reloadToken)
+    val play = resolvedPlay.withSetupLine(setupLine, setupRunning)
     val folderSize by produceState<Long?>(null, entry.id) {
         val path = entry.groupingPath() ?: return@produceState
         value = withContext(Dispatchers.IO) { folderSizeBytes(path) }
@@ -509,7 +515,19 @@ internal fun PcGamePage(
 
     // The primary action, from its button and from X.
     fun pressPrimary() {
-        if (play.chooseEngine) {
+        val step = runnerSetupStep(play, entry, runner)
+        if (step != null) {
+            // Runs here, not through the launch: a step that cannot finish says why on the button's line (Desktop mode
+            // not running, a download that failed), where the launch's failure showed under this page, out of sight.
+            setupRunning = true
+            setupLine = "Working…"
+            scope.launch {
+                val failure = PcRunnerOptions.runAction(context, entry, step, onLaunch = { onClose(); onPlay() }) { setupLine = it }
+                setupLine = failure
+                setupRunning = false
+                reloadToken++
+            }
+        } else if (play.chooseEngine) {
             onChooseEngine()
         } else if (play.pressable) {
             // The setup step runs over the page, which stays: closing it

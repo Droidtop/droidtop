@@ -268,13 +268,28 @@ internal fun setupLine(option: dev.droidtop.library.RunnerOption, runnerLabel: S
 }
 
 /**
+ * The runner's setup step the primary button stands for, or null when it is a launch, a store step, an installer or
+ * the Engine picker. The button and X run it through [dev.droidtop.library.PcRunnerOptions.runAction], as
+ * [PcGameMenu]'s first row does, so a step that needs Desktop mode or a download can say how it went on the page.
+ * Pure.
+ */
+internal fun runnerSetupStep(play: PcPlayState, entry: LibraryEntry, runner: ResolvedRunner?): RunnerAction? {
+    if (!play.pressable || play.ready || play.store != null || play.chooseEngine || entry.pcInfo?.installer != null) return null
+    return runner?.option?.takeIf { it.state == RunnerState.NEEDS_SETUP }?.action
+}
+
+/** [play] with a running or failed setup step's [line] under its button, in place of its own detail. Pure. */
+internal fun PcPlayState.withSetupLine(line: String?, running: Boolean): PcPlayState =
+    if (line == null) this else copy(detail = line, pressable = pressable && !running)
+
+/**
  * The focused game's resolved runner and the [PcPlayState] it gives,
  * worked out for ONE entry off the main thread (a folder walk), never per
  * card. [PcPlayStateLoading] until it answers; the resolved runner is
- * null for a game nothing can run.
+ * null for a game nothing can run. [reload] changes when something the page did (a setup step) may have changed it.
  */
 @Composable
-internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, ResolvedRunner?> {
+internal fun rememberPcPlayState(entry: LibraryEntry, reload: Int = 0): Pair<PcPlayState, ResolvedRunner?> {
     val context = LocalContext.current
     val downloads by StoreInstallJob.live.collectAsState()
     val download = entry.downloadKey()?.let { downloads[it] }
@@ -295,7 +310,7 @@ internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, Resolve
             returns++
         }
     }
-    val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id, setupRunning, returns) {
+    val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id, setupRunning, returns, reload) {
         // Keep the last answer on screen while it is re-asked after a setup, so the button does not flash.
         if (!value.first) value = Triple(false, null, null)
         val (runner, line) = withContext(Dispatchers.IO) {

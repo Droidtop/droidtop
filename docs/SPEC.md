@@ -3253,6 +3253,11 @@ setup in `DroidtopPcGameRuntime`.
   front of the game's binary, so droidtop sets those two variables and never rewrites the script.
 - **Give this game its own container** (the game's Linux tools) moves it to a container of its own, set up on its
   next start.
+- The game page's primary button and X run a runner's setup step (`runnerSetupStep`) through
+  `PcRunnerOptions.runAction`, as the game menu's first row does, and the step's progress or failure replaces the
+  button's detail line until it ends (`withSetupLine`); the button is not pressable meanwhile, and the play state is
+  asked again when it finishes, so it becomes Play. Before, the press went through the launch, whose progress and
+  failure were drawn on the shell under the page.
 
 **Status (2026-11-22).**
 - Built, not yet checked on a device: the Linux games containers (shared and per game), FEX installed through its
