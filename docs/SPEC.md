@@ -3227,8 +3227,13 @@ model of the desktop stack:
 - The game's files stay where they are and are bound in. droidtop never copies or moves them.
 
 **How FEX gets into a container.** droidtop installs it; the person never does it by hand:
-- FEX's own packages go into a glibc container through the image's package manager, from FEX's published repository
-  for that distro.
+- droidtop's FEX build goes into a glibc container: FEX's release with one change, built at the Arm levels FEX's own
+  packages ship (8.0, 8.2, 8.4) and published by `Droidtop/FEX`'s release workflow, checked against its SHA-256 and
+  unpacked over the container's `/`. The change: a file on a noexec mount (Android's shared storage and SD cards) is
+  mapped without host execute permission, which FEX never needs because it translates guest code rather than running
+  it. FEX's own packages refused every x86 program on the card ("MapFile: Some elf mapping failed, 1"). Games are never
+  copied to app storage to get around this. A container with another FEX build is set up again on its next setup.
+  The change is not offered upstream: FEX accepts no AI-written code.
 - The x86 rootfs comes from FEX's published images, fetched through droidtop's download system (aria2,
   DownloadJobs), unpacked into the container's data, and recorded in FEX's config for that container. It is shared
   between containers of the same distro, never downloaded twice.
@@ -3265,8 +3270,9 @@ setup in `DroidtopPcGameRuntime`.
   failure were drawn on the shell under the page.
 
 **Status (2026-11-22).**
-- Built, not yet checked on a device: the Linux games containers (shared and per game), FEX installed through its
-  Ubuntu packages, its rootfs through Downloads, and the launch through FEX (tasks 2 to 4).
+- Checked on the console (2026-11-23): the shared Linux games container, FEX installed, its rootfs through
+  Downloads, and the launch reaching the game's own `.sh` through FEX. Built, not yet checked on a device: droidtop's
+  FEX build loading a game's x86 program from the SD card (tasks 2 to 4).
 - Built, not yet checked on a device: the container's architecture and translator (task 1). A game's Linux tools
   screen (`LinuxGameToolsCatalog`) has **Architecture** (arm64, x86_64, x86; the device's own is the default) and
   **Translator** (FEX, Box64), shown only on an arm64 device, where something is translated. They are kept per
