@@ -177,6 +177,9 @@ private fun PcGameMenuSheet(
     // "Run once with…" (docs/SPEC.md 7i, Droidtop/tracker#636): the same choices as Runs with, for one launch.
     var pickingOnce by remember(entry) { mutableStateOf(false) }
     var status by remember(entry.id) { mutableStateOf<String?>(null) }
+    // The progress or failure line of what the first row started (an install, a runner's setup): drawn as that
+    // row's own detail, not as a loose note between the rows below it.
+    var playStatus by remember(entry.id) { mutableStateOf<String?>(null) }
     var viewingMedia by remember(entry) { mutableStateOf(false) }
     var pickingMatch by remember(entry) { mutableStateOf(false) }
     // "Rescrape with…" (Droidtop/tracker#67): one game, from a source the person picks.
@@ -1068,7 +1071,7 @@ private fun PcGameMenuSheet(
             add(
                 ActionRow(
                     title = playState.verb,
-                    detail = playState.detail,
+                    detail = playStatus ?: playState.detail,
                     onSelect = if (loaded && playState.pressable) {
                         {
                             val store = if (playState.chooseEngine) null else playState.store
@@ -1092,8 +1095,8 @@ private fun PcGameMenuSheet(
                             if (store == null) {
                                 if (entry.pcInfo?.installer != null) {
                                     scope.launch {
-                                        status = "Working…"
-                                        status = dev.droidtop.library.FolderInstalls.install(context, entry) { status = it }
+                                        playStatus = "Working…"
+                                        playStatus = dev.droidtop.library.FolderInstalls.install(context, entry) { playStatus = it }
                                     }
                                 } else if (playState.chooseEngine) {
                                     if (engineChoice.folder != null) pickingEngine = true else status = "No game folder to pick an engine for"
@@ -1102,12 +1105,12 @@ private fun PcGameMenuSheet(
                                     onLaunch()
                                 } else if (setupAction != null) {
                                     scope.launch {
-                                        status = "Working…"
+                                        playStatus = "Working…"
                                         val failure = PcRunnerOptions.runAction(context, entry, setupAction, onLaunch = {
                                             onClose()
                                             onLaunch()
-                                        }) { status = it }
-                                        status = failure
+                                        }) { playStatus = it }
+                                        playStatus = failure
                                         reloadToken++
                                     }
                                 }

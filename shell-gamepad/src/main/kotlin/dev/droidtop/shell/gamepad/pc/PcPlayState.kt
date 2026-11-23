@@ -252,12 +252,15 @@ internal fun primaryActionLabel(option: dev.droidtop.library.RunnerOption): Stri
     null -> "Choose a runner"
 }
 
-/** The line under a setup step's button: which runner it is for and why, then that Play follows. Pure. */
+/**
+ * The line under a setup step's button: why, then that Play follows. The reason already names what is needed ("This
+ * x86 build runs through FEX, which needs setting up once"), so the runner's label is not joined on after it (the
+ * console read "...needs setting up once for Linux container"); it only stands in when there is no reason. Pure.
+ */
 internal fun setupLine(option: dev.droidtop.library.RunnerOption, runnerLabel: String): String {
     val why = option.reason?.takeIf { it.isNotBlank() && it != option.actionLabel }
     val runner = runnerLabel.takeIf { it.isNotBlank() }
     return when {
-        why != null && runner != null -> "$why for $runner, then this becomes Play"
         why != null -> "$why, then this becomes Play"
         runner != null -> "$runner runs this game. One step, then this becomes Play"
         else -> "One step, then this becomes Play"
