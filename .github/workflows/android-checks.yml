@@ -167,6 +167,15 @@ jobs:
         if: always()
         run: python3 -I scripts/compose-stability.py --variant debug --list
 
+      - name: Name the Compose report files for upload
+        # The Compose compiler of Kotlin 2.4 names a module's metrics after its Gradle path, droidtop:app_debug-module.json,
+        # and upload-artifact refuses a colon in a path (check run 45248326691). The stability script has read them by now.
+        if: always()
+        run: |
+          find . -path '*/build/compose-reports/*' -name '*:*' -o -path '*/build/compose-metrics/*' -name '*:*' | while read -r f; do
+            mv "$f" "$(dirname "$f")/$(basename "$f" | tr ':' '_')"
+          done
+
       - name: Upload Compose reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
