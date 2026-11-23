@@ -31,12 +31,17 @@ class PcPrimaryActionLabelTest {
     @Test
     fun theLineUnderTheButtonSaysWhichRunnerAndWhy() {
         assertEquals(
-            "Install the Ren'Py plugin for Enginehost, then this becomes Play",
+            "Install the Ren'Py plugin, then this becomes Play",
             setupLine(option(RunnerAction.INSTALL_ENGINEHOST_PLUGIN, "Install the Ren'Py plugin", "Get Ren'Py support"), "Enginehost"),
         )
         assertEquals(
             "Enginehost runs this game. One step, then this becomes Play",
             setupLine(option(RunnerAction.INSTALL_ENGINEHOST, "Install Enginehost", "Install Enginehost"), "Enginehost"),
+        )
+        // A reason that is already a sentence is not joined to the runner's label ("...once for Linux container").
+        assertEquals(
+            "This x86 build runs through FEX, which needs setting up once, then this becomes Play",
+            setupLine(option(RunnerAction.SET_UP_LINUX_GAMES, "This x86 build runs through FEX, which needs setting up once", null), "Linux container"),
         )
     }
 }

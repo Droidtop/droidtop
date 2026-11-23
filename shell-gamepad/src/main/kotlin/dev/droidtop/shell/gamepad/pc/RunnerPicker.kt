@@ -181,17 +181,23 @@ private fun PickerPage(
 ) {
     // The system back key; the pad's B is the onPad handler below.
     androidx.activity.compose.BackHandler { onDismiss() }
+    // A picker is hosted in a window of its own (FullScreenOverlay), which never reaches the shell's root handler, so
+    // the two menus its footer names are answered here, as the game page does (R2 did nothing on Runs with).
+    val shellMenus = dev.droidtop.shell.gamepad.input.LocalShellMenus.current
     Column(
         modifier = Modifier
             .fillMaxSize()
             .groundBackground()
             .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 32.dp)
             .onPad { press ->
-                if (press.action == GamepadAction.B) {
-                    onDismiss()
-                    true
-                } else {
-                    false
+                when (press.action) {
+                    GamepadAction.B -> {
+                        onDismiss()
+                        true
+                    }
+                    GamepadAction.R2 -> shellMenus?.let { it.openQuick(); true } ?: false
+                    GamepadAction.START -> shellMenus?.let { it.openLeft(); true } ?: false
+                    else -> false
                 }
             },
         verticalArrangement = Arrangement.spacedBy(10.dp),
