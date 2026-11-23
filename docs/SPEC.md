@@ -19881,7 +19881,9 @@ need them again.
 when it is not (Install, Set up), "Choose a runner" when nothing on this
 device offers the game, "Folder is missing" for a game the walk no longer
 finds. That missing-folder state is decided from the entry alone and never waits on the runner lookup, so the
-button is never left on "…"; a lookup that fails is also an answer ("Choose a runner"). A game no runner can take is never a dead end that only says
+button is never left on "…"; a lookup that fails is also an answer ("Choose a runner"). The page asks for the runner again when its options menu closes, from the same stored
+choice the menu wrote (`LaunchStrategyOverridePrefs`), so its "Runs with" line follows a change made there without
+reopening the page. A game no runner can take is never a dead end that only says
 "no runner": the line names what is missing (`PcRunners.noRunnerLine`:
 no engine, Windows or Linux build found in the folder; or that no
 Enginehost plugin covers the engine yet), and ends with the one step that

@@ -146,6 +146,8 @@ internal fun PcGameMenu(
     // Opens on the Engine picker (the page's "Choose a runner" for a game no runner offers).
     openEnginePicker: Boolean = false,
 ) {
+    // The page under this menu draws the runner this menu may change: it asks again when the menu closes.
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { PcPlayRefresh.bump() } }
     // The game that is running leads with its own sheet, this menu one row into it (Droidtop/tracker#740).
     dev.droidtop.shell.gamepad.RunningGameFirst(entry, onClose) {
         PcGameMenuSheet(entry, library, onLaunch, onClose, siblings, onOpenOther, onProgressChanged, onOpenPage, onOpenDownloads, openEnginePicker)

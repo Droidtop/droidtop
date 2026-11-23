@@ -60,4 +60,11 @@ class RunnerSetupStepTest {
         assertFalse(state.chooseEngine)
         assertNull(runnerSetupStep(state, gone, null))
     }
+
+    @Test
+    fun aClosingMenuRaisesTheToken() {
+        val before = PcPlayRefresh.token.value
+        PcPlayRefresh.bump()
+        assertEquals(before + 1, PcPlayRefresh.token.value)
+    }
 }
