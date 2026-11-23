@@ -313,9 +313,17 @@ internal fun rememberPcPlayState(entry: LibraryEntry, reload: Int = 0): Pair<PcP
     val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id, setupRunning, returns, reload) {
         // Keep the last answer on screen while it is re-asked after a setup, so the button does not flash.
         if (!value.first) value = Triple(false, null, null)
-        val (runner, line) = withContext(Dispatchers.IO) {
-            val runners = PcRunnerOptions.forEntry(context, entry)
-            PcRunnerOptions.resolvedFor(context, entry, runners) to runners.noRunnerLine
+        // A game whose folder is gone has no runner to work out, and a lookup that threw left this at "..." for ever:
+        // it settles on the page's "Folder is missing" ([playStateOf]) either way.
+        val (runner, line) = if (entry.missing) {
+            Pair<ResolvedRunner?, String?>(null, null)
+        } else {
+            runCatching<Pair<ResolvedRunner?, String?>> {
+                withContext(Dispatchers.IO) {
+                    val runners = PcRunnerOptions.forEntry(context, entry)
+                    PcRunnerOptions.resolvedFor(context, entry, runners) to runners.noRunnerLine
+                }
+            }.getOrDefault(Pair(null, null))
         }
         value = Triple(true, runner, line)
     }
