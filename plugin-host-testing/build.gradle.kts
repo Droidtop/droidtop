@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.pluginhost.testing"
-    compileSdk = 36
+    compileSdkVersion("android-37.1")
 
     defaultConfig {
         minSdk = 26
