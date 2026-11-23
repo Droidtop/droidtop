@@ -516,7 +516,7 @@ object PluginRepoUpdates {
             val address = if (token != null && asset.apiUrl.isNotBlank()) asset.apiUrl else asset.downloadUrl
             if (address.isBlank()) return Processed.Failure("it has no download address", transient = false)
             val (url, headers) = GitHubAuth.downloadRequestFor(address, token)
-            val fetched = download(context, url, headers, asset.sha256, file, asset.name)
+            val fetched = download(context, url, headers, asset.sha256, file, asset.name, asset.size)
             if (!fetched.ok) {
                 val mismatch = fetched.error == dev.droidtop.pluginhost.DownloadJobs.DIGEST_MISMATCH
                 return Processed.Failure(if (mismatch) "the download doesn't match GitHub's checksum" else "the download failed: ${fetched.error}", transient = !mismatch)
@@ -561,7 +561,7 @@ object PluginRepoUpdates {
      * the window applies once the pass hands its bundles over instead of waiting. Blocks: these passes run off the main
      * thread.
      */
-    private fun download(context: Context, url: String, headers: Map<String, String>, sha256: String?, file: File, assetName: String, updateFor: String? = null) =
+    private fun download(context: Context, url: String, headers: Map<String, String>, sha256: String?, file: File, assetName: String, sizeBytes: Long, updateFor: String? = null) =
         kotlinx.coroutines.runBlocking {
             dev.droidtop.pluginhost.DownloadJobs.run(
                 context = context,
@@ -571,6 +571,9 @@ object PluginRepoUpdates {
                 url = url,
                 name = "bundle_${System.nanoTime()}.droidplugin.tar.xz",
                 sha256 = sha256,
+                // The release's own size for the asset, as the cap and as the size the row counts against.
+                maxBytes = sizeBytes.coerceAtLeast(0L),
+                sizeBytes = sizeBytes.coerceAtLeast(0L),
                 headers = headers,
                 extra = mapOf(dev.droidtop.pluginhost.DownloadJobs.ARG_TARGET_PATH to file.absolutePath) +
                     updateFor?.let { mapOf(dev.droidtop.pluginhost.DownloadJobs.ARG_UPDATE_FOR to it) }.orEmpty(),
@@ -601,7 +604,7 @@ object PluginRepoUpdates {
         try {
             val address = if (token != null && asset.apiUrl.isNotBlank()) asset.apiUrl else asset.downloadUrl
             val (url, headers) = GitHubAuth.downloadRequestFor(address, token)
-            val fetched = download(context, url, headers, asset.sha256, file, asset.name, updateFor)
+            val fetched = download(context, url, headers, asset.sha256, file, asset.name, asset.size, updateFor)
             if (!fetched.ok) return refused("Couldn't download it: ${fetched.error}")
             val peeked = PluginRepos.peek(file) ?: return refused("That is not a plugin bundle.")
             if (peeked.manifest.origin != entry.origin) return refused("That bundle is for another origin than this repository is trusted for.")

@@ -59,6 +59,9 @@ object PluginCatalog {
     private const val REFETCH_AFTER_MS = 60 * 60 * 1000L
     /** Bundles are payload-plus-manifest tar.xz; this cap is a sanity limit on the download, not a substitute for the installer's own per-entry caps. */
     private const val MAX_BUNDLE_BYTES = 512L * 1024 * 1024
+
+    /** A catalog bundle's declared size, when it is one droidtop takes; else the limit, so an index without sizes still downloads. */
+    internal fun bundleBytes(declared: Long): Long = if (declared in 1..MAX_BUNDLE_BYTES) declared else MAX_BUNDLE_BYTES
     private const val DOWNLOAD_POST = "plugin_bundle"
     private const val ARG_LABEL = "label"
     private const val ARG_VERSION = "version"
@@ -422,7 +425,10 @@ object PluginCatalog {
             url = url,
             name = "plugin-" + "${plugin.id}-${release.version}".replace(Regex("[^A-Za-z0-9._-]"), "_") + ".droidplugin.tar.xz",
             sha256 = release.bundle.sha256,
-            maxBytes = MAX_BUNDLE_BYTES,
+            // The catalog's own size for the bundle is the cap and the size the job counts against: the limit alone
+            // showed a 100 KB plugin as "0/536 MB" on Updates (console, F-Droid 0.1.5, 2026-11-22).
+            maxBytes = bundleBytes(release.bundle.size),
+            sizeBytes = bundleBytes(release.bundle.size),
             headers = headers,
             extra = mapOf(ARG_LABEL to plugin.label, ARG_VERSION to release.version, DownloadJobs.ARG_UPDATE_FOR to UpdateTags.plugin(plugin.id, release.version)),
             onStatus = onStatus,
