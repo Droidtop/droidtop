@@ -54,9 +54,11 @@ class LinuxGamesTest {
             assertEquals("FEX", LinuxGames.recordedLauncher(dir, "droidtop-sibling-1"))
             assertNull(LinuxGames.recordedLauncher(dir, "droidtop-sibling-2"))
 
-            // Ready once the rootfs is unpacked too.
+            // Ready once the rootfs is unpacked too: its mark alone, on a partial tree, is not enough.
             assertFalse(LinuxGames.translationReady(dir, shared))
             File(LinuxGames.rootfsDir(dir), ".droidtop-ready").also { it.parentFile.mkdirs() }.writeText("")
+            assertFalse(LinuxGames.translationReady(dir, shared))
+            File(LinuxGames.rootfsDir(dir), LinuxGames.ROOTFS_LOADER).also { it.parentFile.mkdirs() }.writeText("")
             assertTrue(LinuxGames.translationReady(dir, shared))
             assertFalse(LinuxGames.translationReady(dir, own))
         } finally {
@@ -70,6 +72,9 @@ class LinuxGamesTest {
         assertTrue(script.contains("want=\"a1b2c3d4e5f6071\""))
         assertTrue(script.contains("unsquashfs"))
         assertTrue(script.contains(LinuxGames.rootfsInContainer))
+        // Each run unpacks into its own folder and checks the loader before marking the rootfs ready.
+        assertTrue(script.contains(".unpacking.$$"))
+        assertTrue(script.contains(LinuxGames.ROOTFS_LOADER))
     }
 
     @Test

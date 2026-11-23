@@ -36,6 +36,7 @@ import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.SafeDelete
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -763,15 +764,16 @@ class DroidtopPcGameRuntime(
     /**
      * Makes [entryId]'s Linux games container (its own or the shared one), installs FEX in it, and fetches and unpacks
      * FEX's x86 rootfs once for every container (docs/SPEC.md 3c). Each step is skipped when it is done already, so
-     * running it again finishes what an interrupted run left.
+     * running it again finishes what an interrupted run left. One run at a time ([linuxSetup]): two overlapping runs
+     * unpacked the rootfs over each other and left it partial with its ready mark (console, 2026-11-23).
      */
-    override suspend fun setUpLinuxGames(entryId: String?, gameTitle: String?, onStatus: (String) -> Unit): PcProvisionResult {
-        val session = primarySession() ?: return PcProvisionResult(false, "Start Desktop mode first: Linux games run beside it")
+    override suspend fun setUpLinuxGames(entryId: String?, gameTitle: String?, onStatus: (String) -> Unit): PcProvisionResult = linuxSetup.withLock {
+        val session = primarySession() ?: return@withLock PcProvisionResult(false, "Start Desktop mode first: Linux games run beside it")
         val runtime = session.runtime
         val files = context.filesDir
         val own = ownLinuxContainer(entryId)
         val key = LinuxGames.key(entryId, own)
-        return runCatching {
+        runCatching {
             onStatus("Getting the Linux games container")
             val name = if (own && entryId != null) LinuxGames.ownName(gameTitle, entryId) else LinuxGames.SHARED_NAME
             val container = LinuxGames.container(runtime, files, key, name)
@@ -797,6 +799,9 @@ class DroidtopPcGameRuntime(
             PcProvisionResult(true, "Linux games are set up")
         }.getOrElse { PcProvisionResult(false, it.message ?: it.toString()) }
     }
+
+    /** Held while Linux games are set up, so a second press waits for the first run instead of racing it. */
+    private val linuxSetup = kotlinx.coroutines.sync.Mutex()
 
     /** The last lines a command said, for a failure's one sentence. */
     private fun lastLines(result: dev.droidtop.runtime.ContainerExecResult): String =

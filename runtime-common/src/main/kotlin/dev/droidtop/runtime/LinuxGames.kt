@@ -56,8 +56,16 @@ object LinuxGames {
     /** [rootfsImage] as a container sees it. */
     val rootfsImageInContainer: String = "${ContainerLayout.APP_STORAGE_DIR}/fex-rootfs/$ROOTFS_FOLDER.sqsh"
 
-    /** Whether the rootfs is unpacked and checked. */
-    fun rootfsReady(filesDir: File): Boolean = File(rootfsDir(filesDir), READY).isFile
+    /**
+     * The x86-64 loader inside the rootfs, which FEX needs for every program: without it FEX says "Invalid or
+     * Unsupported elf file … misconfigured x86-64 RootFS" (console, 2026-11-23, a rootfs two overlapping setups left
+     * at 159 MB with the ready mark on it).
+     */
+    const val ROOTFS_LOADER = "usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+
+    /** Whether the rootfs is unpacked and checked: its ready mark, and the loader that proves it whole. */
+    fun rootfsReady(filesDir: File): Boolean =
+        File(rootfsDir(filesDir), READY).isFile && File(rootfsDir(filesDir), ROOTFS_LOADER).isFile
 
     /** The variables every FEX run needs: where its x86 rootfs is. */
     fun fexEnvironment(): Map<String, String> = mapOf("FEX_ROOTFS" to rootfsInContainer)
@@ -171,7 +179,10 @@ object LinuxGames {
 
     /**
      * Checks the downloaded image against FEX's published [hash] (its XXH3, which droidtop's download system does
-     * not check), unpacks it beside the rootfs, puts it in place and marks it ready, then removes the image.
+     * not check), unpacks it into a folder of this run's own beside the rootfs, checks the loader is there, puts it in
+     * place and marks it ready, then removes the image. A run's own folder (`.unpacking.<pid>`), not a shared one: a
+     * second run used to clear the folder the first was still unpacking into, and the first then put the remains in
+     * place as ready.
      */
     fun unpackScript(hash: String): String {
         val image = rootfsImageInContainer
@@ -182,10 +193,12 @@ object LinuxGames {
             want="${hash.lowercase().trimStart('0')}"
             got=${'$'}(xxhsum -H3 "$image" | sed -E '$XXH3_PARSE')
             [ "${'$'}got" = "${'$'}want" ] || { echo "FEX's rootfs does not match its published checksum (${'$'}got)" >&2; exit 1; }
-            rm -rf "$dest.unpacking"
-            unsquashfs -q -n -d "$dest.unpacking" "$image"
+            tmp="$dest.unpacking.${'$'}${'$'}"
+            trap 'rm -rf "${'$'}tmp"' EXIT
+            unsquashfs -q -n -d "${'$'}tmp" "$image"
+            [ -f "${'$'}tmp/$ROOTFS_LOADER" ] || { echo "FEX's rootfs unpacked without its x86-64 loader" >&2; exit 1; }
             rm -rf "$dest"
-            mv "$dest.unpacking" "$dest"
+            mv "${'$'}tmp" "$dest"
             touch "$dest/$READY"
             rm -f "$image"
         """.trimIndent()
