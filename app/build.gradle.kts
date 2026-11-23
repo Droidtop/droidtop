@@ -350,7 +350,12 @@ tasks.matching { it.name == "packageDebug" }.configureEach {
 
 // This build's changelog.json (docs/SPEC.md 10b, "Every build carries its changelog"), written by CI's Changelog step
 // before Gradle runs: What's new reads it from the APK's assets. A local build has none and shows an empty history.
-android.sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/changelog"))
+// The folder is static to Gradle: CI writes it before the build starts.
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addStaticSources(layout.buildDirectory.dir("generated/changelog").map { listOf(it) })
+    }
+}
 
 // The enhancement provider host (mytop-project/tracker#852): :provider-host's unsigned release APK, carried as an asset of
 // droidtop itself. droidtop signs it on the device with its own Keystore key and installs it (ProviderHostSetup); the
@@ -389,5 +394,9 @@ val copyRigThrowaway by tasks.registering(Copy::class) {
     into(rigThrowawayAssets)
     rename { "throwaway.apk" }
 }
-android.sourceSets.getByName("androidTest").assets.srcDir(rigThrowawayAssets)
+androidComponents {
+    onVariants { variant ->
+        variant.androidTest?.sources?.assets?.addStaticSources(rigThrowawayAssets.map { listOf(it) })
+    }
+}
 tasks.matching { it.name == "mergeDebugAndroidTestAssets" }.configureEach { dependsOn(copyRigThrowaway) }
