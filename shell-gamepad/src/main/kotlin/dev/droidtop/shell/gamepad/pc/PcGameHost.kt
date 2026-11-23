@@ -182,6 +182,7 @@ fun PcGameStandalone(
                 },
                 onClose = { pageOpen = false },
                 library = library,
+                menuOpen = menuOpen,
             )
         }
         val menuEntry = menuEntryId?.let { id -> pcEntries.firstOrNull { it.id == id } } ?: game

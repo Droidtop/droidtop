@@ -106,6 +106,9 @@ internal fun PcGamePage(
     // The library, for the game's update sources (the source link rows);
     // null draws the page without them.
     library: Library? = null,
+    // True while the game's options menu is open over the page. When it closes the page asks again what the menu
+    // may have changed (Runs with, a setup step): the same state the menu wrote, no copy of it.
+    menuOpen: Boolean = false,
 ) {
     val context = LocalContext.current
     val window = LocalShellWindow.current
@@ -113,6 +116,11 @@ internal fun PcGamePage(
     var setupLine by remember(entry.id) { mutableStateOf<String?>(null) }
     var setupRunning by remember(entry.id) { mutableStateOf(false) }
     var reloadToken by remember(entry.id) { mutableIntStateOf(0) }
+    var menuWasOpen by remember(entry.id) { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(menuOpen) {
+        if (menuWasOpen && !menuOpen) reloadToken++
+        menuWasOpen = menuOpen
+    }
     val (resolvedPlay, runner) = rememberPcPlayState(entry, reloadToken)
     val play = resolvedPlay.withSetupLine(setupLine, setupRunning)
     val folderSize by produceState<Long?>(null, entry.id) {

@@ -19880,7 +19880,9 @@ need them again.
 "Play" when the resolved runner is ready, the one setup step's own name
 when it is not (Install, Set up), "Choose a runner" when nothing on this
 device offers the game, "Folder is missing" for a game the walk no longer
-finds. A game no runner can take is never a dead end that only says
+finds. The page asks for the runner again when its options menu closes, from the same stored choice the menu
+wrote (`LaunchStrategyOverridePrefs`), so the "Runs with" line and the button follow a change made there without
+reopening the page. A game no runner can take is never a dead end that only says
 "no runner": the line names what is missing (`PcRunners.noRunnerLine`:
 no engine, Windows or Linux build found in the folder; or that no
 Enginehost plugin covers the engine yet), and ends with the one step that

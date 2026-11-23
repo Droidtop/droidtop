@@ -1584,6 +1584,7 @@ internal fun PcGamesSection(
             },
             onClose = { state.pageId = null },
             library = library,
+            menuOpen = state.menuId != null,
         )
     }
     if (menuEntry != null) {
