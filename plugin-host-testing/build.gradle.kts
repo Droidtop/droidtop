@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.pluginhost.testing"
-    compileSdk = 36
+    compileSdkVersion("android-37.0")
 
     defaultConfig {
         minSdk = 26
@@ -18,9 +18,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 }
 
 dependencies {

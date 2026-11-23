@@ -7,7 +7,7 @@ plugins {
 // processes such as Wine's attaches to, with libsbx_child.so and sbx-exec packaged beside it.
 android {
     namespace = "dev.droidtop.sandboxhost"
-    compileSdk = 36
+    compileSdkVersion("android-37.0")
     // The same NDK pin as :plugin-host and :input-keyboard, so CI's one NDK install serves all of them.
     ndkVersion = "27.0.12077973"
 
@@ -29,9 +29,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 }
 
 dependencies {

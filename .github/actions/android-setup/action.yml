@@ -158,8 +158,10 @@ runs:
         # (the forked-in Murine Launcher) and its sub-modules compile against
         # 36, and several of their AndroidX deps require :app to compile
         # against 35+ too (AAR-metadata check). 34 is kept for the rest of
-        # droidtop's modules. The NDK version is part of the key.
-        key: android-sdk-ndk27.0.12077973-v2
+        # droidtop's modules. v3 added platforms;android-37.0: Compose 1.13's
+        # AARs need compileSdk 37 (Droidtop/tracker#958). The NDK version is
+        # part of the key.
+        key: android-sdk-ndk27.0.12077973-v3
 
     - name: Install Android SDK + NDK
       if: steps.sdk-cache.outputs.cache-hit != 'true'
@@ -187,7 +189,7 @@ runs:
         (yes || true) | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" --licenses > /dev/null
         "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT" \
           "platform-tools" "platforms;android-34" "build-tools;34.0.0" \
-          "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
+          "platforms;android-36" "build-tools;36.0.0" "platforms;android-37.0" "ndk;${NDK_VERSION}"
 
     - name: Cache cross-compiled vendor deps (libffi, libwayland-client, droidspaces, crane, proot, hev-socks5-tunnel, PulseAudio)
       id: deps-cache

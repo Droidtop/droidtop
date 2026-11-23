@@ -22,7 +22,7 @@ android {
     // androidx.core:core (via androidx-core-ktx, resolved from the shared
     // catalog) requires compiling against 36+ — same class of fix as
     // shell-default's own compileSdk bump.
-    compileSdk = 36
+    compileSdkVersion("android-37.0")
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
@@ -56,9 +56,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
     // A key press on a hosted keyboard runs under Robolectric, which needs the merged resources.
     testOptions {

@@ -20,7 +20,7 @@ android {
     // module stays on its own existing compileSdk; only the final
     // linking module (:app) has to be >= the highest compileSdk among
     // everything it depends on.
-    compileSdk = 36
+    compileSdkVersion("android-37.0")
 
     // A plain incrementing integer, not a git SHA — CI passes the number
     // of commits reachable from the commit it builds (see
@@ -174,9 +174,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
     /**
      * The minSdk gate. droidtop's minSdk is 26 and every module agrees on

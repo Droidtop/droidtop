@@ -22,7 +22,7 @@ val mozcPin: String = file("mozc-engine.pin").readText()
 
 android {
     namespace = "dev.droidtop.input.japanese"
-    compileSdk = 36
+    compileSdkVersion("android-37.0")
 
     defaultConfig {
         minSdk = 26
@@ -47,9 +47,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
     lint {
         abortOnError = false

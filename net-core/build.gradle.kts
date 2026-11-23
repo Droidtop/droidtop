@@ -9,7 +9,7 @@ val aria2EngineVersion: String = file("aria2-engine.pin").readLines()
 
 android {
     namespace = "dev.droidtop.net"
-    compileSdk = 36
+    compileSdkVersion("android-37.0")
     defaultConfig { minSdk = 26 }
     buildFeatures { buildConfig = true }
     val revision = System.getenv("VERSION_REVISION") ?: "0"
@@ -18,7 +18,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
     sourceSets {
         getByName("main") {
             // droidtop's native library for both ABIs (docs/SPEC.md 7o): native/, over the shared
