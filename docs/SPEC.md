@@ -24535,9 +24535,17 @@ runtime reads with `getAssets()` (the JSON lists, input-control profiles and
 icons, Box64 presets, `wincomponents.json`) are GameNative's source files,
 committed in `runtime-windows/src/main/assets`. What droidtop does not
 build is **re-hosted, not committed**, in the `windows-runtime` release of
-Droidtop/droidtop-components: GameNative's Box64 (0.3.2 to 0.4.2), FEXCore
+Droidtop/droidtop-components: GameNative's Box64 (0.3.2 to 0.4.0; 0.4.2 is droidtop's own build, below), FEXCore
 (2507 to 2605) and WowBox64 (0.3.4 to 0.4.2) builds, its Wine input DLL
-sets, and the binaries no source exists for (below). The build fetches
+sets, and the binaries no source exists for (below). Box64 0.4.2, the default, is droidtop's own build:
+`Droidtop/box64` release `droidtop-0.4.2-1`, GameNative's v0.4.2 built their way (NDK r26b,
+ANDROID, ARM_DYNAREC, BAD_SIGNAL) with one change. When a file on a noexec mount (Android's
+shared storage and SD cards) refuses PROT_EXEC, `my_mmap64` and `my_mprotect` retry without it,
+and Box64's own protection record keeps the guest's. Box64 never runs guest code natively, so
+it never needed the host flag. Before this, Wine's refused mprotect of a game's code sections on
+the card ("failed to set … protection … noexec filesystem?", which Wine logs and continues past)
+left Box64's record non-executable. Not offered upstream: Box64 accepts no predominantly
+AI-written pull requests. The build fetches
 them by `runtime-windows/components.pin` (path, SHA-256, maker's URL) into
 `runtime-windows/components/` (`build-scripts/fetch-windows-runtime-components.sh`,
 cached by `android-setup`), our copy first and the maker's second, and
