@@ -37,7 +37,6 @@ android {
     }
     kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
-    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/platformDatabase/assets"))
 
     // The scan code logs for real (one line per folder, one per root --
     // see ScanLog), and a JVM unit test that walks a temporary folder
@@ -115,6 +114,12 @@ val platformDatabaseSeed = tasks.register<Copy>("platformDatabaseSeed") {
     }
 }
 
+// The seed folder is an asset folder of every variant. preBuild runs the copy before anything reads the assets.
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addStaticSources(platformDatabaseSeedDir.map { listOf(it) })
+    }
+}
 tasks.named("preBuild") { dependsOn(platformDatabaseSeed) }
 // The registry/player tests parse the SHIPPED seed, which is now generated.
 tasks.withType<Test>().configureEach { dependsOn(platformDatabaseSeed) }
