@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.rigtest.throwaway"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.droidtop.rigtest.throwaway"

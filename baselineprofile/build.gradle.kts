@@ -10,7 +10,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.baselineprofile"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         // What the profile rule needs on the device that records it.
@@ -23,9 +23,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
     targetProjectPath = ":app"
 }

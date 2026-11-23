@@ -13,7 +13,7 @@ plugins {
 
 android {
     namespace = "com.termux.view"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26

@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.pluginhost"
-    compileSdk = 36
+    compileSdk = 37
     // Only for :plugin-host's own bridge (native/ -- libdroidtoppy.so,
     // docs/SPEC.md 12a's "python" kind): dlopen/dlsym glue that never
     // links or bundles CPython itself. Matches input-keyboard's/
@@ -62,9 +62,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 }
 
 dependencies {
