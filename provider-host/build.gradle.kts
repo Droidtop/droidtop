@@ -10,7 +10,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.providerhost"
-    compileSdk = 36
+    compileSdkVersion("android-37.1")
 
     defaultConfig {
         applicationId = "dev.droidtop.providerhost"

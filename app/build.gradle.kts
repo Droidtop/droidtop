@@ -20,7 +20,7 @@ android {
     // module stays on its own existing compileSdk; only the final
     // linking module (:app) has to be >= the highest compileSdk among
     // everything it depends on.
-    compileSdk = 36
+    compileSdkVersion("android-37.1")
 
     // A plain incrementing integer, not a git SHA — CI passes the number
     // of commits reachable from the commit it builds (see
