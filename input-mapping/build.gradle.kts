@@ -7,7 +7,7 @@ plugins {
 // shared library Enginehost also builds (C9) without a change.
 android {
     namespace = "dev.droidtop.mapping"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26

@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.runtime.linux.root"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26

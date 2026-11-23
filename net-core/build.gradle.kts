@@ -9,7 +9,7 @@ val aria2EngineVersion: String = file("aria2-engine.pin").readLines()
 
 android {
     namespace = "dev.droidtop.net"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig { minSdk = 26 }
     buildFeatures { buildConfig = true }
     val revision = System.getenv("VERSION_REVISION") ?: "0"

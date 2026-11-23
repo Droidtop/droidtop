@@ -7,7 +7,7 @@ plugins {
 // processes such as Wine's attaches to, with libsbx_child.so and sbx-exec packaged beside it.
 android {
     namespace = "dev.droidtop.sandboxhost"
-    compileSdk = 36
+    compileSdk = 37
     // The same NDK pin as :plugin-host and :input-keyboard, so CI's one NDK install serves all of them.
     ndkVersion = "27.0.12077973"
 
