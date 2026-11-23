@@ -67,8 +67,16 @@ object LinuxGames {
     fun rootfsReady(filesDir: File): Boolean =
         File(rootfsDir(filesDir), READY).isFile && File(rootfsDir(filesDir), ROOTFS_LOADER).isFile
 
-    /** The variables every FEX run needs: where its x86 rootfs is. */
-    fun fexEnvironment(): Map<String, String> = mapOf("FEX_ROOTFS" to rootfsInContainer)
+    /**
+     * The variables every FEX run needs: where its x86 rootfs is, and its own errors on standard error. FEX is silent by
+     * default, so a program it could not start ended with only "exit 248" and nothing to act on (console, Bare Witness,
+     * 2026-11-23). Its log carries errors and warnings, not a trace, so a game that runs prints little.
+     */
+    fun fexEnvironment(): Map<String, String> = mapOf(
+        "FEX_ROOTFS" to rootfsInContainer,
+        "FEX_SILENTLOG" to "0",
+        "FEX_OUTPUTLOG" to "stderr",
+    )
 
     /** The record key of [entryId]'s container: its own when [own], else the shared one. */
     fun key(entryId: String?, own: Boolean): String = if (own && entryId != null) "game.$entryId" else SHARED_KEY
