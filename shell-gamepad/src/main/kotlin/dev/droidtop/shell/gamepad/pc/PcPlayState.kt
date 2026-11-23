@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.update
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.platform.LocalContext
@@ -283,6 +284,19 @@ internal fun PcPlayState.withSetupLine(line: String?, running: Boolean): PcPlayS
     if (line == null) this else copy(detail = line, pressable = pressable && !running)
 
 /**
+ * Raised when a game's options menu closes, so a page drawn under it asks for its runner again: what the menu wrote
+ * (the runner chosen under Runs with, a pinned engine) is read from where the menu wrote it, by the same lookup
+ * ([rememberPcPlayState]), never copied. Without it the page's "Runs with" line kept the old runner until it was
+ * reopened.
+ */
+internal object PcPlayRefresh {
+    private val changes = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val token: kotlinx.coroutines.flow.StateFlow<Int> = changes
+
+    fun bump() = changes.update { it + 1 }
+}
+
+/**
  * The focused game's resolved runner and the [PcPlayState] it gives,
  * worked out for ONE entry off the main thread (a folder walk), never per
  * card. [PcPlayStateLoading] until it answers; the resolved runner is
@@ -294,6 +308,7 @@ internal fun rememberPcPlayState(entry: LibraryEntry, reload: Int = 0): Pair<PcP
     val downloads by StoreInstallJob.live.collectAsState()
     val download = entry.downloadKey()?.let { downloads[it] }
     val windowsSetup by WindowsSetup.live.collectAsState()
+    val menuChanges by PcPlayRefresh.token.collectAsState()
     // The runner is worked out again when a Windows setup starts or ends: the
     // page stayed on "Set up Windows games" after it finished because nothing
     // re-asked (Droidtop/tracker#300). Progress lines do not re-ask.
@@ -310,7 +325,7 @@ internal fun rememberPcPlayState(entry: LibraryEntry, reload: Int = 0): Pair<PcP
             returns++
         }
     }
-    val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id, setupRunning, returns, reload) {
+    val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id, setupRunning, returns, reload, menuChanges) {
         // Keep the last answer on screen while it is re-asked after a setup, so the button does not flash.
         if (!value.first) value = Triple(false, null, null)
         // A game whose folder is gone has no runner to work out, and a lookup that threw left this at "..." for ever:
