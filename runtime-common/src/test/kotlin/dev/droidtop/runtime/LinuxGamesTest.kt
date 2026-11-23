@@ -67,6 +67,32 @@ class LinuxGamesTest {
     }
 
     @Test
+    fun aContainerWithAnotherFexBuildIsSetUpAgain() {
+        val dir = Files.createTempDirectory("linux-games").toFile()
+        try {
+            // A container set up with FEX's own packages: a launcher, no build recorded.
+            File(dir, "linux-game-containers.properties").writeText("fex.droidtop-sibling-1=FEX\n")
+            assertNull(LinuxGames.recordedLauncher(dir, "droidtop-sibling-1"))
+            LinuxGames.recordLauncher(dir, "droidtop-sibling-1", "FEX")
+            assertEquals("FEX", LinuxGames.recordedLauncher(dir, "droidtop-sibling-1"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun theInstallScriptChecksDroidtopsFexBuild() {
+        val script = LinuxGames.installScript
+        assertFalse(script.contains("@SHA"))
+        assertFalse(script.contains("ppa.launchpadcontent.net"))
+        assertTrue(script.contains("https://github.com/Droidtop/FEX/releases/download/${LinuxGames.FEX_BUILD}/"))
+        for (level in listOf("armv8.0", "armv8.2", "armv8.4")) {
+            assertTrue(level, Regex("$level\\) want=[0-9a-f]{64} ;;").containsMatchIn(script))
+        }
+        assertTrue(script.contains("sha256sum -c"))
+    }
+
+    @Test
     fun theUnpackScriptChecksTheHashWithoutLeadingZeros() {
         val script = LinuxGames.unpackScript("0A1B2C3D4E5F6071")
         assertTrue(script.contains("want=\"a1b2c3d4e5f6071\""))

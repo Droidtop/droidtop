@@ -37,8 +37,21 @@ object LinuxGames {
     private const val ROOTFS_VERSION = "24.04"
     private const val ROOTFS_FOLDER = "Ubuntu_24_04"
 
-    /** The signing key of FEX's Ubuntu packages (launchpad.net/~fex-emu/+archive/ubuntu/fex, its signing_key_fingerprint). */
-    private const val FEX_KEY = "EDB98BFE8A2310DC9C4A376E76DBFEBEA206F5AC"
+    /**
+     * droidtop's FEX build (github.com/Droidtop/FEX, release [FEX_BUILD]): FEX 2611.1 with guest files on noexec mounts
+     * mapped without host PROT_EXEC. Android mounts shared storage and SD cards noexec, and FEX's own packages refused
+     * every x86 program kept there ("MapFile: Some elf mapping failed, 1", console, 2026-11-23). One tarball of the
+     * installed tree per Arm level, the levels FEX's own Ubuntu packages ship.
+     */
+    const val FEX_BUILD = "droidtop-2611.1-1"
+    private const val FEX_RELEASE = "https://github.com/Droidtop/FEX/releases/download/$FEX_BUILD"
+
+    /** SHA-256 of each level's tarball, from the release's own `.sha256` files. */
+    private val FEX_SHA256 = mapOf(
+        "armv8.0" to "53992275fdf017e4ba43b576446970f15e0df312382025105d6446bd7c3f9cf4",
+        "armv8.2" to "92ab6e5d26a4288022d1ac28b1ffbb2c57366398d0350b0545d1ad6cc935472e",
+        "armv8.4" to "de0c49ebcc58b886702e5b5214d7cb1872b36c71d6459fae74e989dc5d3962f7",
+    )
 
     private const val READY = ".droidtop-ready"
     private const val RECORDS = "linux-game-containers.properties"
@@ -92,8 +105,13 @@ object LinuxGames {
         props.stringPropertyNames().filter { it.startsWith("container.") }.mapNotNull { props.getProperty(it) }.toSet()
     }
 
-    /** The FEX launcher found in container [containerId] after FEX was installed there, when it was. */
-    fun recordedLauncher(filesDir: File, containerId: String): String? = records(filesDir).getProperty("fex.$containerId")
+    /**
+     * The FEX launcher found in container [containerId] after [FEX_BUILD] was installed there, when it was. A container
+     * with another build (FEX's own packages, before droidtop's build) has none, so setup installs this one.
+     */
+    fun recordedLauncher(filesDir: File, containerId: String): String? = records(filesDir).let { props ->
+        props.getProperty("fex.$containerId")?.takeIf { props.getProperty("fexbuild.$containerId") == FEX_BUILD }
+    }
 
     /**
      * The architecture and translator chosen for the container recorded under [key] (a game's own or the shared one),
@@ -132,7 +150,10 @@ object LinuxGames {
 
     fun recordContainer(filesDir: File, key: String, containerId: String) = update(filesDir) { it.setProperty("container.$key", containerId) }
 
-    fun recordLauncher(filesDir: File, containerId: String, launcher: String) = update(filesDir) { it.setProperty("fex.$containerId", launcher) }
+    fun recordLauncher(filesDir: File, containerId: String, launcher: String) = update(filesDir) {
+        it.setProperty("fex.$containerId", launcher)
+        it.setProperty("fexbuild.$containerId", FEX_BUILD)
+    }
 
     /**
      * Whether a Linux game with [key] is ready to run x86 programs: its container exists, FEX is in it, and the rootfs
@@ -156,23 +177,30 @@ object LinuxGames {
     }
 
     /**
-     * Installs FEX's packages, run as the container's root: the tools the rootfs step needs (unsquashfs, xxhsum), FEX's
-     * repository with its signing key, and the FEX build for the CPU (armv8.0, 8.2 or 8.4, from the CPU's features;
-     * armv8.0 runs on every arm64 CPU when the features cannot be read).
+     * Installs [FEX_BUILD], run as the container's root: the tools the rootfs step needs (unsquashfs, xxhsum), then the
+     * build for the CPU (armv8.0, 8.2 or 8.4, from the CPU's features; armv8.0 runs on every arm64 CPU when the
+     * features cannot be read), checked against its SHA-256 and unpacked over `/`. FEX's own packages, from containers
+     * set up before droidtop's build, are removed first so only one FEX is on the path.
      */
     val installScript: String = """
         set -eu
         export DEBIAN_FRONTEND=noninteractive
+        rm -f /etc/apt/sources.list.d/fex-emu.list /usr/share/keyrings/fex-emu.gpg
         apt-get update -q
-        apt-get install -y -q --no-install-recommends ca-certificates curl gnupg squashfs-tools xxhash
-        curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x$FEX_KEY" | gpg --batch --yes --dearmor -o /usr/share/keyrings/fex-emu.gpg
-        echo "deb [signed-by=/usr/share/keyrings/fex-emu.gpg] https://ppa.launchpadcontent.net/fex-emu/fex/ubuntu noble main" > /etc/apt/sources.list.d/fex-emu.list
-        apt-get update -q
+        apt-get remove -y -q 'fex-emu-*' >/dev/null 2>&1 || true
+        apt-get install -y -q --no-install-recommends ca-certificates curl squashfs-tools xxhash xz-utils
         level=armv8.0
         flags=${'$'}(grep -m1 -i '^Features' /proc/cpuinfo || true)
         case "${'$'}flags" in *atomics*) case "${'$'}flags" in *asimdrdm*) level=armv8.2 ;; esac ;; esac
         if [ "${'$'}level" = armv8.2 ]; then case "${'$'}flags" in *ilrcpc*) case "${'$'}flags" in *flagm*) level=armv8.4 ;; esac ;; esac; fi
-        apt-get install -y -q fex-emu-${'$'}level
+        case "${'$'}level" in
+        ${FEX_SHA256.entries.joinToString("\n") { (level, sha) -> "$level) want=$sha ;;" }}
+        esac
+        tarball=/tmp/fex-${'$'}${'$'}.tar.xz
+        trap 'rm -f "${'$'}tarball"' EXIT
+        curl -fsSL -o "${'$'}tarball" "$FEX_RELEASE/fex-${FEX_BUILD.removePrefix("droidtop-")}-${'$'}level.tar.xz"
+        echo "${'$'}want  ${'$'}tarball" | sha256sum -c --quiet - || { echo "droidtop's FEX build does not match its checksum" >&2; exit 1; }
+        tar -C / --no-same-owner --keep-directory-symlink -xJf "${'$'}tarball"
     """.trimIndent()
 
     /** Prints the FEX launcher's name: `FEX` from FEX 2509 on, `FEXInterpreter` before. Empty when FEX is not there. */
