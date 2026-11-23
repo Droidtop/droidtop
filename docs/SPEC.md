@@ -19880,7 +19880,8 @@ need them again.
 "Play" when the resolved runner is ready, the one setup step's own name
 when it is not (Install, Set up), "Choose a runner" when nothing on this
 device offers the game, "Folder is missing" for a game the walk no longer
-finds. The page asks for the runner again when its options menu closes, from the same stored choice the menu
+finds. That missing-folder state is decided from the entry alone and never waits on the runner lookup, so the
+button is never left on "…"; a lookup that fails is also an answer ("Choose a runner"). The page asks for the runner again when its options menu closes, from the same stored choice the menu
 wrote (`LaunchStrategyOverridePrefs`), so the "Runs with" line and the button follow a change made there without
 reopening the page. A game no runner can take is never a dead end that only says
 "no runner": the line names what is missing (`PcRunners.noRunnerLine`:

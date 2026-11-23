@@ -313,9 +313,18 @@ internal fun rememberPcPlayState(entry: LibraryEntry, reload: Int = 0): Pair<PcP
     val resolved by produceState<Triple<Boolean, ResolvedRunner?, String?>>(Triple(false, null, null), entry.id, setupRunning, returns, reload) {
         // Keep the last answer on screen while it is re-asked after a setup, so the button does not flash.
         if (!value.first) value = Triple(false, null, null)
-        val (runner, line) = withContext(Dispatchers.IO) {
-            val runners = PcRunnerOptions.forEntry(context, entry)
-            PcRunnerOptions.resolvedFor(context, entry, runners) to runners.noRunnerLine
+        // A game whose folder is gone has nothing to look up: its state is "Folder is missing" whatever a runner
+        // would say, so the walk is not asked at all (it is what left the button on "..." for such a game).
+        val (runner, line) = if (entry.missing) {
+            null to null
+        } else {
+            withContext(Dispatchers.IO) {
+                // A lookup that throws still ends as an answer ("Choose a runner"), never as a button left loading.
+                runCatching {
+                    val runners = PcRunnerOptions.forEntry(context, entry)
+                    PcRunnerOptions.resolvedFor(context, entry, runners) to runners.noRunnerLine
+                }.getOrDefault(null to null)
+            }
         }
         value = Triple(true, runner, line)
     }
