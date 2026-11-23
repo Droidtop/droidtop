@@ -26,8 +26,9 @@ class GameLaunchStrategyResolverTest {
     }
 
     @Test
-    fun `RenPy with a linux lib folder adds LINUX_CONTAINER`() {
+    fun `RenPy with its sh launcher and a linux lib folder adds LINUX_CONTAINER`() {
         File(tmp.root, "lib/py3-linux-x86_64").mkdirs()
+        File(tmp.root, "Game.sh").createNewFile()
         val strategies = GameLaunchStrategyResolver.resolve(GameEngine.RENPY, tmp.root)
         assertEquals(listOf(GameLaunchStrategy.LINUX_CONTAINER), strategies)
     }
@@ -55,6 +56,7 @@ class GameLaunchStrategyResolverTest {
     @Test
     fun `a Ren'Py game can offer ENGINEHOST, WINE_PREFIX, and LINUX_CONTAINER at once`() {
         File(tmp.root, "Game.exe").createNewFile()
+        File(tmp.root, "Game.sh").createNewFile()
         File(tmp.root, "lib/py3-linux-x86_64").mkdirs()
 
         val strategies = GameLaunchStrategyResolver.resolve(
