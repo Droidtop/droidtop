@@ -117,7 +117,7 @@ val platformDatabaseSeed = tasks.register<Copy>("platformDatabaseSeed") {
 // The seed folder is an asset folder of every variant. preBuild runs the copy before anything reads the assets.
 androidComponents {
     onVariants { variant ->
-        variant.sources.assets?.addStaticSources(platformDatabaseSeedDir.map { listOf(it) })
+        variant.sources.assets?.addStaticSourceDirectory(platformDatabaseSeedDir.get().asFile.absolutePath)
     }
 }
 tasks.named("preBuild") { dependsOn(platformDatabaseSeed) }
