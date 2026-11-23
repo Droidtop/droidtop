@@ -284,8 +284,12 @@ object RetroArchCores {
      * [file] copied to `Download/[SHARED_DIR]/<core>_libretro_android.so` through MediaStore (no storage permission for
      * droidtop), an earlier copy of the same name replaced; the absolute path RetroArch reads. Background only.
      */
-    private fun shareCopy(context: Context, need: Need, file: File): String {
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) error("MediaStore's Downloads collection needs Android 10")
+    private fun shareCopy(context: Context, need: Need, file: File): String =
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) shareCopyFromQ(context, need, file)
+        else error("MediaStore's Downloads collection needs Android 10")
+
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.Q)
+    private fun shareCopyFromQ(context: Context, need: Need, file: File): String {
         val name = "${need.core}$SUFFIX"
         val relative = "${Environment.DIRECTORY_DOWNLOADS}/$SHARED_DIR/"
         val resolver = context.contentResolver
