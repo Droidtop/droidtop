@@ -290,13 +290,13 @@ object PcRunnerOptions {
     /**
      * Whether this folder's native Linux build can run here (docs/SPEC.md 3c). An x86 build on an arm64 device runs
      * through FEX in the game's Linux games container, so it runs once that is set up; a build for this device's own
-     * architecture needs nothing. A Ren'Py game is an x86 build unless it ships `linux-aarch64` binaries; another game
+     * architecture needs nothing. A Ren'Py game is an x86 build unless it ships `linux-aarch64` binaries (`py3-linux-aarch64`, or unprefixed in older builds); another game
      * is one when its launcher is `<Game>.x86_64` or `.x86`, or an ELF built for x86.
      */
     private fun linuxBuildRunsHere(gameRoot: File, entryId: String): Boolean {
         val host = dev.droidtop.shared.containers.ContainerArch.host(android.os.Build.SUPPORTED_ABIS.firstOrNull().orEmpty())
         if (host != dev.droidtop.shared.containers.ContainerArch.ARM64) return true
-        val renPy = File(gameRoot, "lib").list()?.filter { it.startsWith("py2-linux") || it.startsWith("py3-linux") }.orEmpty()
+        val renPy = File(gameRoot, "lib").list()?.filter(dev.droidtop.shared.runners.RenPyLinuxLaunch::isLinuxLibFolder).orEmpty()
         val needsTranslation = if (renPy.isNotEmpty()) {
             renPy.none { it.endsWith("-aarch64") }
         } else {

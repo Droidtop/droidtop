@@ -730,7 +730,7 @@ class DroidtopPcGameRuntime(
             ?: error("${program.name} is on storage the Linux games container can't see; add its folder to your games folders")
         val libFolders = File(gameRoot, "lib").list()?.toList().orEmpty()
         val renPy = program.extension.equals("sh", ignoreCase = true) &&
-            libFolders.any { it.startsWith("py2-linux") || it.startsWith("py3-linux") }
+            libFolders.any(RenPyLinuxLaunch::isLinuxLibFolder)
         fun environmentFor(translator: Translator?) = if (translator == Translator.FEX) LinuxGames.fexEnvironment() else emptyMap()
         fun checkInstalled(translator: Translator?) {
             if (translator == Translator.FEX && fexLauncher == null) error("set up Linux games first: FEX isn't installed in this game's container")
