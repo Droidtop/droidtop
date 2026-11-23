@@ -63,4 +63,15 @@ class LaunchFailureMessageTest {
             LaunchFailureMessage.userMessage("   ", RuntimeException("anything")),
         )
     }
+
+    @Test
+    fun aRefusalWrittenForThePersonIsShownAsItIs() {
+        val sentence = "Start Desktop mode first: a native Linux build runs inside a live container."
+        assertEquals(sentence, LaunchFailureMessage.userMessage("Passion", dev.droidtop.library.LaunchRefused(sentence)))
+        // A raw exception, even an IllegalStateException with a message, still reads "couldn't be started".
+        assertEquals(
+            "\"Passion\" couldn't be started.",
+            LaunchFailureMessage.userMessage("Passion", IllegalStateException("java.io.IOException: boom")),
+        )
+    }
 }

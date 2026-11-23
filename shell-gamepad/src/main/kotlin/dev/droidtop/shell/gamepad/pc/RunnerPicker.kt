@@ -90,7 +90,7 @@ internal fun RunnerPicker(
             item {
                 RunnerRow(
                     title = if (showWhyNot) "Hide why the rest don't apply" else "Why not the others?",
-                    detail = "${hidden.size} runners this game doesn't offer",
+                    detail = if (hidden.size == 1) "1 runner this game doesn't offer" else "${hidden.size} runners this game doesn't offer",
                     enabled = true,
                     selected = false,
                     onSelect = { showWhyNot = !showWhyNot },
