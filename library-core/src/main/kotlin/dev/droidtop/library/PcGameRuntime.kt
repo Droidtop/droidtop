@@ -37,38 +37,21 @@ data class PcProvisionResult(val succeeded: Boolean, val detail: String)
  */
 interface PcGameRuntime {
     /**
-     * Whether any launch could succeed right now: a Wine prefix exists
-     * for Windows software, or a container session is live for a native
-     * Linux build. Which of the two a given game needs is decided by
-     * [launchWindows] / [launchLinux], and each names its own missing
-     * piece -- this only answers "is there any point going further".
-     *
-     * Deliberately no longer "is a container session live". Windows
-     * games run through droidtop's Wine engine, which needs no root and
-     * no container session; requiring one made them root-only by
-     * accident (docs/SPEC.md 5b).
+     * Whether a Windows launch could succeed right now: a Wine prefix exists. A native Linux build has its own
+     * container and never waits for one here ([launchLinux] names what is missing, "set up Linux games first").
+     * Deliberately not "is a container session live": Windows games run through droidtop's Wine engine, which
+     * needs no root and no container session (docs/SPEC.md 5b), and Linux games run in a container of their own
+     * (docs/SPEC.md 3c).
      */
     val isAvailable: Boolean
 
     /**
      * Whether a Windows environment has actually been set up yet: the
      * one precondition a Windows launch has. A Wine launch needs no
-     * container session (docs/SPEC.md 5b); only [launchLinux] does, and
-     * [isLinuxContainerAvailable] answers that separately.
+     * container session (docs/SPEC.md 5b); a native Linux build has its own
+     * container, made by [setUpLinuxGames] (docs/SPEC.md 3c).
      */
     val isProvisioned: Boolean
-
-    /**
-     * Whether a container runtime that can really exec a native Linux
-     * binary is live right now: Desktop mode's primary container, whether
-     * droidspaces (root) or proot (no root) runs it.
-     *
-     * Separate from [isAvailable], which is true as soon as a Wine prefix
-     * exists: a Windows game needs no container, a native Linux build
-     * needs one. Conflating them made the PC surface tell a
-     * user with a Wine prefix that a Linux-only game was ready to run.
-     */
-    val isLinuxContainerAvailable: Boolean
 
     /**
      * Creates the Wine container and installs the Windows environment

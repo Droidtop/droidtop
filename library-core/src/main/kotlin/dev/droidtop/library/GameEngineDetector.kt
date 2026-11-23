@@ -1239,7 +1239,6 @@ object GameLaunchStrategyResolver {
         enginehostCoreLabel: String? = null,
         windowsEnvironmentReady: Boolean = true,
         wineRendererWired: Boolean = true,
-        linuxContainerAvailable: Boolean = true,
         x86TranslationRegistered: Boolean = true,
         preferredOrder: List<GameLaunchStrategy>? = null,
     ): RunnerFacts = RunnerFacts(
@@ -1259,7 +1258,6 @@ object GameLaunchStrategyResolver {
         kirikiroid2Installed = kirikiroid2Installed,
         windowsEnvironmentReady = windowsEnvironmentReady,
         wineRendererWired = wineRendererWired,
-        linuxContainerAvailable = linuxContainerAvailable,
         x86TranslationRegistered = x86TranslationRegistered,
         preferredOrder = preferredOrder.orEmpty(),
     )
@@ -1899,14 +1897,8 @@ class EngineGameProvider(
                 "droidtop's PC runtime isn't registered in this process. Launch from the main " +
                     "droidtop app rather than a standalone surface.",
             )
-        if (!runtime.isAvailable) throw LaunchRefused(
-            if (windows) {
-                "The Windows environment isn't set up yet — run \"Set up Windows games\" in Settings."
-            } else {
-                "Start Desktop mode first: a native Linux build runs inside a live container, " +
-                    "and none is connected right now."
-            },
-        )
+        // A Linux build has its own container and says by itself what is missing ("set up Linux games first").
+        if (windows && !runtime.isAvailable) throw LaunchRefused("The Windows environment isn't set up yet — run \"Set up Windows games\" in Settings.")
 
         // A single-file game ([GameEngineDetector.looseGodotBuilds]) is its
         // own program, run from the folder it sits in.

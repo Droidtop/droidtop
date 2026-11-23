@@ -1,7 +1,8 @@
 package dev.droidtop.app
 
 import android.app.Application
-import dev.droidtop.runtime.PrimaryContainerSession
+import kotlinx.coroutines.sync.withLock
+import dev.droidtop.runtime.ContainerRuntime
 
 /**
  * Every seam droidtop's modules call back through, installed once per process from [DroidtopApplication.onCreate]
@@ -125,21 +126,14 @@ internal object Seams {
         dev.droidtop.pluginhost.PluginBrokers.socialChanged = { pluginId, change ->
             dev.droidtop.library.integrations.PluginSocialProviders.changed(app, pluginId, change)
         }
-        // Fills library-core's PcGameRuntime seam, which is what makes the
-        // WINE_PREFIX / LINUX_CONTAINER launch strategies real rather than
-        // error() stubs. The session supplier is only for the native-Linux
-        // half; Windows games go through the WineEngine seam and need
-        // neither a desktop session nor root. It stays a supplier because
-        // DesktopSessionService may still be connecting when this runs --
-        // and, with Desktop disabled, never connects at all, which the
-        // supplier already expresses as "no primary session".
+        // Fills library-core's PcGameRuntime seam, which is what makes the WINE_PREFIX / LINUX_CONTAINER launch
+        // strategies real rather than error() stubs. Windows games go through the WineEngine seam; a native Linux
+        // build runs in a Linux games container of its own, started directly through the container runtime
+        // (docs/SPEC.md 3c). Neither needs Desktop mode's session, and one that is up changes nothing.
         dev.droidtop.library.PcGameRuntimeRegistry.runtime =
             dev.droidtop.runtime.windows.DroidtopPcGameRuntime(
                 context = app,
-                primarySession = {
-                    (DesktopSessionService.state.value as? DesktopSessionState.Connected)
-                        ?.let { PrimaryContainerSession(it.runtime, it.container) }
-                },
+                containerRuntime = { linuxContainerRuntime(app) },
             )
         // Where a store game's Wine prefix is, for its cloud saves (docs/SPEC.md 7g, "Stores").
         dev.droidtop.library.stores.StoreSaves.locator = dev.droidtop.runtime.windows.DroidtopWinePrefixLocator
@@ -150,4 +144,13 @@ internal object Seams {
             dev.droidtop.runtime.windows.WindowsInstalls.install(context, installer, null, title, onStatus)
         }
     }
+
+    private val linuxRuntimeLock = kotlinx.coroutines.sync.Mutex()
+    @Volatile private var linuxRuntime: ContainerRuntime? = null
+
+    /** The one container runtime Linux games use, chosen as Desktop mode's is ([ContainerRuntimeFactory]) the first time it is asked. */
+    private suspend fun linuxContainerRuntime(app: Application): ContainerRuntime =
+        linuxRuntime ?: linuxRuntimeLock.withLock {
+            linuxRuntime ?: ContainerRuntimeFactory.select(app).also { linuxRuntime = it }
+        }
 }

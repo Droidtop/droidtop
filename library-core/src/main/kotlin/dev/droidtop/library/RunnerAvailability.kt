@@ -105,8 +105,6 @@ data class RunnerFacts(
     val windowsEnvironmentReady: Boolean = true,
     /** Whether a renderer is actually attached to the Wine X server — see [RunnerAvailability.WINE_RENDERER_WIRED]. */
     val wineRendererWired: Boolean = true,
-    /** Whether Desktop mode's Linux container is live, the only place a native Linux build can run (docs/SPEC.md 5a). */
-    val linuxContainerAvailable: Boolean = true,
     /**
      * Whether this game's Linux build runs here: it needs no translation (an arm64 build), or its Linux games
      * container has FEX and FEX's x86 rootfs (docs/SPEC.md 3c).
@@ -289,17 +287,6 @@ object RunnerAvailability {
         }
         if (!facts.hasLinuxBuild) {
             return RunnerOption(strategy, RunnerState.NOT_FOR_THIS_GAME, "No native Linux build in this game's folder")
-        }
-        // A native build runs inside Desktop mode's container, root or
-        // proot (docs/SPEC.md 3, 5a), and a Gaming game is never gated on
-        // it: this row states the reason instead of offering a launch that
-        // cannot work, and every other runner for the game stays offered.
-        if (!facts.linuxContainerAvailable) {
-            return RunnerOption(
-                strategy,
-                RunnerState.NOT_ON_THIS_DEVICE,
-                "Start Desktop mode to run this game's native Linux build",
-            )
         }
         if (!facts.x86TranslationRegistered) {
             // An x86 build on an arm64 device runs through FEX in a Linux games container (docs/SPEC.md 3c): the

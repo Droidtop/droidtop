@@ -3226,6 +3226,15 @@ model of the desktop stack:
   droidtop's game settings, with the same choices as prefixes.
 - The game's files stay where they are and are bound in. droidtop never copies or moves them.
 
+**Linux games need no Desktop mode (owner, Droidtop/tracker#962 Q37: "Linux games shouldn't rely on desktop mode... Wine
+prefixes don't rely on desktop mode, individual linux containers shouldn't either").** A Linux games container is made,
+started and run through the container runtime directly (`ContainerRuntimeFactory`, proot without root, the runtime
+Desktop mode uses), as a Wine prefix is started with nothing else running. Setup, launch, stop, reset and the PC card's
+Linux row never ask for Desktop mode's session (`DroidtopPcGameRuntime` takes a runtime supplier, not a session), and a
+Desktop session that is also up changes nothing: there is one mechanism. The game process belongs to the launch, not to
+a desktop session. What a game window shows on is a separate question: with no compositor running there is none for a
+graphical program to connect to yet.
+
 **How FEX gets into a container.** droidtop installs it; the person never does it by hand:
 - FEX's own packages go into a glibc container through the image's package manager, from FEX's published repository
   for that distro.
@@ -3276,6 +3285,9 @@ setup in `DroidtopPcGameRuntime`.
   translated programs are x86_64; never x86, which is FEX only), and a stale Box64 falls back to FEX.
   `DroidtopPcGameRuntime.linuxCommand` runs programs, and Ren'Py's `RENPY_GDB`, through the recorded translator
   (`LinuxGames.launcherFor`: FEX's recorded launcher, or `box64` from the container's path).
+- Built, not yet checked on a device: Linux games without Desktop mode (setup, launch, stop, reset, the card's Linux
+  row), through `DroidtopPcGameRuntime`'s `containerRuntime` supplier (`Seams`), with the "Start Desktop mode" wording
+  and `isLinuxContainerAvailable`, `RunnerFacts.linuxContainerAvailable` and `PrimaryContainerSession` deleted.
 - Not built: installing Box64 in a container (a Box64 choice assumes `box64` is on the container's path
   when it is not, the launch fails with the container's own error), and x86 containers (task 5): choosing x86_64 or x86 as the architecture is recorded, but the
   container is still made from the arm64 image until then.

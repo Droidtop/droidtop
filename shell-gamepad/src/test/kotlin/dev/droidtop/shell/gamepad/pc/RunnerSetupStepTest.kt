@@ -46,8 +46,8 @@ class RunnerSetupStepTest {
         assertFalse(running.pressable)
         assertEquals(base.verb, running.verb)
         // A failure leaves the button pressable to try again.
-        val failed = base.withSetupLine("Start Desktop mode first", running = false)
-        assertEquals("Start Desktop mode first", failed.detail)
+        val failed = base.withSetupLine("FEX didn't install", running = false)
+        assertEquals("FEX didn't install", failed.detail)
         assertEquals(base.pressable, failed.pressable)
     }
 }

@@ -31,7 +31,7 @@ import dev.droidtop.shared.containers.Translator
 import dev.droidtop.shared.runners.ElfHeader
 import dev.droidtop.shared.runners.RenPyLinuxLaunch
 import dev.droidtop.shared.runners.TranslatedCommand
-import dev.droidtop.runtime.PrimaryContainerSession
+import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.SafeDelete
 import java.io.File
@@ -63,15 +63,14 @@ import org.json.JSONObject
  *    [PrimaryContainerSession] as well, which made Windows games
  *    root-only by accident -- the prefix was provisioned into an
  *    ImageFs that the launch path never entered.
- *  - A native Linux build genuinely does need a Linux rootfs to run in,
- *    so [launchLinux] still asks for the primary container. That is a
- *    real requirement of the job, not an assumption inherited from the
- *    Wine path.
+ *  - A native Linux build needs a Linux rootfs, and has one of its own: a
+ *    Linux games container made by [setUpLinuxGames] (docs/SPEC.md 3c),
+ *    started directly through [containerRuntime] (proot without root), the
+ *    way a Wine prefix needs nothing else running. Desktop mode's session
+ *    is never asked for, and one that is up changes nothing.
  *
- * [primarySession] is a supplier rather than a value for exactly the
- * reason [PcGameProvider]'s constructor already documents: the desktop
- * session may still be connecting, or not be started at all, when this
- * is constructed.
+ * [containerRuntime] is a supplier because the runtime is chosen (root or
+ * not) when first needed, off the main thread.
  *
  * droidtop reuses an existing container rather than creating one per
  * game -- a user's engine game should run in the Wine environment they
@@ -80,12 +79,12 @@ import org.json.JSONObject
  */
 class DroidtopPcGameRuntime(
     private val context: Context,
-    private val primarySession: () -> PrimaryContainerSession?,
+    private val containerRuntime: suspend () -> ContainerRuntime,
     private val wineEngine: WineEngine = BionicWineEngine(context),
 ) : PcGameRuntime {
 
     override val isAvailable: Boolean
-        get() = isProvisioned || primarySession() != null
+        get() = isProvisioned
 
     // On an x86_64 device the environment also needs the x86_64 guest
     // libraries, and a Wine build that runs there directly
@@ -115,14 +114,6 @@ class DroidtopPcGameRuntime(
         android.util.Log.w(TAG, "Windows setup: $step failed", error)
         return PcProvisionResult(false, line)
     }
-
-    // The primary container session IS the Linux runtime: launchLinux
-    // runs inside it and nothing else can. It exists only while Desktop
-    // mode's container is up (droidspaces with root, proot without), which
-    // is why the PC surface shows a Linux row as "not on this device"
-    // otherwise rather than offering a launch that cannot work.
-    override val isLinuxContainerAvailable: Boolean
-        get() = primarySession() != null
 
     /**
      * Setup, logged under [TAG] from start to end: each step the screen
@@ -636,17 +627,17 @@ class DroidtopPcGameRuntime(
         }
 
     override suspend fun launchLinux(executable: File, gameRoot: File, entryId: String?): PcLaunchResult {
-        val (session, container) = linuxGameContainer(entryId)
+        val (runtime, container) = linuxGameContainer(entryId)
             ?: return PcLaunchResult(false, linuxNotReadyReason())
-        return linuxExec(session, container, executable, gameRoot, entryId)
+        return linuxExec(runtime, container, executable, gameRoot, entryId)
     }
 
     override suspend fun runLinuxProgram(program: File, gameRoot: File, entryId: String): PcLaunchResult {
-        val (session, container) = linuxGameContainer(entryId)
+        val (runtime, container) = linuxGameContainer(entryId)
             ?: return PcLaunchResult(false, linuxNotReadyReason())
         val inside = withContext(Dispatchers.IO) { program.isFile && PrefixFolderView.isInside(gameRoot, program) }
         if (!inside) return PcLaunchResult(false, "${program.name} is not a file inside the game's folder")
-        return linuxExec(session, container, program, gameRoot, entryId)
+        return linuxExec(runtime, container, program, gameRoot, entryId)
     }
 
     /** Whether [entryId]'s game has a container of its own (its Linux tools setting), else the shared one. */
@@ -655,25 +646,20 @@ class DroidtopPcGameRuntime(
 
     /**
      * The Linux games container [entryId]'s game runs in (docs/SPEC.md 3c): its own or the shared one, as its settings
-     * say, once "Set up Linux games" made it. Null while Desktop mode is not running (siblings show their windows on
-     * its desktop) or before setup.
+     * say, once "Set up Linux games" made it, with the runtime that runs it. Null before setup. Needs no Desktop
+     * session: the container is started here, through [containerRuntime].
      */
-    private suspend fun linuxGameContainer(entryId: String?): Pair<PrimaryContainerSession, dev.droidtop.runtime.Container>? {
-        val session = primarySession() ?: return null
+    private suspend fun linuxGameContainer(entryId: String?): Pair<ContainerRuntime, dev.droidtop.runtime.Container>? {
+        val runtime = containerRuntime()
         val key = LinuxGames.key(entryId, ownLinuxContainer(entryId))
         val id = withContext(Dispatchers.IO) { LinuxGames.recordedId(context.filesDir, key) } ?: return null
-        val info = session.runtime.listContainers().firstOrNull { it.container.id == id } ?: return null
+        val info = runtime.listContainers().firstOrNull { it.container.id == id } ?: return null
         // proot runs a command straight in a container's files; the rooted backend runs it in a started container.
-        if (!info.running && info.container.backend != dev.droidtop.runtime.ContainerBackend.PROOT) session.runtime.start(info.container)
-        return session to info.container
+        if (!info.running && info.container.backend != dev.droidtop.runtime.ContainerBackend.PROOT) runtime.start(info.container)
+        return runtime to info.container
     }
 
-    private fun linuxNotReadyReason(): String =
-        if (primarySession() == null) {
-            "a native Linux build runs beside Desktop mode, and it isn't running"
-        } else {
-            "set up Linux games first, from the game's page"
-        }
+    private fun linuxNotReadyReason(): String = "set up Linux games first, from the game's page"
 
     /**
      * [program] in [container], in the environment the game starts in: its own home when it has one, and on an arm64
@@ -681,7 +667,7 @@ class DroidtopPcGameRuntime(
      * its lib/ folders to use and to start that binary through FEX (lib-runners' RenPyLinuxLaunch).
      */
     private suspend fun linuxExec(
-        session: PrimaryContainerSession,
+        runtime: ContainerRuntime,
         container: dev.droidtop.runtime.Container,
         program: File,
         gameRoot: File,
@@ -690,12 +676,12 @@ class DroidtopPcGameRuntime(
         val launcher = withContext(Dispatchers.IO) { LinuxGames.recordedLauncher(context.filesDir, container.id) }
         val plan = withContext(Dispatchers.IO) {
             val chosen = LinuxGames.platform(context.filesDir, LinuxGames.key(entryId, ownLinuxContainer(entryId)), hostArch()).translator
-            linuxCommand(session, program, gameRoot, launcher, chosen)
+            linuxCommand(program, gameRoot, launcher, chosen)
         }
             .getOrElse { return PcLaunchResult(false, it.message ?: it.toString()) }
-        val env = withContext(Dispatchers.IO) { linuxEnvironment(session, entryId) } + plan.second
+        val env = withContext(Dispatchers.IO) { linuxEnvironment(runtime, entryId) } + plan.second
         val result = runCatching {
-            NativeLinuxGameSession(container, session.runtime).launch(plan.first.first(), plan.first.drop(1), env)
+            NativeLinuxGameSession(container, runtime).launch(plan.first.first(), plan.first.drop(1), env)
         }.getOrElse { return PcLaunchResult(false, it.message ?: it.toString()) }
 
         return PcLaunchResult(
@@ -720,7 +706,6 @@ class DroidtopPcGameRuntime(
      * container. Reads files.
      */
     private fun linuxCommand(
-        session: PrimaryContainerSession,
         program: File,
         gameRoot: File,
         fexLauncher: String?,
@@ -752,10 +737,10 @@ class DroidtopPcGameRuntime(
     }
 
     /** Empty for a game on the container's home; the game's own home otherwise, made when it is not there yet. */
-    private fun linuxEnvironment(session: PrimaryContainerSession, entryId: String?): Map<String, String> {
+    private fun linuxEnvironment(runtime: ContainerRuntime, entryId: String?): Map<String, String> {
         if (entryId == null || !dev.droidtop.library.LinuxGameOptionsPrefs.ownHome(context, entryId)) return emptyMap()
         val home = LinuxGameHome.dir(context, entryId).also { it.mkdirs() }
-        return LinuxGameHome.environment(session.runtime.hostStorageToContainerPath(home))
+        return LinuxGameHome.environment(runtime.hostStorageToContainerPath(home))
     }
 
     override fun linuxGameReady(entryId: String?): Boolean =
@@ -768,8 +753,7 @@ class DroidtopPcGameRuntime(
      * unpacked the rootfs over each other and left it partial with its ready mark (console, 2026-11-23).
      */
     override suspend fun setUpLinuxGames(entryId: String?, gameTitle: String?, onStatus: (String) -> Unit): PcProvisionResult = linuxSetup.withLock {
-        val session = primarySession() ?: return@withLock PcProvisionResult(false, "Start Desktop mode first: Linux games run beside it")
-        val runtime = session.runtime
+        val runtime = runCatching { containerRuntime() }.getOrElse { return@withLock PcProvisionResult(false, "Couldn't start the container runtime: ${it.message ?: it}") }
         val files = context.filesDir
         val own = ownLinuxContainer(entryId)
         val key = LinuxGames.key(entryId, own)
@@ -808,16 +792,15 @@ class DroidtopPcGameRuntime(
         result.stderr.ifBlank { result.stdout }.trim().lines().takeLast(3).joinToString(" ")
 
     override suspend fun stopLinuxProcesses(gameRoot: File): String {
-        val session = primarySession() ?: return "Desktop mode's container is not running, so nothing of this game is"
         return runCatching {
+            val runtime = containerRuntime()
             val pattern = gamePathInContainer(gameRoot) ?: return@runCatching "No process of this game was running"
-            // A game may run in the primary container (an arm64 build) or in a Linux games container: each is asked.
+            // Every Linux games container is asked: the shared one and each game's own.
             val recorded = withContext(Dispatchers.IO) { LinuxGames.recordedIds(context.filesDir) }
-            val containers = listOf(session.container) +
-                session.runtime.listContainers().map { it.container }.filter { it.id in recorded && it.id != session.container.id }
+            val containers = runtime.listContainers().map { it.container }.filter { it.id in recorded }
             var stopped = 0
             for (container in containers) {
-                val result = session.runtime.exec(
+                val result = runtime.exec(
                     container,
                     listOf("sh", "-c", LinuxGameHome.STOP_SCRIPT),
                     mapOf("DT_STOP_PATTERN" to pattern),
@@ -836,21 +819,21 @@ class DroidtopPcGameRuntime(
     override suspend fun resetLinuxHome(entryId: String): String = withContext(Dispatchers.IO) {
         val home = LinuxGameHome.dir(context, entryId)
         if (!home.isDirectory) return@withContext "This game's own home is empty already"
-        val session = primarySession()
-        // Inside the container when it is up: a rooted container made those files, and the app may not delete them.
-        // Otherwise from the app, which made them under proot.
-        val emptied = if (session != null) {
+        // Inside the game's container when there is one: a rooted container made those files, and the app may not
+        // delete them. Otherwise from the app, which made them under proot.
+        val inside = runCatching { linuxGameContainer(entryId) }.getOrNull()
+        val emptied = if (inside != null) {
             runCatching {
-                session.runtime.exec(
-                    session.container,
+                inside.first.exec(
+                    inside.second,
                     listOf("sh", "-c", LinuxGameHome.RESET_SCRIPT),
-                    mapOf("DT_HOME" to session.runtime.hostStorageToContainerPath(home)),
+                    mapOf("DT_HOME" to inside.first.hostStorageToContainerPath(home)),
                 ).succeeded
             }.getOrDefault(false)
         } else {
             SafeDelete.deleteWithin(home.parentFile ?: return@withContext "Couldn't find the game's home", home) && home.mkdirs()
         }
-        if (emptied) "Reset. This game starts with an empty home" else "Couldn't empty the game's home. Start Desktop mode and try again"
+        if (emptied) "Reset. This game starts with an empty home" else "Couldn't empty the game's home"
     }
 
     internal companion object {

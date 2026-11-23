@@ -34,7 +34,6 @@ class PcRunnerOptionsConsentTest {
         var provisions = 0
         override val isAvailable = true
         override val isProvisioned = false
-        override val isLinuxContainerAvailable = false
         override suspend fun provision(gamesRoots: List<File>, onStatus: (String) -> Unit): PcProvisionResult {
             provisions++
             return PcProvisionResult(true, "set up")

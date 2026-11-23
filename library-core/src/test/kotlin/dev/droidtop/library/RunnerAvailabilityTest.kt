@@ -25,7 +25,6 @@ class RunnerAvailabilityTest {
         kirikiroid2Installed: Boolean = false,
         windowsEnvironmentReady: Boolean = true,
         wineRendererWired: Boolean = true,
-        linuxContainerAvailable: Boolean = true,
         x86TranslationRegistered: Boolean = true,
         preferredOrder: List<GameLaunchStrategy> = emptyList(),
     ) = RunnerFacts(
@@ -41,7 +40,6 @@ class RunnerAvailabilityTest {
         kirikiroid2Installed = kirikiroid2Installed,
         windowsEnvironmentReady = windowsEnvironmentReady,
         wineRendererWired = wineRendererWired,
-        linuxContainerAvailable = linuxContainerAvailable,
         x86TranslationRegistered = x86TranslationRegistered,
         preferredOrder = preferredOrder,
     )
@@ -98,39 +96,17 @@ class RunnerAvailabilityTest {
     }
 
     @Test
-    fun `native Linux without a container is not-on-this-device, and says to start Desktop mode`() {
-        val option = RunnerAvailability
-            .evaluate(facts(hasLinuxBuild = true, linuxContainerAvailable = false))
+    fun `a native Linux build never waits for Desktop mode, only for its own setup`() {
+        val needsSetup = RunnerAvailability
+            .evaluate(facts(hasLinuxBuild = true, x86TranslationRegistered = false))
             .of(GameLaunchStrategy.LINUX_CONTAINER)
-        assertEquals(RunnerState.NOT_ON_THIS_DEVICE, option.state)
-        // Desktop mode's container runs with or without root (SPEC 3), so
-        // the reason names the mode to start, not root.
-        assertTrue(option.reason!!.contains("Desktop mode"))
-    }
-
-    @Test
-    fun `root never gates a game that has another route`() {
-        val options = RunnerAvailability.evaluate(
-            facts(
-                engine = GameEngine.GODOT,
-                enginehostSupported = false,
-                hasWindowsExecutable = true,
-                hasLinuxBuild = true,
-                linuxContainerAvailable = false,
-            ),
-        )
-        val resolved = RunnerAvailability.resolve(options, override = null)
-        assertEquals(GameLaunchStrategy.WINE_PREFIX, resolved!!.option.strategy)
-        assertEquals(RunnerState.READY, resolved.option.state)
-    }
-
-    @Test
-    fun `a game whose only route needs the Linux container says so instead of resolving nothing`() {
-        val options = RunnerAvailability.evaluate(
-            facts(engine = GameEngine.GODOT, hasLinuxBuild = true, linuxContainerAvailable = false, enginehostSupported = false),
-        )
-        val resolved = RunnerAvailability.resolve(options, override = null)
-        assertEquals(RunnerState.NOT_ON_THIS_DEVICE, resolved!!.option.state)
+        assertEquals(RunnerState.NEEDS_SETUP, needsSetup.state)
+        assertEquals(RunnerAction.SET_UP_LINUX_GAMES, needsSetup.action)
+        assertTrue(!needsSetup.reason!!.contains("Desktop"))
+        val ready = RunnerAvailability
+            .evaluate(facts(hasLinuxBuild = true))
+            .of(GameLaunchStrategy.LINUX_CONTAINER)
+        assertEquals(RunnerState.READY, ready.state)
     }
 
     @Test
@@ -282,14 +258,6 @@ class RunnerAvailabilityTest {
             facts(engine = null, hasWindowsExecutable = true, hasLinuxBuild = true),
         )
         assertEquals(GameLaunchStrategy.LINUX_CONTAINER, RunnerAvailability.resolve(options, override = null)!!.option.strategy)
-    }
-
-    @Test
-    fun `a PC game with both builds falls back to Wine where Linux cannot run`() {
-        val options = RunnerAvailability.evaluate(
-            facts(engine = null, hasWindowsExecutable = true, hasLinuxBuild = true, linuxContainerAvailable = false),
-        )
-        assertEquals(GameLaunchStrategy.WINE_PREFIX, RunnerAvailability.resolve(options, override = null)!!.option.strategy)
     }
 
     @Test

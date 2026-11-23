@@ -105,7 +105,6 @@ object PcRunnerOptions {
                 },
                 windowsEnvironmentReady = runtime?.isProvisioned == true,
                 wineRendererWired = RunnerAvailability.WINE_RENDERER_WIRED,
-                linuxContainerAvailable = runtime?.isLinuxContainerAvailable == true,
                 x86TranslationRegistered = linuxBuildRunsHere(gameRoot, entry.id),
                 preferredOrder = engine?.let { EnginesDatabase.priorityFor(context, it) },
             ),

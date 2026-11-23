@@ -474,14 +474,3 @@ interface ContainerRuntime {
      */
     fun hostStorageToContainerPath(hostPath: File): String
 }
-
-/**
- * The live primary [Container] + the [ContainerRuntime] that owns it — what
- * a Wayland-client workload (a native Linux game, in particular) needs to
- * actually launch alongside the running desktop. Owned by `:app`'s
- * `DesktopSessionService`; exposed as
- * this plain value type (rather than `runtime-windows` depending on `:app`'s
- * `DesktopSessionState` directly, which would be a circular module
- * dependency — `:app` depends on `:runtime-windows`, not the reverse).
- */
-data class PrimaryContainerSession(val runtime: ContainerRuntime, val container: Container)

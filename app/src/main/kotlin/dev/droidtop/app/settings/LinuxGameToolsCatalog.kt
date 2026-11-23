@@ -26,7 +26,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * The prefix tools of a native Linux game (docs/SPEC.md 7c, "Prefix tools for Linux games"), the Linux
- * counterpart of [PrefixToolsCatalog]: such a game runs inside Desktop mode's container (through FEX or
+ * counterpart of [PrefixToolsCatalog]: such a game runs in a Linux games container of its own (through FEX or
  * box64 when its code is x86, SPEC 3c), and its "launch environment" is that container with, when the
  * person asks, a home of its own. Run a program from the game's folder, stop its processes, keep its saves
  * and settings in a home of its own, and reset that home. The shared container is never reset here.
@@ -103,7 +103,6 @@ object LinuxGameToolsCatalog {
         val ownHome = withContext(Dispatchers.IO) { LinuxGameOptionsPrefs.ownHome(context, target.entryId) }
         val ownContainer = withContext(Dispatchers.IO) { LinuxGameOptionsPrefs.ownContainer(context, target.entryId) }
         val platformRows = withContext(Dispatchers.IO) { platformRows(context.filesDir, LinuxGames.key(target.entryId, ownContainer)) }
-        val up = runtime?.isLinuxContainerAvailable == true
         val gameRoot = File(target.gameRoot)
         return listOf(
             CatalogGroup(
@@ -112,9 +111,8 @@ object LinuxGameToolsCatalog {
                 items = listOf<CatalogItem>(
                     ActionItem(
                         id = "linux_tools_where",
-                        // docs/SPEC.md 3c: a Linux games container beside Desktop mode, the game's own or the shared one.
+                        // docs/SPEC.md 3c: a Linux games container of its own, the game's own or the shared one.
                         title = if (ownContainer) "Runs in its own Linux games container" else "Runs in the shared Linux games container",
-                        subtitle = if (up) "Desktop mode is running" else "Desktop mode is not running. Start it first: these tools act beside it",
                         value = if (ownHome) "Own home" else "Shared home",
                     ),
                     ToggleItem(

@@ -71,7 +71,6 @@ class StoreEngineGameTest {
         engineHostEngineVersionKnown = true,
         windowsEnvironmentReady = true,
         wineRendererWired = RunnerAvailability.WINE_RENDERER_WIRED,
-        linuxContainerAvailable = false,
         preferredOrder = defs.first { it.engine == GameEngine.RENPY }.strategies,
     )
 
