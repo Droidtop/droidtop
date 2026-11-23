@@ -353,7 +353,7 @@ tasks.matching { it.name == "packageDebug" }.configureEach {
 // The folder is static to Gradle: CI writes it before the build starts.
 androidComponents {
     onVariants { variant ->
-        variant.sources.assets?.addStaticSources(layout.buildDirectory.dir("generated/changelog").map { listOf(it) })
+        variant.sources.assets?.addStaticSourceDirectory(layout.buildDirectory.dir("generated/changelog").get().asFile.absolutePath)
     }
 }
 
@@ -396,7 +396,7 @@ val copyRigThrowaway by tasks.registering(Copy::class) {
 }
 androidComponents {
     onVariants { variant ->
-        variant.androidTest?.sources?.assets?.addStaticSources(rigThrowawayAssets.map { listOf(it) })
+        variant.androidTest?.sources?.assets?.addStaticSourceDirectory(rigThrowawayAssets.get().asFile.absolutePath)
     }
 }
 tasks.matching { it.name == "mergeDebugAndroidTestAssets" }.configureEach { dependsOn(copyRigThrowaway) }
