@@ -1898,18 +1898,18 @@ class EngineGameProvider(
      */
     private suspend fun launchOnPcRuntime(entryId: String, gameRoot: File, windows: Boolean) {
         val runtime = PcGameRuntimeRegistry.runtime
-            ?: error(
+            ?: throw LaunchRefused(
                 "droidtop's PC runtime isn't registered in this process. Launch from the main " +
                     "droidtop app rather than a standalone surface.",
             )
-        check(runtime.isAvailable) {
+        if (!runtime.isAvailable) throw LaunchRefused(
             if (windows) {
                 "The Windows environment isn't set up yet — run \"Set up Windows games\" in Settings."
             } else {
                 "Start Desktop mode first: a native Linux build runs inside a live container, " +
                     "and none is connected right now."
-            }
-        }
+            },
+        )
 
         // A single-file game ([GameEngineDetector.looseGodotBuilds]) is its
         // own program, run from the folder it sits in.
@@ -1930,7 +1930,7 @@ class EngineGameProvider(
             windowsLaunch?.executable ?: throw ProgramNotIdentified(entryId, gameRoot.name, gameRoot.absolutePath)
         } else {
             GameExecutableResolver.linuxExecutable(gameRoot)
-        } ?: error(
+        } ?: throw LaunchRefused(
             "Couldn't identify which file to run in ${gameRoot.name}: it has no single obvious Linux launcher. " +
                 "Set one explicitly with a custom player.",
         )
@@ -1940,6 +1940,8 @@ class EngineGameProvider(
         } else {
             runtime.launchLinux(executable, folder, entryId)
         }
-        check(result.succeeded) { "Launching ${executable.name} failed: ${result.detail}" }
+        // The runtime's detail is written for the person ("set up Linux games first", a Wine start's reason); a command's
+        // own output can be long, so only its first lines are kept.
+        if (!result.succeeded) throw LaunchRefused("Launching ${executable.name} failed: ${result.detail.trim().take(240)}")
     }
 }

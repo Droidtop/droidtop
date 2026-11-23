@@ -5,7 +5,7 @@ import dev.droidtop.library.consoles.NoEmulatorInstalled
 
 /**
  * Maps launch failures to one short sentence (Droidtop/tracker#171).
- * Raw exception details stay in the shell log.
+ * Raw exception details stay in the shell log; a [dev.droidtop.library.LaunchRefused] carries its own sentence.
  */
 object LaunchFailureMessage {
     /**
@@ -21,6 +21,8 @@ object LaunchFailureMessage {
         // Droidtop/tracker#308: what is wrong, never emulator advice.
         cause is ProgramNotIdentified ->
             "droidtop can't tell which program starts \"${game?.takeIf { it.isNotBlank() } ?: cause.title}\"."
+        // A refusal written for the person, naming what to do (library-core's LaunchRefused): shown as it is.
+        cause is dev.droidtop.library.LaunchRefused && !cause.message.isNullOrBlank() -> cause.message!!
         else -> if (game.isNullOrBlank()) {
             "The game couldn't be started."
         } else {
