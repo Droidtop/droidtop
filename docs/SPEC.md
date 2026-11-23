@@ -3205,7 +3205,9 @@ container is either architecture:
   x86 rootfs laid over the container for that program's libraries. This is the Linux side of "arm Wine with FEX
   running the game". Most Linux PC games are this case: a Ren'Py build ships `lib/py*-linux-x86_64` (and `i686`), and
   its `.sh` launcher picks a library folder by `uname -m`, which finds none on arm64. droidtop starts the x86_64
-  launcher through FEX itself.
+  launcher through FEX itself. A folder is a Linux build only when it has the launcher the launch runs (a `.sh`, or a
+  `.x86_64` / `.x86` ELF). A `lib/*linux*` folder alone is not one: a Ren'Py game's Windows download ships
+  `lib/py2-linux-x86_64` holding only `libsteam_api.so`.
 - **x86 container:** a `linux/amd64` (or `linux/386`) image, its whole userland translated, as x86 Wine runs in FEX.
   It is built the way FEX itself is meant to run: a small arm64 glibc layer holding FEX, with the pulled x86 image as
   FEX's RootFS. No guest kernel is involved (that is §3b's QEMU, a different job).

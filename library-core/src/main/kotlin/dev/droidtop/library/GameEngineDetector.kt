@@ -1272,24 +1272,21 @@ object GameLaunchStrategyResolver {
     /**
      * Real, checkable evidence that this folder contains a native Linux
      * build -- never assumed present just because an engine generally
-     * supports Linux. Two independent shapes, both engine-agnostic:
-     *
-     * - `lib/<prefix>linux-<arch>/` -- Ren'Py's own interpreter layout
-     *   (the same folder-naming rule the user's Pythia project inspects).
-     *   This was the only shape checked before, which silently excluded
-     *   every build that ships a bare ELF and no `lib/` at all.
-     * - A `<GameName>.x86_64` / `<GameName>.x86` file in the root -- the
-     *   conventional extension for a Linux ELF launcher. This is the
-     *   same file [GameExecutableResolver.linuxExecutable] then has to
-     *   run, so the two stay in step: offering LINUX_CONTAINER for a
-     *   folder whose launcher the resolver cannot name would just move
-     *   the failure later.
+     * supports Linux: the launcher [GameExecutableResolver.linuxExecutable]
+     * would run, a `.sh` (Ren'Py's own launcher) or a `.x86_64` / `.x86`
+     * ELF. The resolver is the one rule, so the runner row and the launch
+     * agree. A `lib/<prefix>linux-<arch>/` folder alone is not one: a
+     * Ren'Py game's Windows download ships `lib/py2-linux-x86_64/` holding
+     * only `libsteam_api.so`, and offering the Linux container for it
+     * ended at "no single obvious Linux launcher" (console, Projekt:
+     * Passion's `_win` copy, 2026-11-23). The bare extensionless
+     * executables the resolver falls back to are not counted here: on a
+     * FAT or exFAT card every file reads as executable.
      */
     private fun hasLinuxBuild(folder: File): Boolean {
         if (folder.isFile) return folder.extension.lowercase() in LINUX_LAUNCHER_EXTENSIONS
-        val entries = folder.listFiles() ?: return false
-        if (entries.any { it.isFile && it.extension.lowercase() in LINUX_LAUNCHER_EXTENSIONS }) return true
-        return File(folder, "lib").listFiles()?.any { it.isDirectory && it.name.contains("linux") } == true
+        val launcher = GameExecutableResolver.linuxExecutable(folder) ?: return false
+        return launcher.extension.lowercase() in LINUX_LAUNCHER_EXTENSIONS + "sh"
     }
 
     private val LINUX_LAUNCHER_EXTENSIONS = setOf("x86_64", "x86")
