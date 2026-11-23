@@ -22,7 +22,7 @@ android {
     // androidx.core:core (via androidx-core-ktx, resolved from the shared
     // catalog) requires compiling against 36+ — same class of fix as
     // shell-default's own compileSdk bump.
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = "27.0.12077973"
 
     defaultConfig {

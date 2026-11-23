@@ -27,7 +27,7 @@ fun javaString(text: String): String =
 
 android {
     namespace = "dev.droidtop.input.chinese"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = "27.0.12077973"
 
     defaultConfig {

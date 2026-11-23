@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.hostbridge"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = "27.0.12077973"
 
     defaultConfig {

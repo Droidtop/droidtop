@@ -10,7 +10,7 @@ plugins {
 
 android {
     namespace = "dev.droidtop.baselineprofile"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         // What the profile rule needs on the device that records it.

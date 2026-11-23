@@ -22,7 +22,7 @@ val mozcPin: String = file("mozc-engine.pin").readText()
 
 android {
     namespace = "dev.droidtop.input.japanese"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26
