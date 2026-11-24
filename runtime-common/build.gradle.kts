@@ -19,7 +19,7 @@ android {
         // The notice colours and the colour arithmetic are the shared library droidtop and Enginehost both
         // compile (lib-ui's notices module, vendor/lib-ui, Droidtop/lib-ui, pinned as a submodule; docs/SPEC.md 7k "Notices").
         getByName("main") {
-            java.srcDir("../vendor/lib-ui/notices/src/main/kotlin")
+            java.srcDir("../vendor/lib-ui/notices/src/commonMain/kotlin")
             // The version and trust code droidtop and Enginehost share (vendor/lib-net, Droidtop/lib-net,
             // pinned as a submodule; docs/SPEC.md 12a "Shared trust code"): compiled in the same way as the notices.
             java.srcDir("../vendor/lib-net/version/src/main/kotlin")
