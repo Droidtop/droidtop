@@ -74,6 +74,8 @@
     <string name="gamepad_listed_with_your_saved_views_in">Listed with your saved views in Collections</string>
     <string name="gamepad_sort_by">Sort by</string>
     <string name="gamepad_open_its_page">Open its page</string>
+    <string name="gamepad_source_cant_get_games_yet">%1$s can\'t get games yet</string>
+    <string name="gamepad_source_allow">Allow</string>
     <string name="gamepad_searches_again_after">Searches again when closed</string>
     <string name="gamepad_open_plugins">Open Plugins</string>
     <string name="gamepad_launch_on_which_screen">Launch on which screen?</string>

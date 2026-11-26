@@ -853,7 +853,7 @@ internal fun LibrarySearchDialog(
                 state.unavailable.filter { !it.waitingForApproval }.forEach { off ->
                     if (off.askable) {
                         add(
-                            SearchLine.Entry("off:${off.pluginId}", "${off.label} can't get games yet", subtitle = "Allow") {
+                            SearchLine.Entry("off:${off.pluginId}", words(R.string.gamepad_source_cant_get_games_yet, off.label), subtitle = words(R.string.gamepad_source_allow)) {
                                 coroutineScope.launch {
                                     if (AcquireContentSources.askSource(context, off)) searchTick++
                                     else statusLine = "${off.label} is still not allowed to get games"
