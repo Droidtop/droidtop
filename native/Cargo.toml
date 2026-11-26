@@ -19,14 +19,14 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Identity, pairing, the channel, the protocol and the sync rules: mytop-project/mytop-sync.
-droidtop-agent-core = { package = "sync-core", git = "https://github.com/Droidtop/lib-sync", tag = "v0.2.1" }
+droidtop-agent-core = { package = "sync-core", git = "https://github.com/mytop-project/mytop-sync", tag = "v0.2.2" }
 # The person's own shares (mytop-project/tracker#573): mytop-project/mytop-net's share client. WebDAV, S3, SFTP and SMB (libsmb2,
 # built from mytop-net's vendor/libsmb2 for both Android ABIs). SFTP's russh needs ed25519-dalek 3, which the mesh test's
 # droidtop-agent allows since it took windowcast's IronRDP on sspi 0.23.1 (fc52738).
-net-remote = { git = "https://github.com/Droidtop/lib-net", tag = "v0.2.6" }
+net-remote = { git = "https://github.com/mytop-project/mytop-net", tag = "v0.2.6" }
 # KDE Connect, both ways (mytop-project/tracker#645, SPEC 7q): kdeconnect_<op> is passed to
 # mytop-kdeconnect's operation table.
-kdeconnect-service = { git = "https://github.com/Droidtop/lib-kdeconnect", tag = "v0.1.1" }
+kdeconnect-service = { git = "https://github.com/mytop-project/mytop-kdeconnect", tag = "v0.1.1" }
 jni = { version = "0.21", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -35,8 +35,8 @@ serde_json = "1"
 # The mesh test runs the real agent as one of its computers: droidtop-agent's service, at a release.
 # droidtop-agent main c22cd63 (mytop-project/tracker#573): the agent on mytop-sync 0.2, with mytop-games 0.4, mytop-saves
 # 0.3 and mytop-plugins 0.3.
-droidtop-agent-service = { git = "https://github.com/Droidtop/droidtop-agent", rev = "c22cd63f0789cb885c74cd6ee5848aa0c0c22cf5" }
-droidtop-agent-store = { package = "sync-store", git = "https://github.com/Droidtop/lib-sync", tag = "v0.2.1" }
+droidtop-agent-service = { git = "https://github.com/mytop-project/droidtop-agent", rev = "87355dfb83aac2c620c1764b428bdae5f2421baa" }
+droidtop-agent-store = { package = "sync-store", git = "https://github.com/mytop-project/mytop-sync", tag = "v0.2.2" }
 
 [profile.release]
 # As droidtop-agent built it.
