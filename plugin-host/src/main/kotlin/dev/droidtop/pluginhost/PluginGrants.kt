@@ -396,15 +396,16 @@ class PluginGrants(private val dir: File) {
          * Asks the person on the first-use sheet whether [record] may provide [point], a point it declares that is set to
          * Ask first or not answered yet, and keeps the answer: Allow turns it on, Never blocks it, Not now leaves it at Ask
          * first and no longer new ([putOff], mytop-project/tracker#270). True when it is allowed afterwards. Blocks until
-         * answered: off the main thread, and only for something the person just did.
+         * answered: off the main thread, and only for something the person just did. With [evenIfOff] a point the person
+         * turned off is asked about too: they pressed the row that turns it on, so the press is the moment of use.
          */
-        fun askPoint(context: Context, record: PluginRecord, point: String): Boolean {
+        fun askPoint(context: Context, record: PluginRecord, point: String, evenIfOff: Boolean = false): Boolean {
             val id = record.manifest.id
             val store = forContext(context)
             if (!ExtensionPoints.declares(record.manifest, point)) return false
             when (provideState(record, store.read(id), point)) {
                 GrantState.GRANTED -> return true
-                GrantState.DENIED -> return false
+                GrantState.DENIED -> if (!evenIfOff) return false
                 GrantState.ASK -> Unit
             }
             val known = ExtensionPoints.find(point)
