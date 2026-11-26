@@ -140,9 +140,10 @@ data class UnavailableSource(
     /** True while the plugin only waits for the person's approval (the sentence "is waiting for your approval"). */
     val waitingForApproval: Boolean,
     /**
-     * True when the one thing missing is the `library.sources` point, set to Ask first or not answered yet: the row then
-     * asks right there ([PluginGrants.askPoint]) instead of opening a page that would only show Ask first again
-     * (Droidtop/tracker#270).
+     * True when the one thing missing is the `library.sources` point, whether it is set to Ask first or was left off at
+     * approval (high-risk points start unticked): the row then asks right there ([PluginGrants.askPoint], the person's
+     * press being the moment of use) instead of opening a page to look for it (Droidtop/tracker#270; 2026-11-26, the
+     * owner: "I don't seem to be able to use downloader plugins").
      */
     val askable: Boolean = false,
 ) {
@@ -172,7 +173,7 @@ data class UnavailableSource(
                 point == GrantState.DENIED -> "was not allowed to give games"
                 else -> return null
             }
-            val askable = trust == PluginTrustState.APPROVED && enabled && disabledReason == null && point == GrantState.ASK
+            val askable = trust == PluginTrustState.APPROVED && enabled && disabledReason == null && point != GrantState.GRANTED
             return UnavailableSource(label, reason, pluginId, waiting, askable)
         }
 
@@ -290,10 +291,10 @@ object AcquireContentSources {
             listing.state == SourceState.DENIED -> "You denied it" to "Approve it on its page to use it as a source."
             listing.state == SourceState.DISABLED -> "It is disabled" to (listing.record.disabledReason ?: "It stopped after a failure.").take(90)
             listing.state == SourceState.TURNED_OFF -> "It is turned off" to "Turn it on on its page to use it as a source."
-            point == GrantState.DENIED -> "Not allowed to get games" to "Allow Get games from a source on its Permissions page."
             else -> "Not allowed to get games yet" to "Allow it to search and download games for you."
         }
-        val way: CatalogItem = if (listing.state == SourceState.READY && point == GrantState.ASK) {
+        // Off or Ask first alike, the way on is the ask in place: a press on Allow is the person's choice at the moment of use.
+        val way: CatalogItem = if (listing.state == SourceState.READY) {
             askRow("source_blocked_ask_${listing.pluginId}", UnavailableSource(label, "is waiting for your approval", listing.pluginId, true, askable = true))
         } else {
             pluginPageRow(
@@ -333,10 +334,13 @@ object AcquireContentSources {
         },
     )
 
-    /** Asks whether [source] may give games; true when it may afterwards. Off the main thread inside. */
+    /**
+     * Asks whether [source] may give games; true when it may afterwards. A point the person left off is asked about too:
+     * they pressed the row that asks. Off the main thread inside.
+     */
     suspend fun askSource(context: Context, source: UnavailableSource): Boolean = withContext(Dispatchers.IO) {
         val record = PluginStore.installed(context).firstOrNull { it.manifest.id == source.pluginId } ?: return@withContext false
-        PluginGrants.askPoint(context, record, SOURCES_POINT)
+        PluginGrants.askPoint(context, record, SOURCES_POINT, evenIfOff = true)
     }
 
     /**

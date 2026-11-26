@@ -253,8 +253,11 @@ object UnifiedSearch {
                 carry = emptyList(),
                 keep = keep,
                 debounceMs = 0L,
+                // The sources that cannot answer are listed here too, so a source that is installed but not allowed,
+                // waiting or off says so in the first search, not only after "Search the sources" (2026-11-26, the owner:
+                // "I don't seem to be able to use downloader plugins": a source approved with its defaults was nowhere).
                 loadSources = {
-                    withContext(Dispatchers.IO) { GameSources.plugins(context, platform) to emptyList<UnavailableSource>() }
+                    withContext(Dispatchers.IO) { GameSources.plugins(context, platform) to AcquireContentSources.unavailablePlugins(context, platform) }
                 },
                 fetch = { source -> Result.success(source.indexed(context, query.trim(), platform, MAX_ROWS_PER_SOURCE)) },
                 isOff = { it.id in off },
