@@ -151,13 +151,13 @@ class BrokerCoreTest {
     }
 
     @Test
-    fun `an ask permission in a background call fails and leaves a note, never a prompt`() {
+    fun `an ask permission in a background call fails and flags nothing, never a prompt`() {
         val env = shellWorld()
         env.user = false
         val r = reply(shellCaller(env).call(request("priv.shell", "exec", obj("cmd" to "pm list"))))
         assertEquals(PluginErrorCode.PERMISSION_DENIED, r.code)
         assertTrue(env.prompts.isEmpty())
-        assertEquals(listOf("acme.caller" to "priv.shell.adb"), env.wanted)
+        assertTrue("Ask first is the person's choice: nothing is put off or set", env.putOff.isEmpty() && env.states["acme.caller"].isNullOrEmpty())
         assertTrue(env.forwards.isEmpty())
     }
 

@@ -4239,13 +4239,17 @@ When they are asked:
   sheet is gamepad-navigable, has a hint row, and B means Not now.
   - A call in `ask` state from a background context (an event, a
     schedule, a service) fails with `PERMISSION_DENIED` and never shows
-    a prompt. The plugin row shows "Wants <label>", and the user can
-    grant it there. Plugins cannot pop prompts on their own.
+    a prompt. Nothing is flagged for it (2026-11-26, the owner: "there's
+    permanent 'wants more access' badges"): Ask first is a state the person
+    chose, shown as the permission's value. Plugins cannot pop prompts on
+    their own.
   - **Not now lasts this run of droidtop** (2026-10-16,
     mytop-project/tracker#518): the same permission is not asked again until
     droidtop restarts or the person chooses on the plugin's Permissions
     page; until then the call fails with `PERMISSION_DENIED` and a whole
-    sentence saying so.
+    sentence saying so. Not now is an answer: an item an update added stops
+    being new (`PluginGrants.putOff`), and so does Cancel on the full-access
+    dialog.
   - **A refused permission degrades only what needs it.** A page whose
     call failed because droidtop refused one of the plugin's declared
     permissions, which the plugin passed on without naming, is drawn as
@@ -5263,7 +5267,10 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
   (written out first for a plugin that had no file), and
   `PermissionDiff` puts each new permission, point and export at `ask`
   remembered as "fresh" until answered: that is "Wants new access", and
-  `PluginGrants.answerNew` records the answer from the same list.
+  `PluginGrants.answerNew` records the answer from the same list. Any answer
+  ends it for good: Allow, Never or Not now on the sheet, a choice on the
+  Permissions page, or the list. "Fresh" is the only flag the grants keep;
+  the "wanted" note a background call used to leave is gone.
 - **Activity.** `PluginAudit` is the ring of §4.6 (2,000 entries, 30 days,
   kept 7 days after uninstall), written for dangerous and critical calls
   only; normal-permission calls are not counted yet. The Activity screen
@@ -5282,8 +5289,8 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
     that could not be opened; nobody answering is Not now after 60 s.
   - Accounts and sources > Plugins > a plugin > Permissions lists every
     declared permission, each high-risk point it may provide and each
-    export, with Allowed / Ask first / Blocked, its reason, "tried to use
-    this while you were not being asked" and when it was last used (a
+    export, with Allowed / Ask first / Blocked, its reason and when it was
+    last used (a
     logged call's time; an everyday permission, only counted per day
     (4.6), the day of its newest count, mytop-project/tracker#60). Opening a
     plugin's own screen (`ui.main`) set to Ask first is its first use and
