@@ -68,14 +68,16 @@ data class PermissionDiff(
  * treated as `ask` for everything, never as `granted`.
  */
 class PluginGrants(private val dir: File) {
-    /** [wanted]: permissions a call reached while still `ask`. [fresh]: items an update added that still wait for the user. */
+    /**
+     * [fresh]: items an update added that the person has not answered yet, the one flag the plugin screens show. Any
+     * answer ends it for good, Not now included ([putOff]); what the item is set to afterwards is a plain state.
+     */
     data class Snapshot(
         val states: Map<String, GrantState> = emptyMap(),
-        val wanted: Set<String> = emptySet(),
         val fresh: Set<String> = emptySet(),
         val corrupt: Boolean = false,
     ) {
-        /** True while an update's new items are unanswered: the Plugins row says "Wants new access". */
+        /** True while an update's new items are unanswered: the plugin's state reads "Wants new access". */
         val wantsNewAccess: Boolean get() = fresh.any { states[it] == GrantState.ASK }
     }
 
@@ -95,7 +97,6 @@ class PluginGrants(private val dir: File) {
             val states = json.optJSONObject("states") ?: JSONObject()
             Snapshot(
                 states = buildMap { states.keys().forEach { k -> GrantState.fromId(states.optString(k))?.let { put(k, it) } } },
-                wanted = strings(json.optJSONArray("wanted")),
                 fresh = strings(json.optJSONArray("fresh")),
             )
         } catch (e: Exception) {
@@ -108,7 +109,6 @@ class PluginGrants(private val dir: File) {
     private fun writeLocked(pluginId: String, snapshot: Snapshot) {
         val json = JSONObject()
         json.put("states", JSONObject().also { o -> snapshot.states.toSortedMap().forEach { (k, v) -> o.put(k, v.name) } })
-        json.put("wanted", JSONArray(snapshot.wanted.sorted()))
         json.put("fresh", JSONArray(snapshot.fresh.sorted()))
         store.write(pluginId, json)
         changed()
@@ -119,7 +119,7 @@ class PluginGrants(private val dir: File) {
     fun grantsFor(pluginId: String): Map<String, GrantState> = read(pluginId).states
 
     /**
-     * Sets one state, as the user's own choice: it also clears "wanted" and "wants new access" for that item. A changed
+     * Sets one state, as the user's own choice: it also ends "wants new access" for that item. A changed
      * hole permission ([PluginTiers.HOLES]) or shared-files permission ([SharedFiles.PERMISSIONS]) retires the
      * plugin's process, whose filter and file rules can never change: the next call starts it afresh with what is granted
      * now, so a refused network or folder is gone at once (docs/plugin-api.md 5.3).
@@ -133,7 +133,6 @@ class PluginGrants(private val dir: File) {
                 pluginId,
                 snap.copy(
                     states = if (snap.corrupt) mapOf(permission to state) else snap.states + (permission to state),
-                    wanted = snap.wanted - permission,
                     fresh = snap.fresh - permission,
                     corrupt = false,
                 ),
@@ -155,18 +154,25 @@ class PluginGrants(private val dir: File) {
     fun resetChoice(pluginId: String, key: String) = synchronized(LOCK) {
         val snap = readLocked(pluginId)
         if (key !in snap.states) return@synchronized
-        writeLocked(pluginId, snap.copy(states = snap.states - key, wanted = snap.wanted - key, fresh = snap.fresh - key))
+        writeLocked(pluginId, snap.copy(states = snap.states - key, fresh = snap.fresh - key))
     }
 
     /** Resolves the request against this plugin's persisted per-plugin choices. */
     fun resolve(pluginId: String, request: PluginPermissionRequest): GrantState =
         PluginPermissionPolicy.resolve(request, read(pluginId).states)
 
-    /** Records that a call reached [permission] while it was still `ask` and could not prompt (a background call). */
-    fun noteWanted(pluginId: String, permission: String) = synchronized(LOCK) {
-        val snap = readLocked(pluginId)
-        if (snap.corrupt || permission in snap.wanted) return@synchronized
-        writeLocked(pluginId, snap.copy(wanted = snap.wanted + permission))
+    /**
+     * Not now on the first-use sheet: an answer, though not a grant. The item stays Ask first and is not asked again in
+     * this run ([PluginRefusals]); if an update added it, it stops being new, so no screen flags it again. The person
+     * said no for now, which is a normal state, not something left to answer.
+     */
+    fun putOff(pluginId: String, permission: String) {
+        PluginRefusals.rememberNotNow(pluginId, permission)
+        synchronized(LOCK) {
+            val snap = readLocked(pluginId)
+            if (snap.corrupt || permission !in snap.fresh) return@synchronized
+            writeLocked(pluginId, snap.copy(fresh = snap.fresh - permission))
+        }
     }
 
     /**
@@ -207,7 +213,7 @@ class PluginGrants(private val dir: File) {
             val declared = record.manifest.v2.permissions.firstOrNull { it.id == item }
             states[item] = answerFor(item, declared?.let { tierOf(it) } ?: PermissionTier.NORMAL, ticked, declared?.required ?: false)
         }
-        writeLocked(id, snap.copy(states = states, wanted = snap.wanted - ids, fresh = snap.fresh - ids, corrupt = false))
+        writeLocked(id, snap.copy(states = states, fresh = snap.fresh - ids, corrupt = false))
     }
 
     /**
@@ -252,7 +258,7 @@ class PluginGrants(private val dir: File) {
             addAll(diff.points.map { PluginPermissions.PROVIDE_PREFIX + it })
             addAll(diff.exports.map { EXPORT_PREFIX + it })
         }
-        writeLocked(id, Snapshot(states = states, wanted = snap.wanted.filter { it in states }.toSet(), fresh = (snap.fresh + fresh).filter { states[it] == GrantState.ASK }.toSet()))
+        writeLocked(id, Snapshot(states = states, fresh = (snap.fresh + fresh).filter { states[it] == GrantState.ASK }.toSet()))
         diff
     }
 
@@ -388,9 +394,9 @@ class PluginGrants(private val dir: File) {
 
         /**
          * Asks the person on the first-use sheet whether [record] may provide [point], a point it declares that is set to
-         * Ask first or not answered yet, and keeps the answer: Allow turns it on, Never blocks it, Not now leaves it to be
-         * asked again (mytop-project/tracker#270). True when it is allowed afterwards. Blocks until answered: off the main
-         * thread, and only for something the person just did.
+         * Ask first or not answered yet, and keeps the answer: Allow turns it on, Never blocks it, Not now leaves it at Ask
+         * first and no longer new ([putOff], mytop-project/tracker#270). True when it is allowed afterwards. Blocks until
+         * answered: off the main thread, and only for something the person just did.
          */
         fun askPoint(context: Context, record: PluginRecord, point: String): Boolean {
             val id = record.manifest.id
@@ -414,7 +420,10 @@ class PluginGrants(private val dir: File) {
                     store.set(id, key, GrantState.DENIED)
                     false
                 }
-                GrantAnswer.NOT_NOW -> false
+                GrantAnswer.NOT_NOW -> {
+                    store.putOff(id, key)
+                    false
+                }
             }
         }
 
@@ -422,8 +431,8 @@ class PluginGrants(private val dir: File) {
          * Asks the person on the first-use sheet whether [record] may use [permission], one it declares, because they
          * pressed a facet's grant action (docs/plugin-api.md 1.10, "Interaction"): the sheet shows the manifest's reason,
          * and the plugin cannot word it. Asked even when it was turned off before, since the person asked for it. Allow
-         * grants it, Never turns it off, Not now changes nothing. True when it is granted afterwards. Blocks until
-         * answered: off the main thread, and only for something the person just did.
+         * grants it, Never turns it off, Not now leaves its state alone and ends it being new ([putOff]). True when it is
+         * granted afterwards. Blocks until answered: off the main thread, and only for something the person just did.
          */
         fun askPermission(context: Context, record: PluginRecord, permission: String): Boolean {
             val declared = record.manifest.v2.permissions.firstOrNull { it.id == permission } ?: return false
@@ -440,7 +449,10 @@ class PluginGrants(private val dir: File) {
                     store.set(id, permission, GrantState.DENIED)
                     false
                 }
-                GrantAnswer.NOT_NOW -> false
+                GrantAnswer.NOT_NOW -> {
+                    store.putOff(id, permission)
+                    false
+                }
             }
         }
 
