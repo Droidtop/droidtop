@@ -11794,6 +11794,22 @@ service disabled with its mode, §2c; an unused-app reset) is detected the
 next time the feature is opened, and the same row asks again. Grants are
 never requested from a Service or at boot.
 
+**No standing "wants access" flags on plugins (the owner, 2026-11-26: "there's permanent 'wants more access' badges
+and BS").** A plugin's screens flag one thing only: a request the person has not answered. That is "Needs approval"
+(a plugin waiting to be approved) and "Wants new access" (items an update added, `PluginGrants` "fresh"); any answer
+ends it for good, Allow, Never, Not now on the first-use sheet (`PluginGrants.putOff`), Cancel on the full-access
+dialog, a Permissions choice, or "Allow ticked" under the update's items (headed "New in <version>"; nothing ticked
+declines them). Everything the person chose is a plain value, never a banner or a warning colour:
+- a declined or ask-first extension point is the value of its row under "What it provides" ("On", "Off", "Ask
+  first"), and pressing an off one asks on the first-use sheet; the "<point> is off" caution notices are gone;
+- full access is one row ("Full access", its risk in the subtitle, Limit or Turn off), and a plugin that runs only
+  with it one row with Allow (still the red dialog); no caution banner for either;
+- the Permissions page's chips Allowed, Ask first and Blocked are all neutral;
+- a background call that meets Ask first fails and flags nothing (the "It tried to use this" line is gone);
+- no internal names: a permission or API no registry names reads "Access from another plugin", the Waiting row reads
+  "Waiting for another plugin", Activity names the permission in words and "Refused" (the API and op only with the
+  Developer menu), and "Provided by" names an API by its offer words.
+
 ### Import and library sync (design; separate from the flow above)
 
 Two real mechanisms exist to build import on rather than invent from scratch:

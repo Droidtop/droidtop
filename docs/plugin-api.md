@@ -5296,9 +5296,11 @@ Events (`onEvent`) travel the same older path. Moving these four onto the envelo
     plugin's own screen (`ui.main`) set to Ask first is its first use and
     asks on the sheet, as any point does (#59). New
     items from an update sit under "Wants new access" and the plugin's row
-    says so. The state is a chip with a tone (Droidtop/tracker#519, built
-    2026-10-16): Allowed neutral, Ask first caution, Blocked danger, from
-    the notice palette, so what a state costs shows without reading it.
+    says so. The state is a chip (Droidtop/tracker#519, built 2026-10-16);
+    since 2026-11-26 all three are neutral: a refused or ask-first grant
+    is the person's choice, not a fault, and colouring it caution or danger
+    on every row read as a standing warning (the owner: "permanent 'wants
+    more access' badges and BS").
     The tone is the choice's own (`ChoiceOption.tone`); any settings choice
     whose options carry tones is drawn as chips, in Gaming (`MenuRow`'s
     value chip), on the companion and, as coloured bold text, in Standard

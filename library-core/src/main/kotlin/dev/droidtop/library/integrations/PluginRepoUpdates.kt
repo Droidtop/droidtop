@@ -310,10 +310,10 @@ object PluginRepoUpdates {
     /** One sentence for an outcome. */
     fun describe(outcome: RepoUpdateOutcome): String = when (outcome) {
         is RepoUpdateOutcome.Updated -> {
-            val access = if (outcome.newAccess.isEmpty) "" else " It asks for new access, which you decide on its page."
-            "Updated ${outcome.label} to ${outcome.version}.$access"
+            val access = if (outcome.newAccess.isEmpty) "" else ", new access to review"
+            "Updated ${outcome.label} to ${outcome.version}$access."
         }
-        is RepoUpdateOutcome.NeedsApproval -> "${outcome.label} ${outcome.version} is installed; open its page to approve it before it runs."
+        is RepoUpdateOutcome.NeedsApproval -> "${outcome.label} ${outcome.version} to approve."
         is RepoUpdateOutcome.Offered -> "${outcome.label} ${outcome.version} is available to install."
         is RepoUpdateOutcome.Available -> "${outcome.label} ${outcome.version} is available. Update it from Updates."
         is RepoUpdateOutcome.Refused -> "${outcome.label}: not installed, ${outcome.reason}."

@@ -727,7 +727,7 @@ object UpdatesPage {
                                 title = kind.label,
                                 subtitle = when (kind) {
                                     UpdateKinds.Kind.DROIDTOP -> "Android asks to confirm"
-                                    UpdateKinds.Kind.PLUGINS -> "Asks first if it wants more access"
+                                    UpdateKinds.Kind.PLUGINS -> "New access waits for you"
                                     UpdateKinds.Kind.APPS -> "Android may ask"
                                     UpdateKinds.Kind.GAMES -> "Follows Download rules"
                                 },
