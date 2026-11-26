@@ -732,10 +732,11 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
             val refusal = PluginTiers.refusal(record, grantSnapshot)
             val accessBadge = PluginTiers.badge(record, grantSnapshot)
             val caution = PluginTiers.caution(record, grantSnapshot)
+            // Full access is the person's choice: a fact with its way back, one row, never a caution banner (2026-11-26).
             when {
-                refusal != null && PluginTiers.declaresFullTrust(m) -> add(NoticeItem("plugin_${m.id}_access", needsFullAccessNotice(record, refusal)))
+                refusal != null && PluginTiers.declaresFullTrust(m) -> add(needsFullAccessRow(record, refusal))
                 refusal != null -> add(ActionItem(id = "plugin_${m.id}_access", title = "Needs an update", subtitle = refusal))
-                accessBadge != null -> add(NoticeItem("plugin_${m.id}_access", hasFullAccessNotice(record, grantSnapshot)))
+                accessBadge != null -> add(hasFullAccessRow(record))
                 // A granted permission that lets its own code reach past droidtop's checks (gpu.render, docs/plugin-api.md 5.3).
                 caution != null -> add(ActionItem(id = "plugin_${m.id}_access", title = CAUTION_TITLE, subtitle = caution))
             }
@@ -743,30 +744,8 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         // A stopped plugin always has something to press: the newer version when the catalog has one (the row under
         // "Version" below says which), otherwise another go. Switching it back on clears the reason; it stops again if it fails again.
         // A stopped plugin's way forward (Update, or Try again) is the page's primary button.
-        // A main job the person left blocked (mytop-project/tracker#519): high-risk points start unticked, and a plugin whose
-        // point is off looks broken ("search finds nothing") unless its page says why, with the way to turn it on.
-        if (record.trust == PluginTrustState.APPROVED) {
-            m.v2.provides.map { it.point }.distinct().forEach { point ->
-                val registry = dev.droidtop.pluginhost.ExtensionPoints.find(point) ?: return@forEach
-                if (!registry.risk.needsConsent || PluginGrants.provideState(record, grantSnapshot, point) != GrantState.DENIED) return@forEach
-                add(
-                    NoticeItem(
-                        id = "plugin_${m.id}_blocked_$point",
-                        notice = Notice(
-                            tone = NoticeTone.Caution,
-                            title = "${registry.label} is off",
-                            body = "${m.label} can't do its job here until you allow it. ${registry.lets}",
-                            action = NoticeAction("Allow") { ctx ->
-                                withContext(Dispatchers.IO) {
-                                    PluginGrants.forContext(ctx).set(m.id, PluginPermissions.PROVIDE_PREFIX + point, GrantState.GRANTED)
-                                }
-                                withContext(Dispatchers.Main) { pluginsChanged(ctx) }
-                            },
-                        ),
-                    ),
-                )
-            }
-        }
+        // A point the person left off is a value on its row under "What it provides", where pressing it asks; it is a
+        // normal state, never a banner (2026-11-26, the owner: "permanent 'wants more access' badges and BS").
         // The headline above is a plain sentence; what the plugin actually reported is one press away,
         // for its developer or a bug report (docs/SPEC.md 12a, mytop-project/tracker#167), in the Developer menu's
         // rows (docs/SPEC.md 7, "Developer menu").
@@ -794,23 +773,9 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
                 ),
             )
         }
-        resolution.waiting[m.id]?.let { missing ->
-            add(
-                ActionItem(
-                    id = "plugin_${m.id}_waiting",
-                    title = "Needs " + missing.joinToString { it.api },
-                    subtitle = "Waiting for a running plugin",
-                ),
-            )
-        }
-        if (grantSnapshot.wantsNewAccess) {
-            add(
-                ActionItem(
-                    id = "plugin_${m.id}_new_access",
-                    title = "Wants new access",
-                    subtitle = "The update asks for more",
-                ),
-            )
+        // What it waits for, in words: the API ids it names are internals (the header already says "Waiting").
+        resolution.waiting[m.id]?.let {
+            add(ActionItem(id = "plugin_${m.id}_waiting", title = "Waiting for another plugin"))
         }
         // On and off are the page's buttons (Turn on is primary while it is off; Turn off is in More).
         if (m.requestsRoot) {
@@ -852,14 +817,16 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
     val newAccessGroups: List<CatalogGroup> = if (newTicks == null) {
         emptyList()
     } else {
-        pluginConsentGroups(context, record, userKeys, catalogNames, ticks = newTicks, only = freshIds) + CatalogGroup(
+        // Headed by the version that added them; the one answer is the row under them, and nothing ticked declines them.
+        // Either way they stop being new (PluginGrants.answerNew).
+        pluginConsentGroups(context, record, userKeys, catalogNames, ticks = newTicks, only = freshIds)
+            .mapIndexed { i, g -> if (i == 0) g.copy(title = "New in ${m.version}: ${g.title}") else g } + CatalogGroup(
             id = "plugin_${m.id}_new_access_group",
             title = null,
             items = listOf(
                 AsyncActionItem(
                     id = "plugin_${m.id}_new_access_save",
-                    title = "Allow what is ticked",
-                    subtitle = "Changes only the new items",
+                    title = "Allow ticked",
                     run = { ctx, _ ->
                         if (PluginTiers.FULL_TRUST in newTicks && !PluginDangers.askFullAccess(record, update = true)) {
                             "Nothing changed"
@@ -964,12 +931,9 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
         }
         else -> emptySet()
     }
-    val providesGroup = listOf<CatalogItem>(
-        ActionItem(
-            id = "plugin_${m.id}_provides",
-            title = pluginSummary(m, enabledPoints),
-        ),
-    )
+    val providesGroup = providesRows(record, grantSnapshot).ifEmpty {
+        listOf<CatalogItem>(ActionItem(id = "plugin_${m.id}_provides", title = pluginSummary(m, enabledPoints)))
+    }
 
     // What the plugin is for, first (Decky's model, mytop-project/tracker#316): its Quick Menu panel, its settings, its
     // own app and the app it manages. The panel is the same screen the Quick Menu's Plugins section opens, so the
@@ -1471,45 +1435,85 @@ private const val CAUTION_TITLE = "Could reach past droidtop's checks"
 internal val noticeScope = kotlinx.coroutines.MainScope()
 
 /**
- * U4 (docs/SPEC.md 7, "Developer menu", "Notices"; mytop-project/tracker#481): a plugin running with full access says so quietly on its page
- * after it was allowed, with the way back. Limit access takes the grant away when the plugin can run with normal
- * protection, and otherwise turns the plugin off, since it cannot run any other way.
+ * U4 (docs/SPEC.md 7, "Developer menu", "Notices"; mytop-project/tracker#481): a plugin running with full access says so on
+ * its page after it was allowed, with the way back, as one row: the person chose it, so it is a fact with its risk in
+ * plain words, not a caution banner (2026-11-26). Limit takes the grant away when the plugin can run with normal
+ * protection, and otherwise turns the plugin off, since it cannot run any other way (asked first, as it stops it).
  */
-internal fun AppSettingsCatalogs.hasFullAccessNotice(record: dev.droidtop.pluginhost.PluginRecord, grants: PluginGrants.Snapshot): Notice {
+internal fun AppSettingsCatalogs.hasFullAccessRow(record: dev.droidtop.pluginhost.PluginRecord): CatalogItem {
     val m = record.manifest
     val blocker = PluginTiers.containmentBlocker(m)
-    return Notice(
-        tone = NoticeTone.Caution,
-        title = "Has full access",
-        body = "It can use your files and go online freely.",
-        details = accessLine(record, grants) +
-            (blocker?.let { "\nThis plugin can only run with full access ($it), so Limit access turns it off." } ?: ""),
-        action = NoticeAction("Limit access") { ctx ->
+    val limits = blocker == null && PluginTiers.declaresFullTrust(m)
+    return AsyncActionItem(
+        id = "plugin_${m.id}_access",
+        title = "Full access",
+        subtitle = "It can use your files and go online freely",
+        value = if (limits) "Limit" else "Turn off",
+        confirmTitle = if (limits) null else "Turn ${m.label} off? It runs only with full access",
+        run = { ctx, _ ->
             withContext(Dispatchers.IO) {
-                if (blocker == null && PluginTiers.declaresFullTrust(m)) {
-                    PluginGrants.forContext(ctx).set(m.id, PluginTiers.FULL_TRUST, GrantState.DENIED)
-                } else {
-                    PluginStore.setEnabled(ctx, m.id, false)
-                }
+                if (limits) PluginGrants.forContext(ctx).set(m.id, PluginTiers.FULL_TRUST, GrantState.DENIED) else PluginStore.setEnabled(ctx, m.id, false)
             }
-            pluginsChanged(ctx)
+            withContext(Dispatchers.Main) { pluginsChanged(ctx) }
+            if (limits) "Limited" else "Off"
         },
     )
 }
 
-/** A plugin that can only run with full access and was not allowed it: Allow asks in red (D1). */
-internal fun AppSettingsCatalogs.needsFullAccessNotice(record: dev.droidtop.pluginhost.PluginRecord, refusal: String): Notice = Notice(
-    tone = NoticeTone.Caution,
-    title = "Needs full access to work",
-    body = "It won't run until you allow it.",
-    details = refusal,
-    action = NoticeAction("Allow") { ctx ->
+/** A plugin that can only run with full access and was not allowed it: one row, and Allow asks in red (D1). */
+internal fun AppSettingsCatalogs.needsFullAccessRow(record: dev.droidtop.pluginhost.PluginRecord, refusal: String): CatalogItem = AsyncActionItem(
+    id = "plugin_${record.manifest.id}_access",
+    title = "Runs only with full access",
+    subtitle = refusal,
+    value = "Allow",
+    run = { ctx, _ ->
         if (PluginDangers.askFullAccess(record, update = false)) {
             withContext(Dispatchers.IO) { PluginGrants.forContext(ctx).set(record.manifest.id, PluginTiers.FULL_TRUST, GrantState.GRANTED) }
-            pluginsChanged(ctx)
+            withContext(Dispatchers.Main) { pluginsChanged(ctx) }
+            "Allowed"
+        } else {
+            "Not allowed"
         }
     },
 )
+
+/** What a permission or API no registry and no installed plugin names is called: never its id (2026-11-26). */
+internal const val OTHER_ACCESS = "Access from another plugin"
+
+/**
+ * "What it provides" on an approved plugin's page: one row per extension point it declares, the point's name and its
+ * state as the value ("On", "Off", "Ask first"). A point that needs consent and is not on is turned on from its own
+ * row, through the first-use sheet (the person pressed it: the moment of use, docs/SPEC.md "Permissions" 1). This is
+ * where a declined point shows, as a plain value, in place of the "<point> is off" banner (2026-11-26). Empty for a
+ * plugin that is not approved or declares no known point.
+ */
+internal fun AppSettingsCatalogs.providesRows(record: dev.droidtop.pluginhost.PluginRecord, grants: PluginGrants.Snapshot): List<CatalogItem> {
+    if (record.trust != PluginTrustState.APPROVED) return emptyList()
+    val m = record.manifest
+    return m.v2.provides.map { it.point }.distinct().mapNotNull { point ->
+        val registry = ExtensionPoints.find(point) ?: return@mapNotNull null
+        val state = PluginGrants.provideState(record, grants, point)
+        val value = when (state) {
+            GrantState.GRANTED -> "On"
+            GrantState.DENIED -> "Off"
+            GrantState.ASK -> "Ask first"
+        }
+        if (state == GrantState.GRANTED || !registry.risk.needsConsent) {
+            ActionItem(id = "plugin_${m.id}_provides_$point", title = registry.label, value = value)
+        } else {
+            AsyncActionItem(
+                id = "plugin_${m.id}_provides_$point",
+                title = registry.label,
+                value = value,
+                run = { ctx, _ ->
+                    val on = withContext(Dispatchers.IO) { PluginGrants.askPoint(ctx, record, point, evenIfOff = true) }
+                    withContext(Dispatchers.Main) { pluginsChanged(ctx) }
+                    if (on) "On" else value
+                },
+            )
+        }
+    }
+}
 
 /** The subtitle of the full-access row (docs/plugin-api.md 4.6): the one warning, in plain words. */
 internal fun AppSettingsCatalogs.accessLine(record: dev.droidtop.pluginhost.PluginRecord, grants: PluginGrants.Snapshot): String =
@@ -1530,7 +1534,7 @@ internal fun AppSettingsCatalogs.permissionRows(
         if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) continue
         val state = PluginGrants.stateOf(record, snap, declared.id) ?: continue
         val reason = listOfNotNull(PluginPermissions.find(declared.id)?.caution, declared.reason).joinToString(" - ").ifEmpty { null }
-        rows += PermissionRow(declared.id, PluginPermissions.labelFor(declared.id) ?: providerLabels[declared.id] ?: declared.id, reason, PluginGrants.tierOf(declared), state)
+        rows += PermissionRow(declared.id, PluginPermissions.labelFor(declared.id) ?: providerLabels[declared.id] ?: OTHER_ACCESS, reason, PluginGrants.tierOf(declared), state)
     }
     for (entry in m.v2.provides) {
         val point = ExtensionPoints.find(entry.point) ?: continue
@@ -1581,14 +1585,17 @@ internal fun AppSettingsCatalogs.pluginActivityGroups(context: Context, pluginId
     }
     val format = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
     val entries = PluginAudit.forContext(context).entries(pluginId).asReversed().take(ACTIVITY_SHOWN)
+    val developer = DeveloperMenu.on(context)
     val rows = entries.mapIndexed { i, e ->
         ActionItem(
             id = "plugin_${pluginId}_activity_$i",
-            title = (PluginPermissions.labelFor(e.permission) ?: e.permission) + ": " + e.api + " " + e.op,
+            // The permission in words; the API and op it went through are for the plugin's maker (Developer menu).
+            title = PluginPermissions.labelFor(e.permission) ?: OTHER_ACCESS,
             subtitle = listOfNotNull(
                 format.format(java.util.Date(e.atMs)),
                 e.target.takeIf { it.isNotBlank() },
-                if (e.result == "ok") null else "refused or failed: ${e.result}",
+                if (e.result == "ok") null else "Refused",
+                "${e.api}.${e.op}".takeIf { developer },
                 e.via.takeIf { it.isNotEmpty() }?.let { "via ${it.joinToString(" > ")}" },
             ).joinToString(" - "),
         )
@@ -1599,7 +1606,7 @@ internal fun AppSettingsCatalogs.pluginActivityGroups(context: Context, pluginId
         ActionItem(
             id = "plugin_${pluginId}_counts_$day",
             title = day + " - " + counts.sumOf { it.second } + " calls",
-            subtitle = counts.joinToString(", ") { (key, n) -> (PluginPermissions.labelFor(key) ?: key) + " " + n },
+            subtitle = counts.joinToString(", ") { (key, n) -> (PluginPermissions.labelFor(key) ?: OTHER_ACCESS) + " " + n },
         )
     }
     return listOfNotNull(
@@ -1692,10 +1699,11 @@ internal fun AppSettingsCatalogs.pluginPermissionGroups(context: Context, plugin
             title = row.label,
             subtitle = listOfNotNull(row.reason, lastUsed).joinToString(" - ").ifEmpty { null },
             options = listOf(
-                // State chips with tones (mytop-project/tracker#519): what a state costs shows at a glance.
+                // Three choices of equal standing: a refused or ask-first grant is the person's choice, not a fault, so
+                // none is coloured as a warning (2026-11-26; mytop-project/tracker#519 had tinted them caution and danger).
                 dev.droidtop.library.settings.ChoiceOption(GrantState.GRANTED.name, "Allowed"),
-                dev.droidtop.library.settings.ChoiceOption(GrantState.ASK.name, "Ask first", dev.droidtop.library.settings.NoticeTone.Caution),
-                dev.droidtop.library.settings.ChoiceOption(GrantState.DENIED.name, "Blocked", dev.droidtop.library.settings.NoticeTone.Danger),
+                dev.droidtop.library.settings.ChoiceOption(GrantState.ASK.name, "Ask first"),
+                dev.droidtop.library.settings.ChoiceOption(GrantState.DENIED.name, "Blocked"),
             ),
             current = row.state.name,
             onSelect = { ctx, value ->
@@ -1834,7 +1842,8 @@ internal fun AppSettingsCatalogs.providedByGroups(resolution: ApiResolution, cho
             items = shared.map { (api, list) ->
                 dev.droidtop.library.settings.ChoiceItem(
                     id = "plugins_provided_by_$api",
-                    title = api,
+                    // The API's own offer words, as its providers declared them; never its id.
+                    title = list.firstNotNullOfOrNull { p -> p.plugin.manifest.v2.exports.firstOrNull { it.api == api }?.offerLabel() } ?: OTHER_ACCESS,
                     subtitle = "For the plugins that use it",
                     options = list.map { dev.droidtop.library.settings.ChoiceOption(it.plugin.manifest.id, it.plugin.manifest.label) },
                     current = chosen[api]?.takeIf { id -> list.any { it.plugin.manifest.id == id } } ?: list.first().plugin.manifest.id,
