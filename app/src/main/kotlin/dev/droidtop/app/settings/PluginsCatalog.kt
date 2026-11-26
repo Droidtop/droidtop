@@ -1687,11 +1687,10 @@ internal fun AppSettingsCatalogs.pluginPermissionGroups(context: Context, plugin
                     "Last used ${dayFormat.format(java.util.Date(start))}"
                 }.getOrNull()
             }
-        val wanted = if (row.id in snap.wanted) "It tried to use this but could not ask you first" else null
         return dev.droidtop.library.settings.ChoiceItem(
             id = "plugin_${pluginId}_perm_${row.id}",
             title = row.label,
-            subtitle = listOfNotNull(row.reason, wanted, lastUsed).joinToString(" - ").ifEmpty { null },
+            subtitle = listOfNotNull(row.reason, lastUsed).joinToString(" - ").ifEmpty { null },
             options = listOf(
                 // State chips with tones (Droidtop/tracker#519): what a state costs shows at a glance.
                 dev.droidtop.library.settings.ChoiceOption(GrantState.GRANTED.name, "Allowed"),

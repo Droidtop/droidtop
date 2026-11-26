@@ -208,12 +208,23 @@ class PluginGrantsTest {
     }
 
     @Test
-    fun `a wanted note is kept until the user answers`() {
-        grants.set("acme.tool", "net.any", GrantState.ASK)
-        grants.noteWanted("acme.tool", "net.any")
-        assertEquals(setOf("net.any"), grants.read("acme.tool").wanted)
-        grants.set("acme.tool", "net.any", GrantState.GRANTED)
-        assertTrue(grants.read("acme.tool").wanted.isEmpty())
+    fun `Not now is an answer: an update's new item stops being new and stays Ask first`() {
+        val old = plugin(2, "acme.tool", obj("id" to "net.state"))
+        grants.initialiseOnApproval(old)
+        val new = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "clipboard.read"), obj("id" to "net.any"))
+        grants.applyUpdate(old, new)
+        assertTrue(grants.read("acme.tool").wantsNewAccess)
+        grants.putOff("acme.tool", "clipboard.read")
+        val one = grants.read("acme.tool")
+        assertTrue("one new item is still unanswered", one.wantsNewAccess)
+        assertEquals(GrantState.ASK, PluginGrants.stateOf(new, one, "clipboard.read"))
+        assertTrue(PluginRefusals.isNotNow("acme.tool", "clipboard.read"))
+        grants.putOff("acme.tool", "net.any")
+        val both = grants.read("acme.tool")
+        assertFalse("every new item answered, the flag is gone for good", both.wantsNewAccess)
+        assertEquals(GrantState.ASK, PluginGrants.stateOf(new, both, "net.any"))
+        PluginRefusals.forgetNotNow("acme.tool", "clipboard.read")
+        PluginRefusals.forgetNotNow("acme.tool", "net.any")
     }
 
     @Test

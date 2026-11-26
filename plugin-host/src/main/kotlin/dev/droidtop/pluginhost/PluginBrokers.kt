@@ -146,10 +146,6 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         grantStore.set(pluginId, permission, state)
     }
 
-    override fun noteWanted(pluginId: String, permission: String) {
-        grantStore.noteWanted(pluginId, permission)
-    }
-
     override fun audit(pluginId: String, entry: AuditEntry) {
         auditLog.append(pluginId, entry)
     }
@@ -160,7 +156,7 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun notNow(pluginId: String, permission: String): Boolean = PluginRefusals.isNotNow(pluginId, permission)
 
-    override fun rememberNotNow(pluginId: String, permission: String) = PluginRefusals.rememberNotNow(pluginId, permission)
+    override fun rememberNotNow(pluginId: String, permission: String) = grantStore.putOff(pluginId, permission)
 
     override fun noteRefused(pluginId: String, permission: String) = PluginRefusals.noteRefused(pluginId, permission)
 

@@ -33,12 +33,11 @@ interface BrokerEnvironment {
     fun providerChoice(api: String): String?
     fun grants(pluginId: String): PluginGrants.Snapshot
     fun setGrant(pluginId: String, permission: String, state: GrantState)
-    fun noteWanted(pluginId: String, permission: String)
 
     /** Whether the person chose Not now for [permission] of [pluginId] in this run of droidtop ([PluginRefusals]). */
     fun notNow(pluginId: String, permission: String): Boolean = false
 
-    /** Keeps a Not now for the rest of this run, so the same page does not ask on every visit. */
+    /** Keeps a Not now for the rest of this run, so the same page does not ask on every visit; an answer, it ends "new" ([PluginGrants.putOff]). */
     fun rememberNotNow(pluginId: String, permission: String) = Unit
 
     /** The broker refused [permission] to [pluginId]: a page reads it to degrade to that one permission. */
@@ -973,8 +972,8 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
     /**
      * The grant check with the first-use sheet: `granted` passes, `denied`
      * fails, and `ask` shows the sheet only during a user-initiated call.
-     * A call from an event, a schedule or a service fails and leaves a note
-     * that the plugin wants this ("Wants <label>" on its row).
+     * A call from an event, a schedule or a service fails, and nothing is
+     * flagged: Ask first is a state the person chose.
      */
     private fun requireGrant(record: PluginRecord, permission: String, tier: PermissionTier, reason: String?, label: String) {
         fun refuse(message: String): Nothing {
@@ -987,7 +986,6 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
             GrantState.DENIED -> refuse("\"$label\" is turned off for ${record.manifest.label}.")
             GrantState.ASK, null -> {
                 if (!env.userInitiated(pluginId)) {
-                    env.noteWanted(pluginId, permission)
                     refuse("${record.manifest.label} needs you to allow \"$label\".")
                 }
                 // Not now lasts this run of droidtop (Droidtop/tracker#518): the same page does not ask on every visit.

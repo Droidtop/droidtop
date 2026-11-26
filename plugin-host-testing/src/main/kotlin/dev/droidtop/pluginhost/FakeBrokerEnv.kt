@@ -8,7 +8,6 @@ class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
     var now = 1_000_000L
     val records = records.associateBy { it.manifest.id }.toMutableMap()
     val states = mutableMapOf<String, MutableMap<String, GrantState>>()
-    val wanted = mutableListOf<Pair<String, String>>()
     val audits = mutableListOf<Pair<String, AuditEntry>>()
     val prompts = mutableListOf<GrantPromptRequest>()
     var answer = GrantAnswer.ALLOW
@@ -29,9 +28,6 @@ class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
     override fun grants(pluginId: String) = PluginGrants.Snapshot(states[pluginId].orEmpty())
     override fun setGrant(pluginId: String, permission: String, state: GrantState) {
         states.getOrPut(pluginId) { mutableMapOf() }[permission] = state
-    }
-    override fun noteWanted(pluginId: String, permission: String) {
-        wanted += pluginId to permission
     }
     val putOff = mutableSetOf<Pair<String, String>>()
     val refused = mutableListOf<Pair<String, String>>()

@@ -70,9 +70,6 @@ class PrivPackagesRigTest {
         override fun setGrant(pluginId: String, permission: String, state: GrantState) {
             if (pluginId != CALLER) real.setGrant(pluginId, permission, state)
         }
-        override fun noteWanted(pluginId: String, permission: String) {
-            if (pluginId != CALLER) real.noteWanted(pluginId, permission)
-        }
         override fun audit(pluginId: String, entry: dev.droidtop.pluginhost.AuditEntry) {
             if (pluginId != CALLER) real.audit(pluginId, entry)
         }
