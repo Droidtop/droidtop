@@ -1445,7 +1445,11 @@ the facet kind to propose here (Droidtop/tracker#602).
 That's one of the main reasons I designed the facets system, so the app can surface information where it makes
 sense").** A surface that exists to act on an item shows that item's facets in place, inline or as a sheet over the
 current screen; it never navigates to another screen just to reach a facet (first applied on Droidtop/tracker#639: an
-Updates row presents its download facet). In a review, a redirect to reach a facet is a finding.
+Updates row presents its download facet). In a review, a redirect to reach a facet is a finding. Applied to `needs`
+(2026-11-26): a facet whose permission the person turned off is drawn with its own label and "Off", and pressing it asks
+on the first-use sheet right there (full access through its red dialog), instead of opening the plugin's Permissions
+page; nothing names the permission by its id. And an `action`'s `confirm: "danger"` question names what is lost from
+its `sub` ("Clear cache? The index is fetched again"); `confirm` asks "<label>?".
 
 **What facets are (the owner, 2026-10-29: "Facets are 'how a plugin presents information and integrates itself'.
 While a plugin CAN have a full UI, that's unideal, and likely a fallback").** A plugin's own full UI is the fallback for

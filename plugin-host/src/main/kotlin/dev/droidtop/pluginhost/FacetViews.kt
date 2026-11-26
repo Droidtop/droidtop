@@ -64,7 +64,7 @@ object FacetViews {
             // A meter is the host's bar, filled to how much of its maximum it holds, with its figures under it.
             is FacetBody.Meter -> ViewNode.Progress(id, b.label, meterWords(b), meterPercent(b))
             is FacetBody.Chart -> ViewNode.Info(id, b.label, null, chartWords(b))
-            is FacetBody.Action -> ViewNode.Button(id, b.label, b.sub, null, if (b.confirm == "none") null else b.label, action(b.call, id, null))
+            is FacetBody.Action -> ViewNode.Button(id, b.label, b.sub, null, confirmQuestion(b), action(b.call, id, null))
             // Inside a form an input has no call: droidtop only holds its value until the form's submit.
             is FacetBody.Toggle -> ViewNode.Toggle(id, b.label, b.sub, b.value, b.call?.let { action(it, id, "bool") })
             is FacetBody.Choice -> ViewNode.Choice(id, b.label, b.sub, b.options, b.value, b.call?.let { action(it, id, "string") })
@@ -98,7 +98,7 @@ object FacetViews {
         }
         val action = action(submit.call, groupId, null)
         val args = JSONObject(action.argsJson).put(FORM, JSONObject().put("fields", fields).put("required", required))
-        return ViewNode.Button("$groupId.submit", submit.label, submit.sub, null, if (submit.confirm == "none") null else submit.label, action.copy(argsJson = args.toString()))
+        return ViewNode.Button("$groupId.submit", submit.label, submit.sub, null, confirmQuestion(submit), action.copy(argsJson = args.toString()))
     }
 
     /** A list's entries as rows, for a target that draws a list (search results, a watch list). */
@@ -118,6 +118,17 @@ object FacetViews {
             FacetCall.Kind.GRANT -> ViewAction.Kind.GRANT
         }
         return ViewAction(kind, call.op, args.toString())
+    }
+
+    /**
+     * The question droidtop's two-step confirm asks for an action (docs/plugin-api.md 1.10, `action`): none for
+     * `none`; "<label>?" for `confirm`; and for `danger`, the question also names what is lost, from `sub`, as the kind
+     * says ("Clear cache? The index is fetched again"). Pure.
+     */
+    fun confirmQuestion(action: FacetBody.Action): String? = when (action.confirm) {
+        "none" -> null
+        "danger" -> listOfNotNull("${action.label}?", action.sub?.takeIf { it.isNotBlank() }).joinToString(" ")
+        else -> "${action.label}?"
     }
 
     /** A status's state in droidtop's words. */
