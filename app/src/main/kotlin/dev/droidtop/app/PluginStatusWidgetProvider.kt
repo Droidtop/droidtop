@@ -67,10 +67,9 @@ class PluginStatusWidgetProvider : AppWidgetProvider() {
          * -- installed, approved, enabled and re-verified), reading
          * `label`/`value` from its result the same way a real
          * status-tile plugin returns them,
-         * falling back to the manifest's own label and a joined dump of
-         * whatever the plugin returned when it uses different keys --
-         * `status_tile`'s contract names no required keys, so this can't
-         * assume more than that. A plugin that times out or fails is
+         * falling back to the manifest's own label and "OK" when it uses
+         * other keys (`status_tile`'s contract names no required keys, and
+         * a raw key=value dump is not droidtop's language). A plugin that times out or fails is
          * dropped for this refresh, not shown as broken (the approval
          * screen is where a crashed/disabled plugin's own status lives).
          */
@@ -94,9 +93,8 @@ class PluginStatusWidgetProvider : AppWidgetProvider() {
             } ?: return null
             if (!result.ok) return null
             val label = result.values["label"] ?: record.manifest.label
-            val value = result.values["value"] ?: result.values.entries
-                .joinToString(", ") { (k, v) -> "$k=$v" }
-                .ifEmpty { "OK" }
+            // Only the words the plugin gave for the tile; its other keys are its own, never shown raw.
+            val value = result.values["value"] ?: "OK"
             return StatusTile(label, value)
         }
 
