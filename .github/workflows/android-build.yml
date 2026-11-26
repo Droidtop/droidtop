@@ -155,7 +155,34 @@ jobs:
         # without inlining, which is what made droidtop slow before 558.
         # The on-device check APK (app/src/androidTest) comes from the same run, so it matches these APKs; it is never
         # published, only uploaded below for a rig to run with am instrument.
-        run: ./gradlew :app:assembleRelease :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+        run: |
+          # The variants in two Gradle runs, with both daemons stopped between them. Since the Gradle home cache
+          # (restored from an earlier main build) stopped matching, every run is a cold build, and a cold build of
+          # both variants in one run fills the 15.7 GB runner: sampled every 15 seconds (Android build 45364871851)
+          # the Gradle daemon was 9.2 GB resident beside a 4.4 GB Kotlin daemon, swap was full with 425 MB available,
+          # and the runner was lost while merging the debug resources. The debug variant alone, cold, finishes in
+          # 9m43s (45341667273). A memory line every 30 seconds stays in the log, so a run that is lost shows what
+          # was using the machine.
+          (
+            while true; do
+              echo "memory $(date -u +%T) $(free -m | awk '/Mem:/{print "used="$3" avail="$7}') swap=$(free -m | awk '/Swap:/{print $3}') top=$(ps -eo rss,comm --sort=-rss | sed -n 2,3p | paste -sd ';')"
+              sleep 30
+            done
+          ) &
+          sampler=$!
+          set +e
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            ./gradlew --stop
+            pkill -f KotlinCompileDaemon || true
+            sleep 5
+            free -m
+            ./gradlew :app:assembleRelease --stacktrace
+            code=$?
+          fi
+          kill "$sampler" 2>/dev/null
+          exit "$code"
 
       - name: Write release-info.json
         # Beside the APKs, in the same artifact, so that release-promote.yml
