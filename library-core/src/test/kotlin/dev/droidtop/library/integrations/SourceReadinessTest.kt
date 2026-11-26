@@ -52,7 +52,9 @@ class SourceReadinessTest {
         assertTrue(of(point = GrantState.ASK)!!.askable)
         // Not approved yet: the whole plugin waits, which its page answers, not the point sheet.
         assertFalse(of(trust = PluginTrustState.PENDING, point = GrantState.ASK)!!.askable)
-        assertFalse(of(point = GrantState.DENIED)!!.askable)
+        // Left off at approval (high-risk points start unticked): the search row asks in place too (2026-11-26).
+        assertTrue(of(point = GrantState.DENIED)!!.askable)
+        assertFalse(of(trust = PluginTrustState.DENIED, point = GrantState.DENIED)!!.askable)
         assertFalse(of(enabled = false, point = GrantState.ASK)!!.askable)
     }
 

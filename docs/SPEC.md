@@ -29238,6 +29238,14 @@ match" for games Gaming listed (console, 2026-10-17).
   the press; its index goes when its plugin is removed. A source that
   publishes its whole list fills its index in bulk on a refresh that is on by
   default.
+  The sources that cannot answer (waiting for approval, not allowed to give games,
+  off, stopped) are listed under the rows in both, typing and pressed (2026-11-26,
+  the owner: "I don't seem to be able to use downloader plugins": typing listed
+  none, so a source approved with Get games left unticked, the default for a
+  high-risk point, was simply absent). One whose only lack is that point, Ask first
+  or left off alike, reads "<Source> can't get games yet" and a press asks on the
+  first-use sheet (`AcquireContentSources.askSource`); the same ask is Game
+  sources' way on for it.
 - **Streaming, off the main thread.** The device's rows are emitted at once.
   Once asked, the sources answer after the text has rested 350 ms, concurrently,
   each bounded by `PER_SOURCE_TIMEOUT_MS`, and a source's rows join the list
